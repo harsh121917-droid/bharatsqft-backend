@@ -8,6 +8,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const app = express();
+app.set('trust proxy', 1); // add this line
 
 /* ---------- CORS ---------- */
 app.use(cors({ origin: "*", credentials: true }));
