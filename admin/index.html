@@ -42,7 +42,6 @@
             display: flex;
         }
 
-        /* ── Sidebar ── */
         .sidebar {
             width: var(--sidebar);
             background: var(--surface);
@@ -60,7 +59,6 @@
             font-family: 'DM Serif Display', serif;
             font-size: 1.2rem;
             color: var(--accent);
-            letter-spacing: 0.5px;
         }
 
         .logo span {
@@ -113,12 +111,6 @@
             border-top: 1px solid var(--border);
         }
 
-        .admin-badge {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         .avatar {
             width: 32px;
             height: 32px;
@@ -133,21 +125,22 @@
             flex-shrink: 0;
         }
 
-        .admin-info {
-            font-size: 13px;
+        .admin-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .admin-info .name {
+            font-size: 13px;
             font-weight: 500;
-            color: var(--text);
         }
 
         .admin-info .role {
-            color: var(--muted);
             font-size: 11px;
+            color: var(--muted);
         }
 
-        /* ── Main ── */
         .main {
             margin-left: var(--sidebar);
             flex: 1;
@@ -174,12 +167,6 @@
             font-weight: 600;
         }
 
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
         .btn-logout {
             background: none;
             border: 1px solid var(--border);
@@ -202,7 +189,6 @@
             flex: 1;
         }
 
-        /* ── Login ── */
         #login-page {
             position: fixed;
             inset: 0;
@@ -246,7 +232,9 @@
             font-weight: 500;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             background: var(--surface2);
             border: 1px solid var(--border);
@@ -259,8 +247,15 @@
             transition: border-color 0.15s;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
             border-color: var(--accent);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 90px;
         }
 
         .btn-primary {
@@ -274,7 +269,6 @@
             font-weight: 600;
             cursor: pointer;
             font-family: var(--font);
-            margin-top: 0.5rem;
             transition: opacity 0.15s;
         }
 
@@ -289,10 +283,9 @@
             text-align: center;
         }
 
-        /* ── Stats Grid ── */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -326,27 +319,36 @@
         }
 
         .c-amber {
-            color: var(--accent);
+            color: var(--accent)
         }
 
         .c-green {
-            color: var(--success);
+            color: var(--success)
         }
 
         .c-blue {
-            color: var(--info);
+            color: var(--info)
         }
 
         .c-red {
-            color: var(--danger);
+            color: var(--danger)
         }
 
-        /* ── Section ── */
+        .c-purple {
+            color: #9b59b6
+        }
+
+        .c-teal {
+            color: #1abc9c
+        }
+
         .section-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .section-title {
@@ -370,7 +372,25 @@
             border-color: var(--accent);
         }
 
-        /* ── Table ── */
+        .btn-add {
+            background: var(--accent);
+            color: #0f1117;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-add:hover {
+            opacity: 0.9;
+        }
+
         .table-wrap {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -408,7 +428,6 @@
             background: rgba(255, 255, 255, 0.02);
         }
 
-        /* ── Badges ── */
         .badge {
             display: inline-block;
             padding: 3px 10px;
@@ -417,6 +436,21 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        .badge-published {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--success);
+        }
+
+        .badge-unpublished {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--danger);
+        }
+
+        .badge-draft {
+            background: rgba(122, 128, 153, 0.15);
+            color: var(--muted);
         }
 
         .badge-new {
@@ -459,11 +493,10 @@
             color: var(--danger);
         }
 
-        /* ── Action Buttons ── */
         .btn-sm {
             border: none;
             border-radius: 6px;
-            padding: 5px 12px;
+            padding: 5px 10px;
             font-size: 12px;
             cursor: pointer;
             font-family: var(--font);
@@ -490,7 +523,11 @@
             color: var(--success);
         }
 
-        /* ── Select ── */
+        .btn-warning {
+            background: rgba(243, 156, 18, 0.15);
+            color: var(--warning);
+        }
+
         .status-select {
             background: var(--surface2);
             border: 1px solid var(--border);
@@ -502,7 +539,6 @@
             cursor: pointer;
         }
 
-        /* ── Empty ── */
         .empty {
             text-align: center;
             padding: 3rem;
@@ -517,7 +553,6 @@
             opacity: 0.3;
         }
 
-        /* ── Loading ── */
         .loading {
             text-align: center;
             padding: 2rem;
@@ -525,7 +560,6 @@
             font-size: 14px;
         }
 
-        /* ── Pages ── */
         .page {
             display: none;
         }
@@ -534,7 +568,6 @@
             display: block;
         }
 
-        /* ── Toast ── */
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -565,25 +598,191 @@
             border-color: var(--danger);
             color: var(--danger);
         }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            padding: 1rem;
+        }
+
+        .modal-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 680px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--surface);
+            z-index: 1;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .modal-close:hover {
+            background: var(--surface2);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            background: var(--surface2);
+            border: none;
+            color: var(--muted);
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: var(--font);
+        }
+
+        .btn-save {
+            background: var(--accent);
+            border: none;
+            color: #0f1117;
+            padding: 9px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-section {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 1.25rem 0 0.75rem;
+            font-weight: 600;
+        }
+
+        .amenity-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .amenity-tag {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .amenity-tag button {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+        }
+
+        .amenity-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .amenity-input-row input {
+            flex: 1;
+        }
+
+        .btn-add-small {
+            background: var(--accent);
+            border: none;
+            color: #0f1117;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font);
+            white-space: nowrap;
+        }
+
+        .prop-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: var(--surface2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 18px;
+        }
     </style>
 </head>
 
 <body>
 
-    <!-- Login Page -->
+    <!-- Login -->
     <div id="login-page">
         <div class="login-box">
             <h1>Bharat SQFT</h1>
             <p>Admin Dashboard — Sign in to continue</p>
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="login-email" placeholder="admin@bharatsqft.com" />
-            </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="login-password" placeholder="••••••••"
-                    onkeydown="if(event.key==='Enter') doLogin()" />
-            </div>
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" /></div>
+            <div class="form-group"><label>Password</label><input type="password" id="login-password"
+                    onkeydown="if(event.key==='Enter') doLogin()" /></div>
             <button class="btn-primary" onclick="doLogin()">Sign In</button>
             <div class="error-msg" id="login-error"></div>
         </div>
@@ -593,15 +792,13 @@
     <aside class="sidebar" id="sidebar" style="display:none">
         <div class="logo">Bharat SQFT <span>Admin Panel</span></div>
         <nav class="nav">
-            <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
-                <i class="fas fa-chart-pie"></i> Dashboard
-            </div>
-            <div class="nav-item" onclick="showPage('enquiries')" id="nav-enquiries">
-                <i class="fas fa-envelope"></i> Enquiries
-            </div>
-            <div class="nav-item" onclick="showPage('users')" id="nav-users">
-                <i class="fas fa-users"></i> Users
-            </div>
+            <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><i
+                    class="fas fa-chart-pie"></i> Dashboard</div>
+            <div class="nav-item" onclick="showPage('properties')" id="nav-properties"><i class="fas fa-building"></i>
+                Properties</div>
+            <div class="nav-item" onclick="showPage('enquiries')" id="nav-enquiries"><i class="fas fa-envelope"></i>
+                Enquiries</div>
+            <div class="nav-item" onclick="showPage('users')" id="nav-users"><i class="fas fa-users"></i> Users</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -618,7 +815,7 @@
     <div class="main" id="main-wrap" style="display:none">
         <div class="topbar">
             <div class="page-title" id="topbar-title">Dashboard</div>
-            <div class="topbar-right">
+            <div style="display:flex;align-items:center;gap:1rem">
                 <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </div>
@@ -629,11 +826,11 @@
             <div class="page active" id="page-dashboard">
                 <div class="stats-grid" id="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-label">Total Users</div><i class="fas fa-users stat-icon c-blue"></i>
+                        <div class="stat-label">Users</div><i class="fas fa-users stat-icon c-blue"></i>
                         <div class="stat-value c-blue" id="stat-users">—</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Total Enquiries</div><i class="fas fa-envelope stat-icon c-amber"></i>
+                        <div class="stat-label">Enquiries</div><i class="fas fa-envelope stat-icon c-amber"></i>
                         <div class="stat-value c-amber" id="stat-total">—</div>
                     </div>
                     <div class="stat-card">
@@ -644,12 +841,38 @@
                         <div class="stat-label">Resolved</div><i class="fas fa-check-circle stat-icon c-red"></i>
                         <div class="stat-value c-red" id="stat-resolved">—</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Properties</div><i class="fas fa-building stat-icon c-purple"></i>
+                        <div class="stat-value c-purple" id="stat-props">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Published</div><i class="fas fa-globe stat-icon c-teal"></i>
+                        <div class="stat-value c-teal" id="stat-published">—</div>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <div
-                        style="padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-size:14px; font-weight:600;">
+                        style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:14px;font-weight:600">
                         Recent Enquiries</div>
                     <div id="recent-enquiries-body">
+                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Properties -->
+            <div class="page" id="page-properties">
+                <div class="section-header">
+                    <div class="section-title">Property Listings</div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <input class="search-bar" placeholder="🔍 Search properties..."
+                            oninput="filterProperties(this.value)" />
+                        <button class="btn-add" onclick="openPropertyModal()"><i class="fas fa-plus"></i> Add
+                            Property</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <div id="properties-body">
                         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                     </div>
                 </div>
@@ -659,7 +882,7 @@
             <div class="page" id="page-enquiries">
                 <div class="section-header">
                     <div class="section-title">All Enquiries</div>
-                    <input class="search-bar" placeholder="🔍  Search enquiries..."
+                    <input class="search-bar" placeholder="🔍 Search enquiries..."
                         oninput="filterEnquiries(this.value)" />
                 </div>
                 <div class="table-wrap">
@@ -673,7 +896,7 @@
             <div class="page" id="page-users">
                 <div class="section-header">
                     <div class="section-title">All Users</div>
-                    <input class="search-bar" placeholder="🔍  Search users..." oninput="filterUsers(this.value)" />
+                    <input class="search-bar" placeholder="🔍 Search users..." oninput="filterUsers(this.value)" />
                 </div>
                 <div class="table-wrap">
                     <div id="users-body">
@@ -685,36 +908,147 @@
         </div>
     </div>
 
+    <!-- Property Modal -->
+    <div class="modal-overlay" id="prop-modal" style="display:none">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="modal-title">Add Property</h3>
+                <button class="modal-close" onclick="closePropertyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+
+                <div class="form-section">Basic Info</div>
+                <div class="form-group"><label>Property Title *</label><input type="text" id="p-title"
+                        placeholder="e.g. Skyline Penthouse, Bandra West" /></div>
+                <div class="form-group"><label>Description *</label><textarea id="p-description"
+                        placeholder="Describe the property..."></textarea></div>
+
+                <div class="form-section">Location</div>
+                <div class="form-row">
+                    <div class="form-group"><label>Address</label><input type="text" id="p-address"
+                            placeholder="Street / Society" /></div>
+                    <div class="form-group"><label>City *</label><input type="text" id="p-city" placeholder="Mumbai" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>State</label><input type="text" id="p-state"
+                            placeholder="Maharashtra" /></div>
+                    <div class="form-group"><label>Pincode</label><input type="text" id="p-pincode"
+                            placeholder="400050" /></div>
+                </div>
+
+                <div class="form-section">Price & Details</div>
+                <div class="form-row-3">
+                    <div class="form-group"><label>Price (₹) *</label><input type="number" id="p-price"
+                            placeholder="4200000" /></div>
+                    <div class="form-group"><label>Price Label</label><input type="text" id="p-price-label"
+                            placeholder="onwards / per month" /></div>
+                    <div class="form-group"><label>Property Type</label>
+                        <select id="p-type">
+                            <option value="apartment">Apartment</option>
+                            <option value="villa">Villa</option>
+                            <option value="penthouse">Penthouse</option>
+                            <option value="plot">Plot</option>
+                            <option value="commercial">Commercial</option>
+                            <option value="farmhouse">Farmhouse</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>BHK</label>
+                        <select id="p-bhk">
+                            <option value="">Select</option>
+                            <option value="1BHK">1 BHK</option>
+                            <option value="2BHK">2 BHK</option>
+                            <option value="3BHK">3 BHK</option>
+                            <option value="4BHK">4 BHK</option>
+                            <option value="5BHK+">5 BHK+</option>
+                            <option value="Studio">Studio</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Area (sqft)</label><input type="number" id="p-area"
+                            placeholder="2400" /></div>
+                </div>
+
+                <div class="form-section">Amenities</div>
+                <div class="amenity-input-row">
+                    <input type="text" id="amenity-input" placeholder="e.g. Swimming Pool"
+                        onkeydown="if(event.key==='Enter'){addAmenity();event.preventDefault()}" />
+                    <button class="btn-add-small" onclick="addAmenity()">+ Add</button>
+                </div>
+                <div class="amenity-tags" id="amenity-tags"></div>
+
+                <div class="form-section">Contact Info</div>
+                <div class="form-row-3">
+                    <div class="form-group"><label>Contact Name</label><input type="text" id="p-contact-name"
+                            placeholder="Agent Name" /></div>
+                    <div class="form-group"><label>Phone</label><input type="text" id="p-contact-phone"
+                            placeholder="+91 98765 43210" /></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="p-contact-email"
+                            placeholder="agent@email.com" /></div>
+                </div>
+
+                <div class="form-section">SEO</div>
+                <div class="form-group"><label>URL Slug</label><input type="text" id="p-slug"
+                        placeholder="auto-generated from title" /></div>
+                <div class="form-group"><label>Meta Title</label><input type="text" id="p-meta-title" /></div>
+                <div class="form-group"><label>Meta Description</label><textarea id="p-meta-desc"
+                        style="min-height:60px"></textarea></div>
+
+                <div class="form-section">Status</div>
+                <div class="form-group">
+                    <select id="p-status">
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="unpublished">Unpublished</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-top:8px">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="p-featured" style="width:auto" />
+                        <span>Mark as Featured</span>
+                    </label>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closePropertyModal()">Cancel</button>
+                <button class="btn-save" onclick="saveProperty()" id="save-btn">Save Property</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
-        const API = 'https://bharatsqft-backend-production-e30b.up.railway.app/api';
+        const API = 'https://bharatsqft-backend-production.up.railway.app/api';
         let TOKEN = localStorage.getItem('bsqft_token') || '';
         let adminUser = null;
-        let allEnquiries = [], allUsers = [];
+        let allEnquiries = [], allUsers = [], allProperties = [];
+        let editingPropertyId = null;
+        let amenities = [];
 
         /* ── Auth ── */
         async function doLogin() {
             const email = document.getElementById('login-email').value.trim();
-            const password = document.getElementById('login-password').value;
-            const errEl = document.getElementById('login-error');
-            errEl.textContent = '';
-            if (!email || !password) { errEl.textContent = 'Please fill all fields'; return; }
+            const pass = document.getElementById('login-password').value;
+            const err = document.getElementById('login-error');
+            err.textContent = '';
             try {
-                const res = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+                const res = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pass }) });
                 const data = await res.json();
-                if (!data.success) { errEl.textContent = data.message; return; }
-                if (data.user.role !== 'admin') { errEl.textContent = 'Access denied. Admin only.'; return; }
-                TOKEN = data.token;
-                adminUser = data.user;
+                if (!data.success) { err.textContent = data.message; return; }
+                if (data.user.role !== 'admin') { err.textContent = 'Admin access only.'; return; }
+                TOKEN = data.token; adminUser = data.user;
                 localStorage.setItem('bsqft_token', TOKEN);
                 showApp();
-            } catch (e) { errEl.textContent = 'Connection error. Is server running?'; }
+            } catch (e) { err.textContent = 'Connection error.'; }
         }
 
         function doLogout() {
-            localStorage.removeItem('bsqft_token');
-            TOKEN = ''; adminUser = null;
+            localStorage.removeItem('bsqft_token'); TOKEN = ''; adminUser = null;
             document.getElementById('login-page').style.display = 'flex';
             document.getElementById('sidebar').style.display = 'none';
             document.getElementById('main-wrap').style.display = 'none';
@@ -731,7 +1065,6 @@
             await loadDashboard();
         }
 
-        /* ── Auto-login if token exists ── */
         async function tryAutoLogin() {
             if (!TOKEN) return;
             try {
@@ -739,22 +1072,22 @@
                 const data = await res.json();
                 if (data.success && data.user.role === 'admin') { adminUser = data.user; showApp(); }
                 else { localStorage.removeItem('bsqft_token'); TOKEN = ''; }
-            } catch (e) { /* server offline */ }
+            } catch (e) { }
         }
 
-        /* ── Navigation ── */
+        /* ── Nav ── */
         function showPage(name) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', enquiries: 'Enquiries', users: 'Users' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users' };
             document.getElementById('topbar-title').textContent = titles[name];
+            if (name === 'properties') loadProperties();
             if (name === 'enquiries') loadEnquiries();
             if (name === 'users') loadUsers();
         }
 
-        /* ── API Helper ── */
         async function api(path, opts = {}) {
             const res = await fetch(`${API}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`, ...(opts.headers || {}) } });
             return res.json();
@@ -768,32 +1101,200 @@
                 document.getElementById('stat-total').textContent = data.data.totalEnquiries;
                 document.getElementById('stat-new').textContent = data.data.newEnquiries;
                 document.getElementById('stat-resolved').textContent = data.data.resolvedEnquiries;
+                document.getElementById('stat-props').textContent = data.data.totalProperties ?? '—';
+                document.getElementById('stat-published').textContent = data.data.publishedProperties ?? '—';
             }
             const eq = await api('/admin/enquiries?limit=5');
             const el = document.getElementById('recent-enquiries-body');
-            if (eq.success && eq.data.length) {
-                el.innerHTML = renderEnquiryTable(eq.data, false);
-            } else {
-                el.innerHTML = `<div class="empty"><i class="fas fa-inbox"></i>No enquiries yet</div>`;
-            }
+            el.innerHTML = eq.success && eq.data.length ? renderEnquiryTable(eq.data, false) : `<div class="empty"><i class="fas fa-inbox"></i>No enquiries yet</div>`;
+        }
+
+        /* ── Properties ── */
+        async function loadProperties() {
+            document.getElementById('properties-body').innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+            const data = await api('/admin/properties?limit=100');
+            if (data.success) { allProperties = data.data; renderProperties(allProperties); }
+            else document.getElementById('properties-body').innerHTML = `<div class="empty">Failed to load</div>`;
+        }
+
+        function filterProperties(q) {
+            const f = allProperties.filter(p => p.title.toLowerCase().includes(q.toLowerCase()) || (p.location?.city || '').toLowerCase().includes(q.toLowerCase()));
+            renderProperties(f);
+        }
+
+        function renderProperties(data) {
+            const el = document.getElementById('properties-body');
+            if (!data.length) { el.innerHTML = `<div class="empty"><i class="fas fa-building"></i>No properties yet. Click "Add Property" to create one.</div>`; return; }
+            const rows = data.map(p => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="prop-img">${p.images?.length ? `<img src="${p.images[0].url}" style="width:40px;height:40px;border-radius:6px;object-fit:cover"/>` : '<i class="fas fa-building"></i>'}</div>
+          <div>
+            <div style="font-weight:600">${p.title}</div>
+            <div style="color:var(--muted);font-size:12px">${p.location?.city || '—'}, ${p.location?.state || ''}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge badge-${p.propertyType}" style="background:rgba(52,152,219,0.1);color:var(--info)">${p.propertyType}</span></td>
+      <td style="font-weight:600;color:var(--accent)">₹${formatPrice(p.price?.amount)}</td>
+      <td>${p.bhk || '—'}</td>
+      <td><span class="badge badge-${p.status}">${p.status}</span></td>
+      <td style="color:var(--muted);font-size:12px">${new Date(p.createdAt).toLocaleDateString('en-IN')}</td>
+      <td>
+        <button class="btn-sm btn-warning" onclick="togglePublish('${p._id}','${p.status}')" title="${p.status === 'published' ? 'Unpublish' : 'Publish'}">
+          <i class="fas fa-${p.status === 'published' ? 'eye-slash' : 'eye'}"></i>
+        </button>
+        <button class="btn-sm btn-info" style="margin-left:4px" onclick="editProperty('${p._id}')"><i class="fas fa-edit"></i></button>
+        <button class="btn-sm btn-danger" style="margin-left:4px" onclick="deleteProperty('${p._id}')"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+            el.innerHTML = `<table><thead><tr><th>Property</th><th>Type</th><th>Price</th><th>BHK</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+
+        function formatPrice(n) {
+            if (!n) return '—';
+            if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
+            if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
+            return n.toLocaleString('en-IN');
+        }
+
+        /* ── Property Modal ── */
+        function openPropertyModal(data) {
+            editingPropertyId = data?._id || null;
+            amenities = data?.amenities ? [...data.amenities] : [];
+            document.getElementById('modal-title').textContent = data ? 'Edit Property' : 'Add Property';
+            document.getElementById('p-title').value = data?.title || '';
+            document.getElementById('p-description').value = data?.description || '';
+            document.getElementById('p-address').value = data?.location?.address || '';
+            document.getElementById('p-city').value = data?.location?.city || '';
+            document.getElementById('p-state').value = data?.location?.state || '';
+            document.getElementById('p-pincode').value = data?.location?.pincode || '';
+            document.getElementById('p-price').value = data?.price?.amount || '';
+            document.getElementById('p-price-label').value = data?.price?.label || '';
+            document.getElementById('p-type').value = data?.propertyType || 'apartment';
+            document.getElementById('p-bhk').value = data?.bhk || '';
+            document.getElementById('p-area').value = data?.area || '';
+            document.getElementById('p-contact-name').value = data?.contact?.name || '';
+            document.getElementById('p-contact-phone').value = data?.contact?.phone || '';
+            document.getElementById('p-contact-email').value = data?.contact?.email || '';
+            document.getElementById('p-slug').value = data?.seo?.slug || '';
+            document.getElementById('p-meta-title').value = data?.seo?.metaTitle || '';
+            document.getElementById('p-meta-desc').value = data?.seo?.metaDescription || '';
+            document.getElementById('p-status').value = data?.status || 'draft';
+            document.getElementById('p-featured').checked = data?.featured || false;
+            renderAmenityTags();
+            document.getElementById('prop-modal').style.display = 'flex';
+        }
+
+        function closePropertyModal() {
+            document.getElementById('prop-modal').style.display = 'none';
+            editingPropertyId = null; amenities = [];
+        }
+
+        function addAmenity() {
+            const val = document.getElementById('amenity-input').value.trim();
+            if (!val) return;
+            amenities.push(val);
+            document.getElementById('amenity-input').value = '';
+            renderAmenityTags();
+        }
+
+        function removeAmenity(i) {
+            amenities.splice(i, 1);
+            renderAmenityTags();
+        }
+
+        function renderAmenityTags() {
+            document.getElementById('amenity-tags').innerHTML = amenities.map((a, i) => `
+    <div class="amenity-tag">${a}<button onclick="removeAmenity(${i})">&times;</button></div>`).join('');
+        }
+
+        async function saveProperty() {
+            const title = document.getElementById('p-title').value.trim();
+            const desc = document.getElementById('p-description').value.trim();
+            const price = document.getElementById('p-price').value;
+            const city = document.getElementById('p-city').value.trim();
+            if (!title || !desc || !price || !city) { toast('Title, description, price and city are required', 'error'); return; }
+
+            const body = {
+                title, description: desc,
+                location: {
+                    address: document.getElementById('p-address').value.trim(),
+                    city,
+                    state: document.getElementById('p-state').value.trim(),
+                    pincode: document.getElementById('p-pincode').value.trim(),
+                },
+                price: {
+                    amount: +price,
+                    label: document.getElementById('p-price-label').value.trim(),
+                },
+                propertyType: document.getElementById('p-type').value,
+                bhk: document.getElementById('p-bhk').value,
+                area: +document.getElementById('p-area').value || undefined,
+                amenities,
+                contact: {
+                    name: document.getElementById('p-contact-name').value.trim(),
+                    phone: document.getElementById('p-contact-phone').value.trim(),
+                    email: document.getElementById('p-contact-email').value.trim(),
+                },
+                seo: {
+                    slug: document.getElementById('p-slug').value.trim(),
+                    metaTitle: document.getElementById('p-meta-title').value.trim(),
+                    metaDescription: document.getElementById('p-meta-desc').value.trim(),
+                },
+                status: document.getElementById('p-status').value,
+                featured: document.getElementById('p-featured').checked,
+            };
+
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true; btn.textContent = 'Saving...';
+
+            try {
+                const data = editingPropertyId
+                    ? await api(`/admin/properties/${editingPropertyId}`, { method: 'PUT', body: JSON.stringify(body) })
+                    : await api('/admin/properties', { method: 'POST', body: JSON.stringify(body) });
+
+                if (data.success) {
+                    toast(editingPropertyId ? 'Property updated!' : 'Property created!', 'success');
+                    closePropertyModal();
+                    loadProperties();
+                    loadDashboard();
+                } else {
+                    toast(data.message || 'Error saving', 'error');
+                }
+            } catch (e) { toast('Connection error', 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Save Property'; }
+        }
+
+        async function editProperty(id) {
+            const data = await api(`/admin/properties/${id}`);
+            if (data.success) openPropertyModal(data.data);
+        }
+
+        async function deleteProperty(id) {
+            if (!confirm('Delete this property?')) return;
+            const data = await api(`/admin/properties/${id}`, { method: 'DELETE' });
+            if (data.success) { toast('Deleted', 'success'); loadProperties(); loadDashboard(); }
+            else toast('Delete failed', 'error');
+        }
+
+        async function togglePublish(id, status) {
+            const data = await api(`/admin/properties/${id}/toggle`, { method: 'PATCH' });
+            if (data.success) { toast(`Property ${data.status}`, 'success'); loadProperties(); loadDashboard(); }
+            else toast('Toggle failed', 'error');
         }
 
         /* ── Enquiries ── */
         async function loadEnquiries() {
-            const el = document.getElementById('enquiries-body');
-            el.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+            document.getElementById('enquiries-body').innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
             const data = await api('/admin/enquiries?limit=100');
-            if (data.success) { allEnquiries = data.data; el.innerHTML = renderEnquiryTable(allEnquiries, true); }
-            else el.innerHTML = `<div class="empty">Failed to load</div>`;
+            if (data.success) { allEnquiries = data.data; document.getElementById('enquiries-body').innerHTML = renderEnquiryTable(allEnquiries, true); }
         }
 
         function filterEnquiries(q) {
-            const filtered = allEnquiries.filter(e =>
-                e.name.toLowerCase().includes(q.toLowerCase()) ||
-                e.email.toLowerCase().includes(q.toLowerCase()) ||
-                e.message.toLowerCase().includes(q.toLowerCase())
-            );
-            document.getElementById('enquiries-body').innerHTML = renderEnquiryTable(filtered, true);
+            const f = allEnquiries.filter(e => e.name.toLowerCase().includes(q.toLowerCase()) || e.email.toLowerCase().includes(q.toLowerCase()) || e.message.toLowerCase().includes(q.toLowerCase()));
+            document.getElementById('enquiries-body').innerHTML = renderEnquiryTable(f, true);
         }
 
         function renderEnquiryTable(data, showActions) {
@@ -802,11 +1303,11 @@
     <tr>
       <td><strong>${e.name}</strong><br><span style="color:var(--muted);font-size:12px">${e.email}</span></td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.message}</td>
-      <td><span class="badge badge-${e.type === 'property' ? 'info' : 'user'}">${e.type}</span></td>
-      <td>${statusBadge(e.status)}</td>
+      <td><span class="badge" style="background:rgba(52,152,219,0.1);color:var(--info)">${e.type}</span></td>
+      <td><span class="badge badge-${e.status}">${e.status.replace('_', ' ')}</span></td>
       <td style="color:var(--muted);font-size:12px">${new Date(e.createdAt).toLocaleDateString('en-IN')}</td>
       ${showActions ? `<td>
-        <select class="status-select" onchange="updateEnquiryStatus('${e._id}', this.value)">
+        <select class="status-select" onchange="updateEnquiryStatus('${e._id}',this.value)">
           <option value="new"         ${e.status === 'new' ? 'selected' : ''}>New</option>
           <option value="in_progress" ${e.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
           <option value="resolved"    ${e.status === 'resolved' ? 'selected' : ''}>Resolved</option>
@@ -815,15 +1316,7 @@
         <button class="btn-sm btn-danger" style="margin-left:6px" onclick="deleteEnquiry('${e._id}')"><i class="fas fa-trash"></i></button>
       </td>` : ''}
     </tr>`).join('');
-            return `<table><thead><tr>
-    <th>Contact</th><th>Message</th><th>Type</th><th>Status</th><th>Date</th>
-    ${showActions ? '<th>Actions</th>' : ''}
-  </tr></thead><tbody>${rows}</tbody></table>`;
-        }
-
-        function statusBadge(s) {
-            const map = { new: 'badge-new', in_progress: 'badge-progress', resolved: 'badge-resolved', closed: 'badge-closed' };
-            return `<span class="badge ${map[s] || 'badge-user'}">${s.replace('_', ' ')}</span>`;
+            return `<table><thead><tr><th>Contact</th><th>Message</th><th>Type</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>`;
         }
 
         async function updateEnquiryStatus(id, status) {
@@ -836,55 +1329,39 @@
             if (!confirm('Delete this enquiry?')) return;
             const data = await api(`/admin/enquiries/${id}`, { method: 'DELETE' });
             if (data.success) { toast('Deleted', 'success'); loadEnquiries(); loadDashboard(); }
-            else toast('Delete failed', 'error');
         }
 
         /* ── Users ── */
         async function loadUsers() {
-            const el = document.getElementById('users-body');
-            el.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+            document.getElementById('users-body').innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
             const data = await api('/admin/users?limit=100');
-            if (data.success) { allUsers = data.data; el.innerHTML = renderUsersTable(allUsers); }
-            else el.innerHTML = `<div class="empty">Failed to load</div>`;
+            if (data.success) { allUsers = data.data; document.getElementById('users-body').innerHTML = renderUsersTable(allUsers); }
         }
 
         function filterUsers(q) {
-            const filtered = allUsers.filter(u =>
-                u.name.toLowerCase().includes(q.toLowerCase()) ||
-                u.email.toLowerCase().includes(q.toLowerCase())
-            );
-            document.getElementById('users-body').innerHTML = renderUsersTable(filtered);
+            const f = allUsers.filter(u => u.name.toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()));
+            document.getElementById('users-body').innerHTML = renderUsersTable(f);
         }
 
         function renderUsersTable(data) {
             if (!data.length) return `<div class="empty"><i class="fas fa-users"></i>No users found</div>`;
             const rows = data.map(u => `
     <tr>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="avatar" style="width:30px;height:30px;font-size:12px">${u.name[0].toUpperCase()}</div>
-          <div><strong>${u.name}</strong></div>
-        </div>
-      </td>
+      <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.name[0].toUpperCase()}</div><strong>${u.name}</strong></div></td>
       <td style="color:var(--muted)">${u.email}</td>
       <td>${u.phone || '—'}</td>
       <td><span class="badge badge-${u.role}">${u.role}</span></td>
       <td><span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px">${new Date(u.createdAt).toLocaleDateString('en-IN')}</td>
-      <td>
-        <button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i></button>
-      </td>
+      <td><button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i></button></td>
     </tr>`).join('');
-            return `<table><thead><tr>
-    <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
+            return `<table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
         }
 
         async function deleteUser(id) {
             if (!confirm('Delete this user?')) return;
             const data = await api(`/admin/users/${id}`, { method: 'DELETE' });
-            if (data.success) { toast('User deleted', 'success'); loadUsers(); }
-            else toast('Delete failed', 'error');
+            if (data.success) { toast('Deleted', 'success'); loadUsers(); }
         }
 
         /* ── Toast ── */
@@ -895,7 +1372,6 @@
             setTimeout(() => el.classList.remove('show'), 2500);
         }
 
-        /* ── Init ── */
         tryAutoLogin();
     </script>
 </body>

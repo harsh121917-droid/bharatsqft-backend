@@ -41,6 +41,7 @@ app.use("/admin", express.static(path.join(__dirname, "admin")));
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/enquiries", require("./routes/enquiries"));
+app.use("/api/properties", require("./routes/properties"));
 app.use("/api/admin", require("./routes/admin"));
 
 /* ---------- Health Check ---------- */
