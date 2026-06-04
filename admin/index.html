@@ -996,6 +996,45 @@
                 <div class="form-group"><label>Meta Description</label><textarea id="p-meta-desc"
                         style="min-height:60px"></textarea></div>
 
+
+                <div class="form-section" id="images-section-header" style="display:none">Photos <span
+                        style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px">(Upload after
+                        saving property)</span></div>
+
+                <!-- Image Upload Area — shown only when editing existing property -->
+                <div id="image-upload-area" style="display:none">
+
+                    <!-- Drop Zone -->
+                    <div id="drop-zone"
+                        style="border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:12px"
+                        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+                        ondragleave="this.style.borderColor='var(--border)'" ondrop="handleDrop(event)">
+                        <i class="fas fa-cloud-upload-alt"
+                            style="font-size:2rem;color:var(--muted);display:block;margin-bottom:8px"></i>
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px">Drag & drop images here</div>
+                        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">or click to browse — JPG, PNG,
+                            WebP — max 10MB each</div>
+                        <input type="file" id="image-file-input" multiple accept="image/*" style="display:none"
+                            onchange="handleFileSelect(this.files)" />
+                        <button type="button" class="btn-add-small"
+                            onclick="document.getElementById('image-file-input').click()">Browse Files</button>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="upload-progress" style="display:none;margin-bottom:12px">
+                        <div style="font-size:13px;color:var(--muted);margin-bottom:6px" id="upload-status">Uploading...
+                        </div>
+                        <div style="background:var(--surface2);border-radius:20px;height:6px">
+                            <div id="progress-bar"
+                                style="background:var(--accent);height:6px;border-radius:20px;width:0%;transition:width 0.3s">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Uploaded Images Grid -->
+                    <div id="images-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px"></div>
+                </div>
+
                 <div class="form-section">Status</div>
                 <div class="form-group">
                     <select id="p-status">
@@ -1256,8 +1295,13 @@
                     : await api('/admin/properties', { method: 'POST', body: JSON.stringify(body) });
 
                 if (data.success) {
-                    toast(editingPropertyId ? 'Property updated!' : 'Property created!', 'success');
-                    closePropertyModal();
+                    toast(editingPropertyId ? 'Property updated!' : 'Property created! Now upload images below.', 'success');
+                    if (!editingPropertyId) {
+                        // new property — keep modal open for image upload
+                        editingPropertyId = data.data._id;
+                        showImageUploadArea(data.data._id);
+                        document.getElementById('save-btn').textContent = 'Update Property';
+                    }
                     loadProperties();
                     loadDashboard();
                 } else {
@@ -1269,7 +1313,7 @@
 
         async function editProperty(id) {
             const data = await api(`/admin/properties/${id}`);
-            if (data.success) openPropertyModal(data.data);
+            if (data.success) { openPropertyModal(data.data); setTimeout(() => showImageUploadArea(id), 100); }
         }
 
         async function deleteProperty(id) {
@@ -1370,6 +1414,87 @@
             el.textContent = (type === 'success' ? '✓ ' : '✗ ') + msg;
             el.className = `toast ${type} show`;
             setTimeout(() => el.classList.remove('show'), 2500);
+        }
+
+
+        /* ── Image Upload ── */
+        function showImageUploadArea(propertyId) {
+            document.getElementById('images-section-header').style.display = '';
+            document.getElementById('image-upload-area').style.display = '';
+            loadPropertyImages(propertyId);
+        }
+
+        async function loadPropertyImages(id) {
+            const data = await api(`/admin/properties/${id}`);
+            if (data.success) renderImagesGrid(data.data.images, id);
+        }
+
+        function renderImagesGrid(images, propId) {
+            const grid = document.getElementById('images-grid');
+            if (!images || !images.length) { grid.innerHTML = `<div style="color:var(--muted);font-size:13px;grid-column:1/-1">No images yet. Upload some above!</div>`; return; }
+            grid.innerHTML = images.map((img, i) => `
+    <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:var(--surface2)">
+      <img src="${img.url}" style="width:100%;height:100%;object-fit:cover"/>
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;display:flex;align-items:center;justify-content:center;gap:6px"
+        onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+        ${i > 0 ? `<button onclick="setCover('${propId}','${img._id}')" title="Set as Cover" style="background:var(--accent);border:none;color:#000;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:11px"><i class="fas fa-star"></i></button>` : '<span style="background:var(--accent);color:#000;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700">COVER</span>'}
+        <button onclick="deleteImg('${propId}','${img._id}')" title="Delete" style="background:var(--danger);border:none;color:#fff;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:11px"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`).join('');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').style.borderColor = 'var(--border)';
+            handleFileSelect(e.dataTransfer.files);
+        }
+
+        async function handleFileSelect(files) {
+            if (!editingPropertyId) { toast('Save property first, then upload images', 'error'); return; }
+            const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (!arr.length) { toast('Please select image files only', 'error'); return; }
+
+            const progress = document.getElementById('upload-progress');
+            const bar = document.getElementById('progress-bar');
+            const status = document.getElementById('upload-status');
+            progress.style.display = '';
+
+            for (let i = 0; i < arr.length; i++) {
+                status.textContent = `Uploading ${i + 1} of ${arr.length}...`;
+                bar.style.width = `${Math.round(((i) / arr.length) * 100)}%`;
+
+                const fd = new FormData();
+                fd.append('images', arr[i]);
+
+                try {
+                    const res = await fetch(`${API}/upload/${editingPropertyId}/images`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${TOKEN}` },
+                        body: fd
+                    });
+                    const data = await res.json();
+                    if (!data.success) { toast(`Failed: ${arr[i].name}`, 'error'); }
+                } catch (e) { toast('Upload error', 'error'); }
+            }
+
+            bar.style.width = '100%';
+            status.textContent = 'Done!';
+            setTimeout(() => { progress.style.display = 'none'; bar.style.width = '0%'; }, 1500);
+            loadPropertyImages(editingPropertyId);
+            toast(`${arr.length} image(s) uploaded!`, 'success');
+        }
+
+        async function deleteImg(propId, imgId) {
+            if (!confirm('Delete this image?')) return;
+            const data = await api(`/upload/${propId}/images/${imgId}`, { method: 'DELETE' });
+            if (data.success) { loadPropertyImages(propId); toast('Image deleted', 'success'); }
+            else toast('Delete failed', 'error');
+        }
+
+        async function setCover(propId, imgId) {
+            const data = await api(`/upload/${propId}/images/cover`, { method: 'PATCH', body: JSON.stringify({ imageId: imgId }) });
+            if (data.success) { loadPropertyImages(propId); toast('Cover image set!', 'success'); }
+            else toast('Failed', 'error');
         }
 
         tryAutoLogin();

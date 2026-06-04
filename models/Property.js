@@ -53,7 +53,7 @@ const PropertySchema = new mongoose.Schema(
             slug: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
         },
         // Media — will add upload in later phase
-        images: [{ url: String, caption: String }],
+        images: [new (require('mongoose')).Schema({ url: String, caption: String }, { _id: true })],
         videos: [{ url: String, title: String }],
         documents: [{ url: String, title: String, type: String }],
 
