@@ -6,7 +6,10 @@ const { uploadImages, uploadVideo, uploadDoc } = require("../middleware/uploadMi
 exports.uploadPropertyImages = (req, res) => {
     uploadImages(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, message: err.message });
-
+        if (err) {
+            console.error('Upload error:', err); // add this
+            return res.status(400).json({ success: false, message: err.message || err.toString() });
+        }
         try {
             const property = await Property.findById(req.params.id);
             if (!property) return res.status(404).json({ success: false, message: "Property not found" });
@@ -66,5 +69,6 @@ exports.setCoverImage = async (req, res) => {
         res.json({ success: true, message: "Cover image set", images: property.images });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
+
     }
 };
