@@ -52,6 +52,12 @@ const PropertySchema = new mongoose.Schema(
             metaDescription: { type: String, trim: true },
             slug: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
         },
+        // Brick Investment fields
+        brickPrice: { type: Number, default: 0 },   // price per brick in INR
+        totalBricks: { type: Number, default: 0 },   // total bricks available
+        soldBricks: { type: Number, default: 0 },   // auto-updated on payment
+        investmentEnabled: { type: Boolean, default: false }, // toggle on/off
+
         // Media — will add upload in later phase
         images: [new (require('mongoose')).Schema({ url: String, caption: String }, { _id: true })],
         videos: [{ url: String, title: String }],

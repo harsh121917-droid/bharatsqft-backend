@@ -10,6 +10,7 @@ const {
   createProperty, updateProperty,
   deleteProperty, toggleStatus,
 } = require("../controllers/propertyController");
+const { getAllInvestments } = require("../controllers/paymentController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect, authorize("admin"));
@@ -35,5 +36,8 @@ router.post("/properties", createProperty);
 router.put("/properties/:id", updateProperty);
 router.delete("/properties/:id", deleteProperty);
 router.patch("/properties/:id/toggle", toggleStatus);
+
+// Investments
+router.get("/investments", getAllInvestments);
 
 module.exports = router;
