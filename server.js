@@ -12,6 +12,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const app = express();
+app.set('trust proxy', 1); // Railway runs behind a proxy
 
 /* ---------- Security Middleware ---------- */
 app.use(helmet());
