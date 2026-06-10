@@ -40,17 +40,23 @@ exports.createOrder = async (req, res, next) => {
         const totalAmount = bricks * property.brickPrice;
         const amountPaise = totalAmount * 100;
 
-        const order = await getRazorpay().orders.create({
-            amount: amountPaise,
-            currency: "INR",
-            receipt: `bsqft_${Date.now()}`,
-            notes: {
-                propertyId: propertyId,
-                propertyTitle: property.title,
-                bricks: String(bricks),
-                userId: String(req.user._id),
-            },
-        });
+        let order;
+        try {
+            order = await getRazorpay().orders.create({
+                amount: amountPaise,
+                currency: "INR",
+                receipt: `bsqft_${Date.now()}`,
+                notes: {
+                    propertyId: propertyId,
+                    propertyTitle: property.title,
+                    bricks: String(bricks),
+                    userId: String(req.user._id),
+                },
+            });
+        } catch (rzpErr) {
+            console.error("Razorpay error:", JSON.stringify(rzpErr));
+            return res.status(500).json({ success: false, message: "Payment gateway error: " + (rzpErr?.error?.description || rzpErr?.message || JSON.stringify(rzpErr)) });
+        }
 
         const investment = await Investment.create({
             user: req.user._id,
@@ -75,8 +81,8 @@ exports.createOrder = async (req, res, next) => {
             key: process.env.RAZORPAY_KEY_ID,
         });
     } catch (err) {
-        console.error("createOrder error:", err.message, err.stack);
-        return res.status(500).json({ success: false, message: err.message || "Server error" });
+        console.error("createOrder error:", err?.message || JSON.stringify(err));
+        return res.status(500).json({ success: false, message: err?.message || JSON.stringify(err) || "Server error" });
     }
 };
 
