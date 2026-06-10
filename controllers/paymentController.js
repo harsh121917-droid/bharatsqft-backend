@@ -3,7 +3,6 @@ const crypto = require("crypto");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
 
-/* lazy init — only created when first API call hits */
 function getRazorpay() {
     if (!process.env.RAZORPAY_KEY_ID) throw new Error("RAZORPAY_KEY_ID missing in .env");
     return new Razorpay({
@@ -12,11 +11,6 @@ function getRazorpay() {
     });
 }
 
-/* ─────────────────────────────────────────
-   POST /api/payments/create-order
-   Body: { propertyId, bricks }
-   Auth: required (logged in user)
-───────────────────────────────────────── */
 exports.createOrder = async (req, res, next) => {
     try {
         const { propertyId, bricks } = req.body;
@@ -27,14 +21,16 @@ exports.createOrder = async (req, res, next) => {
 
         const property = await Property.findById(propertyId);
         if (!property) return res.status(404).json({ success: false, message: "Property not found" });
-        if (property.status !== "published") return res.status(400).json({ success: false, message: "Property not available" });
+        if (property.status !== "published") return res.status(400).json({ success: false, message: "Property not available for investment" });
+        if (!property.investmentEnabled) return res.status(400).json({ success: false, message: "Brick investment not enabled for this property" });
+        if (!property.brickPrice || property.brickPrice <= 0) return res.status(400).json({ success: false, message: "Brick price not set" });
+        if (!property.totalBricks || property.totalBricks <= 0) return res.status(400).json({ success: false, message: "Total bricks not set" });
 
-        // Check bricks available
-        const soldBricks = await Investment.aggregate([
+        const soldAgg = await Investment.aggregate([
             { $match: { property: property._id, status: "paid" } },
             { $group: { _id: null, total: { $sum: "$bricks" } } }
         ]);
-        const sold = soldBricks[0]?.total || 0;
+        const sold = soldAgg[0]?.total || 0;
         const available = property.totalBricks - sold;
 
         if (bricks > available) {
@@ -42,9 +38,8 @@ exports.createOrder = async (req, res, next) => {
         }
 
         const totalAmount = bricks * property.brickPrice;
-        const amountPaise = totalAmount * 100; // Razorpay uses paise
+        const amountPaise = totalAmount * 100;
 
-        // Create Razorpay order
         const order = await getRazorpay().orders.create({
             amount: amountPaise,
             currency: "INR",
@@ -52,12 +47,11 @@ exports.createOrder = async (req, res, next) => {
             notes: {
                 propertyId: propertyId,
                 propertyTitle: property.title,
-                bricks: bricks.toString(),
-                userId: req.user._id.toString(),
+                bricks: String(bricks),
+                userId: String(req.user._id),
             },
         });
 
-        // Save pending investment
         const investment = await Investment.create({
             user: req.user._id,
             property: propertyId,
@@ -68,13 +62,9 @@ exports.createOrder = async (req, res, next) => {
             status: "pending",
         });
 
-        res.json({
+        return res.json({
             success: true,
-            order: {
-                id: order.id,
-                amount: order.amount,
-                currency: order.currency,
-            },
+            order: { id: order.id, amount: order.amount, currency: order.currency },
             investment: {
                 id: investment._id,
                 bricks,
@@ -84,82 +74,62 @@ exports.createOrder = async (req, res, next) => {
             },
             key: process.env.RAZORPAY_KEY_ID,
         });
-    } catch (err) { next(err); }
+    } catch (err) {
+        console.error("createOrder error:", err.message, err.stack);
+        return res.status(500).json({ success: false, message: err.message || "Server error" });
+    }
 };
 
-/* ─────────────────────────────────────────
-   POST /api/payments/verify
-   Body: { razorpayOrderId, razorpayPaymentId, razorpaySignature, investmentId }
-───────────────────────────────────────── */
 exports.verifyPayment = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, investmentId } = req.body;
 
-        // Verify signature
         const body = razorpayOrderId + "|" + razorpayPaymentId;
         const expected = crypto
             .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body)
-            .digest("hex");
+            .update(body).digest("hex");
 
         if (expected !== razorpaySignature) {
             await Investment.findByIdAndUpdate(investmentId, { status: "failed" });
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
-        // Mark investment as paid
         const investment = await Investment.findByIdAndUpdate(
             investmentId,
-            {
-                status: "paid",
-                razorpayPaymentId,
-                razorpaySignature,
-            },
+            { status: "paid", razorpayPaymentId, razorpaySignature },
             { new: true }
         ).populate("property", "title location brickPrice totalBricks");
 
-        // Update property soldBricks count
-        const soldBricks = await Investment.aggregate([
+        const soldAgg = await Investment.aggregate([
             { $match: { property: investment.property._id, status: "paid" } },
             { $group: { _id: null, total: { $sum: "$bricks" } } }
         ]);
-        await require("../models/Property").findByIdAndUpdate(
+        await Property.findByIdAndUpdate(
             investment.property._id,
-            { soldBricks: soldBricks[0]?.total || 0 }
+            { soldBricks: soldAgg[0]?.total || 0 }
         );
 
-        res.json({
-            success: true,
-            message: "Payment successful! Bricks allocated.",
-            investment,
-        });
-    } catch (err) { next(err); }
+        return res.json({ success: true, message: "Payment successful! Bricks allocated.", investment });
+    } catch (err) {
+        console.error("verifyPayment error:", err.message);
+        next(err);
+    }
 };
 
-/* ─────────────────────────────────────────
-   GET /api/payments/my
-   User's own investments
-───────────────────────────────────────── */
 exports.getMyInvestments = async (req, res, next) => {
     try {
         const investments = await Investment.find({ user: req.user._id, status: "paid" })
             .populate("property", "title location images brickPrice totalBricks")
             .sort("-createdAt");
-
-        res.json({ success: true, count: investments.length, data: investments });
+        return res.json({ success: true, count: investments.length, data: investments });
     } catch (err) { next(err); }
 };
 
-/* ─────────────────────────────────────────
-   GET /api/admin/investments
-   Admin sees all investments
-───────────────────────────────────────── */
 exports.getAllInvestments = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
-
         const filter = {};
         if (req.query.status) filter.status = req.query.status;
         if (req.query.propertyId) filter.property = req.query.propertyId;
@@ -168,18 +138,16 @@ exports.getAllInvestments = async (req, res, next) => {
             Investment.find(filter)
                 .populate("user", "name email phone")
                 .populate("property", "title location")
-                .sort("-createdAt")
-                .skip(skip).limit(limit),
+                .sort("-createdAt").skip(skip).limit(limit),
             Investment.countDocuments(filter),
         ]);
 
-        // Total revenue
         const revenue = await Investment.aggregate([
             { $match: { status: "paid" } },
             { $group: { _id: null, total: { $sum: "$totalAmount" } } }
         ]);
 
-        res.json({
+        return res.json({
             success: true, total, page,
             pages: Math.ceil(total / limit),
             totalRevenue: revenue[0]?.total || 0,
