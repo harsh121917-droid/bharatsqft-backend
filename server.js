@@ -1,43 +1,52 @@
 require("dotenv").config();
 
-const path = require("path");
+/* ============================================================
+   Bharat SQFT — Server Entry Point
+   ============================================================ */
+
 const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const app = express();
-app.set('trust proxy', 1); // add this line
 
-/* ---------- CORS ---------- */
-app.use(cors({ origin: "*", credentials: true }));
-
-/* ---------- Security ---------- */
-app.use(helmet({ contentSecurityPolicy: false }));
+/* ---------- Security Middleware ---------- */
+app.use(helmet());
+app.use(cors({
+  origin: '*',
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.options('*', cors()); // handle preflight
 
 /* ---------- Rate Limiting ---------- */
-app.use("/api/", rateLimit({
+const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500, // increased for testing
   message: { success: false, message: "Too many requests, try again later." },
-}));
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", limiter);
 
 /* ---------- Body Parser ---------- */
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ---------- Logger ---------- */
-if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
+/* ---------- Logger (dev only) ---------- */
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
 
-/* ---------- DB ---------- */
+/* ---------- DB Connection ---------- */
 const connectDB = require("./config/db");
 connectDB();
 
-/* ---------- Admin Panel ---------- */
-app.use("/admin", express.static(path.join(__dirname, "admin")));
-
-/* ---------- API Routes ---------- */
+/* ---------- Routes ---------- */
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/enquiries", require("./routes/enquiries"));
@@ -48,20 +57,20 @@ app.use("/api/admin", require("./routes/admin"));
 
 /* ---------- Health Check ---------- */
 app.get("/api/health", (req, res) => {
-  res.json({ success: true, message: "Bharat SQFT API running" });
+  res.json({ success: true, message: "Bharat SQFT API running", env: process.env.NODE_ENV });
 });
 
-/* ---------- 404 ---------- */
+/* ---------- 404 Handler ---------- */
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-/* ---------- Error Handler ---------- */
+/* ---------- Global Error Handler ---------- */
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   if (process.env.NODE_ENV === "development") console.error(err.stack);
-  res.status(statusCode).json({ success: false, message });
+  res.status(statusCode).json({ success: false, message, ...(process.env.NODE_ENV === "development" && { stack: err.stack }) });
 });
 
 /* ---------- Start ---------- */
