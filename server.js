@@ -56,6 +56,10 @@ app.use("/api/upload", require("./routes/upload"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/admin", require("./routes/admin"));
 
+/* ---------- Admin Panel (static) ---------- */
+const path = require("path");
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
 /* ---------- Health Check ---------- */
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "Bharat SQFT API running", env: process.env.NODE_ENV });
