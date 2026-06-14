@@ -57,6 +57,8 @@ const PropertySchema = new mongoose.Schema(
         totalBricks: { type: Number, default: 0 },   // total bricks available
         soldBricks: { type: Number, default: 0 },   // auto-updated on payment
         investmentEnabled: { type: Boolean, default: false }, // toggle on/off
+        expectedAppreciation: { type: Number, default: 8 },  // % per year, capital growth
+        expectedRentalYield: { type: Number, default: 3 },  // % per year, rental income
 
         // Media — will add upload in later phase
         images: [new (require('mongoose')).Schema({ url: String, caption: String }, { _id: true })],
