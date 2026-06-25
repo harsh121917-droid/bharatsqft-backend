@@ -57,6 +57,7 @@ app.use("/api/properties", require("./routes/properties"));
 app.use("/api/upload", require("./routes/upload"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/kyc", require("./routes/kyc"));
+app.use("/smc", require("./routes/smc"));  // SMC test — remove in production
 app.use("/api/admin", require("./routes/admin"));
 
 /* ---------- Admin Panel (static) ---------- */
