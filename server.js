@@ -21,8 +21,8 @@ app.use(helmet({
 app.use(cors({
   origin: '*',
   credentials: false,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.options('*', cors()); // handle preflight
 
@@ -50,13 +50,14 @@ const connectDB = require("./config/db");
 connectDB();
 
 /* ---------- Routes ---------- */
-app.use("/api/auth",      require("./routes/auth"));
-app.use("/api/users",     require("./routes/users"));
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/users", require("./routes/users"));
 app.use("/api/enquiries", require("./routes/enquiries"));
 app.use("/api/properties", require("./routes/properties"));
-app.use("/api/upload",     require("./routes/upload"));
-app.use("/api/payments",   require("./routes/payments"));
-app.use("/api/admin",      require("./routes/admin"));
+app.use("/api/upload", require("./routes/upload"));
+app.use("/api/payments", require("./routes/payments"));
+app.use("/api/kyc", require("./routes/kyc"));
+app.use("/api/admin", require("./routes/admin"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
@@ -75,7 +76,7 @@ app.use((req, res) => {
 /* ---------- Global Error Handler ---------- */
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
-  const message    = err.message    || "Internal Server Error";
+  const message = err.message || "Internal Server Error";
   if (process.env.NODE_ENV === "development") console.error(err.stack);
   res.status(statusCode).json({ success: false, message, ...(process.env.NODE_ENV === "development" && { stack: err.stack }) });
 });

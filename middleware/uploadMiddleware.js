@@ -32,6 +32,16 @@ const docStorage = new CloudinaryStorage({
     },
 });
 
+/* ── KYC Documents (PAN / Aadhaar images) ── */
+const kycStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "bharatsqft/kyc",
+        allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
+        transformation: [{ width: 1600, height: 1600, crop: "limit", quality: "auto" }],
+    },
+});
+
 const uploadImages = multer({
     storage: imageStorage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per image
@@ -47,4 +57,14 @@ const uploadDoc = multer({
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 }).single("document");
 
-module.exports = { uploadImages, uploadVideo, uploadDoc };
+/* KYC upload — expects 3 files: panImage, aadhaarFront, aadhaarBack */
+const uploadKycDocs = multer({
+    storage: kycStorage,
+    limits: { fileSize: 8 * 1024 * 1024 }, // 8MB per file
+}).fields([
+    { name: "panImage", maxCount: 1 },
+    { name: "aadhaarFront", maxCount: 1 },
+    { name: "aadhaarBack", maxCount: 1 },
+]);
+
+module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs };

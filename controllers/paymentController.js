@@ -2,6 +2,7 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
+const Kyc = require("../models/Kyc");
 
 function getRazorpay() {
     if (!process.env.RAZORPAY_KEY_ID) throw new Error("RAZORPAY_KEY_ID missing in .env");
@@ -17,6 +18,21 @@ exports.createOrder = async (req, res, next) => {
 
         if (!propertyId || !bricks || bricks < 1) {
             return res.status(400).json({ success: false, message: "propertyId and bricks required" });
+        }
+
+        // KYC check — required before any brick investment
+        const kyc = await Kyc.findOne({ user: req.user._id });
+        if (!kyc || kyc.status !== "approved") {
+            return res.status(403).json({
+                success: false,
+                code: "KYC_REQUIRED",
+                kycStatus: kyc?.status || "not_submitted",
+                message: kyc?.status === "pending"
+                    ? "Your KYC is under review. Please wait for approval before investing."
+                    : kyc?.status === "rejected"
+                        ? "Your KYC was rejected. Please resubmit with correct details."
+                        : "Please complete KYC verification before investing in bricks.",
+            });
         }
 
         const property = await Property.findById(propertyId);

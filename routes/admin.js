@@ -11,6 +11,7 @@ const {
   deleteProperty, toggleStatus,
 } = require("../controllers/propertyController");
 const { getAllInvestments } = require("../controllers/paymentController");
+const { getAllKyc, getKycById, reviewKyc } = require("../controllers/kycController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect, authorize("admin"));
@@ -39,5 +40,10 @@ router.patch("/properties/:id/toggle", toggleStatus);
 
 // Investments
 router.get("/investments", getAllInvestments);
+
+// KYC
+router.get("/kyc", getAllKyc);
+router.get("/kyc/:id", getKycById);
+router.patch("/kyc/:id", reviewKyc);
 
 module.exports = router;
