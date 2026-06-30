@@ -59,6 +59,7 @@ app.use("/api/payments", require("./routes/payments"));
 app.use("/api/kyc", require("./routes/kyc"));
 app.use("/smc", require("./routes/smc"));  // SMC test — remove in production
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/savings", require("./routes/savings"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
