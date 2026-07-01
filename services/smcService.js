@@ -37,6 +37,8 @@ async function smcLogin() {
 
     console.log('\n========== SMC LOGIN REQUEST ==========');
     console.log('URL    :', url);
+    console.log('DEBUG  : client-id =', credentials.clientId);
+    console.log('DEBUG  : x-api-key =', credentials.apiKey);
     console.log('Headers:', JSON.stringify({
         ...headers,
         password: '***HIDDEN***',
