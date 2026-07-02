@@ -25,7 +25,7 @@ exports.initiateFirstPayment = async (req, res, next) => {
         const order = await rz.orders.create({
             amount: amountPaise,
             currency: "INR",
-            receipt: `saving_${saving._id}_first`,
+            receipt: `fst_${saving._id.toString().slice(-8)}_${Date.now()}`,
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
@@ -119,7 +119,7 @@ exports.initiateCyclePayment = async (req, res, next) => {
         const order = await rz.orders.create({
             amount: amountPaise,
             currency: "INR",
-            receipt: `saving_${saving._id}_cycle_${Date.now()}`,
+            receipt: `cyc_${saving._id.toString().slice(-8)}_${Date.now()}`,
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
@@ -142,13 +142,15 @@ exports.initiateCyclePayment = async (req, res, next) => {
             cycleAmount,
         });
     } catch (err) {
-        return res.status(500).json({
-            success: false,
-            message: "DEBUG",
-            errorMessage: err.message,
-            errorDetails: err.error || null,
-            errorStack: err.stack,
-        });
+        // return res.status(500).json({
+        //     success: false,
+        //     message: "DEBUG",
+        //     errorMessage: err.message,
+        //     errorDetails: err.error || null,
+        //     errorStack: err.stack,
+        // });
+        console.error("ERROR:", err);
+        next(err);
     }
 };
 
