@@ -7,6 +7,8 @@ const {
 const {
     initiateFirstPayment,
     verifyFirstPayment,
+    initiateCyclePayment,
+    verifyCyclePayment,
 } = require("../controllers/savingPaymentController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -17,8 +19,12 @@ router.route("/:id").patch(updateSaving).delete(deleteSaving);
 router.get("/:id/history", getHistory);
 router.post("/:id/deposit", deposit);
 
-// Razorpay — first payment per plan
+// First payment
 router.post("/:id/pay/initiate", initiateFirstPayment);
 router.post("/:id/pay/verify", verifyFirstPayment);
+
+// Subsequent cycle payments via Razorpay
+router.post("/:id/pay/cycle/initiate", initiateCyclePayment);
+router.post("/:id/pay/cycle/verify", verifyCyclePayment);
 
 module.exports = router;
