@@ -88,3 +88,18 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV || "development"}]`);
 });
+
+/* ---------- Global Error Handler ---------- */
+app.use((err, req, res, next) => {
+  console.error("ERROR:", err); // always log, not just dev
+
+  const statusCode = err.statusCode || 500;
+  const rzMsg = err?.error?.description || err?.error?.reason;
+  const message = rzMsg || err.message || "Internal Server Error";
+
+  res.status(statusCode).json({
+    success: false,
+    message,
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+  });
+});
