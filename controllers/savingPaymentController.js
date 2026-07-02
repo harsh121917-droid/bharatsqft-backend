@@ -142,7 +142,13 @@ exports.initiateCyclePayment = async (req, res, next) => {
             cycleAmount,
         });
     } catch (err) {
-        next(err);
+        return res.status(500).json({
+            success: false,
+            message: "DEBUG",
+            errorMessage: err.message,
+            errorDetails: err.error || null,
+            errorStack: err.stack,
+        });
     }
 };
 
