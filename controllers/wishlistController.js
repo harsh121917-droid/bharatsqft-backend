@@ -108,7 +108,7 @@ exports.adminByProperty = async (req, res, next) => {
                     as: "property",
                 },
             },
-            { $unwind: { path: "$property", preserveNullAndEmpty: false } },
+            { $unwind: { path: "$property", preserveNullAndEmptyArrays: false } },
             {
                 $lookup: {
                     from: "users",
@@ -150,7 +150,7 @@ exports.adminByUser = async (req, res, next) => {
                     from: "users", localField: "_id", foreignField: "_id", as: "user",
                 },
             },
-            { $unwind: { path: "$user", preserveNullAndEmpty: false } },
+            { $unwind: { path: "$user", preserveNullAndEmptyArrays: false } },
             {
                 $lookup: {
                     from: "properties", localField: "properties", foreignField: "_id", as: "propertyDetails",
