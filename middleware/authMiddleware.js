@@ -1,4 +1,4 @@
-const jwt  = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 /* Verify JWT token */
@@ -25,6 +25,11 @@ exports.protect = async (req, res, next) => {
   } catch (err) {
     return res.status(401).json({ success: false, message: "Token invalid or expired" });
   }
+};
+
+exports.adminOnly = (req, res, next) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin only' });
+  next();
 };
 
 /* Role-based access: pass allowed roles as args

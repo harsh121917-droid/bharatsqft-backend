@@ -60,6 +60,7 @@ app.use("/api/kyc", require("./routes/kyc"));
 app.use("/smc", require("./routes/smc"));  // SMC test — remove in production
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/savings", require("./routes/savings"));
+app.use("/api/wishlist", require("./routes/wishlist"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
