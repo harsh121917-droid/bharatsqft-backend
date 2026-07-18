@@ -1,6 +1,6 @@
+const https = require("https");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const axios = require("axios");
 const {
     GoldBalance,
     GoldRate,
@@ -27,18 +27,32 @@ const razorpay = new Razorpay({
 // ─── GoldAPI.io fetch helper ──────────────────────────────────────────────────
 // Sign up free at https://goldapi.io → get your API key → add to .env as GOLDAPI_KEY
 // Symbols: XAU=Gold  XAG=Silver  XCU=Copper   Currency: INR
-async function fetchFromGoldAPI(symbol = "XAU") {
-    const res = await axios.get(
-        `https://www.goldapi.io/api/${symbol}/INR`,
-        {
+function fetchFromGoldAPI(symbol = "XAU") {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: "www.goldapi.io",
+            path: `/api/${symbol}/INR`,
+            method: "GET",
             headers: {
                 "x-access-token": process.env.GOLDAPI_KEY,
                 "Content-Type": "application/json",
             },
-            timeout: 8000,
-        }
-    );
-    return res.data;
+        };
+        const req = https.request(options, (res) => {
+            let data = "";
+            res.on("data", (chunk) => { data += chunk; });
+            res.on("end", () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.error) return reject(new Error(parsed.error));
+                    resolve(parsed);
+                } catch (e) { reject(e); }
+            });
+        });
+        req.on("error", reject);
+        req.setTimeout(8000, () => { req.destroy(); reject(new Error("GoldAPI timeout")); });
+        req.end();
+    });
 }
 
 // ─── Fetch + cache all 3 metals ───────────────────────────────────────────────
@@ -48,30 +62,20 @@ async function fetchLiveRates() {
     if (_rateCache && now - _cacheTime < CACHE_TTL_MS) return _rateCache;
 
     try {
-        // Fetch Gold, Silver, Copper in parallel
-        const [gold, silver, copper] = await Promise.all([
+        // GoldAPI.io free plan: XAU + XAG only — XCU (copper) not supported
+        const [gold, silver] = await Promise.all([
             fetchFromGoldAPI("XAU"),
             fetchFromGoldAPI("XAG"),
-            fetchFromGoldAPI("XCU"),
         ]);
 
-        /*
-          GoldAPI response fields (in INR):
-          - price          → price per troy oz in INR
-          - price_gram_24k → price per gram (24K) in INR  ← use this for gold
-          - ch             → change vs prev close (INR)
-          - chp            → change %
-        */
-
-        // Gold: INR per gram 24K — directly available
-        // Gold: use price_gram_24k directly, fallback to troy oz conversion
+        // Gold: price_gram_24k is per gram in INR directly
         const goldBuyPerGram = parseFloat(
-            ((gold.price_gram_24k ?? gold.price / TROY_OZ_GRAMS)).toFixed(2)
+            (gold.price_gram_24k ?? gold.price / TROY_OZ_GRAMS).toFixed(2)
         );
         // Silver: price per troy oz → per gram
         const silverPerGram = parseFloat((silver.price / TROY_OZ_GRAMS).toFixed(2));
-        // Copper: price per troy oz → per gram
-        const copperPerGram = parseFloat((copper.price / TROY_OZ_GRAMS).toFixed(2));
+        // Copper: static MCX approx ₹0.85/gram — update via admin POST /api/gold/rate
+        const copperPerGram = 0.85;
 
         _rateCache = {
             gold: {
@@ -91,8 +95,9 @@ async function fetchLiveRates() {
             copper: {
                 buyRate: copperPerGram,
                 sellRate: parseFloat((copperPerGram * (1 - SELL_SPREAD)).toFixed(2)),
-                change24h: parseFloat((copper.ch ?? 0).toFixed(2)),
-                changePct: parseFloat((copper.chp ?? 0).toFixed(2)),
+                change24h: 0,
+                changePct: 0,
+                note: "Static MCX approx — update via admin endpoint",
             },
             updatedAt: new Date(),
             source: "goldapi.io",
