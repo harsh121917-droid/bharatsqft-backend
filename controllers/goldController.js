@@ -64,10 +64,13 @@ async function fetchLiveRates() {
         */
 
         // Gold: INR per gram 24K — directly available
-        const goldBuyPerGram = parseFloat(gold.price_gram_24k.toFixed(2));
-        // Silver: price per troy oz → convert to per gram
+        // Gold: use price_gram_24k directly, fallback to troy oz conversion
+        const goldBuyPerGram = parseFloat(
+            ((gold.price_gram_24k ?? gold.price / TROY_OZ_GRAMS)).toFixed(2)
+        );
+        // Silver: price per troy oz → per gram
         const silverPerGram = parseFloat((silver.price / TROY_OZ_GRAMS).toFixed(2));
-        // Copper: price per troy oz → convert to per gram
+        // Copper: price per troy oz → per gram
         const copperPerGram = parseFloat((copper.price / TROY_OZ_GRAMS).toFixed(2));
 
         _rateCache = {
