@@ -423,3 +423,6 @@ exports.updateRate = async (req, res, next) => {
         res.json({ success: true, message: "Rate updated", data: rate });
     } catch (err) { next(err); }
 };
+
+// Export for use in walletController
+exports.fetchLiveRates = fetchLiveRates;
