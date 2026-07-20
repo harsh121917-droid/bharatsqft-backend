@@ -5,7 +5,8 @@ const WalletSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
         balance: { type: Number, default: 0, min: 0 },       // available ₹
-        lockedBalance: { type: Number, default: 0 },               // ₹ locked (pending sell payout)
+        lockedBalance: { type: Number, default: 0 },               // ₹ already-in-balance, held for pending withdrawal payout
+        pendingCredit: { type: Number, default: 0 },               // ₹ NOT yet in balance, from a sell awaiting 24h release
         totalAdded: { type: Number, default: 0 },               // lifetime ₹ added
         totalWithdrawn: { type: Number, default: 0 },               // lifetime ₹ withdrawn
     },

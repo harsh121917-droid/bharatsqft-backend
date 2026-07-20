@@ -38,6 +38,7 @@ exports.getWallet = async (req, res, next) => {
             data: {
                 balance: wallet.balance,
                 lockedBalance: wallet.lockedBalance,
+                pendingCredit: wallet.pendingCredit,
                 availableBalance: wallet.balance - wallet.lockedBalance,
                 totalAdded: wallet.totalAdded,
                 totalWithdrawn: wallet.totalWithdrawn,
@@ -217,9 +218,10 @@ exports.sellGoldToWallet = async (req, res, next) => {
         goldBal.lockedGrams = parseFloat((goldBal.lockedGrams + grams).toFixed(6));
         await goldBal.save();
 
-        // Add sell value to wallet as LOCKED balance (not spendable yet)
+        // Add sell value as PENDING CREDIT — not yet in balance, and must NOT
+        // reduce availableBalance (it isn't held from balance, it's awaiting release)
         const balBefore = wallet.balance;
-        wallet.lockedBalance = parseFloat((wallet.lockedBalance + sellValue).toFixed(2));
+        wallet.pendingCredit = parseFloat((wallet.pendingCredit + sellValue).toFixed(2));
         await wallet.save();
 
         // Record gold transaction
@@ -243,7 +245,7 @@ exports.sellGoldToWallet = async (req, res, next) => {
             message: `₹${sellValue} will be credited to your wallet within 24 hours`,
             data: {
                 grams, sellValue, ratePerGram: sellRate,
-                walletLockedBalance: wallet.lockedBalance,
+                walletPendingCredit: wallet.pendingCredit,
                 releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
             },
         });

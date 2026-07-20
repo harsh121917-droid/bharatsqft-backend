@@ -32,10 +32,11 @@ cron.schedule("*/5 * * * *", async () => {
                 goldBal.investedAmt = parseFloat(Math.max(0, goldBal.investedAmt - txn.goldValue * 0.9).toFixed(2));
                 await goldBal.save();
 
-                // Move locked → available in wallet
+                // Move pendingCredit → balance (this was never held from balance,
+                // it's the sell payout finally landing)
                 const balBefore = wallet.balance;
                 wallet.balance = parseFloat((wallet.balance + txn.totalAmt).toFixed(2));
-                wallet.lockedBalance = parseFloat((wallet.lockedBalance - txn.totalAmt).toFixed(2));
+                wallet.pendingCredit = parseFloat((wallet.pendingCredit - txn.totalAmt).toFixed(2));
                 await wallet.save();
 
                 // Mark gold txn success
