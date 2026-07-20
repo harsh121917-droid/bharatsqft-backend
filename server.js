@@ -65,6 +65,7 @@ app.use("/api/transactions", require("./routes/transaction"));
 app.use("/api/gold", require("./routes/gold"));
 app.use("/api/wallet", require("./routes/wallet"));
 app.use("/api/bank", require("./routes/bank"));
+app.use("/api/coins", require("./routes/coins"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");

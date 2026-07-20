@@ -29,7 +29,7 @@ const GoldRateSchema = new mongoose.Schema(
 const GoldTransactionSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-        type: { type: String, enum: ["buy", "sell", "sip_buy", "gift"], required: true },
+        type: { type: String, enum: ["buy", "sell", "sip_buy", "gift", "redeem"], required: true },
         grams: { type: Number, required: true },          // grams bought/sold
         ratePerGram: { type: Number, required: true },          // rate locked at time of txn
         goldValue: { type: Number, required: true },          // grams × rate
@@ -65,9 +65,32 @@ const GoldSipSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// ─── Coin Redemption Order ──────────────────────────────────────────────────
+const CoinOrderSchema = new mongoose.Schema(
+    {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        coinId: { type: String, required: true },       // catalog id, e.g. "gold-1g"
+        coinName: { type: String, required: true },
+        metal: { type: String, enum: ["gold", "silver"], required: true },
+        grams: { type: Number, required: true },
+        makingChargePct: { type: Number, default: 0 },
+        goldValue: { type: Number, required: true },     // grams × rate at redemption
+        makingCharge: { type: Number, default: 0 },
+        totalValue: { type: Number, required: true },    // goldValue + makingCharge (deducted from digital gold)
+        ratePerGram: { type: Number, required: true },
+        goldTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "GoldTransaction" },
+        addressLine: { type: String, required: true },
+        pincode: { type: String, required: true },
+        phone: { type: String, required: true },
+        status: { type: String, enum: ["placed", "processing", "shipped", "delivered", "cancelled"], default: "placed" },
+    },
+    { timestamps: true }
+);
+
 module.exports = {
     GoldBalance: mongoose.model("GoldBalance", GoldBalanceSchema),
     GoldRate: mongoose.model("GoldRate", GoldRateSchema),
     GoldTransaction: mongoose.model("GoldTransaction", GoldTransactionSchema),
     GoldSip: mongoose.model("GoldSip", GoldSipSchema),
+    CoinOrder: mongoose.model("CoinOrder", CoinOrderSchema),
 };

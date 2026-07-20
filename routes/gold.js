@@ -7,6 +7,8 @@ const {
     verifyBuy,
     sellGold,
     getTransactions,
+    getTransactionDetail,
+    getTransactionInvoice,
     updateRate,
 } = require("../controllers/goldController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
@@ -21,6 +23,8 @@ router.post("/buy/initiate", initiateBuy);
 router.post("/buy/verify", verifyBuy);
 router.post("/sell", sellGold);
 router.get("/transactions", getTransactions);
+router.get("/transactions/:id", getTransactionDetail);
+router.get("/transactions/:id/invoice", getTransactionInvoice);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 router.post("/rate", adminOnly, updateRate);  // POST to update rate
