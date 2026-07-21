@@ -389,7 +389,7 @@ exports.getTransactions = async (req, res, next) => {
         res.json({
             success: true,
             data: txns.map(t => ({
-                id: t._id, type: t.type, grams: t.grams,
+                id: t._id, invoiceNo: t.invoiceNo, type: t.type, grams: t.grams,
                 ratePerGram: t.ratePerGram, goldValue: t.goldValue,
                 gstAmt: t.gstAmt, totalAmt: t.totalAmt,
                 status: t.status, razorpayPaymentId: t.razorpayPaymentId,
@@ -439,7 +439,7 @@ exports.getTransactionDetail = async (req, res, next) => {
         res.json({
             success: true,
             data: {
-                id: txn._id, type: txn.type, grams: txn.grams,
+                id: txn._id, invoiceNo: txn.invoiceNo, type: txn.type, grams: txn.grams,
                 ratePerGram: txn.ratePerGram, goldValue: txn.goldValue,
                 gstAmt: txn.gstAmt, totalAmt: txn.totalAmt,
                 status: txn.status, razorpayPaymentId: txn.razorpayPaymentId,
@@ -463,8 +463,9 @@ exports.getTransactionInvoice = async (req, res, next) => {
         const isBuy = ["buy", "sip_buy"].includes(txn.type);
         const doc = new PDFDocument({ size: "A4", margin: 50 });
 
+        const invoiceLabel = txn.invoiceNo || `TX-${String(txn._id).slice(-8).toUpperCase()}`;
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="invoice-${txn._id}.pdf"`);
+        res.setHeader("Content-Disposition", `attachment; filename="invoice-${invoiceLabel}.pdf"`);
         doc.pipe(res);
 
         // Header
@@ -475,7 +476,7 @@ exports.getTransactionInvoice = async (req, res, next) => {
         doc.strokeColor("#D4A017").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
         doc.moveDown(1);
 
-        doc.fillColor("#000").fontSize(12).text(`Invoice #: ${txn._id}`);
+        doc.fillColor("#000").fontSize(12).text(`Invoice #: ${invoiceLabel}`);
         doc.text(`Date: ${new Date(txn.createdAt).toLocaleString("en-IN")}`);
         doc.text(`Transaction Type: ${isBuy ? "Gold Purchase" : "Gold Sale"}`);
         doc.text(`Status: ${txn.status}`);

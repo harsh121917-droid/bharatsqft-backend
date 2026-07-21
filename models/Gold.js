@@ -1,5 +1,23 @@
 const mongoose = require("mongoose");
 
+// ─── Atomic Counter (for short sequential invoice numbers) ─────────────────
+const CounterSchema = new mongoose.Schema({
+    _id: { type: String, required: true },   // counter name, e.g. "gold_invoice"
+    seq: { type: Number, default: 0 },
+});
+const Counter = mongoose.model("Counter", CounterSchema);
+
+async function nextInvoiceNo() {
+    const year = new Date().getFullYear();
+    const counterId = `gold_invoice_${year}`;
+    const counter = await Counter.findOneAndUpdate(
+        { _id: counterId },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+    return `INV-${year}-${String(counter.seq).padStart(6, "0")}`; // e.g. INV-2026-000123
+}
+
 // ─── Gold Balance (per user) ───────────────────────────────────────────────
 const GoldBalanceSchema = new mongoose.Schema(
     {
@@ -29,6 +47,7 @@ const GoldRateSchema = new mongoose.Schema(
 const GoldTransactionSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        invoiceNo: { type: String, unique: true, sparse: true }, // short human-friendly ref, e.g. INV-2026-000123
         type: { type: String, enum: ["buy", "sell", "sip_buy", "gift", "redeem"], required: true },
         grams: { type: Number, required: true },          // grams bought/sold
         ratePerGram: { type: Number, required: true },          // rate locked at time of txn
@@ -49,6 +68,15 @@ const GoldTransactionSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+// Auto-assign a short sequential invoice number on first save
+GoldTransactionSchema.pre("save", async function (next) {
+    if (this.isNew && !this.invoiceNo) {
+        this.invoiceNo = await nextInvoiceNo();
+    }
+    next();
+});
+
 
 // ─── Gold SIP Plan ─────────────────────────────────────────────────────────
 const GoldSipSchema = new mongoose.Schema(
@@ -93,4 +121,6 @@ module.exports = {
     GoldTransaction: mongoose.model("GoldTransaction", GoldTransactionSchema),
     GoldSip: mongoose.model("GoldSip", GoldSipSchema),
     CoinOrder: mongoose.model("CoinOrder", CoinOrderSchema),
+    Counter: mongoose.model("Counter", CounterSchema),
+    nextInvoiceNo,
 };
