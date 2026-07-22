@@ -121,9 +121,9 @@ async function fetchLiveRates() {
         return _rateCache;
     } catch (err) {
         console.error("GoldAPI fetch failed:", err.message);
-        // Fallback: use last saved rate from DB
+        // Fallback: use last saved rate from DB — but only if it's actually usable.
         const dbRate = await GoldRate.findOne({ isActive: true }).sort({ updatedAt: -1 });
-        if (dbRate) {
+        if (dbRate && dbRate.buyRate > 0 && dbRate.sellRate > 0) {
             return {
                 gold: {
                     buyRate: dbRate.buyRate,
@@ -134,9 +134,10 @@ async function fetchLiveRates() {
                 silver: { buyRate: 0, sellRate: 0, change24h: 0, changePct: 0 },
                 copper: { buyRate: 0, sellRate: 0, change24h: 0, changePct: 0 },
                 updatedAt: dbRate.updatedAt,
-                source: "db_fallback",
+                source: "db_fallback", // frontend should flag this as possibly stale
             };
         }
+        // No usable fallback — don't hand back broken/zero prices, fail loudly instead
         throw new Error("Metal rates unavailable. Please try again shortly.");
     }
 }

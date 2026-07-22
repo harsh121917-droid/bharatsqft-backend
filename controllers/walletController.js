@@ -298,3 +298,6 @@ exports.initiateWithdraw = async (req, res, next) => {
         });
     } catch (err) { next(err); }
 };
+
+// Exported for reuse by schemeController (installment payments deduct from wallet)
+exports.getOrCreateWallet = getOrCreateWallet;
