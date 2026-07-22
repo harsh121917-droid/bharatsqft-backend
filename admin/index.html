@@ -1250,6 +1250,8 @@
                     id="kyc-pending-badge"
                     style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;display:none">0</span>
             </div>
+            <div class="nav-item" onclick="showPage('schemes')" id="nav-schemes"><i class="fas fa-award"></i> Gold
+                Schemes</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1391,6 +1393,20 @@
                 </div>
                 <div class="table-wrap">
                     <div id="investments-body">
+                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gold Schemes Page -->
+            <div class="page" id="page-schemes">
+                <div class="section-header">
+                    <div class="section-title">Gold Schemes</div>
+                    <button class="btn-primary" onclick="openSchemeModal()"><i class="fas fa-plus"></i> New
+                        Scheme</button>
+                </div>
+                <div class="table-wrap">
+                    <div id="schemes-body">
                         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                     </div>
                 </div>
@@ -1608,6 +1624,58 @@
         </div>
     </div>
 
+    <!-- Gold Scheme Create/Edit Modal -->
+    <div class="modal-overlay" id="scheme-modal" style="display:none">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="scheme-modal-title">New Gold Scheme</h3>
+                <button class="modal-close" onclick="closeSchemeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="scheme-id">
+                <div class="form-group">
+                    <label>Scheme Name</label>
+                    <input type="text" id="scheme-name" placeholder="e.g. 11+1 Gold Savings Scheme">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="scheme-description" rows="2"
+                        placeholder="Short description shown to customers"></textarea>
+                </div>
+                <div style="display:flex;gap:12px">
+                    <div class="form-group" style="flex:1">
+                        <label>Duration (months customer pays)</label>
+                        <input type="number" id="scheme-duration" placeholder="11" min="1">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Bonus (free months on maturity)</label>
+                        <input type="number" id="scheme-bonus" placeholder="1" min="0">
+                    </div>
+                </div>
+                <div style="display:flex;gap:12px">
+                    <div class="form-group" style="flex:1">
+                        <label>Minimum Monthly Amount (₹)</label>
+                        <input type="number" id="scheme-min" placeholder="500" min="1">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Maximum Monthly Amount (₹, 0 = no cap)</label>
+                        <input type="number" id="scheme-max" placeholder="0" min="0">
+                    </div>
+                </div>
+                <div class="form-group" id="scheme-active-row" style="display:none">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="scheme-active" style="width:auto">
+                        Active (visible to customers)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeSchemeModal()">Cancel</button>
+                <button class="btn-save" onclick="saveScheme()" id="scheme-save-btn">Save Scheme</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
@@ -1682,7 +1750,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -1690,6 +1758,7 @@
             if (name === 'users') loadUsers();
             if (name === 'investments') loadInvestments();
             if (name === 'kyc') loadKyc();
+            if (name === 'schemes') loadSchemes();
         }
 
         async function api(path, opts = {}) {
@@ -2368,6 +2437,117 @@
             document.getElementById('kyc-modal').style.display = 'none';
         }
 
+        /* ── Gold Schemes ── */
+        async function loadSchemes() {
+            const body = document.getElementById('schemes-body');
+            body.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+            const data = await api('/schemes/admin/all');
+            if (!data.success) { body.innerHTML = `<div class="empty">Failed to load</div>`; return; }
+            if (!data.data.length) {
+                body.innerHTML = `<div class="empty"><i class="fas fa-award"></i>No schemes yet — click "New Scheme" to create one</div>`;
+                return;
+            }
+
+            const rows = data.data.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong>${s.description ? `<br><span style="color:var(--muted);font-size:12px">${s.description}</span>` : ''}</td>
+      <td style="font-weight:600;color:var(--accent)">${s.durationMonths}+${s.bonusMonths}</td>
+      <td>₹${(s.minAmount || 0).toLocaleString('en-IN')}${s.maxAmount ? ' – ₹' + s.maxAmount.toLocaleString('en-IN') : '+'}</td>
+      <td><span class="badge badge-${s.active ? 'active' : 'inactive'}">${s.active ? 'Active' : 'Inactive'}</span></td>
+      <td style="color:var(--muted);font-size:12px">${new Date(s.createdAt).toLocaleDateString('en-IN')}</td>
+      <td>
+        <button class="btn-sm btn-info" onclick='openSchemeModal(${JSON.stringify(s)})' title="Edit"><i class="fas fa-edit"></i></button>
+        <button class="btn-sm btn-warning" style="margin-left:4px" onclick="toggleSchemeActive('${s._id}', ${!s.active})" title="${s.active ? 'Deactivate' : 'Activate'}"><i class="fas fa-${s.active ? 'toggle-on' : 'toggle-off'}"></i></button>
+      </td>
+    </tr>`).join('');
+
+            const cards = data.data.map(s => `
+    <div class="m-card">
+      <div class="m-card-row">
+        <div style="flex:1">
+          <div class="m-card-title">${s.name}</div>
+          <div class="m-card-sub">${s.durationMonths}+${s.bonusMonths} · ₹${(s.minAmount || 0).toLocaleString('en-IN')}${s.maxAmount ? ' – ₹' + s.maxAmount.toLocaleString('en-IN') : '+'}</div>
+        </div>
+        <span class="badge badge-${s.active ? 'active' : 'inactive'}">${s.active ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div class="m-card-actions">
+        <button class="btn-sm btn-info" onclick='openSchemeModal(${JSON.stringify(s)})'><i class="fas fa-edit"></i> Edit</button>
+        <button class="btn-sm btn-warning" onclick="toggleSchemeActive('${s._id}', ${!s.active})"><i class="fas fa-${s.active ? 'toggle-on' : 'toggle-off'}"></i> ${s.active ? 'Deactivate' : 'Activate'}</button>
+      </div>
+    </div>`).join('');
+
+            body.innerHTML = `
+    <div class="table-view"><table><thead><tr><th>Scheme</th><th>Plan</th><th>Amount Range</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="card-list">${cards}</div>`;
+        }
+
+        function openSchemeModal(scheme) {
+            document.getElementById('scheme-modal-title').textContent = scheme && scheme._id ? 'Edit Gold Scheme' : 'New Gold Scheme';
+            document.getElementById('scheme-id').value = scheme && scheme._id ? scheme._id : '';
+            document.getElementById('scheme-name').value = scheme ? scheme.name : '';
+            document.getElementById('scheme-description').value = scheme ? (scheme.description || '') : '';
+            document.getElementById('scheme-duration').value = scheme ? scheme.durationMonths : '';
+            document.getElementById('scheme-bonus').value = scheme ? scheme.bonusMonths : 1;
+            document.getElementById('scheme-min').value = scheme ? scheme.minAmount : '';
+            document.getElementById('scheme-max').value = scheme ? (scheme.maxAmount || 0) : 0;
+            const activeRow = document.getElementById('scheme-active-row');
+            if (scheme && scheme._id) {
+                activeRow.style.display = 'block';
+                document.getElementById('scheme-active').checked = !!scheme.active;
+            } else {
+                activeRow.style.display = 'none';
+            }
+            document.getElementById('scheme-modal').style.display = 'flex';
+        }
+
+        function closeSchemeModal() {
+            document.getElementById('scheme-modal').style.display = 'none';
+        }
+
+        async function saveScheme() {
+            const id = document.getElementById('scheme-id').value;
+            const name = document.getElementById('scheme-name').value.trim();
+            const description = document.getElementById('scheme-description').value.trim();
+            const durationMonths = parseInt(document.getElementById('scheme-duration').value, 10);
+            const bonusMonths = parseInt(document.getElementById('scheme-bonus').value, 10) || 0;
+            const minAmount = parseFloat(document.getElementById('scheme-min').value);
+            const maxAmount = parseFloat(document.getElementById('scheme-max').value) || 0;
+
+            if (!name || !durationMonths || !minAmount) {
+                toast('Please fill name, duration and minimum amount', 'error');
+                return;
+            }
+
+            const payload = { name, description, durationMonths, bonusMonths, minAmount, maxAmount };
+            if (id) payload.active = document.getElementById('scheme-active').checked;
+
+            const btn = document.getElementById('scheme-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            const data = id
+                ? await api(`/schemes/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+                : await api('/schemes', { method: 'POST', body: JSON.stringify(payload) });
+            btn.disabled = false;
+            btn.textContent = 'Save Scheme';
+
+            if (data.success) {
+                toast(id ? 'Scheme updated ✓' : 'Scheme created ✓', 'success');
+                closeSchemeModal();
+                loadSchemes();
+            } else {
+                toast(data.message || 'Failed to save scheme', 'error');
+            }
+        }
+
+        async function toggleSchemeActive(id, makeActive) {
+            const data = await api(`/schemes/${id}`, { method: 'PUT', body: JSON.stringify({ active: makeActive }) });
+            if (data.success) {
+                toast(makeActive ? 'Scheme activated' : 'Scheme deactivated', 'success');
+                loadSchemes();
+            } else {
+                toast(data.message || 'Action failed', 'error');
+            }
+        }
 
         tryAutoLogin();
     </script>
