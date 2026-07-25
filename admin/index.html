@@ -1634,6 +1634,13 @@
             <div class="modal-body">
                 <input type="hidden" id="scheme-id">
                 <div class="form-group">
+                    <label>Metal</label>
+                    <select id="scheme-metal">
+                        <option value="gold">Gold</option>
+                        <option value="silver">Silver</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Scheme Name</label>
                     <input type="text" id="scheme-name" placeholder="e.g. 11+1 Gold Savings Scheme">
                 </div>
@@ -1661,6 +1668,11 @@
                         <label>Maximum Monthly Amount (₹, 0 = no cap)</label>
                         <input type="number" id="scheme-max" placeholder="0" min="0">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Benefits (one per line)</label>
+                    <textarea id="scheme-benefits" rows="4"
+                        placeholder="No making charges&#10;24K 99.9% pure gold&#10;Secure insured storage&#10;Cancel anytime"></textarea>
                 </div>
                 <div class="form-group" id="scheme-active-row" style="display:none">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -2450,7 +2462,7 @@
 
             const rows = data.data.map(s => `
     <tr>
-      <td><strong>${s.name}</strong>${s.description ? `<br><span style="color:var(--muted);font-size:12px">${s.description}</span>` : ''}</td>
+      <td><strong>${s.name}</strong> <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${s.metal === 'silver' ? '#e8e8e8' : '#fff3d6'};color:${s.metal === 'silver' ? '#555' : '#a67c00'}">${(s.metal || 'gold').toUpperCase()}</span>${s.description ? `<br><span style="color:var(--muted);font-size:12px">${s.description}</span>` : ''}</td>
       <td style="font-weight:600;color:var(--accent)">${s.durationMonths}+${s.bonusMonths}</td>
       <td>₹${(s.minAmount || 0).toLocaleString('en-IN')}${s.maxAmount ? ' – ₹' + s.maxAmount.toLocaleString('en-IN') : '+'}</td>
       <td><span class="badge badge-${s.active ? 'active' : 'inactive'}">${s.active ? 'Active' : 'Inactive'}</span></td>
@@ -2485,11 +2497,13 @@
             document.getElementById('scheme-modal-title').textContent = scheme && scheme._id ? 'Edit Gold Scheme' : 'New Gold Scheme';
             document.getElementById('scheme-id').value = scheme && scheme._id ? scheme._id : '';
             document.getElementById('scheme-name').value = scheme ? scheme.name : '';
+            document.getElementById('scheme-metal').value = scheme ? (scheme.metal || 'gold') : 'gold';
             document.getElementById('scheme-description').value = scheme ? (scheme.description || '') : '';
             document.getElementById('scheme-duration').value = scheme ? scheme.durationMonths : '';
             document.getElementById('scheme-bonus').value = scheme ? scheme.bonusMonths : 1;
             document.getElementById('scheme-min').value = scheme ? scheme.minAmount : '';
             document.getElementById('scheme-max').value = scheme ? (scheme.maxAmount || 0) : 0;
+            document.getElementById('scheme-benefits').value = scheme && scheme.benefits ? scheme.benefits.join('\n') : '';
             const activeRow = document.getElementById('scheme-active-row');
             if (scheme && scheme._id) {
                 activeRow.style.display = 'block';
@@ -2507,18 +2521,21 @@
         async function saveScheme() {
             const id = document.getElementById('scheme-id').value;
             const name = document.getElementById('scheme-name').value.trim();
+            const metal = document.getElementById('scheme-metal').value;
             const description = document.getElementById('scheme-description').value.trim();
             const durationMonths = parseInt(document.getElementById('scheme-duration').value, 10);
             const bonusMonths = parseInt(document.getElementById('scheme-bonus').value, 10) || 0;
             const minAmount = parseFloat(document.getElementById('scheme-min').value);
             const maxAmount = parseFloat(document.getElementById('scheme-max').value) || 0;
+            const benefits = document.getElementById('scheme-benefits').value
+                .split('\n').map(s => s.trim()).filter(Boolean);
 
             if (!name || !durationMonths || !minAmount) {
                 toast('Please fill name, duration and minimum amount', 'error');
                 return;
             }
 
-            const payload = { name, description, durationMonths, bonusMonths, minAmount, maxAmount };
+            const payload = { name, metal, description, durationMonths, bonusMonths, minAmount, maxAmount, benefits };
             if (id) payload.active = document.getElementById('scheme-active').checked;
 
             const btn = document.getElementById('scheme-save-btn');

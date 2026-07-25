@@ -23,6 +23,8 @@ const WalletTxnSchema = new mongoose.Schema(
                 "add",          // user added money to wallet via Razorpay
                 "gold_buy",     // deducted for gold purchase
                 "gold_sell",    // credited from gold sale (locked first)
+                "silver_buy",   // deducted for silver purchase
+                "silver_sell",  // credited from silver sale (locked first)
                 "withdraw",     // withdrawn to bank
                 "refund",       // refund on failed gold buy
             ],
@@ -36,6 +38,7 @@ const WalletTxnSchema = new mongoose.Schema(
         razorpayPaymentId: { type: String },
         razorpaySignature: { type: String },
         goldTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "GoldTransaction" },
+        silverTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "SilverTransaction" },
         note: { type: String },
     },
     { timestamps: true }

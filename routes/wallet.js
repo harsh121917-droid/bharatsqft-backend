@@ -6,6 +6,8 @@ const {
     verifyAdd,
     buyGoldFromWallet,
     sellGoldToWallet,
+    buySilverFromWallet,
+    sellSilverToWallet,
     initiateWithdraw,
 } = require("../controllers/walletController");
 const { protect } = require("../middleware/authMiddleware");
@@ -17,6 +19,8 @@ router.post("/add/initiate", initiateAdd);
 router.post("/add/verify", verifyAdd);
 router.post("/buy-gold", buyGoldFromWallet);
 router.post("/sell-gold", sellGoldToWallet);
+router.post("/buy-silver", buySilverFromWallet);
+router.post("/sell-silver", sellSilverToWallet);
 router.post("/withdraw/initiate", initiateWithdraw);
 
 module.exports = router;

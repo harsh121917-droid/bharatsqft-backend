@@ -1,5 +1,6 @@
 const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 const { GoldBalance, GoldTransaction } = require("../models/Gold");
+const { SilverBalance, SilverTransaction } = require("../models/Silver");
 const { fetchLiveRates } = require("./goldController");
 const { getOrCreateWallet } = require("./walletController");
 
@@ -12,14 +13,16 @@ const GST_PCT = 3;
 // POST /api/schemes  (admin) — create a scheme plan, e.g. "11+1 Gold Scheme"
 exports.createScheme = async (req, res, next) => {
     try {
-        const { name, description, durationMonths, bonusMonths, minAmount, maxAmount } = req.body;
+        const { name, metal, description, durationMonths, bonusMonths, minAmount, maxAmount, benefits } = req.body;
         if (!name || !durationMonths || !minAmount) {
             return res.status(400).json({ success: false, message: "name, durationMonths, minAmount are required" });
         }
         const scheme = await GoldScheme.create({
-            name, description: description || "",
+            name, metal: metal === "silver" ? "silver" : "gold",
+            description: description || "",
             durationMonths, bonusMonths: bonusMonths ?? 1,
             minAmount, maxAmount: maxAmount ?? 0,
+            benefits: Array.isArray(benefits) ? benefits.filter(Boolean) : [],
             createdBy: req.user._id,
         });
         res.json({ success: true, data: scheme });
@@ -65,21 +68,31 @@ exports.listSchemes = async (req, res, next) => {
 };
 
 async function payInstallment({ userId, enrollment, amount, isBonus = false }) {
+    const metal = enrollment.metal === "silver" ? "silver" : "gold";
     const rates = await fetchLiveRates();
-    const buyRate = rates.gold.buyRate;
+    const buyRate = metal === "silver" ? rates.silver.buyRate : rates.gold.buyRate;
+    if (!buyRate || buyRate <= 0) {
+        const err = new Error(`${metal === "silver" ? "Silver" : "Gold"} rate unavailable right now`);
+        err.status = 400;
+        throw err;
+    }
 
-    let grams, goldValue, gstAmt, totalDeduct;
+    const Balance = metal === "silver" ? SilverBalance : GoldBalance;
+    const Transaction = metal === "silver" ? SilverTransaction : GoldTransaction;
+    const valueField = metal === "silver" ? "silverValue" : "goldValue";
+
+    let grams, metalValue, gstAmt, totalDeduct;
     if (isBonus) {
-        // Bonus gold is free — no wallet deduction, but still GST-accounted for records
-        goldValue = amount;
+        // Bonus metal is free — no wallet deduction, but still GST-accounted for records
+        metalValue = amount;
         gstAmt = 0;
         totalDeduct = 0;
-        grams = parseFloat((goldValue / buyRate).toFixed(6));
+        grams = parseFloat((metalValue / buyRate).toFixed(6));
     } else {
-        goldValue = amount;
-        gstAmt = parseFloat((goldValue * GST_PCT / 100).toFixed(2));
-        totalDeduct = parseFloat((goldValue + gstAmt).toFixed(2));
-        grams = parseFloat((goldValue / buyRate).toFixed(6));
+        metalValue = amount;
+        gstAmt = parseFloat((metalValue * GST_PCT / 100).toFixed(2));
+        totalDeduct = parseFloat((metalValue + gstAmt).toFixed(2));
+        grams = parseFloat((metalValue / buyRate).toFixed(6));
 
         const wallet = await getOrCreateWallet(userId);
         if (wallet.balance < totalDeduct) {
@@ -93,23 +106,26 @@ async function payInstallment({ userId, enrollment, amount, isBonus = false }) {
         await wallet.save();
     }
 
-    let goldBal = await GoldBalance.findOne({ user: userId });
-    if (!goldBal) goldBal = await GoldBalance.create({ user: userId });
-    goldBal.totalGrams = parseFloat((goldBal.totalGrams + grams).toFixed(6));
-    if (!isBonus) goldBal.investedAmt = parseFloat((goldBal.investedAmt + goldValue).toFixed(2));
-    await goldBal.save();
+    let bal = await Balance.findOne({ user: userId });
+    if (!bal) bal = await Balance.create({ user: userId });
+    bal.totalGrams = parseFloat((bal.totalGrams + grams).toFixed(6));
+    if (!isBonus) bal.investedAmt = parseFloat((bal.investedAmt + metalValue).toFixed(2));
+    await bal.save();
 
-    const goldTxn = await GoldTransaction.create({
-        user: userId, type: "sip_buy", grams,
-        ratePerGram: buyRate, goldValue, gstAmt, totalAmt: isBonus ? 0 : totalDeduct,
+    const txnData = {
+        user: userId, type: metal === "silver" ? "buy" : "sip_buy", grams,
+        ratePerGram: buyRate, gstAmt, totalAmt: isBonus ? 0 : totalDeduct,
         status: "success",
         note: isBonus
-            ? `Bonus gold — ${enrollment.schemeName} maturity`
+            ? `Bonus ${metal} — ${enrollment.schemeName} maturity`
             : `Installment #${enrollment.installmentsPaid + 1} — ${enrollment.schemeName}`,
-        sipPlanId: enrollment._id,
-    });
+    };
+    txnData[valueField] = metalValue;
+    if (metal === "gold") txnData.sipPlanId = enrollment._id; // GoldTransaction-only field
 
-    return { grams, ratePerGram: buyRate, goldTxnId: goldTxn._id };
+    const txn = await Transaction.create(txnData);
+
+    return { grams, ratePerGram: buyRate, goldTxnId: txn._id };
 }
 
 // POST /api/schemes/:id/enroll  — join a scheme by paying the FIRST installment
@@ -139,6 +155,7 @@ exports.enrollScheme = async (req, res, next) => {
             user: req.user._id,
             scheme: scheme._id,
             schemeName: scheme.name,
+            metal: scheme.metal,
             monthlyAmount,
             durationMonths: scheme.durationMonths,
             bonusMonths: scheme.bonusMonths,

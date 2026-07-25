@@ -299,5 +299,147 @@ exports.initiateWithdraw = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// 4b. POST /api/wallet/buy-silver  — buy silver using wallet balance
+// body: { amountInRupees } OR { grams }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.buySilverFromWallet = async (req, res, next) => {
+    try {
+        const { SilverBalance, SilverTransaction } = require("../models/Silver");
+        const { fetchLiveRates } = require("./goldController");
+
+        const rates = await fetchLiveRates();
+        const buyRate = rates.silver.buyRate;
+        if (!buyRate || buyRate <= 0) {
+            return res.status(503).json({ success: false, message: "Silver rate unavailable right now" });
+        }
+        const GST_PCT = 3;
+
+        let { amountInRupees, grams } = req.body;
+        if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
+        if (!amountInRupees || amountInRupees < 100) {
+            return res.status(400).json({ success: false, message: "Minimum purchase is ₹100" });
+        }
+
+        const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
+        const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
+        const gramsToAdd = parseFloat((amountInRupees / buyRate).toFixed(6));
+
+        const wallet = await getOrCreateWallet(req.user._id);
+        if (wallet.balance < totalAmt) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient wallet balance. Have ₹${wallet.balance.toFixed(2)}, need ₹${totalAmt.toFixed(2)}`,
+                data: { walletBalance: wallet.balance, required: totalAmt },
+            });
+        }
+
+        const balBefore = wallet.balance;
+        wallet.balance = parseFloat((wallet.balance - totalAmt).toFixed(2));
+        await wallet.save();
+
+        let silverBal = await SilverBalance.findOne({ user: req.user._id });
+        if (!silverBal) silverBal = await SilverBalance.create({ user: req.user._id });
+        silverBal.totalGrams = parseFloat((silverBal.totalGrams + gramsToAdd).toFixed(6));
+        silverBal.investedAmt = parseFloat((silverBal.investedAmt + amountInRupees).toFixed(2));
+        await silverBal.save();
+
+        const silverTxn = await SilverTransaction.create({
+            user: req.user._id, type: "buy", grams: gramsToAdd,
+            ratePerGram: buyRate, silverValue: amountInRupees,
+            gstAmt, totalAmt, status: "success",
+            note: "Purchased via wallet",
+        });
+
+        await recordTxn(req.user._id, "silver_buy", totalAmt, balBefore, wallet.balance, {
+            silverTxnId: silverTxn._id,
+            note: `Bought ${gramsToAdd}g silver @ ₹${buyRate}/g`,
+            status: "success",
+        });
+
+        res.json({
+            success: true,
+            message: `${gramsToAdd}g silver credited to your account`,
+            data: {
+                grams: gramsToAdd,
+                totalGrams: silverBal.totalGrams,
+                amountDeducted: totalAmt,
+                walletBalance: wallet.balance,
+                breakdown: { silverValue: amountInRupees, gstAmt, totalAmt, ratePerGram: buyRate },
+                invoiceNo: silverTxn.invoiceNo,
+            },
+        });
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5b. POST /api/wallet/sell-silver  — sell silver → credit wallet (locked)
+// body: { grams }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.sellSilverToWallet = async (req, res, next) => {
+    try {
+        const { SilverBalance, SilverTransaction } = require("../models/Silver");
+        const { fetchLiveRates } = require("./goldController");
+
+        const { grams } = req.body;
+        if (!grams || grams < 0.001) {
+            return res.status(400).json({ success: false, message: "Minimum sell is 0.001g" });
+        }
+
+        const [rates, silverBal, wallet] = await Promise.all([
+            fetchLiveRates(),
+            SilverBalance.findOne({ user: req.user._id }),
+            getOrCreateWallet(req.user._id),
+        ]);
+
+        if (!silverBal || silverBal.totalGrams - silverBal.lockedGrams < grams) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient silver. Available: ${(silverBal?.totalGrams - silverBal?.lockedGrams || 0).toFixed(4)}g`,
+            });
+        }
+
+        const sellRate = rates.silver.sellRate;
+        if (!sellRate || sellRate <= 0) {
+            return res.status(503).json({ success: false, message: "Silver rate unavailable right now" });
+        }
+        const sellValue = parseFloat((grams * sellRate).toFixed(2));
+
+        silverBal.lockedGrams = parseFloat((silverBal.lockedGrams + grams).toFixed(6));
+        await silverBal.save();
+
+        const balBefore = wallet.balance;
+        wallet.pendingCredit = parseFloat((wallet.pendingCredit + sellValue).toFixed(2));
+        await wallet.save();
+
+        const silverTxn = await SilverTransaction.create({
+            user: req.user._id, type: "sell", grams,
+            ratePerGram: sellRate, silverValue: sellValue,
+            gstAmt: 0, totalAmt: sellValue, status: "processing",
+            note: "Sold — pending wallet credit",
+        });
+
+        await recordTxn(req.user._id, "silver_sell", sellValue, balBefore, wallet.balance, {
+            silverTxnId: silverTxn._id,
+            note: `Sold ${grams}g silver @ ₹${sellRate}/g — releasing in 24h`,
+            status: "pending",
+        });
+
+        // Reuses the same goldCron.js release job pattern — see note below
+        // on wiring the 24h release for silver sells too.
+        res.json({
+            success: true,
+            message: `₹${sellValue} will be credited to your wallet within 24 hours`,
+            data: {
+                grams, sellValue, ratePerGram: sellRate,
+                walletPendingCredit: wallet.pendingCredit,
+                releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                invoiceNo: silverTxn.invoiceNo,
+            },
+        });
+    } catch (err) { next(err); }
+};
+
+
 // Exported for reuse by schemeController (installment payments deduct from wallet)
 exports.getOrCreateWallet = getOrCreateWallet;

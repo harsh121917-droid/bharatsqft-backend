@@ -7,15 +7,20 @@ const CounterSchema = new mongoose.Schema({
 });
 const Counter = mongoose.model("Counter", CounterSchema);
 
-async function nextInvoiceNo() {
+// Generic — usable by any metal's transaction schema (gold, silver, ...)
+async function nextInvoiceNoFor(counterName, prefix) {
     const year = new Date().getFullYear();
-    const counterId = `gold_invoice_${year}`;
+    const counterId = `${counterName}_${year}`;
     const counter = await Counter.findOneAndUpdate(
         { _id: counterId },
         { $inc: { seq: 1 } },
         { new: true, upsert: true }
     );
-    return `INV-${year}-${String(counter.seq).padStart(6, "0")}`; // e.g. INV-2026-000123
+    return `${prefix}-${year}-${String(counter.seq).padStart(6, "0")}`; // e.g. INV-2026-000123
+}
+
+async function nextInvoiceNo() {
+    return nextInvoiceNoFor("gold_invoice", "INV");
 }
 
 // ─── Gold Balance (per user) ───────────────────────────────────────────────
@@ -121,6 +126,5 @@ module.exports = {
     GoldTransaction: mongoose.model("GoldTransaction", GoldTransactionSchema),
     GoldSip: mongoose.model("GoldSip", GoldSipSchema),
     CoinOrder: mongoose.model("CoinOrder", CoinOrderSchema),
-    Counter: mongoose.model("Counter", CounterSchema),
-    nextInvoiceNo,
+    nextInvoiceNoFor,
 };
