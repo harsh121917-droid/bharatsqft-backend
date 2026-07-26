@@ -1,6 +1,8 @@
 const User = require("../models/User");
 const Enquiry = require("../models/Enquiry");
 const { Wallet, WalletTxn } = require("../models/Wallet");
+const { GoldBalance, GoldTransaction } = require("../models/Gold");
+const { SilverBalance, SilverTransaction } = require("../models/Silver");
 
 exports.getAllUsers = async (req, res, next) => {
     try {
@@ -158,5 +160,96 @@ exports.completeWithdrawal = async (req, res, next) => {
         await wtxn.save();
 
         res.json({ success: true, message: "Withdrawal marked complete", data: wtxn });
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Sell Payout Approvals (gold + silver) ─────────────────────────────────────
+// Selling gold/silver no longer auto-releases to the wallet after 24h — an
+// admin must manually approve it first. Once approved, the money moves from
+// pendingCredit → balance and becomes withdrawable.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/admin/sell-approvals?metal=gold|silver|all&status=processing
+exports.getSellApprovals = async (req, res, next) => {
+    try {
+        const { metal = "all", status = "processing", page = 1, limit = 30 } = req.query;
+        const filter = { type: "sell" };
+        if (status !== "all") filter.status = status;
+
+        const wantGold = metal === "all" || metal === "gold";
+        const wantSilver = metal === "all" || metal === "silver";
+
+        const [goldTxns, silverTxns] = await Promise.all([
+            wantGold ? GoldTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
+            wantSilver ? SilverTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
+        ]);
+
+        const combined = [
+            ...goldTxns.map(t => ({ ...t.toObject(), metal: "gold", value: t.goldValue })),
+            ...silverTxns.map(t => ({ ...t.toObject(), metal: "silver", value: t.silverValue })),
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        const total = combined.length;
+        const start = (page - 1) * limit;
+        const paged = combined.slice(start, start + Number(limit));
+
+        res.json({ success: true, data: paged, total, page: +page, pages: Math.ceil(total / limit) });
+    } catch (err) { next(err); }
+};
+
+// PATCH /api/admin/sell-approvals/:id/approve?metal=gold|silver
+// Moves pendingCredit → balance, deducts locked grams, marks the sale complete.
+exports.approveSellPayout = async (req, res, next) => {
+    try {
+        const { metal } = req.query;
+        if (metal !== "gold" && metal !== "silver") {
+            return res.status(400).json({ success: false, message: "metal query param must be 'gold' or 'silver'" });
+        }
+
+        const Transaction = metal === "gold" ? GoldTransaction : SilverTransaction;
+        const Balance = metal === "gold" ? GoldBalance : SilverBalance;
+        const valueField = metal === "gold" ? "goldValue" : "silverValue";
+        const linkField = metal === "gold" ? "goldTxnId" : "silverTxnId";
+
+        const txn = await Transaction.findById(req.params.id);
+        if (!txn || txn.type !== "sell") {
+            return res.status(404).json({ success: false, message: "Sell transaction not found" });
+        }
+        if (txn.status !== "processing") {
+            return res.status(400).json({ success: false, message: `Already ${txn.status}` });
+        }
+
+        const [bal, wallet] = await Promise.all([
+            Balance.findOne({ user: txn.user }),
+            Wallet.findOne({ user: txn.user }),
+        ]);
+        if (!bal || !wallet) {
+            return res.status(404).json({ success: false, message: "User balance/wallet not found" });
+        }
+
+        // Deduct the metal (it was only locked, not yet removed, until now)
+        bal.totalGrams = parseFloat((bal.totalGrams - txn.grams).toFixed(6));
+        bal.lockedGrams = parseFloat((bal.lockedGrams - txn.grams).toFixed(6));
+        bal.investedAmt = parseFloat(Math.max(0, bal.investedAmt - txn[valueField] * 0.9).toFixed(2));
+        await bal.save();
+
+        // Move pendingCredit → balance — now withdrawable
+        wallet.balance = parseFloat((wallet.balance + txn.totalAmt).toFixed(2));
+        wallet.pendingCredit = parseFloat(Math.max(0, wallet.pendingCredit - txn.totalAmt).toFixed(2));
+        await wallet.save();
+
+        txn.status = "success";
+        await txn.save();
+
+        await WalletTxn.findOneAndUpdate(
+            { [linkField]: txn._id },
+            {
+                status: "success", balanceAfter: wallet.balance,
+                note: `₹${txn.totalAmt} approved & credited to wallet from ${metal} sale`,
+            }
+        );
+
+        res.json({ success: true, message: `${metal} sell payout approved — ₹${txn.totalAmt} now withdrawable`, data: txn });
     } catch (err) { next(err); }
 };

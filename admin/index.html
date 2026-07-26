@@ -1257,6 +1257,11 @@
                 <span id="withdrawals-pending-badge"
                     style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;display:none">0</span>
             </div>
+            <div class="nav-item" onclick="showPage('sellapprovals')" id="nav-sellapprovals"><i
+                    class="fas fa-check-double"></i> Sell Approvals
+                <span id="sellapprovals-pending-badge"
+                    style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;display:none">0</span>
+            </div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1430,6 +1435,32 @@
                 </div>
                 <div class="table-wrap">
                     <div id="withdrawals-body">
+                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sell Approvals Page -->
+            <div class="page" id="page-sellapprovals">
+                <div class="section-header">
+                    <div class="section-title">Sell Payout Approvals</div>
+                    <div style="display:flex;gap:8px">
+                        <select id="sellapprovals-metal-filter" onchange="loadSellApprovals()"
+                            style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#333);background:var(--card,#1a1a1a);color:inherit">
+                            <option value="all" selected>All Metals</option>
+                            <option value="gold">Gold Only</option>
+                            <option value="silver">Silver Only</option>
+                        </select>
+                        <select id="sellapprovals-status-filter" onchange="loadSellApprovals()"
+                            style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#333);background:var(--card,#1a1a1a);color:inherit">
+                            <option value="processing" selected>Pending Approval</option>
+                            <option value="success">Approved</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <div id="sellapprovals-body">
                         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                     </div>
                 </div>
@@ -1785,7 +1816,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -1795,6 +1826,7 @@
             if (name === 'kyc') loadKyc();
             if (name === 'schemes') loadSchemes();
             if (name === 'withdrawals') loadWithdrawals();
+            if (name === 'sellapprovals') loadSellApprovals();
         }
 
         async function api(path, opts = {}) {
@@ -2649,6 +2681,74 @@
                 loadWithdrawals();
             } else {
                 toast(data.message || 'Failed to complete withdrawal', 'error');
+            }
+        }
+
+        /* Sell Payout Approvals */
+        async function loadSellApprovals() {
+            const body = document.getElementById('sellapprovals-body');
+            body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+            const metal = document.getElementById('sellapprovals-metal-filter').value;
+            const status = document.getElementById('sellapprovals-status-filter').value;
+            const data = await api('/admin/sell-approvals?metal=' + metal + '&status=' + status + '&limit=100');
+            if (!data.success) { body.innerHTML = '<div class="empty">Failed to load</div>'; return; }
+
+            const pendingData = status === 'processing' ? data : await api('/admin/sell-approvals?metal=all&status=processing&limit=1');
+            const badge = document.getElementById('sellapprovals-pending-badge');
+            if (pendingData.total > 0) { badge.textContent = pendingData.total; badge.style.display = ''; }
+            else badge.style.display = 'none';
+
+            if (!data.data.length) {
+                body.innerHTML = '<div class="empty"><i class="fas fa-check-double"></i>No sell payouts to show</div>';
+                return;
+            }
+
+            const sc = { processing: 'var(--warning)', success: 'var(--success)' };
+            const rows = data.data.map(function (t) {
+                const metalBadge = t.metal === 'silver'
+                    ? '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#e8e8e8;color:#555">SILVER</span>'
+                    : '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#fff3d6;color:#a67c00">GOLD</span>';
+                const userName = (t.user && t.user.name) ? t.user.name : 'Unknown';
+                const userEmail = (t.user && t.user.email) ? t.user.email : '';
+                const action = t.status === 'processing'
+                    ? '<button class="btn-sm btn-info" onclick="approveSellPayout(\'' + t._id + '\', \'' + t.metal + '\')"><i class="fas fa-check"></i> Approve</button>'
+                    : '<span style="color:var(--muted);font-size:12px">Approved</span>';
+                return '<tr>'
+                    + '<td><strong>' + userName + '</strong> ' + metalBadge + '<br><span style="color:var(--muted);font-size:12px">' + userEmail + '</span></td>'
+                    + '<td>' + t.grams.toFixed(4) + 'g @ ₹' + t.ratePerGram.toFixed(2) + '</td>'
+                    + '<td style="font-weight:600">₹' + (t.totalAmt || 0).toLocaleString('en-IN') + '</td>'
+                    + '<td><span class="badge" style="background:' + sc[t.status] + '22;color:' + sc[t.status] + '">' + t.status + '</span></td>'
+                    + '<td style="color:var(--muted);font-size:12px">' + new Date(t.createdAt).toLocaleString('en-IN') + '</td>'
+                    + '<td>' + action + '</td>'
+                    + '</tr>';
+            }).join('');
+
+            const cards = data.data.map(function (t) {
+                const metalLabel = t.metal === 'silver' ? 'SILVER' : 'GOLD';
+                const userName = (t.user && t.user.name) ? t.user.name : 'Unknown';
+                const action = t.status === 'processing'
+                    ? '<div class="m-card-actions"><button class="btn-sm btn-info" onclick="approveSellPayout(\'' + t._id + '\', \'' + t.metal + '\')"><i class="fas fa-check"></i> Approve</button></div>'
+                    : '';
+                return '<div class="m-card">'
+                    + '<div class="m-card-row">'
+                    + '<div style="flex:1"><div class="m-card-title">' + userName + ' · ' + metalLabel + '</div>'
+                    + '<div class="m-card-sub">' + t.grams.toFixed(4) + 'g → ₹' + (t.totalAmt || 0).toLocaleString('en-IN') + '</div></div>'
+                    + '<span class="badge" style="background:' + sc[t.status] + '22;color:' + sc[t.status] + '">' + t.status + '</span>'
+                    + '</div>' + action + '</div>';
+            }).join('');
+
+            body.innerHTML = '<div class="table-view"><table><thead><tr><th>User</th><th>Grams</th><th>Amount</th><th>Status</th><th>Sold On</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                + '<div class="card-list">' + cards + '</div>';
+        }
+
+        async function approveSellPayout(id, metal) {
+            if (!confirm('Approve this sell payout? The amount becomes withdrawable in the user wallet immediately.')) return;
+            const data = await api('/admin/sell-approvals/' + id + '/approve?metal=' + metal, { method: 'PATCH' });
+            if (data.success) {
+                toast('Sell payout approved ✓', 'success');
+                loadSellApprovals();
+            } else {
+                toast(data.message || 'Failed to approve', 'error');
             }
         }
 
