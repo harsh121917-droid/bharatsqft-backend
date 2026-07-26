@@ -104,7 +104,7 @@ async function fetchLiveRates() {
         };
         _cacheTime = now;
 
-        // Persist latest gold rate to DB (for history / offline fallback)
+        // Persist latest gold + silver rate to DB (for history / offline fallback)
         await GoldRate.findOneAndUpdate(
             { source: "goldapi.io" },
             {
@@ -112,6 +112,10 @@ async function fetchLiveRates() {
                 sellRate: _rateCache.gold.sellRate,
                 change24h: _rateCache.gold.change24h,
                 changePct: _rateCache.gold.changePct,
+                silverBuyRate: _rateCache.silver.buyRate,
+                silverSellRate: _rateCache.silver.sellRate,
+                silverChange24h: _rateCache.silver.change24h,
+                silverChangePct: _rateCache.silver.changePct,
                 source: "goldapi.io",
                 isActive: true,
             },
@@ -131,7 +135,17 @@ async function fetchLiveRates() {
                     change24h: dbRate.change24h,
                     changePct: dbRate.changePct,
                 },
-                silver: { buyRate: 0, sellRate: 0, change24h: 0, changePct: 0 },
+                silver: (dbRate.silverBuyRate > 0 && dbRate.silverSellRate > 0)
+                    ? {
+                        buyRate: dbRate.silverBuyRate,
+                        sellRate: dbRate.silverSellRate,
+                        change24h: dbRate.silverChange24h,
+                        changePct: dbRate.silverChangePct,
+                    }
+                    // No cached silver rate ever saved (e.g. very first run before
+                    // the API ever succeeded) — better to show a rough static
+                    // estimate than a hard zero, which reads as "free silver" in the app.
+                    : { buyRate: 175, sellRate: 173, change24h: 0, changePct: 0 },
                 copper: { buyRate: 0, sellRate: 0, change24h: 0, changePct: 0 },
                 updatedAt: dbRate.updatedAt,
                 source: "db_fallback", // frontend should flag this as possibly stale

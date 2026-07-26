@@ -37,10 +37,14 @@ const GoldBalanceSchema = new mongoose.Schema(
 // ─── Gold Rate (admin updates / cron syncs) ────────────────────────────────
 const GoldRateSchema = new mongoose.Schema(
     {
-        buyRate: { type: Number, required: true },   // ₹/g user pays
-        sellRate: { type: Number, required: true },   // ₹/g user gets
+        buyRate: { type: Number, required: true },   // ₹/g user pays (gold)
+        sellRate: { type: Number, required: true },   // ₹/g user gets (gold)
         change24h: { type: Number, default: 0 },
         changePct: { type: Number, default: 0 },
+        silverBuyRate: { type: Number, default: 0 },
+        silverSellRate: { type: Number, default: 0 },
+        silverChange24h: { type: Number, default: 0 },
+        silverChangePct: { type: Number, default: 0 },
         source: { type: String, default: "manual" }, // manual | mmtc | safegold
         purity: { type: String, default: "24K" },
         isActive: { type: Boolean, default: true },

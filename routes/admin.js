@@ -4,6 +4,7 @@ const {
   getAllUsers, getUserById, updateUser, deleteUser,
   getAllEnquiries, updateEnquiry, deleteEnquiry,
   getDashboard,
+  getWithdrawals, completeWithdrawal,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -45,5 +46,9 @@ router.get("/investments", getAllInvestments);
 router.get("/kyc", getAllKyc);
 router.get("/kyc/:id", getKycById);
 router.patch("/kyc/:id", reviewKyc);
+
+// Withdrawals
+router.get("/withdrawals", getWithdrawals);
+router.patch("/withdrawals/:id/complete", completeWithdrawal);
 
 module.exports = router;

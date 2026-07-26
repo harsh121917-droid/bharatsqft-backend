@@ -1252,6 +1252,11 @@
             </div>
             <div class="nav-item" onclick="showPage('schemes')" id="nav-schemes"><i class="fas fa-award"></i> Gold
                 Schemes</div>
+            <div class="nav-item" onclick="showPage('withdrawals')" id="nav-withdrawals"><i
+                    class="fas fa-hand-holding-usd"></i> Withdrawals
+                <span id="withdrawals-pending-badge"
+                    style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;display:none">0</span>
+            </div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1407,6 +1412,24 @@
                 </div>
                 <div class="table-wrap">
                     <div id="schemes-body">
+                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Withdrawals Page -->
+            <div class="page" id="page-withdrawals">
+                <div class="section-header">
+                    <div class="section-title">Withdrawal Requests</div>
+                    <select id="withdrawals-filter" onchange="loadWithdrawals()"
+                        style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#333);background:var(--card,#1a1a1a);color:inherit">
+                        <option value="pending" selected>Pending</option>
+                        <option value="success">Completed</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <div id="withdrawals-body">
                         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                     </div>
                 </div>
@@ -1762,7 +1785,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -1771,6 +1794,7 @@
             if (name === 'investments') loadInvestments();
             if (name === 'kyc') loadKyc();
             if (name === 'schemes') loadSchemes();
+            if (name === 'withdrawals') loadWithdrawals();
         }
 
         async function api(path, opts = {}) {
@@ -2563,6 +2587,68 @@
                 loadSchemes();
             } else {
                 toast(data.message || 'Action failed', 'error');
+            }
+        }
+
+        /* ── Withdrawals ── */
+        async function loadWithdrawals() {
+            const body = document.getElementById('withdrawals-body');
+            body.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>`;
+            const status = document.getElementById('withdrawals-filter').value;
+            const data = await api(`/admin/withdrawals?status=${status}&limit=100`);
+            if (!data.success) { body.innerHTML = `<div class="empty">Failed to load</div>`; return; }
+
+            // Update sidebar pending badge using a fixed pending fetch (independent of current filter)
+            const pendingData = status === 'pending' ? data : await api('/admin/withdrawals?status=pending&limit=1');
+            const badge = document.getElementById('withdrawals-pending-badge');
+            if (pendingData.total > 0) { badge.textContent = pendingData.total; badge.style.display = ''; }
+            else badge.style.display = 'none';
+
+            if (!data.data.length) {
+                body.innerHTML = `<div class="empty"><i class="fas fa-hand-holding-usd"></i>No ${status === 'all' ? '' : status} withdrawal requests</div>`;
+                return;
+            }
+
+            const sc = { pending: 'var(--warning)', success: 'var(--success)', failed: 'var(--danger)' };
+            const rows = data.data.map(w => `
+    <tr>
+      <td><strong>${w.user?.name || 'Unknown'}</strong><br><span style="color:var(--muted);font-size:12px">${w.user?.email || ''}</span></td>
+      <td style="font-weight:600">₹${(w.amount || 0).toLocaleString('en-IN')}</td>
+      <td><span class="badge" style="background:${sc[w.status]}22;color:${sc[w.status]}">${w.status}</span></td>
+      <td style="color:var(--muted);font-size:12px">${new Date(w.createdAt).toLocaleString('en-IN')}</td>
+      <td>${w.status === 'pending'
+                    ? `<button class="btn-sm btn-info" onclick="completeWithdrawal('${w._id}')"><i class="fas fa-check"></i> Mark Complete</button>`
+                    : `<span style="color:var(--muted);font-size:12px">${w.note || '—'}</span>`}</td>
+    </tr>`).join('');
+
+            const cards = data.data.map(w => `
+    <div class="m-card">
+      <div class="m-card-row">
+        <div style="flex:1">
+          <div class="m-card-title">${w.user?.name || 'Unknown'}</div>
+          <div class="m-card-sub">₹${(w.amount || 0).toLocaleString('en-IN')} · ${new Date(w.createdAt).toLocaleDateString('en-IN')}</div>
+        </div>
+        <span class="badge" style="background:${sc[w.status]}22;color:${sc[w.status]}">${w.status}</span>
+      </div>
+      ${w.status === 'pending' ? `
+      <div class="m-card-actions">
+        <button class="btn-sm btn-info" onclick="completeWithdrawal('${w._id}')"><i class="fas fa-check"></i> Mark Complete</button>
+      </div>` : ''}
+    </div>`).join('');
+
+            body.innerHTML = `
+    <div class="table-view"><table><thead><tr><th>User</th><th>Amount</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="card-list">${cards}</div>`;
+        }
+
+        async function completeWithdrawal(id) {
+            if (!confirm('Mark this withdrawal as completed? This releases the money from the locked balance and records it as withdrawn.')) return;
+            const data = await api(`/admin/withdrawals/${id}/complete`, { method: 'PATCH' });
+            if (data.success) {
+                toast('Withdrawal marked complete ✓', 'success');
+                loadWithdrawals();
+            } else {
+                toast(data.message || 'Failed to complete withdrawal', 'error');
             }
         }
 
