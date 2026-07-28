@@ -68,7 +68,22 @@ async function sendViaArihant(phone, message) {
         dltContentId: ARIHANT_DLT_CONTENT_ID,
     };
 
-    const response = await axios.get(ARIHANT_BASE_URL, { params, timeout: 10000 });
+    let response;
+    try {
+        response = await axios.get(ARIHANT_BASE_URL, { params, timeout: 10000 });
+    } catch (err) {
+        // Arihant returned a non-2xx HTTP status (not the documented "200 with
+        // error statusCode inside" shape) — axios throws before we can see the
+        // body normally, so log it explicitly here to find out what's wrong.
+        console.error("[Arihant SMS] HTTP error status:", err.response?.status);
+        console.error("[Arihant SMS] HTTP error body:", err.response?.data);
+        console.error("[Arihant SMS] request URL was:", err.config?.url);
+        console.error("[Arihant SMS] request params were:", { ...params, password: "••••" });
+        throw new Error(
+            `Arihant SMS request rejected (HTTP ${err.response?.status}): ` +
+            `${JSON.stringify(err.response?.data) || err.message}`
+        );
+    }
     const data = response.data;
     console.log("[Arihant SMS] response:", data);
 
