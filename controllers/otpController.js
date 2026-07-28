@@ -1,0 +1,110 @@
+const Otp = require("../models/Otp");
+const User = require("../models/User");
+const { sendSms } = require("../services/smsService");
+
+const OTP_EXPIRY_MINUTES = 5;
+const MAX_VERIFY_ATTEMPTS = 5;
+const RESEND_COOLDOWN_SECONDS = 30;
+
+function generateCode() {
+    return String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/otp/send   body: { phone, purpose: "register" | "login" }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.sendOtp = async (req, res, next) => {
+    try {
+        const { phone, purpose } = req.body;
+        if (!phone || !/^[0-9+\-\s()]{7,15}$/.test(phone)) {
+            return res.status(400).json({ success: false, message: "Valid phone number required" });
+        }
+        if (!["register", "login"].includes(purpose)) {
+            return res.status(400).json({ success: false, message: "purpose must be 'register' or 'login'" });
+        }
+
+        const existingUser = await User.findOne({ phone });
+        if (purpose === "register" && existingUser) {
+            return res.status(400).json({ success: false, message: "Phone already registered — try logging in instead" });
+        }
+        if (purpose === "login" && !existingUser) {
+            return res.status(404).json({ success: false, message: "No account found with this phone number" });
+        }
+
+        // Cooldown — stop someone spamming resend and burning SMS credits
+        const recent = await Otp.findOne({ phone, purpose }).sort({ createdAt: -1 });
+        if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_SECONDS * 1000) {
+            const waitSec = Math.ceil(
+                (RESEND_COOLDOWN_SECONDS * 1000 - (Date.now() - recent.createdAt.getTime())) / 1000
+            );
+            return res.status(429).json({ success: false, message: `Please wait ${waitSec}s before requesting another OTP` });
+        }
+
+        const code = generateCode();
+        const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+        await Otp.create({ phone, code, purpose, expiresAt });
+
+        const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+        await sendSms(phone, message);
+
+        res.json({ success: true, message: `OTP sent to ${phone}`, expiresInSeconds: OTP_EXPIRY_MINUTES * 60 });
+    } catch (err) {
+        console.error("sendOtp error:", err.message);
+        res.status(502).json({ success: false, message: "Failed to send OTP. Please try again shortly." });
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/otp/verify   body: { phone, purpose, code }
+// Returns a short-lived verification token to be passed to register/login-phone.
+// ══════════════════════════════════════════════════════════════════════════════
+exports.verifyOtp = async (req, res, next) => {
+    try {
+        const { phone, purpose, code } = req.body;
+        if (!phone || !purpose || !code) {
+            return res.status(400).json({ success: false, message: "phone, purpose and code are required" });
+        }
+
+        const otp = await Otp.findOne({ phone, purpose, verified: false }).sort({ createdAt: -1 });
+        if (!otp) {
+            return res.status(400).json({ success: false, message: "No pending OTP for this phone — request a new one" });
+        }
+        if (otp.expiresAt.getTime() < Date.now()) {
+            return res.status(400).json({ success: false, message: "OTP expired — request a new one" });
+        }
+        if (otp.attempts >= MAX_VERIFY_ATTEMPTS) {
+            return res.status(429).json({ success: false, message: "Too many incorrect attempts — request a new OTP" });
+        }
+
+        if (otp.code !== String(code).trim()) {
+            otp.attempts += 1;
+            await otp.save();
+            return res.status(400).json({
+                success: false,
+                message: `Incorrect OTP (${MAX_VERIFY_ATTEMPTS - otp.attempts} attempts left)`,
+            });
+        }
+
+        otp.verified = true;
+        await otp.save();
+
+        res.json({
+            success: true,
+            message: "OTP verified",
+            // Client passes this straight back to /api/auth/register-phone or
+            // /api/auth/login-phone as `otpRecordId` to prove verification.
+            otpRecordId: otp._id,
+        });
+    } catch (err) { next(err); }
+};
+
+// Internal helper used by authController — confirms a given otpRecordId is a
+// real, verified, unexpired, unused OTP for this exact phone+purpose.
+exports.consumeVerifiedOtp = async (phone, purpose, otpRecordId) => {
+    const otp = await Otp.findOne({ _id: otpRecordId, phone, purpose, verified: true });
+    if (!otp) return false;
+    if (otp.expiresAt.getTime() < Date.now()) return false;
+    await otp.deleteOne(); // single-use — consumed
+    return true;
+};
