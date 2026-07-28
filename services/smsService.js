@@ -2,42 +2,53 @@ const axios = require("axios");
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * ⚠️  ARIHANT GLOBAL — FILL IN YOUR REAL API DETAILS BELOW
+ * ARIHANT GLOBAL — confirmed from their official API Specification Document
+ * (not a guess — this matches their real welcome email + PDF exactly)
  * ══════════════════════════════════════════════════════════════════════════
- * Arihant Global's public site doesn't publish the exact API spec — they
- * give you the real endpoint URL, parameter names, and your API key/username
- * after you sign up, usually via:
- *   - the welcome email sent after signup, OR
- *   - "API Docs" / "API" section inside https://control.arihantglobal.in
- *     after logging into your account
+ * Endpoint (GET, query params):
+ *   https://control.arihantglobal.in/fe/api/v1/send
+ *     ?username={api_username}&password={api_password}
+ *     &dltPrincipalEntityId={Entityid}&from={sender_name}
+ *     &text={message_text}&to={mobile number}&unicode=false
+ *     &dltContentId={template id}
  *
- * The shape below (GET request, user/pass/sender/mobile/message params) is
- * the MOST COMMON pattern used by Indian bulk-SMS reseller panels — but you
- * MUST confirm the exact parameter names against your own account's API doc
- * before this will actually send anything. Log into your panel, find the
- * "API" tab, and copy the exact sample URL they show you — then update the
- * `ARIHANT_API_URL` and the `params` object below to match exactly.
+ * IMPORTANT — the API username/password are NOT your login credentials
+ * (payvikaindia / GUI password). Get the real API password from:
+ *   Login to https://control.arihantglobal.in → My Profile →
+ *   click "Email API Credential" — it emails your real API username +
+ *   password to your registered service account email. You don't need to
+ *   fill in the "SV Profile" fields (those are locked/greyed out and are
+ *   for a different, unrelated sub-service) — just click that button.
  *
- * Also register your OTP message as a DLT-approved template first — Indian
- * telecom operators will silently drop transactional SMS that doesn't match
- * an approved template registered against your Sender ID.
+ * API username format: {account}.trans for Transactional SMS (confirmed
+ * in the PDF's own example: "Test.trans"), e.g. "payvikaindia.trans".
+ *
+ * You also need, from your DLT registration:
+ *   - dltPrincipalEntityId — your Principal Entity ID
+ *   - dltContentId         — the approved template ID for your OTP message
+ *     text. The template text on DLT must match `text` sent here EXACTLY
+ *     (variable placeholders aside) or the operator will silently drop it.
+ *
+ * Set all of these in your .env — see the ARIHANT_* vars below.
  * ══════════════════════════════════════════════════════════════════════════
  */
-const ARIHANT_API_URL = process.env.ARIHANT_API_URL || "https://smpp.arihantglobal.in/api/mt/SendSMS"; // ← confirm this against your panel
-const ARIHANT_USER = process.env.ARIHANT_SMS_USER;         // your Arihant account username
-const ARIHANT_PASSWORD = process.env.ARIHANT_SMS_PASSWORD; // your Arihant account password/API key
-const ARIHANT_SENDER_ID = process.env.ARIHANT_SENDER_ID;   // your approved 6-char Sender ID, e.g. "BSQFTX"
-const ARIHANT_DLT_TEMPLATE_ID = process.env.ARIHANT_DLT_TEMPLATE_ID; // your approved DLT template ID for the OTP message
+const ARIHANT_BASE_URL = "https://control.arihantglobal.in/fe/api/v1/send";
+const ARIHANT_API_USERNAME = process.env.ARIHANT_API_USERNAME;   // e.g. "payvikaindia.trans"
+const ARIHANT_API_PASSWORD = process.env.ARIHANT_API_PASSWORD;   // generated from My Profile, NOT your GUI login password
+const ARIHANT_SENDER_ID = process.env.ARIHANT_SENDER_ID;         // your approved 6-char Sender ID ("from")
+const ARIHANT_DLT_PE_ID = process.env.ARIHANT_DLT_PRINCIPAL_ENTITY_ID; // your DLT Principal Entity ID
+const ARIHANT_DLT_CONTENT_ID = process.env.ARIHANT_DLT_CONTENT_ID;     // approved template ID for the OTP message
 
 /**
- * Sends an SMS via Arihant Global's HTTP API.
+ * Sends an SMS via Arihant Global's real HTTP API.
  * Returns true on apparent success, throws on hard failure.
  */
 async function sendViaArihant(phone, message) {
-    if (!ARIHANT_USER || !ARIHANT_PASSWORD || !ARIHANT_SENDER_ID) {
+    if (!ARIHANT_API_USERNAME || !ARIHANT_API_PASSWORD || !ARIHANT_SENDER_ID || !ARIHANT_DLT_PE_ID || !ARIHANT_DLT_CONTENT_ID) {
         throw new Error(
-            "Arihant SMS credentials not configured — set ARIHANT_SMS_USER, " +
-            "ARIHANT_SMS_PASSWORD, ARIHANT_SENDER_ID (and ARIHANT_DLT_TEMPLATE_ID) in .env"
+            "Arihant SMS credentials not configured — set ARIHANT_API_USERNAME, " +
+            "ARIHANT_API_PASSWORD, ARIHANT_SENDER_ID, ARIHANT_DLT_PRINCIPAL_ENTITY_ID " +
+            "and ARIHANT_DLT_CONTENT_ID in .env (see comments in this file for where each comes from)"
         );
     }
 
@@ -46,23 +57,41 @@ async function sendViaArihant(phone, message) {
     const normalizedPhone = phone.replace(/\D/g, "").replace(/^0+/, "");
     const fullNumber = normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
 
-    // ── ⚠️ REPLACE these param names with your panel's actual API doc ──────
     const params = {
-        user: ARIHANT_USER,
-        password: ARIHANT_PASSWORD,
-        sender: ARIHANT_SENDER_ID,
-        mobile: fullNumber,
-        message,
-        route: "T",              // "T" = Transactional (typical convention — confirm with panel)
-        ...(ARIHANT_DLT_TEMPLATE_ID ? { dltTemplateId: ARIHANT_DLT_TEMPLATE_ID } : {}),
+        username: ARIHANT_API_USERNAME,
+        password: ARIHANT_API_PASSWORD,
+        dltPrincipalEntityId: ARIHANT_DLT_PE_ID,
+        from: ARIHANT_SENDER_ID,
+        text: message,
+        to: fullNumber,
+        unicode: "false",
+        dltContentId: ARIHANT_DLT_CONTENT_ID,
     };
 
-    const response = await axios.get(ARIHANT_API_URL, { params, timeout: 10000 });
+    const response = await axios.get(ARIHANT_BASE_URL, { params, timeout: 10000 });
+    const data = response.data;
+    console.log("[Arihant SMS] response:", data);
 
-    // Most of these panels return a plain-text "OK"/error string rather than
-    // JSON — log it so you can see the exact response shape while testing,
-    // then tighten this success check once you know their real response format.
-    console.log("[Arihant SMS] response:", response.data);
+    // Confirmed from Arihant's real API spec (API SPECIFICATION DOCUMENT, p.4-5):
+    // HTTP 200 does NOT mean the SMS was actually accepted — Arihant returns
+    // business-logic errors as statusCode inside a 200 OK body, so we must
+    // check statusCode explicitly rather than trusting the HTTP status alone.
+    const ARIHANT_ERROR_CODES = {
+        2051: "Sender ID doesn't exist — check ARIHANT_SENDER_ID is registered on your panel",
+        2070: "Authentication failed — check ARIHANT_API_USERNAME/ARIHANT_API_PASSWORD, or account may have expired",
+        2054: "Invalid mobile number format — must be 10 digits, or 12 with 91 country code",
+        6001: "Insufficient balance in your Arihant account",
+        7001: "DLT Content ID not found — check ARIHANT_DLT_CONTENT_ID matches an approved template",
+    };
+
+    if (data && data.statusCode && data.statusCode !== 200) {
+        const reason = ARIHANT_ERROR_CODES[data.statusCode] || data.description || "Unknown error";
+        throw new Error(`Arihant SMS failed (${data.statusCode}): ${reason}`);
+    }
+    if (data && data.state && data.state !== "SUBMIT_ACCEPTED") {
+        throw new Error(`Arihant SMS not accepted: ${data.description || data.state}`);
+    }
+
     return true;
 }
 
