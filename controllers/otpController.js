@@ -51,7 +51,10 @@ exports.sendOtp = async (req, res, next) => {
         // of whether the SMS send below succeeds or fails.
         console.log(`[OTP] ${phone} (${purpose}): ${code}  — expires in ${OTP_EXPIRY_MINUTES}m`);
 
-        const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+        // const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+        //         const message = `Dear Customer,
+        // Your OTP for VIKAONE is ${code}. Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
+        const message = `Dear Customer, Your OTP for VIKAONE is ${code} . Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
         await sendSms(phone, message);
 
         res.json({ success: true, message: `OTP sent to ${phone}`, expiresInSeconds: OTP_EXPIRY_MINUTES * 60 });
