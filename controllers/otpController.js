@@ -45,6 +45,12 @@ exports.sendOtp = async (req, res, next) => {
 
         await Otp.create({ phone, code, purpose, expiresAt });
 
+        // Visible in your Render logs — lets you test the whole OTP flow
+        // via curl/Postman before Arihant is fully wired up, without
+        // needing direct DB access. The record is saved above regardless
+        // of whether the SMS send below succeeds or fails.
+        console.log(`[OTP] ${phone} (${purpose}): ${code}  — expires in ${OTP_EXPIRY_MINUTES}m`);
+
         const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
         await sendSms(phone, message);
 
