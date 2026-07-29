@@ -50,6 +50,33 @@ exports.getMe = async (req, res) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/auth/verify-credentials — step 1 of login: check identifier
+// (email OR phone) + password WITHOUT issuing a token yet. If valid, returns
+// the user's registered phone so the client can send an OTP there next —
+// even if the user typed their email as identifier, OTP always goes to the
+// registered phone, never email.
+// body: { identifier, password }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.verifyCredentials = async (req, res, next) => {
+  try {
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, message: "Email/phone and password required" });
+    }
+    const isEmail = identifier.includes("@");
+    const user = await User.findOne(isEmail ? { email: identifier } : { phone: identifier }).select("+password");
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+    if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
+    if (!user.phone) {
+      return res.status(400).json({ success: false, message: "No phone number on file — contact support" });
+    }
+    res.json({ success: true, phone: user.phone });
+  } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Phone + OTP register/login — additive, doesn't change the existing
 // email/password flow above. Client must first call:
 //   POST /api/otp/send    { phone, purpose: "register" | "login" }
