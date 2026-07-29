@@ -1262,6 +1262,8 @@
                 <span id="sellapprovals-pending-badge"
                     style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;display:none">0</span>
             </div>
+            <div class="nav-item" onclick="showPage('gateways')" id="nav-gateways"><i class="fas fa-credit-card"></i>
+                Payment Gateways</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1374,6 +1376,48 @@
                 </div>
             </div>
 
+            <!-- User Edit Modal -->
+            <div class="modal-overlay" id="user-modal" style="display:none">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3>Edit User</h3>
+                        <button class="modal-close" onclick="closeUserModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="user-id">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="user-name" placeholder="Full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="text" id="user-email" disabled style="opacity:0.6;cursor:not-allowed">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" id="user-phone" placeholder="10-digit mobile number">
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <select id="user-role">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" id="user-active" style="width:auto">
+                                Active (uncheck to deactivate this account)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-cancel" onclick="closeUserModal()">Cancel</button>
+                        <button class="btn-save" onclick="saveUser()" id="user-save-btn">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- KYC Page -->
             <div class="page" id="page-kyc">
                 <div class="section-header">
@@ -1466,6 +1510,85 @@
                 </div>
             </div>
 
+            <!-- Payment Gateways Page -->
+            <div class="page" id="page-gateways">
+                <div class="section-header">
+                    <div class="section-title">Payment Gateways</div>
+                    <div style="color:var(--muted);font-size:12px;max-width:340px;text-align:right">
+                        Enter your real API keys per gateway/mode. The app uses whichever is marked Default when a
+                        request doesn't specify one.
+                    </div>
+                </div>
+                <div id="gateways-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Payment Gateway Edit Modal -->
+    <div class="modal-overlay" id="gateway-modal" style="display:none">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="gateway-modal-title">Configure Gateway</h3>
+                <button class="modal-close" onclick="closeGatewayModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="gateway-id">
+                <div class="form-group">
+                    <label>Gateway</label>
+                    <select id="gateway-name">
+                        <option value="razorpay">Razorpay</option>
+                        <option value="cashfree">Cashfree (Payments)</option>
+                        <option value="cashfree_payout">Cashfree Payout</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mode</label>
+                    <select id="gateway-mode">
+                        <option value="live">Live</option>
+                        <option value="demo">Demo / Sandbox</option>
+                    </select>
+                </div>
+                <div id="gateway-razorpay-fields">
+                    <div class="form-group">
+                        <label>Key ID</label>
+                        <input type="text" id="gateway-keyId" placeholder="rzp_live_xxxxxxxxxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label>Key Secret</label>
+                        <input type="password" id="gateway-keySecret" placeholder="Leave blank to keep existing secret">
+                    </div>
+                </div>
+                <div id="gateway-cashfree-fields" style="display:none">
+                    <div class="form-group">
+                        <label>Client ID</label>
+                        <input type="text" id="gateway-clientId" placeholder="Your Cashfree Client ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Client Secret</label>
+                        <input type="password" id="gateway-clientSecret"
+                            placeholder="Leave blank to keep existing secret">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="gateway-active" style="width:auto" checked>
+                        Active
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="gateway-default" style="width:auto">
+                        Set as default (used when app doesn't specify gateway/mode)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeGatewayModal()">Cancel</button>
+                <button class="btn-save" onclick="saveGateway()" id="gateway-save-btn">Save Gateway</button>
+            </div>
         </div>
     </div>
 
@@ -1816,7 +1939,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -1827,6 +1950,7 @@
             if (name === 'schemes') loadSchemes();
             if (name === 'withdrawals') loadWithdrawals();
             if (name === 'sellapprovals') loadSellApprovals();
+            if (name === 'gateways') loadGateways();
         }
 
         async function api(path, opts = {}) {
@@ -2158,7 +2282,10 @@
       <td><span class="badge badge-${u.role}">${u.role}</span></td>
       <td><span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px">${new Date(u.createdAt).toLocaleDateString('en-IN')}</td>
-      <td><button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i></button></td>
+      <td>
+        <button class="btn-sm btn-info" onclick="openUserModal('${u._id}')"><i class="fas fa-edit"></i></button>
+        <button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i></button>
+      </td>
     </tr>`).join('');
 
             const cards = data.map(u => `
@@ -2176,6 +2303,7 @@
         <span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span>
       </div>
       <div class="m-card-actions">
+        <button class="btn-sm btn-info" onclick="openUserModal('${u._id}')"><i class="fas fa-edit"></i> Edit</button>
         <button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i> Delete</button>
       </div>
     </div>`).join('');
@@ -2189,6 +2317,51 @@
             if (!confirm('Delete this user?')) return;
             const data = await api(`/admin/users/${id}`, { method: 'DELETE' });
             if (data.success) { toast('Deleted', 'success'); loadUsers(); }
+        }
+
+        function openUserModal(id) {
+            const u = allUsers.find(function (x) { return x._id === id; });
+            if (!u) return;
+            document.getElementById('user-id').value = u._id;
+            document.getElementById('user-name').value = u.name || '';
+            document.getElementById('user-email').value = u.email || '';
+            document.getElementById('user-phone').value = u.phone || '';
+            document.getElementById('user-role').value = u.role || 'user';
+            document.getElementById('user-active').checked = !!u.isActive;
+            document.getElementById('user-modal').style.display = 'flex';
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-modal').style.display = 'none';
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('user-id').value;
+            const payload = {
+                name: document.getElementById('user-name').value.trim(),
+                phone: document.getElementById('user-phone').value.trim(),
+                role: document.getElementById('user-role').value,
+                isActive: document.getElementById('user-active').checked,
+            };
+            if (!payload.name) {
+                toast('Name is required', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('user-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            const data = await api('/admin/users/' + id, { method: 'PATCH', body: JSON.stringify(payload) });
+            btn.disabled = false;
+            btn.textContent = 'Save Changes';
+
+            if (data.success) {
+                toast('User updated ✓', 'success');
+                closeUserModal();
+                loadUsers();
+            } else {
+                toast(data.message || 'Failed to update user', 'error');
+            }
         }
 
         /* ── Toast ── */
@@ -2749,6 +2922,131 @@
                 loadSellApprovals();
             } else {
                 toast(data.message || 'Failed to approve', 'error');
+            }
+        }
+
+        /* Payment Gateways */
+        const GATEWAY_LABELS = { razorpay: 'Razorpay', cashfree: 'Cashfree (Payments)', cashfree_payout: 'Cashfree Payout' };
+
+        async function loadGateways() {
+            const body = document.getElementById('gateways-body');
+            body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+            const data = await api('/admin/payment-gateways');
+            if (!data.success) { body.innerHTML = '<div class="empty">Failed to load</div>'; return; }
+
+            // Always show all 6 possible (name, mode) combinations, configured or not
+            const names = ['razorpay', 'cashfree', 'cashfree_payout'];
+            const modes = ['live', 'demo'];
+            const byKey = {};
+            data.data.forEach(function (g) { byKey[g.name + '_' + g.mode] = g; });
+
+            const cards = [];
+            names.forEach(function (name) {
+                modes.forEach(function (mode) {
+                    const g = byKey[name + '_' + mode];
+                    const configured = !!g;
+                    const isCashfree = name !== 'razorpay';
+                    const idField = isCashfree ? (g ? g.clientId : '') : (g ? g.keyId : '');
+                    const secretMasked = isCashfree ? (g ? g.clientSecret : '') : (g ? g.keySecret : '');
+
+                    cards.push('<div class="m-card" style="margin-bottom:12px">'
+                        + '<div class="m-card-row">'
+                        + '<div style="flex:1">'
+                        + '<div class="m-card-title">' + GATEWAY_LABELS[name] + ' <span style="font-size:11px;color:var(--muted)">(' + mode.toUpperCase() + ')</span>'
+                        + (g && g.isDefault ? ' <span class="badge badge-active" style="margin-left:6px">DEFAULT</span>' : '')
+                        + '</div>'
+                        + '<div class="m-card-sub">'
+                        + (configured
+                            ? (isCashfree ? 'Client ID: ' + (idField || '—') : 'Key ID: ' + (idField || '—')) + ' · Secret: ' + (secretMasked || '—')
+                            : 'Not configured yet')
+                        + '</div></div>'
+                        + '<span class="badge badge-' + (configured && g.isActive ? 'active' : 'inactive') + '">' + (configured ? (g.isActive ? 'Active' : 'Inactive') : 'Not Set') + '</span>'
+                        + '</div>'
+                        + '<div class="m-card-actions">'
+                        + '<button class="btn-sm btn-info" onclick=\'openGatewayModal(' + JSON.stringify(name) + ',' + JSON.stringify(mode) + ',' + JSON.stringify(g || null) + ')\'><i class="fas fa-edit"></i> ' + (configured ? 'Edit' : 'Configure') + '</button>'
+                        + (configured ? '<button class="btn-sm btn-warning" onclick="setDefaultGateway(' + JSON.stringify(g._id) + ')"' + (g.isDefault ? ' disabled' : '') + '><i class="fas fa-star"></i> Set Default</button>' : '')
+                        + (configured ? '<button class="btn-sm btn-danger" onclick="deleteGateway(' + JSON.stringify(g._id) + ')"><i class="fas fa-trash"></i> Delete</button>' : '')
+                        + '</div></div>');
+                });
+            });
+
+            body.innerHTML = '<div class="card-list" style="display:block">' + cards.join('') + '</div>';
+        }
+
+        function openGatewayModal(name, mode, g) {
+            document.getElementById('gateway-modal-title').textContent = GATEWAY_LABELS[name] + ' — ' + mode.toUpperCase();
+            document.getElementById('gateway-id').value = g ? g._id : '';
+            document.getElementById('gateway-name').value = name;
+            document.getElementById('gateway-mode').value = mode;
+            document.getElementById('gateway-name').disabled = true;
+            document.getElementById('gateway-mode').disabled = true;
+
+            const isCashfree = name !== 'razorpay';
+            document.getElementById('gateway-razorpay-fields').style.display = isCashfree ? 'none' : 'block';
+            document.getElementById('gateway-cashfree-fields').style.display = isCashfree ? 'block' : 'none';
+
+            document.getElementById('gateway-keyId').value = g && g.keyId ? g.keyId : '';
+            document.getElementById('gateway-keySecret').value = '';
+            document.getElementById('gateway-clientId').value = g && g.clientId ? g.clientId : '';
+            document.getElementById('gateway-clientSecret').value = '';
+            document.getElementById('gateway-active').checked = g ? !!g.isActive : true;
+            document.getElementById('gateway-default').checked = g ? !!g.isDefault : false;
+
+            document.getElementById('gateway-modal').style.display = 'flex';
+        }
+
+        function closeGatewayModal() {
+            document.getElementById('gateway-modal').style.display = 'none';
+        }
+
+        async function saveGateway() {
+            const id = document.getElementById('gateway-id').value;
+            const name = document.getElementById('gateway-name').value;
+            const mode = document.getElementById('gateway-mode').value;
+            const payload = {
+                name: name, mode: mode,
+                keyId: document.getElementById('gateway-keyId').value.trim(),
+                keySecret: document.getElementById('gateway-keySecret').value.trim(),
+                clientId: document.getElementById('gateway-clientId').value.trim(),
+                clientSecret: document.getElementById('gateway-clientSecret').value.trim(),
+                isActive: document.getElementById('gateway-active').checked,
+                isDefault: document.getElementById('gateway-default').checked,
+            };
+
+            const btn = document.getElementById('gateway-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            const data = await api('/admin/payment-gateways', { method: 'POST', body: JSON.stringify(payload) });
+            btn.disabled = false;
+            btn.textContent = 'Save Gateway';
+
+            if (data.success) {
+                toast('Gateway saved ✓', 'success');
+                closeGatewayModal();
+                loadGateways();
+            } else {
+                toast(data.message || 'Failed to save gateway', 'error');
+            }
+        }
+
+        async function setDefaultGateway(id) {
+            const data = await api('/admin/payment-gateways/' + id + '/set-default', { method: 'PATCH' });
+            if (data.success) {
+                toast('Default gateway updated ✓', 'success');
+                loadGateways();
+            } else {
+                toast(data.message || 'Failed to set default', 'error');
+            }
+        }
+
+        async function deleteGateway(id) {
+            if (!confirm('Delete this gateway configuration? The app will not be able to use it until reconfigured.')) return;
+            const data = await api('/admin/payment-gateways/' + id, { method: 'DELETE' });
+            if (data.success) {
+                toast('Gateway config deleted', 'success');
+                loadGateways();
+            } else {
+                toast(data.message || 'Failed to delete', 'error');
             }
         }
 
