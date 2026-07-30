@@ -40,7 +40,13 @@ exports.sendOtp = async (req, res, next) => {
             return res.status(429).json({ success: false, message: `Please wait ${waitSec}s before requesting another OTP` });
         }
 
-        const code = generateCode();
+        // ── Test number bypass ──────────────────────────────────────────
+        // Set OTP_TEST_PHONE + OTP_TEST_CODE in .env to make ONE specific
+        // number always receive the same fixed code, and skip the real SMS
+        // send entirely (free, instant, no waiting on Arihant/DLT while
+        // testing the rest of the app). Every other number behaves normally.
+        const isTestPhone = process.env.OTP_TEST_PHONE && phone === process.env.OTP_TEST_PHONE;
+        const code = isTestPhone ? (process.env.OTP_TEST_CODE || "123456") : generateCode();
         const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
         await Otp.create({ phone, code, purpose, expiresAt });
@@ -49,13 +55,12 @@ exports.sendOtp = async (req, res, next) => {
         // via curl/Postman before Arihant is fully wired up, without
         // needing direct DB access. The record is saved above regardless
         // of whether the SMS send below succeeds or fails.
-        console.log(`[OTP] ${phone} (${purpose}): ${code}  — expires in ${OTP_EXPIRY_MINUTES}m`);
+        console.log(`[OTP] ${phone} (${purpose}): ${code}  — expires in ${OTP_EXPIRY_MINUTES}m${isTestPhone ? " [TEST NUMBER — SMS skipped]" : ""}`);
 
-        // const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
-        //         const message = `Dear Customer,
-        // Your OTP for VIKAONE is ${code}. Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
-        const message = `Dear Customer, Your OTP for VIKAONE is ${code} . Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
-        await sendSms(phone, message);
+        if (!isTestPhone) {
+            const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+            await sendSms(phone, message);
+        }
 
         res.json({ success: true, message: `OTP sent to ${phone}`, expiresInSeconds: OTP_EXPIRY_MINUTES * 60 });
     } catch (err) {

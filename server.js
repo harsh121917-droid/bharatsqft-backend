@@ -69,7 +69,7 @@ app.use("/api/coins", require("./routes/coins"));
 app.use("/api/schemes", require("./routes/schemes"));
 app.use("/api/silver", require("./routes/silver"));
 app.use("/api/otp", require("./routes/otp"));
-// app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
+app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
