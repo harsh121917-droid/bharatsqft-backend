@@ -58,7 +58,11 @@ exports.sendOtp = async (req, res, next) => {
         console.log(`[OTP] ${phone} (${purpose}): ${code}  — expires in ${OTP_EXPIRY_MINUTES}m${isTestPhone ? " [TEST NUMBER — SMS skipped]" : ""}`);
 
         if (!isTestPhone) {
-            const message = `Your Bharat SQFT verification code is ${code}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+            // Must match the DLT-approved Content Template EXACTLY (only the
+            // {#num#} variable position changes) — any wording difference
+            // here, even punctuation, causes the operator to silently drop
+            // the message after Arihant's gateway has already accepted it.
+            const message = `Dear Customer, Your OTP for VIKAONE is ${code} . Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
             await sendSms(phone, message);
         }
 
