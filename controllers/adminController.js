@@ -3,6 +3,7 @@ const Enquiry = require("../models/Enquiry");
 const { Wallet, WalletTxn } = require("../models/Wallet");
 const { GoldBalance, GoldTransaction } = require("../models/Gold");
 const { SilverBalance, SilverTransaction } = require("../models/Silver");
+const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 
 exports.getAllUsers = async (req, res, next) => {
     try {
@@ -253,3 +254,68 @@ exports.approveSellPayout = async (req, res, next) => {
         res.json({ success: true, message: `${metal} sell payout approved — ₹${txn.totalAmt} now withdrawable`, data: txn });
     } catch (err) { next(err); }
 };
+
+exports.getSchemeEnrollments = async (req, res, next) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 30;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+
+        // Metal filter
+        if (req.query.metal && req.query.metal !== "all") {
+            filter.metal = req.query.metal;
+        }
+
+        // Status filters (active, completed, cancelled, cart/unpaid)
+        if (req.query.status && req.query.status !== "all") {
+            if (req.query.status === "cart") {
+                filter.installmentsPaid = 0;
+            } else {
+                filter.status = req.query.status;
+                filter.installmentsPaid = { $gt: 0 }; // only show actual paid ones
+            }
+        }
+
+        // Search filter (User Name, Email, Phone, or Scheme Name)
+        if (req.query.search) {
+            const searchRegex = { $regex: req.query.search, $options: "i" };
+            
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex }
+                ]
+            }).select("_id");
+            
+            const userIds = matchingUsers.map(u => u._id);
+
+            filter.$or = [
+                { user: { $in: userIds } },
+                { schemeName: searchRegex }
+            ];
+        }
+
+        const [enrollments, total] = await Promise.all([
+            SchemeEnrollment.find(filter)
+                .populate("user", "name email phone")
+                .populate("scheme", "name minAmount durationMonths")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            SchemeEnrollment.countDocuments(filter)
+        ]);
+
+        res.json({
+            success: true,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            data: enrollments
+        });
+    } catch (err) {
+        next(err);
+    }
+};

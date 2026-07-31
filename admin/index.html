@@ -1454,14 +1454,48 @@
 
             <!-- Gold Schemes Page -->
             <div class="page" id="page-schemes">
-                <div class="section-header">
-                    <div class="section-title">Gold Schemes</div>
-                    <button class="btn-primary" onclick="openSchemeModal()"><i class="fas fa-plus"></i> New
-                        Scheme</button>
+                <div class="sub-tabs" style="display:flex;gap:16px;border-bottom:1px solid var(--border);margin-bottom:1.5rem">
+                    <div class="sub-tab active" onclick="switchSchemeTab('plans')" id="tab-scheme-plans" style="padding:10px 4px;font-weight:600;font-size:14px;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);user-select:none">Scheme Plans</div>
+                    <div class="sub-tab" onclick="switchSchemeTab('enrollments')" id="tab-scheme-enrollments" style="padding:10px 4px;font-weight:500;font-size:14px;cursor:pointer;color:var(--muted);transition:all .15s;user-select:none">Customer Enrollments</div>
                 </div>
-                <div class="table-wrap">
-                    <div id="schemes-body">
-                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+
+                <!-- Tab 1: Scheme Plans -->
+                <div id="schemes-plans-container">
+                    <div class="section-header">
+                        <div class="section-title">Gold & Silver Plans</div>
+                        <button class="btn-primary" onclick="openSchemeModal()"><i class="fas fa-plus"></i> New Scheme</button>
+                    </div>
+                    <div class="table-wrap">
+                        <div id="schemes-body">
+                            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Customer Enrollments -->
+                <div id="schemes-enrollments-container" style="display:none">
+                    <div class="section-header">
+                        <div class="section-title">Customer Enrollments & Investments</div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;justify-content:flex-end">
+                            <input class="search-bar" id="enrollment-search" placeholder="🔍 Search customer or scheme..." style="max-width:240px; margin-bottom:0" oninput="loadEnrollments()" />
+                            <select id="enrollment-metal-filter" onchange="loadEnrollments()" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#333);background:var(--surface2);color:inherit;font-family:var(--font);font-size:13px;height:var(--tap);outline:none">
+                                <option value="all" selected>All Metals</option>
+                                <option value="gold">Gold Only</option>
+                                <option value="silver">Silver Only</option>
+                            </select>
+                            <select id="enrollment-status-filter" onchange="loadEnrollments()" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#333);background:var(--surface2);color:inherit;font-family:var(--font);font-size:13px;height:var(--tap);outline:none">
+                                <option value="all" selected>All Statuses</option>
+                                <option value="active">Active</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="cart">In Cart (Unpaid)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <div id="enrollments-body">
+                            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1865,6 +1899,22 @@
         </div>
     </div>
 
+    <!-- Enrollment Detail Modal -->
+    <div class="modal-overlay" id="enrollment-detail-modal" style="display:none">
+        <div class="modal-box" style="max-width:760px">
+            <div class="modal-header">
+                <h3>Enrollment & Payment Details</h3>
+                <button class="modal-close" onclick="closeEnrollmentModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="enrollment-modal-body">
+                <!-- Content injected dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeEnrollmentModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
@@ -1947,7 +1997,7 @@
             if (name === 'users') loadUsers();
             if (name === 'investments') loadInvestments();
             if (name === 'kyc') loadKyc();
-            if (name === 'schemes') loadSchemes();
+            if (name === 'schemes') switchSchemeTab('plans');
             if (name === 'withdrawals') loadWithdrawals();
             if (name === 'sellapprovals') loadSellApprovals();
             if (name === 'gateways') loadGateways();
@@ -2793,6 +2843,233 @@
             } else {
                 toast(data.message || 'Action failed', 'error');
             }
+        }
+
+        function switchSchemeTab(tab) {
+            const tabPlans = document.getElementById('tab-scheme-plans');
+            const tabEnrollments = document.getElementById('tab-scheme-enrollments');
+            const containerPlans = document.getElementById('schemes-plans-container');
+            const containerEnrollments = document.getElementById('schemes-enrollments-container');
+
+            if (!tabPlans || !tabEnrollments || !containerPlans || !containerEnrollments) return;
+
+            if (tab === 'plans') {
+                tabPlans.classList.add('active');
+                tabPlans.style.color = 'var(--accent)';
+                tabPlans.style.borderBottom = '2px solid var(--accent)';
+                tabPlans.style.fontWeight = '600';
+                
+                tabEnrollments.classList.remove('active');
+                tabEnrollments.style.color = 'var(--muted)';
+                tabEnrollments.style.borderBottom = 'none';
+                tabEnrollments.style.fontWeight = '500';
+
+                containerPlans.style.display = 'block';
+                containerEnrollments.style.display = 'none';
+                loadSchemes();
+            } else {
+                tabEnrollments.classList.add('active');
+                tabEnrollments.style.color = 'var(--accent)';
+                tabEnrollments.style.borderBottom = '2px solid var(--accent)';
+                tabEnrollments.style.fontWeight = '600';
+
+                tabPlans.classList.remove('active');
+                tabPlans.style.color = 'var(--muted)';
+                tabPlans.style.borderBottom = 'none';
+                tabPlans.style.fontWeight = '500';
+
+                containerPlans.style.display = 'none';
+                containerEnrollments.style.display = 'block';
+                loadEnrollments();
+            }
+        }
+
+        async function loadEnrollments() {
+            const body = document.getElementById('enrollments-body');
+            if (!body) return;
+            body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+            const searchVal = document.getElementById('enrollment-search')?.value.trim() || '';
+            const metalVal = document.getElementById('enrollment-metal-filter')?.value || 'all';
+            const statusVal = document.getElementById('enrollment-status-filter')?.value || 'all';
+
+            let url = '/admin/schemes/enrollments?limit=100';
+            if (searchVal) url += '&search=' + encodeURIComponent(searchVal);
+            if (metalVal !== 'all') url += '&metal=' + metalVal;
+            if (statusVal !== 'all') url += '&status=' + statusVal;
+
+            window.currentEnrollments = [];
+            try {
+                const data = await api(url);
+                if (!data.success) {
+                    body.innerHTML = '<div class="empty">Failed to load enrollments</div>';
+                    return;
+                }
+
+                if (!data.data.length) {
+                    body.innerHTML = '<div class="empty"><i class="fas fa-award"></i>No enrollments found</div>';
+                    return;
+                }
+
+                window.currentEnrollments = data.data;
+
+                const sc = { active: 'var(--success)', completed: 'var(--info)', cancelled: 'var(--danger)', cart: 'var(--muted)' };
+
+                const rows = data.data.map(function (e, index) {
+                    const user = e.user || { name: 'Unknown', email: '—', phone: '—' };
+                    const installmentsPaid = e.installmentsPaid || 0;
+                    const durationMonths = e.durationMonths || 0;
+                    
+                    let statusText = e.status || 'active';
+                    let statusClass = e.status || 'active';
+                    if (installmentsPaid === 0) {
+                        statusText = 'In Cart (Unpaid)';
+                        statusClass = 'cart';
+                    }
+
+                    const metalBadge = e.metal === 'silver'
+                        ? '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#e8e8e8;color:#555">SILVER</span>'
+                        : '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#fff3d6;color:#a67c00">GOLD</span>';
+
+                    return '<tr>'
+                        + '<td><strong>' + userNameEsc(user.name) + '</strong><br>'
+                        + '<span style="color:var(--muted);font-size:12px">' + user.email + ' · ' + user.phone + '</span></td>'
+                        + '<td><strong>' + e.schemeName + '</strong> ' + metalBadge + '<br>'
+                        + '<span style="color:var(--muted);font-size:12px">₹' + (e.monthlyAmount || 0).toLocaleString('en-IN') + '/mo</span></td>'
+                        + '<td style="font-weight:600">₹' + (e.totalInvested || 0).toLocaleString('en-IN') + '</td>'
+                        + '<td>' + (e.totalGoldGrams || 0).toFixed(4) + 'g</td>'
+                        + '<td style="font-weight:600">' + installmentsPaid + ' / ' + durationMonths + '</td>'
+                        + '<td><span class="badge" style="background:' + sc[statusClass] + '22;color:' + sc[statusClass] + '">' + statusText.toUpperCase() + '</span></td>'
+                        + '<td style="color:var(--muted);font-size:12px">' + new Date(e.createdAt || e.startedAt).toLocaleDateString('en-IN') + '</td>'
+                        + '<td>'
+                        + '<button class="btn-sm btn-info" onclick="viewEnrollmentDetails(' + index + ')"><i class="fas fa-eye"></i> View</button>'
+                        + '</td>'
+                        + '</tr>';
+                }).join('');
+
+                const cards = data.data.map(function (e, index) {
+                    const user = e.user || { name: 'Unknown', email: '—', phone: '—' };
+                    const installmentsPaid = e.installmentsPaid || 0;
+                    
+                    let statusText = e.status || 'active';
+                    let statusClass = e.status || 'active';
+                    if (installmentsPaid === 0) {
+                        statusText = 'In Cart';
+                        statusClass = 'cart';
+                    }
+
+                    const metalLabel = e.metal === 'silver' ? 'SILVER' : 'GOLD';
+
+                    return '<div class="m-card">'
+                        + '<div class="m-card-row">'
+                        + '<div style="flex:1">'
+                        + '<div class="m-card-title">' + userNameEsc(user.name) + '</div>'
+                        + '<div class="m-card-sub">' + e.schemeName + ' (' + metalLabel + ')</div>'
+                        + '</div>'
+                        + '<span class="badge" style="background:' + sc[statusClass] + '22;color:' + sc[statusClass] + '">' + statusText.toUpperCase() + '</span>'
+                        + '</div>'
+                        + '<div class="m-card-row">'
+                        + '<div class="m-card-price">₹' + (e.totalInvested || 0).toLocaleString('en-IN') + '</div>'
+                        + '<div class="m-card-sub">' + installmentsPaid + ' / ' + e.durationMonths + ' inst. · ' + (e.totalGoldGrams || 0).toFixed(4) + 'g</div>'
+                        + '</div>'
+                        + '<div class="m-card-actions">'
+                        + '<button class="btn-sm btn-info" onclick="viewEnrollmentDetails(' + index + ')"><i class="fas fa-eye"></i> View Details</button>'
+                        + '</div>'
+                        + '</div>';
+                }).join('');
+
+                body.innerHTML = '<div class="table-view"><table><thead><tr><th>Customer</th><th>Scheme Info</th><th>Total Invested</th><th>Total Grams</th><th>Installments</th><th>Status</th><th>Enrolled On</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                    + '<div class="card-list">' + cards + '</div>';
+
+            } catch (err) {
+                body.innerHTML = '<div class="empty">Error loading enrollments</div>';
+            }
+        }
+
+        function userNameEsc(name) {
+            if (!name) return 'Unknown';
+            return name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function viewEnrollmentDetails(index) {
+            const e = window.currentEnrollments[index];
+            if (!e) return;
+
+            const user = e.user || { name: 'Unknown', email: '—', phone: '—' };
+            const statusText = e.installmentsPaid === 0 ? 'In Cart (Unpaid)' : (e.status || 'active').toUpperCase();
+            const statusClass = e.installmentsPaid === 0 ? 'cart' : (e.status || 'active');
+            const sc = { active: 'var(--success)', completed: 'var(--info)', cancelled: 'var(--danger)', cart: 'var(--muted)' };
+
+            let paymentsHtml = '';
+            if (!e.payments || e.payments.length === 0) {
+                paymentsHtml = '<div class="empty" style="padding:1.5rem"><i class="fas fa-info-circle"></i> No payments made yet.</div>';
+            } else {
+                const rows = e.payments.map(function (p) {
+                    const isBonus = p.isBonus ? '<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:#e1f5fe;color:#0288d1;margin-left:4px">BONUS</span>' : '';
+                    return '<tr>'
+                        + '<td><strong>#' + p.installmentNo + '</strong>' + isBonus + '</td>'
+                        + '<td style="font-weight:600">₹' + (p.amount || 0).toLocaleString('en-IN') + '</td>'
+                        + '<td>' + (p.grams || 0).toFixed(4) + 'g</td>'
+                        + '<td>₹' + (p.ratePerGram || 0).toFixed(2) + '/g</td>'
+                        + '<td>' + new Date(p.paidAt).toLocaleString('en-IN') + '</td>'
+                        + '<td style="font-family:monospace;font-size:11px;color:var(--muted)">' + (p.goldTxnId || '—') + '</td>'
+                        + '<td><span class="badge badge-published">SUCCESS</span></td>'
+                        + '</tr>';
+                }).join('');
+
+                paymentsHtml = '<div class="table-wrap" style="margin-top:10px;border-radius:8px">'
+                    + '<div class="table-view">'
+                    + '<table><thead><tr><th>Inst.</th><th>Amount</th><th>Grams</th><th>Rate</th><th>Paid At</th><th>Txn ID</th><th>Status</th></tr></thead>'
+                    + '<tbody>' + rows + '</tbody></table>'
+                    + '</div></div>';
+            }
+
+            document.getElementById('enrollment-modal-body').innerHTML = 
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">'
+                + '<div>'
+                + '<div class="form-section" style="margin-top:0">Customer Details</div>'
+                + '<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">'
+                + '<div><span style="color:var(--muted)">Name:</span> <strong>' + userNameEsc(user.name) + '</strong></div>'
+                + '<div><span style="color:var(--muted)">Email:</span> ' + user.email + '</div>'
+                + '<div><span style="color:var(--muted)">Phone:</span> ' + user.phone + '</div>'
+                + '</div>'
+                + '</div>'
+                + '<div>'
+                + '<div class="form-section" style="margin-top:0">Scheme Information</div>'
+                + '<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">'
+                + '<div><span style="color:var(--muted)">Scheme Plan:</span> <strong>' + e.schemeName + '</strong></div>'
+                + '<div><span style="color:var(--muted)">Metal:</span> <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:' + (e.metal === 'silver' ? '#e8e8e8' : '#fff3d6') + ';color:' + (e.metal === 'silver' ? '#555' : '#a67c00') + '">' + e.metal.toUpperCase() + '</span></div>'
+                + '<div><span style="color:var(--muted)">Monthly Amount:</span> ₹' + (e.monthlyAmount || 0).toLocaleString('en-IN') + '</div>'
+                + '<div><span style="color:var(--muted)">Duration:</span> ' + e.durationMonths + ' months + ' + e.bonusMonths + ' bonus</div>'
+                + '</div>'
+                + '</div>'
+                + '</div>'
+                + '<div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:20px">'
+                + '<div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center;border:1px solid var(--border)">'
+                + '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Invested</div>'
+                + '<div style="font-size:16px;font-weight:600;color:var(--accent)">₹' + (e.totalInvested || 0).toLocaleString('en-IN') + '</div>'
+                + '</div>'
+                + '<div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center;border:1px solid var(--border)">'
+                + '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Metal Credited</div>'
+                + '<div style="font-size:16px;font-weight:600">' + (e.totalGoldGrams || 0).toFixed(4) + 'g</div>'
+                + '</div>'
+                + '<div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center;border:1px solid var(--border)">'
+                + '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Installments</div>'
+                + '<div style="font-size:16px;font-weight:600">' + e.installmentsPaid + ' / ' + e.durationMonths + '</div>'
+                + '</div>'
+                + '<div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center;border:1px solid var(--border)">'
+                + '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Status</div>'
+                + '<span class="badge" style="background:' + sc[statusClass] + '22;color:' + sc[statusClass] + ';margin-top:2px;display:inline-block">' + statusText + '</span>'
+                + '</div>'
+                + '</div>'
+                + '<div class="form-section">Payment Installment History</div>'
+                + paymentsHtml;
+
+            document.getElementById('enrollment-detail-modal').style.display = 'flex';
+        }
+
+        function closeEnrollmentModal() {
+            document.getElementById('enrollment-detail-modal').style.display = 'none';
         }
 
         /* ── Withdrawals ── */

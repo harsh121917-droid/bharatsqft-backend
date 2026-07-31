@@ -6,6 +6,7 @@ const {
   getDashboard,
   getWithdrawals, completeWithdrawal,
   getSellApprovals, approveSellPayout,
+  getSchemeEnrollments,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -55,5 +56,8 @@ router.patch("/withdrawals/:id/complete", completeWithdrawal);
 // Sell Payout Approvals (gold + silver)
 router.get("/sell-approvals", getSellApprovals);
 router.patch("/sell-approvals/:id/approve", approveSellPayout);
+
+// Gold Scheme Enrollments
+router.get("/schemes/enrollments", getSchemeEnrollments);
 
 module.exports = router;

@@ -1,12 +1,7 @@
-const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const { Wallet, WalletTxn } = require("../models/Wallet");
 const { GoldTransaction, GoldBalance } = require("../models/Gold");
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+const paymentGatewayService = require("../services/paymentGatewayService");
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 async function getOrCreateWallet(userId) {
@@ -58,14 +53,24 @@ exports.initiateAdd = async (req, res, next) => {
         if (!amount || amount < 100) {
             return res.status(400).json({ success: false, message: "Minimum add is ₹100" });
         }
-        const order = await razorpay.orders.create({
-            amount: Math.round(amount * 100), // paise
-            currency: "INR",
+
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({
+                success: false,
+                message: `Active default payment gateway is '${config.name}', but this endpoint only supports Razorpay. Please configure Razorpay as default in Admin.`,
+            });
+        }
+
+        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+            amount,
             notes: { userId: req.user._id.toString(), type: "wallet_add" },
+            mode: config.mode,
         });
+
         res.json({
             success: true,
-            data: { order, key: process.env.RAZORPAY_KEY_ID, amount },
+            data: { order, key: keyId, amount },
         });
     } catch (err) { next(err); }
 };
@@ -78,12 +83,19 @@ exports.verifyAdd = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, amount } = req.body;
 
-        const expected = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-            .digest("hex");
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
+        }
 
-        if (expected !== razorpaySignature) {
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+            signature: razorpaySignature,
+            keySecret: config.keySecret,
+        });
+
+        if (!isValid) {
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
@@ -96,7 +108,7 @@ exports.verifyAdd = async (req, res, next) => {
 
         await recordTxn(req.user._id, "add", amount, balBefore, wallet.balance, {
             razorpayOrderId, razorpayPaymentId, razorpaySignature,
-            note: `Added ₹${amount} via Razorpay`,
+            note: `Added ₹${amount} via Razorpay (${config.mode})`,
             status: "success",
         });
 
