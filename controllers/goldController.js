@@ -1,11 +1,11 @@
 const https = require("https");
-const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const {
     GoldBalance,
     GoldRate,
     GoldTransaction,
 } = require("../models/Gold");
+const paymentGatewayService = require("../services/paymentGatewayService");
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const GST_PCT = 3;     // 3% GST on buy, no making charges
@@ -19,10 +19,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // cache rate 5 min to save API quota
 let _rateCache = null;
 let _cacheTime = 0;
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 
 // ─── GoldAPI.io fetch helper ──────────────────────────────────────────────────
 // Sign up free at https://goldapi.io → get your API key → add to .env as GOLDAPI_KEY
@@ -231,10 +227,6 @@ exports.getBalance = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 3a. POST /api/gold/buy/initiate
-// body: { amountInRupees }  OR  { grams }
-// ══════════════════════════════════════════════════════════════════════════════
 exports.initiateBuy = async (req, res, next) => {
     try {
         const rates = await fetchLiveRates();
@@ -255,10 +247,18 @@ exports.initiateBuy = async (req, res, next) => {
         const gstAmt = parseFloat(((amountInRupees * GST_PCT) / 100).toFixed(2));
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
 
-        const order = await razorpay.orders.create({
-            amount: Math.round(totalAmt * 100),
-            currency: "INR",
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({
+                success: false,
+                message: `Active default payment gateway is '${config.name}', but direct gold purchases only support Razorpay. Please set Razorpay as the default gateway in Admin.`,
+            });
+        }
+
+        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+            amount: totalAmt,
             notes: { userId: req.user._id.toString(), type: "gold_buy", grams: gramsToAdd },
+            mode: config.mode,
         });
 
         const txn = await GoldTransaction.create({
@@ -271,7 +271,7 @@ exports.initiateBuy = async (req, res, next) => {
         res.json({
             success: true,
             data: {
-                order, key: process.env.RAZORPAY_KEY_ID,
+                order, key: keyId,
                 transaction: { id: txn._id },
                 breakdown: { grams: gramsToAdd, goldValue: amountInRupees, gstAmt, totalAmt, ratePerGram: buyRate },
             },
@@ -285,12 +285,20 @@ exports.initiateBuy = async (req, res, next) => {
 exports.verifyBuy = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, transactionId } = req.body;
-        const expected = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-            .digest("hex");
 
-        if (expected !== razorpaySignature) {
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
+        }
+
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+            signature: razorpaySignature,
+            keySecret: config.keySecret,
+        });
+
+        if (!isValid) {
             await GoldTransaction.findByIdAndUpdate(transactionId, { status: "failed" });
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }

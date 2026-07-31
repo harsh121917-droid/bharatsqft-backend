@@ -1,14 +1,6 @@
-const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const Saving = require("../models/Saving");
-
-function getRazorpay() {
-    if (!process.env.RAZORPAY_KEY_ID) throw new Error("RAZORPAY_KEY_ID missing");
-    return new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-}
+const paymentGatewayService = require("../services/paymentGatewayService");
 
 // ── POST /api/savings/:id/pay/initiate ────────────────────────────────────────
 exports.initiateFirstPayment = async (req, res, next) => {
@@ -19,19 +11,23 @@ exports.initiateFirstPayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "First payment already completed" });
         }
 
-        const amountPaise = saving.amountPerCycle * 100;
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({
+                success: false,
+                message: `Active default payment gateway is '${config.name}', but savings schemes only support Razorpay. Please set Razorpay as default in Admin.`,
+            });
+        }
 
-        const rz = getRazorpay();
-        const order = await rz.orders.create({
-            amount: amountPaise,
-            currency: "INR",
-            receipt: `fst_${saving._id.toString().slice(-8)}_${Date.now()}`,
+        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+            amount: saving.amountPerCycle,
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
                 type: saving.type,
                 amountPerCycle: saving.amountPerCycle,
             },
+            mode: config.mode,
         });
 
         // store order id on saving for verification
@@ -41,9 +37,9 @@ exports.initiateFirstPayment = async (req, res, next) => {
         res.json({
             success: true,
             orderId: order.id,
-            amount: amountPaise,
+            amount: saving.amountPerCycle * 100, // paise
             currency: "INR",
-            keyId: process.env.RAZORPAY_KEY_ID,
+            keyId: keyId,
             savingId: saving._id,
             planType: saving.type,
             amountPerCycle: saving.amountPerCycle,
@@ -63,14 +59,19 @@ exports.verifyFirstPayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Missing payment fields" });
         }
 
-        // verify signature
-        const body = razorpay_order_id + "|" + razorpay_payment_id;
-        const expected = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body)
-            .digest("hex");
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
+        }
 
-        if (expected !== razorpay_signature) {
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId: razorpay_order_id,
+            paymentId: razorpay_payment_id,
+            signature: razorpay_signature,
+            keySecret: config.keySecret,
+        });
+
+        if (!isValid) {
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
@@ -85,7 +86,7 @@ exports.verifyFirstPayment = async (req, res, next) => {
         saving.cycles.push({
             date: new Date(),
             amount: saving.amountPerCycle,
-            note: "First payment via Razorpay",
+            note: `First payment via Razorpay (${config.mode})`,
         });
         await saving.save();
 
@@ -113,19 +114,23 @@ exports.initiateCyclePayment = async (req, res, next) => {
             ? parseInt(req.body.amount, 10)
             : saving.amountPerCycle;
 
-        const amountPaise = cycleAmount * 100;
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({
+                success: false,
+                message: `Active default payment gateway is '${config.name}', but savings schemes only support Razorpay. Please set Razorpay as default in Admin.`,
+            });
+        }
 
-        const rz = getRazorpay();
-        const order = await rz.orders.create({
-            amount: amountPaise,
-            currency: "INR",
-            receipt: `cyc_${saving._id.toString().slice(-8)}_${Date.now()}`,
+        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+            amount: cycleAmount,
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
                 type: saving.type,
                 cycleAmount,
             },
+            mode: config.mode,
         });
 
         saving.razorpayOrderId = order.id;
@@ -134,21 +139,14 @@ exports.initiateCyclePayment = async (req, res, next) => {
         res.json({
             success: true,
             orderId: order.id,
-            amount: amountPaise,
+            amount: cycleAmount * 100, // paise
             currency: "INR",
-            keyId: process.env.RAZORPAY_KEY_ID,
+            keyId: keyId,
             savingId: saving._id,
             planType: saving.type,
             cycleAmount,
         });
     } catch (err) {
-        // return res.status(500).json({
-        //     success: false,
-        //     message: "DEBUG",
-        //     errorMessage: err.message,
-        //     errorDetails: err.error || null,
-        //     errorStack: err.stack,
-        // });
         console.error("ERROR:", err);
         next(err);
     }
@@ -163,13 +161,19 @@ exports.verifyCyclePayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Missing payment fields" });
         }
 
-        const body = razorpay_order_id + "|" + razorpay_payment_id;
-        const expected = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body)
-            .digest("hex");
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
+        }
 
-        if (expected !== razorpay_signature) {
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId: razorpay_order_id,
+            paymentId: razorpay_payment_id,
+            signature: razorpay_signature,
+            keySecret: config.keySecret,
+        });
+
+        if (!isValid) {
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
@@ -184,7 +188,7 @@ exports.verifyCyclePayment = async (req, res, next) => {
         saving.cycles.push({
             date: new Date(),
             amount: cycleAmount,
-            note: "Cycle payment via Razorpay",
+            note: `Cycle payment via Razorpay (${config.mode})`,
         });
         await saving.save();
 

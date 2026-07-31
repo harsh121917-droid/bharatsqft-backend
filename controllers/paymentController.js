@@ -1,16 +1,8 @@
-const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
 const Kyc = require("../models/Kyc");
-
-function getRazorpay() {
-    if (!process.env.RAZORPAY_KEY_ID) throw new Error("RAZORPAY_KEY_ID missing in .env");
-    return new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-}
+const paymentGatewayService = require("../services/paymentGatewayService");
 
 exports.createOrder = async (req, res, next) => {
     try {
@@ -56,19 +48,27 @@ exports.createOrder = async (req, res, next) => {
         const totalAmount = bricks * property.brickPrice;
         const amountPaise = totalAmount * 100;
 
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({
+                success: false,
+                message: `Active default payment gateway is '${config.name}', but brick investments only support Razorpay. Please set Razorpay as default in Admin.`,
+            });
+        }
+
         let order;
         try {
-            order = await getRazorpay().orders.create({
-                amount: amountPaise,
-                currency: "INR",
-                receipt: `bsqft_${Date.now()}`,
+            const result = await paymentGatewayService.createRazorpayOrder({
+                amount: totalAmount,
                 notes: {
                     propertyId: propertyId,
                     propertyTitle: property.title,
                     bricks: String(bricks),
                     userId: String(req.user._id),
                 },
+                mode: config.mode,
             });
+            order = result.order;
         } catch (rzpErr) {
             console.error("Razorpay error:", JSON.stringify(rzpErr));
             return res.status(500).json({ success: false, message: "Payment gateway error: " + (rzpErr?.error?.description || rzpErr?.message || JSON.stringify(rzpErr)) });
@@ -94,7 +94,7 @@ exports.createOrder = async (req, res, next) => {
                 totalAmount,
                 propertyTitle: property.title,
             },
-            key: process.env.RAZORPAY_KEY_ID,
+            key: config.keyId,
         });
     } catch (err) {
         console.error("createOrder error:", err?.message || JSON.stringify(err));
@@ -106,12 +106,19 @@ exports.verifyPayment = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, investmentId } = req.body;
 
-        const body = razorpayOrderId + "|" + razorpayPaymentId;
-        const expected = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(body).digest("hex");
+        const config = await paymentGatewayService.resolveGateway({});
+        if (config.name !== "razorpay") {
+            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
+        }
 
-        if (expected !== razorpaySignature) {
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+            signature: razorpaySignature,
+            keySecret: config.keySecret,
+        });
+
+        if (!isValid) {
             await Investment.findByIdAndUpdate(investmentId, { status: "failed" });
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
