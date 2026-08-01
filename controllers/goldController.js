@@ -20,17 +20,16 @@ let _rateCache = null;
 let _cacheTime = 0;
 
 
-// ─── GoldAPI.io fetch helper ──────────────────────────────────────────────────
-// Sign up free at https://goldapi.io → get your API key → add to .env as GOLDAPI_KEY
-// Symbols: XAU=Gold  XAG=Silver  XCU=Copper   Currency: INR
+// ─── Gold-API.com fetch helper ────────────────────────────────────────────────
+// Docs: https://gold-api.com/docs
+// Symbols: XAU=Gold  XAG=Silver   Currency: INR
 function fetchFromGoldAPI(symbol = "XAU") {
     return new Promise((resolve, reject) => {
         const options = {
-            hostname: "www.goldapi.io",
-            path: `/api/${symbol}/INR`,
+            hostname: "api.gold-api.com",
+            path: `/price/${symbol}/INR`,
             method: "GET",
             headers: {
-                "x-access-token": process.env.GOLDAPI_KEY,
                 "Content-Type": "application/json",
             },
         };
@@ -46,7 +45,7 @@ function fetchFromGoldAPI(symbol = "XAU") {
             });
         });
         req.on("error", reject);
-        req.setTimeout(8000, () => { req.destroy(); reject(new Error("GoldAPI timeout")); });
+        req.setTimeout(8000, () => { req.destroy(); reject(new Error("Gold-API.com timeout")); });
         req.end();
     });
 }
@@ -58,16 +57,14 @@ async function fetchLiveRates() {
     if (_rateCache && now - _cacheTime < CACHE_TTL_MS) return _rateCache;
 
     try {
-        // GoldAPI.io free plan: XAU + XAG only — XCU (copper) not supported
+        // gold-api.com free plan: XAU + XAG only
         const [gold, silver] = await Promise.all([
             fetchFromGoldAPI("XAU"),
             fetchFromGoldAPI("XAG"),
         ]);
 
-        // Gold: price_gram_24k is per gram in INR directly
-        const goldBuyPerGram = parseFloat(
-            (gold.price_gram_24k ?? gold.price / TROY_OZ_GRAMS).toFixed(2)
-        );
+        // Gold: price per troy oz → per gram
+        const goldBuyPerGram = parseFloat((gold.price / TROY_OZ_GRAMS).toFixed(2));
         // Silver: price per troy oz → per gram
         const silverPerGram = parseFloat((silver.price / TROY_OZ_GRAMS).toFixed(2));
         // Copper: static MCX approx ₹0.85/gram — update via admin POST /api/gold/rate
@@ -77,16 +74,16 @@ async function fetchLiveRates() {
             gold: {
                 buyRate: goldBuyPerGram,
                 sellRate: parseFloat((goldBuyPerGram * (1 - SELL_SPREAD)).toFixed(2)),
-                change24h: parseFloat((gold.ch ?? 0).toFixed(2)),
-                changePct: parseFloat((gold.chp ?? 0).toFixed(2)),
-                high: parseFloat(((gold.high_price ?? gold.price) / TROY_OZ_GRAMS).toFixed(2)),
-                low: parseFloat(((gold.low_price ?? gold.price) / TROY_OZ_GRAMS).toFixed(2)),
+                change24h: 0,
+                changePct: 0,
+                high: goldBuyPerGram,
+                low: goldBuyPerGram,
             },
             silver: {
                 buyRate: silverPerGram,
                 sellRate: parseFloat((silverPerGram * (1 - SELL_SPREAD)).toFixed(2)),
-                change24h: parseFloat((silver.ch ?? 0).toFixed(2)),
-                changePct: parseFloat((silver.chp ?? 0).toFixed(2)),
+                change24h: 0,
+                changePct: 0,
             },
             copper: {
                 buyRate: copperPerGram,
@@ -96,13 +93,13 @@ async function fetchLiveRates() {
                 note: "Static MCX approx — update via admin endpoint",
             },
             updatedAt: new Date(),
-            source: "goldapi.io",
+            source: "gold-api.com",
         };
         _cacheTime = now;
 
         // Persist latest gold + silver rate to DB (for history / offline fallback)
         await GoldRate.findOneAndUpdate(
-            { source: "goldapi.io" },
+            { source: "gold-api.com" },
             {
                 buyRate: _rateCache.gold.buyRate,
                 sellRate: _rateCache.gold.sellRate,
@@ -112,7 +109,7 @@ async function fetchLiveRates() {
                 silverSellRate: _rateCache.silver.sellRate,
                 silverChange24h: _rateCache.silver.change24h,
                 silverChangePct: _rateCache.silver.changePct,
-                source: "goldapi.io",
+                source: "gold-api.com",
                 isActive: true,
             },
             { upsert: true, new: true }
@@ -120,7 +117,7 @@ async function fetchLiveRates() {
 
         return _rateCache;
     } catch (err) {
-        console.error("GoldAPI fetch failed:", err.message);
+        console.error("Gold-API.com fetch failed:", err.message);
         // Fallback: use last saved rate from DB — but only if it's actually usable.
         const dbRate = await GoldRate.findOne({ isActive: true }).sort({ updatedAt: -1 });
         if (dbRate && dbRate.buyRate > 0 && dbRate.sellRate > 0) {
