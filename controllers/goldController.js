@@ -50,25 +50,31 @@ function fetchFromGoldAPI(symbol = "XAU") {
     });
 }
 
-// ─── Fetch + cache all 3 metals ───────────────────────────────────────────────
+// ─── Fetch + cache all 5 metals ───────────────────────────────────────────────
 async function fetchLiveRates() {
     const now = Date.now();
     // Return cache if fresh
     if (_rateCache && now - _cacheTime < CACHE_TTL_MS) return _rateCache;
 
     try {
-        // gold-api.com free plan: XAU + XAG only
-        const [gold, silver] = await Promise.all([
+        const [gold, silver, platinum, palladium, copper] = await Promise.all([
             fetchFromGoldAPI("XAU"),
             fetchFromGoldAPI("XAG"),
+            fetchFromGoldAPI("XPT"),
+            fetchFromGoldAPI("XPD"),
+            fetchFromGoldAPI("HG"),
         ]);
 
         // Gold: price per troy oz → per gram
         const goldBuyPerGram = parseFloat((gold.price / TROY_OZ_GRAMS).toFixed(2));
         // Silver: price per troy oz → per gram
         const silverPerGram = parseFloat((silver.price / TROY_OZ_GRAMS).toFixed(2));
-        // Copper: static MCX approx ₹0.85/gram — update via admin POST /api/gold/rate
-        const copperPerGram = 0.85;
+        // Platinum: price per troy oz → per gram
+        const platinumPerGram = parseFloat((platinum.price / TROY_OZ_GRAMS).toFixed(2));
+        // Palladium: price per troy oz → per gram
+        const palladiumPerGram = parseFloat((palladium.price / TROY_OZ_GRAMS).toFixed(2));
+        // Copper: price per lb → per gram (1 lb = 453.59237 grams)
+        const copperPerGram = parseFloat((copper.price / 453.59237).toFixed(2));
 
         _rateCache = {
             gold: {
@@ -85,19 +91,30 @@ async function fetchLiveRates() {
                 change24h: 0,
                 changePct: 0,
             },
+            platinum: {
+                buyRate: platinumPerGram,
+                sellRate: parseFloat((platinumPerGram * (1 - SELL_SPREAD)).toFixed(2)),
+                change24h: 0,
+                changePct: 0,
+            },
+            palladium: {
+                buyRate: palladiumPerGram,
+                sellRate: parseFloat((palladiumPerGram * (1 - SELL_SPREAD)).toFixed(2)),
+                change24h: 0,
+                changePct: 0,
+            },
             copper: {
                 buyRate: copperPerGram,
                 sellRate: parseFloat((copperPerGram * (1 - SELL_SPREAD)).toFixed(2)),
                 change24h: 0,
                 changePct: 0,
-                note: "Static MCX approx — update via admin endpoint",
             },
             updatedAt: new Date(),
             source: "gold-api.com",
         };
         _cacheTime = now;
 
-        // Persist latest gold + silver rate to DB (for history / offline fallback)
+        // Persist latest rates to DB (for history / offline fallback)
         await GoldRate.findOneAndUpdate(
             { source: "gold-api.com" },
             {
@@ -109,6 +126,15 @@ async function fetchLiveRates() {
                 silverSellRate: _rateCache.silver.sellRate,
                 silverChange24h: _rateCache.silver.change24h,
                 silverChangePct: _rateCache.silver.changePct,
+                platinumBuyRate: _rateCache.platinum.buyRate,
+                platinumSellRate: _rateCache.platinum.sellRate,
+                platinumChangePct: _rateCache.platinum.changePct,
+                palladiumBuyRate: _rateCache.palladium.buyRate,
+                palladiumSellRate: _rateCache.palladium.sellRate,
+                palladiumChangePct: _rateCache.palladium.changePct,
+                copperBuyRate: _rateCache.copper.buyRate,
+                copperSellRate: _rateCache.copper.sellRate,
+                copperChangePct: _rateCache.copper.changePct,
                 source: "gold-api.com",
                 isActive: true,
             },
@@ -135,11 +161,31 @@ async function fetchLiveRates() {
                         change24h: dbRate.silverChange24h,
                         changePct: dbRate.silverChangePct,
                     }
-                    // No cached silver rate ever saved (e.g. very first run before
-                    // the API ever succeeded) — better to show a rough static
-                    // estimate than a hard zero, which reads as "free silver" in the app.
                     : { buyRate: 175, sellRate: 173, change24h: 0, changePct: 0 },
-                copper: { buyRate: 0, sellRate: 0, change24h: 0, changePct: 0 },
+                platinum: (dbRate.platinumBuyRate > 0)
+                    ? {
+                        buyRate: dbRate.platinumBuyRate,
+                        sellRate: dbRate.platinumSellRate,
+                        change24h: 0,
+                        changePct: dbRate.platinumChangePct || 0,
+                    }
+                    : { buyRate: 5079, sellRate: 5043, change24h: 0, changePct: 0 },
+                palladium: (dbRate.palladiumBuyRate > 0)
+                    ? {
+                        buyRate: dbRate.palladiumBuyRate,
+                        sellRate: dbRate.palladiumSellRate,
+                        change24h: 0,
+                        changePct: dbRate.palladiumChangePct || 0,
+                    }
+                    : { buyRate: 3979, sellRate: 3951, change24h: 0, changePct: 0 },
+                copper: (dbRate.copperBuyRate > 0)
+                    ? {
+                        buyRate: dbRate.copperBuyRate,
+                        sellRate: dbRate.copperSellRate,
+                        change24h: 0,
+                        changePct: dbRate.copperChangePct || 0,
+                    }
+                    : { buyRate: 1.31, sellRate: 1.30, change24h: 0, changePct: 0 },
                 updatedAt: dbRate.updatedAt,
                 source: "db_fallback", // frontend should flag this as possibly stale
             };
@@ -173,6 +219,16 @@ exports.getRate = async (req, res, next) => {
                 },
                 silver: {
                     ...rates.silver,
+                    purity: "999",
+                    unit: "per gram",
+                },
+                platinum: {
+                    ...rates.platinum,
+                    purity: "950",
+                    unit: "per gram",
+                },
+                palladium: {
+                    ...rates.palladium,
                     purity: "999",
                     unit: "per gram",
                 },
