@@ -1264,6 +1264,8 @@
             </div>
             <div class="nav-item" onclick="showPage('gateways')" id="nav-gateways"><i class="fas fa-credit-card"></i>
                 Payment Gateways</div>
+            <div class="nav-item" onclick="showPage('rewards')" id="nav-rewards"><i class="fas fa-gift"></i>
+                Rewards Config</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1555,6 +1557,101 @@
                 </div>
                 <div id="gateways-body">
                     <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+
+            <!-- Rewards & Spin to Win Page -->
+            <div class="page" id="page-rewards">
+                <div class="section-header">
+                    <div class="section-title">Rewards & Spin to Win</div>
+                    <div style="color:var(--muted);font-size:12px;text-align:right">
+                        Configure user points ratios, registration/referral rewards, and view points ledgers.
+                    </div>
+                </div>
+
+                <div class="rewards-grid" style="display:grid; grid-template-columns: 1fr 2fr; gap: 24px; margin-top: 16px;">
+                    <!-- Settings Card -->
+                    <div class="card" style="background:var(--surface); border:1px solid var(--border); padding: 20px; border-radius: 8px;">
+                        <h4 style="margin-bottom: 16px; color: var(--accent); font-family: 'DM Serif Display', serif; font-size: 16px;">Reward Settings</h4>
+                        
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display:block; margin-bottom: 6px; font-size: 13px;">Enable Rewards System</label>
+                            <select id="rewards-active" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display:block; margin-bottom: 6px; font-size: 13px;">Registration Welcome Points</label>
+                            <input type="number" id="rewards-reg-points" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display:block; margin-bottom: 6px; font-size: 13px;">Referral Invite Points</label>
+                            <input type="number" id="rewards-ref-points" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display:block; margin-bottom: 6px; font-size: 13px;">1 Point Value in Rupees (₹)</label>
+                            <input type="number" step="0.01" id="rewards-wallet-rate" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                            <small style="color:var(--muted); font-size:11px;">e.g., 0.10 means 10 points = ₹1.00</small>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label style="display:block; margin-bottom: 6px; font-size: 13px;">Spin Wheel Slices (Comma-separated)</label>
+                            <input type="text" id="rewards-spin-slices" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                            <small style="color:var(--muted); font-size:11px;">e.g., 10, 20, 50, 100, 150, 200</small>
+                        </div>
+
+                        <button onclick="saveRewardSettings()" class="btn" style="width:100%; background:var(--accent); color:#000; border:none; padding:10px; font-weight:600; border-radius:4px; cursor:pointer;">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </div>
+
+                    <!-- Ledger Card -->
+                    <div class="card" style="background:var(--surface); border:1px solid var(--border); padding: 20px; border-radius: 8px; display:flex; flex-direction:column;">
+                        <h4 style="margin-bottom: 16px; color: var(--accent); font-family: 'DM Serif Display', serif; font-size: 16px;">Points Ledger History</h4>
+                        
+                        <!-- Search & Filter Controls -->
+                        <div style="display:flex; gap:12px; margin-bottom: 16px;">
+                            <input type="text" id="rewards-search" placeholder="Search by name, email, phone..." oninput="filterRewards()" style="flex:2; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                            <select id="rewards-filter-type" onchange="filterRewards()" style="flex:1; background:var(--surface2); border:1px solid var(--border); color:#fff; padding: 8px; border-radius:4px;">
+                                <option value="">All Types</option>
+                                <option value="spin_win">Spin & Win</option>
+                                <option value="registration">Registration</option>
+                                <option value="referral">Referral</option>
+                                <option value="redeem">Redemption</option>
+                            </select>
+                        </div>
+
+                        <div class="table-wrap" style="flex:1; overflow-x:auto;">
+                            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+                                <thead>
+                                    <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+                                        <th style="padding:10px 5px;">User</th>
+                                        <th style="padding:10px 5px;">Type</th>
+                                        <th style="padding:10px 5px; text-align:right;">Points</th>
+                                        <th style="padding:10px 5px;">Description</th>
+                                        <th style="padding:10px 5px;">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rewards-history-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                            <div id="rewards-loading" style="text-align:center; padding: 20px; display:none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </div>
+                        </div>
+
+                        <!-- Pagination Controls -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                            <button id="rewards-prev-btn" onclick="prevRewardsPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Previous</button>
+                            <span id="rewards-page-info" style="font-size:12px; color:var(--muted);">Page 1 of 1</span>
+                            <button id="rewards-next-btn" onclick="nextRewardsPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Next</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1973,6 +2070,150 @@
             loadKycBadge();
         }
 
+        /* ── Rewards & Spin to Win ── */
+        let rewardsPage = 1;
+        let rewardsTotalPages = 1;
+
+        async function loadRewardsPage() {
+            rewardsPage = 1;
+            await Promise.all([
+                loadRewardSettings(),
+                loadRewardHistory()
+            ]);
+        }
+
+        async function loadRewardSettings() {
+            try {
+                const res = await api('/admin/rewards/settings');
+                if (res.success && res.data) {
+                    document.getElementById('rewards-active').value = String(res.data.isActive);
+                    document.getElementById('rewards-reg-points').value = res.data.registrationPoints ?? 0;
+                    document.getElementById('rewards-ref-points').value = res.data.referralPoints ?? 0;
+                    document.getElementById('rewards-wallet-rate').value = res.data.pointToWalletRate ?? 0.10;
+                    document.getElementById('rewards-spin-slices').value = (res.data.spinPoints || []).join(', ');
+                }
+            } catch (err) {
+                console.error("Failed to load reward settings", err);
+                toast("Failed to load reward settings", "error");
+            }
+        }
+
+        async function saveRewardSettings() {
+            try {
+                const activeVal = document.getElementById('rewards-active').value === 'true';
+                const regPoints = parseInt(document.getElementById('rewards-reg-points').value, 10) || 0;
+                const refPoints = parseInt(document.getElementById('rewards-ref-points').value, 10) || 0;
+                const walletRate = parseFloat(document.getElementById('rewards-wallet-rate').value) || 0.10;
+                const spinSlicesStr = document.getElementById('rewards-spin-slices').value;
+                const spinPoints = spinSlicesStr.split(',')
+                    .map(s => parseInt(s.trim(), 10))
+                    .filter(n => !isNaN(n));
+
+                const res = await api('/admin/rewards/settings', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        isActive: activeVal,
+                        registrationPoints: regPoints,
+                        referralPoints: refPoints,
+                        pointToWalletRate: walletRate,
+                        spinPoints
+                    })
+                });
+
+                if (res.success) {
+                    toast("Settings saved successfully ✓", "success");
+                    await loadRewardSettings();
+                } else {
+                    toast(res.message || "Failed to save settings", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                toast("Failed to save settings", "error");
+            }
+        }
+
+        async function loadRewardHistory() {
+            const tableBody = document.getElementById('rewards-history-body');
+            const loadingEl = document.getElementById('rewards-loading');
+            
+            tableBody.innerHTML = '';
+            loadingEl.style.display = 'block';
+
+            try {
+                const search = document.getElementById('rewards-search').value;
+                const type = document.getElementById('rewards-filter-type').value;
+
+                let url = `/admin/rewards/history?page=${rewardsPage}&limit=15`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+                if (type) url += `&type=${encodeURIComponent(type)}`;
+
+                const res = await api(url);
+                loadingEl.style.display = 'none';
+
+                if (res.success && res.data && res.data.length > 0) {
+                    rewardsTotalPages = res.pages || 1;
+                    document.getElementById('rewards-page-info').textContent = `Page ${rewardsPage} of ${rewardsTotalPages}`;
+                    document.getElementById('rewards-prev-btn').disabled = rewardsPage <= 1;
+                    document.getElementById('rewards-next-btn').disabled = rewardsPage >= rewardsTotalPages;
+
+                    tableBody.innerHTML = res.data.map(txn => {
+                        const userName = txn.user ? `${txn.user.name} (${txn.user.phone || txn.user.email})` : 'Deleted User';
+                        const pointsStyle = txn.points > 0 ? 'color:var(--success); font-weight:bold;' : 'color:var(--danger);';
+                        const pointsStr = txn.points > 0 ? `+${txn.points}` : `${txn.points}`;
+                        const typeLabels = {
+                            spin_win: '<span style="background:rgba(243,156,18,0.15); color:var(--warning); padding:2px 6px; border-radius:4px; font-size:11px;">Spin & Win</span>',
+                            registration: '<span style="background:rgba(52,152,219,0.15); color:var(--info); padding:2px 6px; border-radius:4px; font-size:11px;">Registration</span>',
+                            referral: '<span style="background:rgba(46,204,113,0.15); color:var(--success); padding:2px 6px; border-radius:4px; font-size:11px;">Referral</span>',
+                            redeem: '<span style="background:rgba(231,76,60,0.15); color:var(--danger); padding:2px 6px; border-radius:4px; font-size:11px;">Redemption</span>'
+                        };
+                        const typeHtml = typeLabels[txn.type] || txn.type;
+                        const dateStr = new Date(txn.createdAt).toLocaleString();
+
+                        return `
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:10px 5px;">${userName}</td>
+                                <td style="padding:10px 5px;">${typeHtml}</td>
+                                <td style="padding:10px 5px; text-align:right; ${pointsStyle}">${pointsStr}</td>
+                                <td style="padding:10px 5px; color:var(--text);">${txn.description}</td>
+                                <td style="padding:10px 5px; color:var(--muted);">${dateStr}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--muted);">No point logs found.</td></tr>`;
+                    document.getElementById('rewards-page-info').textContent = 'Page 1 of 1';
+                    document.getElementById('rewards-prev-btn').disabled = true;
+                    document.getElementById('rewards-next-btn').disabled = true;
+                }
+            } catch (err) {
+                loadingEl.style.display = 'none';
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Error loading data.</td></tr>`;
+            }
+        }
+
+        let rewardsDebounce = null;
+        function filterRewards() {
+            clearTimeout(rewardsDebounce);
+            rewardsDebounce = setTimeout(() => {
+                rewardsPage = 1;
+                loadRewardHistory();
+            }, 300);
+        }
+
+        function prevRewardsPage() {
+            if (rewardsPage > 1) {
+                rewardsPage--;
+                loadRewardHistory();
+            }
+        }
+
+        function nextRewardsPage() {
+            if (rewardsPage < rewardsTotalPages) {
+                rewardsPage++;
+                loadRewardHistory();
+            }
+        }
+
         async function tryAutoLogin() {
             if (!TOKEN) return;
             try {
@@ -1989,7 +2230,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -2001,6 +2242,7 @@
             if (name === 'withdrawals') loadWithdrawals();
             if (name === 'sellapprovals') loadSellApprovals();
             if (name === 'gateways') loadGateways();
+            if (name === 'rewards') loadRewardsPage();
         }
 
         async function api(path, opts = {}) {

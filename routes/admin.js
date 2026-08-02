@@ -7,6 +7,9 @@ const {
   getWithdrawals, completeWithdrawal,
   getSellApprovals, approveSellPayout,
   getSchemeEnrollments,
+  getRewardSettings,
+  updateRewardSettings,
+  getAllRewardHistory,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -59,5 +62,10 @@ router.patch("/sell-approvals/:id/approve", approveSellPayout);
 
 // Gold Scheme Enrollments
 router.get("/schemes/enrollments", getSchemeEnrollments);
+
+// Reward Points System
+router.get("/rewards/settings", getRewardSettings);
+router.post("/rewards/settings", updateRewardSettings);
+router.get("/rewards/history", getAllRewardHistory);
 
 module.exports = router;

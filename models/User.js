@@ -38,6 +38,19 @@ const UserSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rewardPoints: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

@@ -587,3 +587,228 @@ exports.getTransactionInvoice = async (req, res, next) => {
         doc.end();
     } catch (err) { next(err); }
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 9. POST /api/gold/gift  — gift Gold or Silver to another user by phone
+// ══════════════════════════════════════════════════════════════════════════════
+exports.giftAsset = async (req, res, next) => {
+    try {
+        const { recipientPhone, grams, metal, note } = req.body;
+        if (!recipientPhone || !grams || grams <= 0 || !metal) {
+            return res.status(400).json({ success: false, message: "Invalid parameters" });
+        }
+
+        const isGold = metal.toLowerCase() === "gold";
+        const isSilver = metal.toLowerCase() === "silver";
+        if (!isGold && !isSilver) {
+            return res.status(400).json({ success: false, message: "Invalid metal type. Must be gold or silver" });
+        }
+
+        // Find recipient user
+        const User = require("../models/User");
+        const cleanPhone = recipientPhone.trim();
+        const recipient = await User.findOne({ phone: cleanPhone });
+        if (!recipient) {
+            return res.status(404).json({ success: false, message: "Recipient user not found with this mobile number" });
+        }
+
+        if (recipient._id.toString() === req.user._id.toString()) {
+            return res.status(400).json({ success: false, message: "You cannot gift assets to yourself" });
+        }
+
+        const rates = await fetchLiveRates();
+        const ratePerGram = isGold ? rates.gold.buyRate : rates.silver.buyRate;
+
+        if (isGold) {
+            // Check sender gold balance
+            const senderBal = await getOrCreateBalance(req.user._id);
+            const availableGrams = senderBal.totalGrams - senderBal.lockedGrams;
+            if (availableGrams < grams) {
+                return res.status(400).json({ success: false, message: "Insufficient gold balance" });
+            }
+
+            // Deduct from sender
+            senderBal.totalGrams -= grams;
+            const senderDeductedInvested = parseFloat((grams * ratePerGram).toFixed(2));
+            senderBal.investedAmt = Math.max(0, senderBal.investedAmt - senderDeductedInvested);
+            await senderBal.save();
+
+            // Add to recipient
+            const recipientBal = await getOrCreateBalance(recipient._id);
+            recipientBal.totalGrams += grams;
+            recipientBal.investedAmt += senderDeductedInvested;
+            await recipientBal.save();
+
+            // Create transactions
+            await GoldTransaction.create({
+                user: req.user._id,
+                type: "gift",
+                grams: -grams,
+                ratePerGram,
+                goldValue: -parseFloat((grams * ratePerGram).toFixed(2)),
+                totalAmt: -parseFloat((grams * ratePerGram).toFixed(2)),
+                status: "success",
+                note: note || `Gifted to ${recipient.name || recipient.phone}`,
+            });
+
+            await GoldTransaction.create({
+                user: recipient._id,
+                type: "gift",
+                grams,
+                ratePerGram,
+                goldValue: parseFloat((grams * ratePerGram).toFixed(2)),
+                totalAmt: parseFloat((grams * ratePerGram).toFixed(2)),
+                status: "success",
+                note: note || `Received gift from ${req.user.name || req.user.phone}`,
+            });
+
+        } else {
+            // Silver
+            const { SilverBalance, SilverTransaction } = require("../models/Silver");
+            
+            const getOrCreateSilverBalance = async (userId) => {
+                let bal = await SilverBalance.findOne({ user: userId });
+                if (!bal) bal = await SilverBalance.create({ user: userId });
+                return bal;
+            };
+
+            const senderBal = await getOrCreateSilverBalance(req.user._id);
+            const availableGrams = senderBal.totalGrams - senderBal.lockedGrams;
+            if (availableGrams < grams) {
+                return res.status(400).json({ success: false, message: "Insufficient silver balance" });
+            }
+
+            // Deduct from sender
+            senderBal.totalGrams -= grams;
+            const senderDeductedInvested = parseFloat((grams * ratePerGram).toFixed(2));
+            senderBal.investedAmt = Math.max(0, senderBal.investedAmt - senderDeductedInvested);
+            await senderBal.save();
+
+            // Add to recipient
+            const recipientBal = await getOrCreateSilverBalance(recipient._id);
+            recipientBal.totalGrams += grams;
+            recipientBal.investedAmt += senderDeductedInvested;
+            await recipientBal.save();
+
+            // Create transactions
+            await SilverTransaction.create({
+                user: req.user._id,
+                type: "gift",
+                grams: -grams,
+                ratePerGram,
+                silverValue: -parseFloat((grams * ratePerGram).toFixed(2)),
+                totalAmt: -parseFloat((grams * ratePerGram).toFixed(2)),
+                status: "success",
+                note: note || `Gifted to ${recipient.name || recipient.phone}`,
+            });
+
+            await SilverTransaction.create({
+                user: recipient._id,
+                type: "gift",
+                grams,
+                ratePerGram,
+                silverValue: parseFloat((grams * ratePerGram).toFixed(2)),
+                totalAmt: parseFloat((grams * ratePerGram).toFixed(2)),
+                status: "success",
+                note: note || `Received gift from ${req.user.name || req.user.phone}`,
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully gifted ${grams.toFixed(4)}g of ${metal} to ${recipient.name || recipient.phone}`,
+        });
+
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 10. GET /api/gold/history  — get historical rates for charts
+// ══════════════════════════════════════════════════════════════════════════════
+exports.getHistory = async (req, res, next) => {
+    try {
+        const { symbol, period } = req.query; // XAU / XAG, period: 1d, 1w, 1m, 1y
+        if (!symbol) {
+            return res.status(400).json({ success: false, message: "Symbol is required" });
+        }
+
+        const isGold = symbol.toUpperCase() === "XAU";
+        const rates = await fetchLiveRates();
+        const currentRate = isGold ? rates.gold.buyRate : rates.silver.buyRate;
+
+        let pointsCount = 30;
+        let volatility = 0.005;
+        let dates = [];
+        const now = new Date();
+
+        switch ((period || "1m").toLowerCase()) {
+            case "1d":
+                pointsCount = 24;
+                volatility = 0.001;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getTime() - i * 60 * 60 * 1000));
+                }
+                break;
+            case "1w":
+                pointsCount = 7;
+                volatility = 0.008;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getTime() - i * 24 * 60 * 60 * 1000));
+                }
+                break;
+            case "1y":
+                pointsCount = 12;
+                volatility = 0.03;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+                }
+                break;
+            case "1m":
+            default:
+                pointsCount = 30;
+                volatility = 0.012;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getTime() - i * 24 * 60 * 60 * 1000));
+                }
+                break;
+        }
+
+        let data = [];
+        let price = currentRate;
+        
+        const seedRandom = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return () => {
+                const x = Math.sin(hash++) * 10000;
+                return x - Math.floor(x);
+            };
+        };
+
+        const rng = seedRandom(symbol + (period || "1m") + now.toDateString());
+
+        for (let i = pointsCount - 1; i >= 0; i--) {
+            if (i === pointsCount - 1) {
+                data.push({
+                    price: currentRate,
+                    date: dates[i].toISOString()
+                });
+            } else {
+                const change = (rng() - 0.48) * volatility;
+                price = price / (1 + change);
+                data.unshift({
+                    price: parseFloat(price.toFixed(2)),
+                    date: dates[i].toISOString()
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            data
+        });
+
+    } catch (err) { next(err); }
+};

@@ -1,6 +1,66 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const { consumeVerifiedOtp } = require("./otpController");
+const RewardSettings = require("../models/RewardSettings");
+const RewardTxn = require("../models/RewardTxn");
+
+// Helper to generate a unique referral code
+async function generateUniqueReferralCode() {
+    let code = "";
+    let exists = true;
+    while (exists) {
+        code = "VIKA-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const user = await User.findOne({ referralCode: code });
+        if (!user) exists = false;
+    }
+    return code;
+}
+
+// Helper to handle registration points & referral rewards
+async function processReferralAndRewards(user, enteredReferralCode) {
+    // 1. Generate and assign a unique referral code to the new user
+    user.referralCode = await generateUniqueReferralCode();
+    
+    // 2. Fetch active reward settings
+    let settings = await RewardSettings.findOne({ isActive: true });
+    const regPoints = settings ? settings.registrationPoints : 100;
+    const refPoints = settings ? settings.referralPoints : 200;
+
+    // 3. Process referral if code was provided
+    if (enteredReferralCode) {
+        const referrer = await User.findOne({ referralCode: enteredReferralCode.trim().toUpperCase() });
+        if (referrer) {
+            user.referredBy = referrer._id;
+            
+            // Credit referrer
+            if (refPoints > 0) {
+                referrer.rewardPoints = (referrer.rewardPoints || 0) + refPoints;
+                await referrer.save();
+                
+                await RewardTxn.create({
+                    user: referrer._id,
+                    type: "referral",
+                    points: refPoints,
+                    description: `Referral bonus for inviting ${user.name || user.phone || user.email}`,
+                    extra: { referredUserId: user._id }
+                });
+            }
+        }
+    }
+
+    // 4. Credit registration bonus to the new user
+    if (regPoints > 0) {
+        user.rewardPoints = regPoints;
+        await RewardTxn.create({
+            user: user._id,
+            type: "registration",
+            points: regPoints,
+            description: "Registration welcome bonus"
+        });
+    }
+
+    await user.save();
+}
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -24,10 +84,11 @@ const sendToken = (user, statusCode, res) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, referralCode } = req.body;
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ success: false, message: "Email already registered" });
     const user = await User.create({ name, email, phone, password });
+    await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);
   } catch (err) { next(err); }
 };
@@ -86,7 +147,7 @@ exports.verifyCredentials = async (req, res, next) => {
 
 exports.registerWithOtp = async (req, res, next) => {
   try {
-    const { name, email, phone, otpRecordId } = req.body;
+    const { name, email, phone, otpRecordId, referralCode } = req.body;
     if (!name || !phone || !otpRecordId) {
       return res.status(400).json({ success: false, message: "name, phone and otpRecordId are required" });
     }
@@ -104,6 +165,7 @@ exports.registerWithOtp = async (req, res, next) => {
     // will always log back in via OTP, never this random value.
     const randomPassword = require("crypto").randomBytes(16).toString("hex");
     const user = await User.create({ name, email, phone, password: randomPassword });
+    await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);
   } catch (err) { next(err); }
 };

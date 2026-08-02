@@ -318,4 +318,95 @@ exports.getSchemeEnrollments = async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+};
+
+// ── Admin Rewards Settings ───────────────────────────────────────────────────
+exports.getRewardSettings = async (req, res, next) => {
+    try {
+        const RewardSettings = require("../models/RewardSettings");
+        let settings = await RewardSettings.findOne();
+        if (!settings) {
+            settings = await RewardSettings.create({
+                registrationPoints: 100,
+                referralPoints: 200,
+                pointToWalletRate: 0.10,
+                spinPoints: [10, 20, 50, 100, 150, 200],
+                isActive: true,
+            });
+        }
+        res.json({ success: true, data: settings });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateRewardSettings = async (req, res, next) => {
+    try {
+        const RewardSettings = require("../models/RewardSettings");
+        const { registrationPoints, referralPoints, pointToWalletRate, spinPoints, isActive } = req.body;
+
+        let settings = await RewardSettings.findOne();
+        if (!settings) {
+            settings = new RewardSettings();
+        }
+
+        if (registrationPoints !== undefined) settings.registrationPoints = registrationPoints;
+        if (referralPoints !== undefined) settings.referralPoints = referralPoints;
+        if (pointToWalletRate !== undefined) settings.pointToWalletRate = pointToWalletRate;
+        if (spinPoints !== undefined) settings.spinPoints = spinPoints;
+        if (isActive !== undefined) settings.isActive = isActive;
+
+        await settings.save();
+        res.json({ success: true, message: "Reward settings updated successfully", data: settings });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── GET /api/admin/rewards/history ────────────────────────────────────────────
+exports.getAllRewardHistory = async (req, res, next) => {
+    try {
+        const RewardTxn = require("../models/RewardTxn");
+        const User = require("../models/User");
+
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        if (req.query.userId) filter.user = req.query.userId;
+
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, "i");
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex },
+                ],
+            }).select("_id");
+            const userIds = matchingUsers.map((u) => u._id);
+            filter.user = { $in: userIds };
+        }
+
+        const [history, total] = await Promise.all([
+            RewardTxn.find(filter)
+                .populate("user", "name email phone")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            RewardTxn.countDocuments(filter),
+        ]);
+
+        res.json({
+            success: true,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            data: history,
+        });
+    } catch (err) {
+        next(err);
+    }
 };

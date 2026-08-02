@@ -10,11 +10,14 @@ const {
     getTransactionDetail,
     getTransactionInvoice,
     updateRate,
+    giftAsset,
+    getHistory,
 } = require("../controllers/goldController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.get("/rate", getRate);   // live rate — no auth needed (show on landing page too)
+router.get("/history", getHistory);
 
 // ── User (auth required) ──────────────────────────────────────────────────────
 router.use(protect);
@@ -22,6 +25,7 @@ router.get("/balance", getBalance);
 router.post("/buy/initiate", initiateBuy);
 router.post("/buy/verify", verifyBuy);
 router.post("/sell", sellGold);
+router.post("/gift", giftAsset);
 router.get("/transactions", getTransactions);
 router.get("/transactions/:id", getTransactionDetail);
 router.get("/transactions/:id/invoice", getTransactionInvoice);
