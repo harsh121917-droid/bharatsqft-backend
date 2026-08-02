@@ -65,12 +65,12 @@ async function fetchLiveRates() {
             fetchFromGoldAPI("HG"),
         ]);
 
-        // Calibrate API rates (since gold-api.com returns inflated spot rates for free endpoints)
-        const GOLD_CALIBRATION = 0.58; 
-        const SILVER_CALIBRATION = 0.50;
-        const PLATINUM_CALIBRATION = 0.55;
-        const PALLADIUM_CALIBRATION = 0.55;
-        const COPPER_CALIBRATION = 0.50;
+        // Calibrate API rates (set to 1.0 to show the actual live 2026 market rates)
+        const GOLD_CALIBRATION = 1.0; 
+        const SILVER_CALIBRATION = 1.0;
+        const PLATINUM_CALIBRATION = 1.0;
+        const PALLADIUM_CALIBRATION = 1.0;
+        const COPPER_CALIBRATION = 1.0;
 
         // Gold: price per troy oz → per gram
         const goldBuyPerGram = parseFloat(((gold.price * GOLD_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));
