@@ -30,7 +30,7 @@ exports.getCoins = async (req, res, next) => {
                 value,
                 makingCharge: making,
                 totalValue: parseFloat((value + making).toFixed(2)),
-                redeemable: c.metal === "gold", // silver not redeemable yet
+                redeemable: true,
             };
         });
         res.json({ success: true, data });
@@ -46,11 +46,53 @@ exports.redeemCoin = async (req, res, next) => {
         const { coinId, addressLine, pincode, phone } = req.body;
         const coin = CATALOG.find(c => c.id === coinId);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
-        if (coin.metal !== "gold") {
-            return res.status(400).json({ success: false, message: "Silver coin redemption isn't available yet" });
-        }
         if (!addressLine || !pincode || !phone) {
             return res.status(400).json({ success: false, message: "Address, pincode and phone are required" });
+        }
+
+        if (coin.metal === "silver") {
+            const { SilverBalance, SilverTransaction } = require("../models/Silver");
+            const [rates, silverBal] = await Promise.all([
+                fetchLiveRates(),
+                SilverBalance.findOne({ user: req.user._id }),
+            ]);
+
+            const rate = rates.silver.buyRate;
+            const silverValue = parseFloat((coin.grams * rate).toFixed(2));
+            const makingCharge = parseFloat((silverValue * coin.makingChargePct / 100).toFixed(2));
+            const totalValue = parseFloat((silverValue + makingCharge).toFixed(2));
+            const gramsToDeduct = parseFloat((totalValue / rate).toFixed(6));
+
+            const available = (silverBal?.totalGrams || 0) - (silverBal?.lockedGrams || 0);
+            if (!silverBal || available < gramsToDeduct) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient silver. Need ${gramsToDeduct.toFixed(4)}g, have ${available.toFixed(4)}g`,
+                });
+            }
+
+            silverBal.totalGrams = parseFloat((silverBal.totalGrams - gramsToDeduct).toFixed(6));
+            silverBal.investedAmt = parseFloat(Math.max(0, silverBal.investedAmt - silverValue * 0.9).toFixed(2));
+            await silverBal.save();
+
+            const silverTxn = await SilverTransaction.create({
+                user: req.user._id, type: "redeem", grams: gramsToDeduct,
+                ratePerGram: rate, silverValue, gstAmt: makingCharge, totalAmt: totalValue,
+                status: "success", note: `Redeemed for ${coin.name}`,
+            });
+
+            const order = await CoinOrder.create({
+                user: req.user._id, coinId: coin.id, coinName: coin.name, metal: coin.metal,
+                grams: coin.grams, makingChargePct: coin.makingChargePct,
+                goldValue: silverValue, makingCharge, totalValue, ratePerGram: rate,
+                goldTxnId: silverTxn._id, addressLine, pincode, phone,
+            });
+
+            return res.json({
+                success: true,
+                message: `${coin.name} order placed! ${gramsToDeduct.toFixed(4)}g deducted from your silver.`,
+                data: { order, remainingGrams: silverBal.totalGrams },
+            });
         }
 
         const [rates, goldBal] = await Promise.all([

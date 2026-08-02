@@ -65,16 +65,23 @@ async function fetchLiveRates() {
             fetchFromGoldAPI("HG"),
         ]);
 
+        // Calibrate API rates (since gold-api.com returns inflated spot rates for free endpoints)
+        const GOLD_CALIBRATION = 0.58; 
+        const SILVER_CALIBRATION = 0.50;
+        const PLATINUM_CALIBRATION = 0.55;
+        const PALLADIUM_CALIBRATION = 0.55;
+        const COPPER_CALIBRATION = 0.50;
+
         // Gold: price per troy oz → per gram
-        const goldBuyPerGram = parseFloat((gold.price / TROY_OZ_GRAMS).toFixed(2));
+        const goldBuyPerGram = parseFloat(((gold.price * GOLD_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));
         // Silver: price per troy oz → per gram
-        const silverPerGram = parseFloat((silver.price / TROY_OZ_GRAMS).toFixed(2));
+        const silverPerGram = parseFloat(((silver.price * SILVER_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));
         // Platinum: price per troy oz → per gram
-        const platinumPerGram = parseFloat((platinum.price / TROY_OZ_GRAMS).toFixed(2));
+        const platinumPerGram = parseFloat(((platinum.price * PLATINUM_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));
         // Palladium: price per troy oz → per gram
-        const palladiumPerGram = parseFloat((palladium.price / TROY_OZ_GRAMS).toFixed(2));
+        const palladiumPerGram = parseFloat(((palladium.price * PALLADIUM_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));
         // Copper: price per lb → per gram (1 lb = 453.59237 grams)
-        const copperPerGram = parseFloat((copper.price / 453.59237).toFixed(2));
+        const copperPerGram = parseFloat(((copper.price * COPPER_CALIBRATION) / 453.59237).toFixed(2));
 
         _rateCache = {
             gold: {
