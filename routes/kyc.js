@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { submitKyc, getMyKyc } = require("../controllers/kycController");
+const { submitKyc, getMyKyc, initiateDigioKyc, verifyDigioKyc } = require("../controllers/kycController");
 const { protect } = require("../middleware/authMiddleware");
 const { uploadKycDocs } = require("../middleware/uploadMiddleware");
 
@@ -16,5 +16,9 @@ router.post("/submit", (req, res, next) => {
 
 // Get my KYC status
 router.get("/me", getMyKyc);
+
+// Digio KYC endpoints
+router.post("/digio/initiate", initiateDigioKyc);
+router.post("/digio/verify/:kycId", verifyDigioKyc);
 
 module.exports = router;
