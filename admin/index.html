@@ -2917,8 +2917,8 @@
         <div class="form-section" style="margin-top:14px">Review Status</div>
         <span class="badge" style="background:${sc[k.status]}22;color:${sc[k.status]};font-size:13px;padding:6px 14px">${k.status.toUpperCase()}</span>
         ${k.rejectionReason ? `<div style="margin-top:8px;font-size:12px;color:var(--danger)"><i class="fas fa-exclamation-circle"></i> ${k.rejectionReason}</div>` : ''}
-        ${k.status !== 'approved' ? `<div class="form-section" style="margin-top:14px">Rejection Reason</div>
-        <textarea id="kyc-rejection-reason" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;min-height:70px;resize:vertical;outline:none" placeholder="Enter reason for rejection...">${k.rejectionReason || ''}</textarea>` : ''}
+        <div class="form-section" style="margin-top:14px">Rejection Reason</div>
+        <textarea id="kyc-rejection-reason" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;min-height:70px;resize:vertical;outline:none" placeholder="Enter reason for rejection/revocation...">${k.rejectionReason || ''}</textarea>
       </div>
       <div>
         <div class="form-section">Documents <span style="color:var(--muted);font-weight:400;text-transform:none">(click to open full size)</span></div>
