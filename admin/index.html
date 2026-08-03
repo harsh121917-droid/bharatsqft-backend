@@ -2893,7 +2893,6 @@
 
             const data = await api(`/admin/kyc/${id}`);
             if (!data.success) { document.getElementById('kyc-modal-body').innerHTML = '<div class="empty">Failed to load</div>'; return; }
-
             const k = data.data;
             const sc = { pending: 'var(--warning)', approved: 'var(--success)', rejected: 'var(--danger)' };
 
@@ -2931,26 +2930,16 @@
     </div>`;
 
             const footer = document.getElementById('kyc-modal-footer');
-            if (k.status === 'pending') {
-                footer.innerHTML = `
+            footer.innerHTML = `
       <button class="btn-cancel" onclick="closeKycModal()">Close</button>
-      <button class="btn-sm btn-danger" style="padding:0 20px;height:var(--tap);font-size:14px;border-radius:8px" onclick="reviewKyc('${id}','rejected')"><i class="fas fa-times"></i> Reject</button>
+      <button class="btn-sm" style="padding:0 20px;height:var(--tap);font-size:14px;border-radius:8px;background:#3498db;color:white;border:none;cursor:pointer;margin-right:8px" onclick="reviewKyc('${id}','pending')"><i class="fas fa-undo"></i> Set Pending</button>
+      <button class="btn-sm btn-danger" style="padding:0 20px;height:var(--tap);font-size:14px;border-radius:8px;margin-right:8px" onclick="reviewKyc('${id}','rejected')"><i class="fas fa-ban"></i> Reject / Revoke</button>
       <button class="btn-save" onclick="reviewKyc('${id}','approved')"><i class="fas fa-check"></i> Approve</button>`;
-            } else if (k.status === 'approved') {
-                footer.innerHTML = `
-      <button class="btn-cancel" onclick="closeKycModal()">Close</button>
-      <button class="btn-sm btn-danger" style="padding:0 20px;height:var(--tap);font-size:14px;border-radius:8px" onclick="reviewKyc('${id}','rejected')"><i class="fas fa-ban"></i> Revoke & Reject</button>`;
-            } else {
-                footer.innerHTML = `
-      <button class="btn-cancel" onclick="closeKycModal()">Close</button>
-      <button class="btn-save" onclick="reviewKyc('${id}','approved')"><i class="fas fa-check"></i> Approve</button>`;
-            }
         }
 
         async function reviewKyc(id, status) {
             const reasonEl = document.getElementById('kyc-rejection-reason');
             const reason = reasonEl?.value?.trim();
-            if (status === 'rejected' && !reason) { toast('Please enter a rejection reason', 'error'); return; }
 
             const data = await api(`/admin/kyc/${id}`, {
                 method: 'PATCH',
@@ -2958,7 +2947,7 @@
             });
 
             if (data.success) {
-                toast(`KYC ${status === 'approved' ? 'Approved ✓' : 'Rejected'}`, status === 'approved' ? 'success' : 'error');
+                toast(`KYC Status Changed to ${status.toUpperCase()} ✓`, 'success');
                 closeKycModal();
                 loadKyc();
             } else {

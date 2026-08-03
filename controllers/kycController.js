@@ -134,18 +134,16 @@ exports.reviewKyc = async (req, res, next) => {
     try {
         const { status, rejectionReason } = req.body;
 
-        if (!["approved", "rejected"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Status must be 'approved' or 'rejected'" });
+        if (!["approved", "rejected", "pending"].includes(status)) {
+            return res.status(400).json({ success: false, message: "Status must be 'approved', 'rejected', or 'pending'" });
         }
-        if (status === "rejected" && !rejectionReason) {
-            return res.status(400).json({ success: false, message: "Rejection reason is required" });
-        }
+        const reason = status === "rejected" ? (rejectionReason || "Rejected by Administrator") : undefined;
 
         const kyc = await Kyc.findByIdAndUpdate(
             req.params.id,
             {
                 status,
-                rejectionReason: status === "rejected" ? rejectionReason : undefined,
+                rejectionReason: reason,
                 reviewedBy: req.user._id,
                 reviewedAt: new Date(),
             },
@@ -153,6 +151,11 @@ exports.reviewKyc = async (req, res, next) => {
         ).populate("user", "name email phone");
 
         if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
+
+        if (kyc.user) {
+            const User = require("../models/User");
+            await User.findByIdAndUpdate(kyc.user._id, { kycStatus: status });
+        }
 
         res.json({ success: true, message: `KYC ${status}`, data: kyc });
     } catch (err) { next(err); }
