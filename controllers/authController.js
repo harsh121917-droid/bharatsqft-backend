@@ -202,3 +202,25 @@ exports.updatePassword = async (req, res, next) => {
     sendToken(user, 200, res);
   } catch (err) { next(err); }
 };
+
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const { name, email } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    if (name) user.name = name;
+    if (email) {
+      if (email.toLowerCase() !== user.email.toLowerCase()) {
+        const emailExists = await User.findOne({ email: email.toLowerCase() });
+        if (emailExists) {
+          return res.status(400).json({ success: false, message: "Email already in use" });
+        }
+        user.email = email.toLowerCase();
+      }
+    }
+
+    await user.save({ validateBeforeSave: false });
+    sendToken(user, 200, res);
+  } catch (err) { next(err); }
+};
