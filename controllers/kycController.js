@@ -427,10 +427,11 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                 );
 
                 const resData = response.data || {};
-                // Cashfree verify OKYC returns demographic info in `data` field
-                if ((resData.status === "VALID" || resData.status === "SUCCESS") && resData.data) {
-                    const cfData = resData.data;
-                    
+                const cfData = resData.data || resData;
+                const isValidStatus = ["VALID", "SUCCESS", "VERIFIED"].includes(String(resData.status).toUpperCase()) || 
+                                      resData.message === "Aadhaar Card Exists";
+
+                if (isValidStatus) {
                     // Parse DOB
                     let parsedDob = new Date("1995-01-01");
                     if (cfData.dob) {
@@ -447,14 +448,30 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                         }
                     }
 
+                    let line1 = "Address Line 1";
+                    let city = "Mumbai";
+                    let state = "Maharashtra";
+                    let pincode = "400001";
+
+                    if (cfData.address) {
+                        if (typeof cfData.address === "object") {
+                            line1 = [cfData.address.house, cfData.address.street, cfData.address.loc, cfData.address.vtc].filter(Boolean).join(", ") || "Address Line 1";
+                            city = cfData.address.city || cfData.address.dist || "Mumbai";
+                            state = cfData.address.state || "Maharashtra";
+                            pincode = cfData.address.pincode || "400001";
+                        } else if (typeof cfData.address === "string") {
+                            line1 = cfData.address;
+                        }
+                    }
+
                     details = {
                         fullName: cfData.name || req.user.name,
                         dob: parsedDob,
                         address: {
-                            line1: [cfData.address.house, cfData.address.street, cfData.address.loc, cfData.address.vtc].filter(Boolean).join(", ") || "Address Line 1",
-                            city: cfData.address.city || cfData.address.dist || "Mumbai",
-                            state: cfData.address.state || "Maharashtra",
-                            pincode: cfData.address.pincode || "400001"
+                            line1,
+                            city,
+                            state,
+                            pincode
                         },
                         panNumber: "ABCDE1234F",
                         aadhaarNumber: aadhaarNumber || "123456789012"
