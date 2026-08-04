@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { submitKyc, getMyKyc, initiateDigioKyc, verifyDigioKyc } = require("../controllers/kycController");
+const { submitKyc, getMyKyc, initiateDigioKyc, verifyDigioKyc, initiateCashfreeOtp, verifyCashfreeOtp } = require("../controllers/kycController");
 const { protect } = require("../middleware/authMiddleware");
 const { uploadKycDocs } = require("../middleware/uploadMiddleware");
 
@@ -20,5 +20,9 @@ router.get("/me", getMyKyc);
 // Digio KYC endpoints
 router.post("/digio/initiate", initiateDigioKyc);
 router.post("/digio/verify/:kycId", verifyDigioKyc);
+
+// Cashfree KYC endpoints
+router.post("/cashfree/otp", initiateCashfreeOtp);
+router.post("/cashfree/verify", verifyCashfreeOtp);
 
 module.exports = router;
