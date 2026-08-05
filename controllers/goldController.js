@@ -65,9 +65,9 @@ async function fetchLiveRates() {
             fetchFromGoldAPI("HG"),
         ]);
 
-        // Calibrate API rates (set to 1.0 to show the actual live 2026 market rates)
-        const GOLD_CALIBRATION = 1.0; 
-        const SILVER_CALIBRATION = 1.0;
+        // Calibrate API rates to match current Indian market rates (approx. 0.5576 for Gold, 0.446 for Silver)
+        const GOLD_CALIBRATION = 0.5576; 
+        const SILVER_CALIBRATION = 0.446;
         const PLATINUM_CALIBRATION = 1.0;
         const PALLADIUM_CALIBRATION = 1.0;
         const COPPER_CALIBRATION = 1.0;

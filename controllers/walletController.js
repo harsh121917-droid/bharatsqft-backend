@@ -134,15 +134,19 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         const buyRate = rates.gold.buyRate;
         const GST_PCT = 3;
 
-        let { amountInRupees, grams } = req.body;
+        let { amountInRupees, grams, pointsRedeemed } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         if (!amountInRupees || amountInRupees < 100) {
             return res.status(400).json({ success: false, message: "Minimum purchase is ₹100" });
         }
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
+        let pointsDiscount = 0;
+        if (pointsRedeemed) {
+            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+        }
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
-        const gramsToAdd = parseFloat((amountInRupees / buyRate).toFixed(6));
+        const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
 
         // Check wallet balance
         const wallet = await getOrCreateWallet(req.user._id);
@@ -171,13 +175,13 @@ exports.buyGoldFromWallet = async (req, res, next) => {
             user: req.user._id, type: "buy", grams: gramsToAdd,
             ratePerGram: buyRate, goldValue: amountInRupees,
             gstAmt, totalAmt, status: "success",
-            note: "Purchased via wallet",
+            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra gold)` : "Purchased via wallet",
         });
 
         // Record wallet transaction
         await recordTxn(req.user._id, "gold_buy", totalAmt, balBefore, wallet.balance, {
             goldTxnId: goldTxn._id,
-            note: `Bought ${gramsToAdd}g gold @ ₹${buyRate}/g`,
+            note: pointsRedeemed ? `Bought ${gramsToAdd}g gold @ ₹${buyRate}/g (Redeemed ${pointsRedeemed} pts for extra gold)` : `Bought ${gramsToAdd}g gold @ ₹${buyRate}/g`,
             status: "success",
         });
 
@@ -327,15 +331,19 @@ exports.buySilverFromWallet = async (req, res, next) => {
         }
         const GST_PCT = 3;
 
-        let { amountInRupees, grams } = req.body;
+        let { amountInRupees, grams, pointsRedeemed } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         if (!amountInRupees || amountInRupees < 100) {
             return res.status(400).json({ success: false, message: "Minimum purchase is ₹100" });
         }
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
+        let pointsDiscount = 0;
+        if (pointsRedeemed) {
+            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+        }
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
-        const gramsToAdd = parseFloat((amountInRupees / buyRate).toFixed(6));
+        const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
 
         const wallet = await getOrCreateWallet(req.user._id);
         if (wallet.balance < totalAmt) {
@@ -360,12 +368,12 @@ exports.buySilverFromWallet = async (req, res, next) => {
             user: req.user._id, type: "buy", grams: gramsToAdd,
             ratePerGram: buyRate, silverValue: amountInRupees,
             gstAmt, totalAmt, status: "success",
-            note: "Purchased via wallet",
+            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra silver)` : "Purchased via wallet",
         });
 
         await recordTxn(req.user._id, "silver_buy", totalAmt, balBefore, wallet.balance, {
             silverTxnId: silverTxn._id,
-            note: `Bought ${gramsToAdd}g silver @ ₹${buyRate}/g`,
+            note: pointsRedeemed ? `Bought ${gramsToAdd}g silver @ ₹${buyRate}/g (Redeemed ${pointsRedeemed} pts for extra silver)` : `Bought ${gramsToAdd}g silver @ ₹${buyRate}/g`,
             status: "success",
         });
 
