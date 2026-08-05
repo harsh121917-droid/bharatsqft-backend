@@ -66,11 +66,11 @@ async function fetchLiveRates() {
         ]);
 
         // Calibrate API rates to match current Indian market rates (approx. 0.5576 for Gold, 0.446 for Silver)
-        const GOLD_CALIBRATION = 1.1152; 
-        const SILVER_CALIBRATION = 0.446;
-        const PLATINUM_CALIBRATION = 1.0;
-        const PALLADIUM_CALIBRATION = 1.0;
-        const COPPER_CALIBRATION = 1.0;
+        const GOLD_CALIBRATION = 1.0875; 
+        const SILVER_CALIBRATION = 1.1383;
+        const PLATINUM_CALIBRATION = 1.1482;
+        const PALLADIUM_CALIBRATION = 0.1121;
+        const COPPER_CALIBRATION = 0.9853;
 
         // Gold: price per troy oz → per gram
         const goldBuyPerGram = parseFloat(((gold.price * GOLD_CALIBRATION) / TROY_OZ_GRAMS).toFixed(2));

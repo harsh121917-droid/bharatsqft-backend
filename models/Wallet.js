@@ -27,6 +27,7 @@ const WalletTxnSchema = new mongoose.Schema(
                 "silver_sell",  // credited from silver sale (locked first)
                 "withdraw",     // withdrawn to bank
                 "refund",       // refund on failed gold buy
+                "coin_redeem",  // coin delivery payment
             ],
             required: true
         },
