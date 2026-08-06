@@ -84,9 +84,20 @@ const sendToken = (user, statusCode, res) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, referralCode } = req.body;
+    const { name, email, phone, password, otpRecordId, referralCode } = req.body;
+    if (!phone || !otpRecordId) {
+      return res.status(400).json({ success: false, message: "Phone number and OTP verification required" });
+    }
+    const ok = await consumeVerifiedOtp(phone, "register", otpRecordId);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: "OTP not verified or expired — verify again" });
+    }
+
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ success: false, message: "Email already registered" });
+    const existsPhone = await User.findOne({ phone });
+    if (existsPhone) return res.status(400).json({ success: false, message: "Phone number already registered" });
+
     const user = await User.create({ name, email, phone, password });
     await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);

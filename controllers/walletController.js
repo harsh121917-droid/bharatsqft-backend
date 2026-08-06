@@ -129,6 +129,8 @@ exports.buyGoldFromWallet = async (req, res, next) => {
     try {
         const { GoldBalance, GoldTransaction } = require("../models/Gold");
         const { fetchLiveRates } = require("./goldController");
+        const User = require("../models/User");
+        const RewardTxn = require("../models/RewardTxn");
 
         const rates = await fetchLiveRates();
         const buyRate = rates.gold.buyRate;
@@ -142,8 +144,27 @@ exports.buyGoldFromWallet = async (req, res, next) => {
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
         let pointsDiscount = 0;
-        if (pointsRedeemed) {
+        if (pointsRedeemed && pointsRedeemed > 0) {
+            const dbUser = await User.findById(req.user._id);
+            if (!dbUser.rewardPoints || dbUser.rewardPoints < pointsRedeemed) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
+                });
+            }
             pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            
+            // Deduct points
+            dbUser.rewardPoints -= pointsRedeemed;
+            await dbUser.save();
+
+            // Record in RewardTxn
+            await RewardTxn.create({
+                user: req.user._id,
+                type: "redeem",
+                points: -pointsRedeemed,
+                description: `Redeemed ${pointsRedeemed} points for extra gold purchase`,
+            });
         }
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
         const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
@@ -323,6 +344,8 @@ exports.buySilverFromWallet = async (req, res, next) => {
     try {
         const { SilverBalance, SilverTransaction } = require("../models/Silver");
         const { fetchLiveRates } = require("./goldController");
+        const User = require("../models/User");
+        const RewardTxn = require("../models/RewardTxn");
 
         const rates = await fetchLiveRates();
         const buyRate = rates.silver.buyRate;
@@ -339,8 +362,27 @@ exports.buySilverFromWallet = async (req, res, next) => {
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
         let pointsDiscount = 0;
-        if (pointsRedeemed) {
+        if (pointsRedeemed && pointsRedeemed > 0) {
+            const dbUser = await User.findById(req.user._id);
+            if (!dbUser.rewardPoints || dbUser.rewardPoints < pointsRedeemed) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
+                });
+            }
             pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            
+            // Deduct points
+            dbUser.rewardPoints -= pointsRedeemed;
+            await dbUser.save();
+
+            // Record in RewardTxn
+            await RewardTxn.create({
+                user: req.user._id,
+                type: "redeem",
+                points: -pointsRedeemed,
+                description: `Redeemed ${pointsRedeemed} points for extra silver purchase`,
+            });
         }
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
         const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
