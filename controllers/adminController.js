@@ -5,6 +5,9 @@ const { GoldBalance, GoldTransaction } = require("../models/Gold");
 const { SilverBalance, SilverTransaction } = require("../models/Silver");
 const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 
+const Investment = require("../models/Investment");
+const Property = require("../models/Property");
+
 exports.getAllUsers = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -17,12 +20,108 @@ exports.getAllUsers = async (req, res, next) => {
             filter.$or = [
                 { name: { $regex: req.query.search, $options: "i" } },
                 { email: { $regex: req.query.search, $options: "i" } },
+                { phone: { $regex: req.query.search, $options: "i" } },
             ];
         }
-        const [users, total] = await Promise.all([
-            User.find(filter).sort("-createdAt").skip(skip).limit(limit),
-            User.countDocuments(filter),
-        ]);
+
+        const pipeline = [
+            { $match: filter },
+            {
+                $lookup: {
+                    from: "investments",
+                    let: { userId: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $and: [ { $eq: ["$user", "$$userId"] }, { $eq: ["$status", "paid"] } ] } } },
+                        { $lookup: { from: "properties", localField: "property", foreignField: "_id", as: "prop" } },
+                        { $unwind: { path: "$prop", preserveNullAndEmptyArrays: true } }
+                    ],
+                    as: "propertyTxns"
+                }
+            },
+            {
+                $lookup: {
+                    from: "goldbalances",
+                    localField: "_id",
+                    foreignField: "user",
+                    as: "goldBal"
+                }
+            },
+            {
+                $lookup: {
+                    from: "silverbalances",
+                    localField: "_id",
+                    foreignField: "user",
+                    as: "silverBal"
+                }
+            },
+            {
+                $addFields: {
+                    propertyInvestments: {
+                        totalInvested: { $sum: "$propertyTxns.totalAmount" },
+                        items: {
+                            $map: {
+                                input: "$propertyTxns",
+                                as: "pt",
+                                in: {
+                                    propertyId: "$$pt.property",
+                                    propertyName: "$$pt.prop.title",
+                                    bricks: "$$pt.bricks",
+                                    totalAmount: "$$pt.totalAmount",
+                                    ownershipPercent: "$$pt.ownershipPercent"
+                                }
+                            }
+                        }
+                    },
+                    goldInvestments: {
+                        totalInvested: { $ifNull: [ { $arrayElemAt: ["$goldBal.investedAmt", 0] }, 0 ] },
+                        grams: { $ifNull: [ { $arrayElemAt: ["$goldBal.totalGrams", 0] }, 0 ] }
+                    },
+                    silverInvestments: {
+                        totalInvested: { $ifNull: [ { $arrayElemAt: ["$silverBal.investedAmt", 0] }, 0 ] },
+                        grams: { $ifNull: [ { $arrayElemAt: ["$silverBal.totalGrams", 0] }, 0 ] }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    totalInvested: {
+                        $add: [
+                            "$propertyInvestments.totalInvested",
+                            "$goldInvestments.totalInvested",
+                            "$silverInvestments.totalInvested"
+                        ]
+                    }
+                }
+            }
+        ];
+
+        // Filtering by investment presence
+        if (req.query.hasInvestment === "true") {
+            pipeline.push({ $match: { totalInvested: { $gt: 0 } } });
+        } else if (req.query.hasInvestment === "false") {
+            pipeline.push({ $match: { totalInvested: 0 } });
+        }
+
+        // Filtering by investment type
+        if (req.query.investmentType === "property") {
+            pipeline.push({ $match: { "propertyInvestments.totalInvested": { $gt: 0 } } });
+        } else if (req.query.investmentType === "gold") {
+            pipeline.push({ $match: { "goldInvestments.totalInvested": { $gt: 0 } } });
+        } else if (req.query.investmentType === "silver") {
+            pipeline.push({ $match: { "silverInvestments.totalInvested": { $gt: 0 } } });
+        }
+
+        pipeline.push({
+            $facet: {
+                metadata: [ { $count: "total" } ],
+                data: [ { $sort: { createdAt: -1 } }, { $skip: skip }, { $limit: limit } ]
+            }
+        });
+
+        const results = await User.aggregate(pipeline);
+        const total = results[0]?.metadata[0]?.total || 0;
+        const users = results[0]?.data || [];
+
         res.json({ success: true, total, page, pages: Math.ceil(total / limit), data: users });
     } catch (err) { next(err); }
 };
