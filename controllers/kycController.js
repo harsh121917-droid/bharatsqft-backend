@@ -72,7 +72,7 @@ exports.submitKyc = async (req, res, next) => {
 ───────────────────────────────────────── */
 exports.getMyKyc = async (req, res, next) => {
     try {
-        const kyc = await Kyc.findOne({ user: req.user._id });
+        const kyc = await Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber");
         if (!kyc) {
             return res.json({ success: true, data: null, status: "not_submitted" });
         }
@@ -249,6 +249,7 @@ exports.initiateDigioKyc = async (req, res, next) => {
 exports.verifyDigioKyc = async (req, res, next) => {
     try {
         const { kycId } = req.params;
+        const { panNumber, aadhaarNumber } = req.body;
         let details = null;
 
         if (!kycId.startsWith("kid_mock_") && DIGIO_CLIENT_SECRET !== "DUMMY_SECRET") {
@@ -265,8 +266,8 @@ exports.verifyDigioKyc = async (req, res, next) => {
                             state: docDetails.state || "Maharashtra",
                             pincode: docDetails.pincode || "400001"
                         },
-                        panNumber: "ABCDE1234F",
-                        aadhaarNumber: docDetails.aadhaar_number_masked || "123456789012"
+                        panNumber: panNumber || "ABCDE1234F",
+                        aadhaarNumber: aadhaarNumber || docDetails.aadhaar_number_masked || "123456789012"
                     };
                 }
             } catch (err) {
@@ -284,8 +285,8 @@ exports.verifyDigioKyc = async (req, res, next) => {
                     state: "Maharashtra",
                     pincode: "400054"
                 },
-                panNumber: "ABCDE1234F",
-                aadhaarNumber: "987654321012"
+                panNumber: panNumber || "ABCDE1234F",
+                aadhaarNumber: aadhaarNumber || "987654321012"
             };
         }
 
@@ -400,7 +401,7 @@ exports.initiateCashfreeOtp = async (req, res, next) => {
 
 exports.verifyCashfreeOtp = async (req, res, next) => {
     try {
-        const { otp, refId, aadhaarNumber } = req.body;
+        const { otp, refId, aadhaarNumber, panNumber } = req.body;
         if (!otp || !refId) {
             return res.status(400).json({ success: false, message: "OTP and refId are required" });
         }
@@ -473,7 +474,7 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                             state,
                             pincode
                         },
-                        panNumber: "ABCDE1234F",
+                        panNumber: panNumber || "ABCDE1234F",
                         aadhaarNumber: aadhaarNumber || "123456789012"
                     };
                 } else {
@@ -494,7 +495,7 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                     state: "Maharashtra",
                     pincode: "400054"
                 },
-                panNumber: "ABCDE1234F",
+                panNumber: panNumber || "ABCDE1234F",
                 aadhaarNumber: aadhaarNumber || "987654321012"
             };
         }

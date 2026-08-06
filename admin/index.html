@@ -2862,6 +2862,7 @@
       <td><strong>${k.user?.name || '—'}</strong><br><span style="color:var(--muted);font-size:12px">${k.user?.email || ''}</span></td>
       <td>${k.fullName || '—'}</td>
       <td style="font-size:12px">${k.panNumber || '—'}</td>
+      <td style="font-size:12px">${k.aadhaarNumber || '—'}</td>
       <td style="font-size:12px">${k.address?.city || '—'}, ${k.address?.state || '—'}</td>
       <td style="color:var(--muted);font-size:12px">${new Date(k.submittedAt || k.createdAt).toLocaleDateString('en-IN')}</td>
       <td><span class="badge" style="background:${sc[k.status]}22;color:${sc[k.status]}">${k.status.toUpperCase()}</span></td>
@@ -2875,14 +2876,14 @@
         <span class="badge" style="background:${sc[k.status]}22;color:${sc[k.status]}">${k.status.toUpperCase()}</span>
       </div>
       <div class="m-card-row">
-        <div class="m-card-sub">PAN: ${k.panNumber || '—'}</div>
+        <div class="m-card-sub">PAN: ${k.panNumber || '—'} · Aadhaar: ${k.aadhaarNumber || '—'}</div>
         <div class="m-card-sub">${new Date(k.submittedAt || k.createdAt).toLocaleDateString('en-IN')}</div>
       </div>
       <div class="m-card-actions"><button class="btn-sm btn-info" onclick="openKycModal('${k._id}')"><i class="fas fa-eye"></i> Review</button></div>
     </div>`).join('');
 
             document.getElementById('kyc-body').innerHTML = `
-    <div class="table-view"><table><thead><tr><th>User</th><th>Full Name</th><th>PAN</th><th>Location</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-view"><table><thead><tr><th>User</th><th>Full Name</th><th>PAN</th><th>Aadhaar</th><th>Location</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="card-list">${cards}</div>`;
         }
 
@@ -2904,6 +2905,7 @@
           <div><span style="color:var(--muted)">Full Name:</span> <strong>${k.fullName || '—'}</strong></div>
           <div><span style="color:var(--muted)">DOB:</span> ${k.dob ? new Date(k.dob).toLocaleDateString('en-IN') : '—'}</div>
           <div><span style="color:var(--muted)">PAN:</span> <strong style="letter-spacing:1px">${k.panNumber || '—'}</strong></div>
+          <div><span style="color:var(--muted)">Aadhaar Number:</span> <strong style="letter-spacing:1px">${k.aadhaarNumber || '—'}</strong></div>
           <div><span style="color:var(--muted)">Address:</span> ${k.address?.line1 || '—'}, ${k.address?.city || ''}, ${k.address?.state || ''} ${k.address?.pincode || ''}</div>
         </div>
         <div class="form-section" style="margin-top:14px">Bank Details</div>
