@@ -10,7 +10,7 @@ const paymentGatewayService = require("../services/paymentGatewayService");
 // ─── Constants ────────────────────────────────────────────────────────────────
 const GST_PCT = 3;     // 3% GST on buy, no making charges
 const SELL_SPREAD = 0.007; // sell rate = buyRate × (1 - 0.7%) — typical dealer spread
-const MIN_BUY = 100;   // ₹ minimum
+const MIN_BUY = 50;   // ₹ minimum
 const MIN_SELL = 0.001; // grams minimum
 const TROY_OZ_GRAMS = 31.1035; // 1 troy oz = 31.1035g
 const CACHE_TTL_MS = 5 * 60 * 1000; // cache rate 5 min to save API quota
@@ -289,6 +289,10 @@ exports.getBalance = async (req, res, next) => {
 
 exports.initiateBuy = async (req, res, next) => {
     try {
+        if (req.user.kycStatus !== "approved") {
+            return res.status(400).json({ success: false, message: "Please complete your KYC to buy gold/silver." });
+        }
+
         const rates = await fetchLiveRates();
         const buyRate = rates.gold.buyRate;
         let { amountInRupees, grams } = req.body;

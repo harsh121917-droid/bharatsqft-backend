@@ -127,6 +127,10 @@ exports.verifyAdd = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.buyGoldFromWallet = async (req, res, next) => {
     try {
+        if (req.user.kycStatus !== "approved") {
+            return res.status(400).json({ success: false, message: "Please complete your KYC to buy gold/silver." });
+        }
+
         const { GoldBalance, GoldTransaction } = require("../models/Gold");
         const { fetchLiveRates } = require("./goldController");
         const User = require("../models/User");
@@ -138,8 +142,8 @@ exports.buyGoldFromWallet = async (req, res, next) => {
 
         let { amountInRupees, grams, pointsRedeemed } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
-        if (!amountInRupees || amountInRupees < 100) {
-            return res.status(400).json({ success: false, message: "Minimum purchase is ₹100" });
+        if (!amountInRupees || amountInRupees < 50) {
+            return res.status(400).json({ success: false, message: "Minimum purchase is ₹50" });
         }
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
@@ -342,6 +346,10 @@ exports.initiateWithdraw = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.buySilverFromWallet = async (req, res, next) => {
     try {
+        if (req.user.kycStatus !== "approved") {
+            return res.status(400).json({ success: false, message: "Please complete your KYC to buy gold/silver." });
+        }
+
         const { SilverBalance, SilverTransaction } = require("../models/Silver");
         const { fetchLiveRates } = require("./goldController");
         const User = require("../models/User");
@@ -356,8 +364,8 @@ exports.buySilverFromWallet = async (req, res, next) => {
 
         let { amountInRupees, grams, pointsRedeemed } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
-        if (!amountInRupees || amountInRupees < 100) {
-            return res.status(400).json({ success: false, message: "Minimum purchase is ₹100" });
+        if (!amountInRupees || amountInRupees < 50) {
+            return res.status(400).json({ success: false, message: "Minimum purchase is ₹50" });
         }
 
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
