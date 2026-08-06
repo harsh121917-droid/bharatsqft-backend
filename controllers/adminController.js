@@ -86,7 +86,6 @@ exports.getAllUsers = async (req, res, next) => {
                 $addFields: {
                     totalInvested: {
                         $add: [
-                            "$propertyInvestments.totalInvested",
                             "$goldInvestments.totalInvested",
                             "$silverInvestments.totalInvested"
                         ]

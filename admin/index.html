@@ -1397,7 +1397,6 @@
                             onchange="loadUserInvestments()"
                             style="min-height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);outline:none;padding:0 10px">
                             <option value="">All Assets</option>
-                            <option value="property">Property Bricks</option>
                             <option value="gold">Digital Gold</option>
                             <option value="silver">Digital Silver</option>
                         </select>
@@ -2719,14 +2718,12 @@
 
             const rows = data.map(u => {
                 const totalInvested = u.totalInvested || 0;
-                const propAmt = u.propertyInvestments?.totalInvested || 0;
                 const goldAmt = u.goldInvestments?.totalInvested || 0;
                 const silverAmt = u.silverInvestments?.totalInvested || 0;
                 return `
     <tr>
       <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.name[0].toUpperCase()}</div><strong>${u.name}</strong></div></td>
       <td style="color:var(--muted)">${u.email}</td>
-      <td>₹${propAmt.toLocaleString('en-IN')}</td>
       <td>₹${goldAmt.toLocaleString('en-IN')}</td>
       <td>₹${silverAmt.toLocaleString('en-IN')}</td>
       <td><strong style="color:var(--accent)">₹${totalInvested.toLocaleString('en-IN')}</strong></td>
@@ -2738,7 +2735,6 @@
 
             const cards = data.map(u => {
                 const totalInvested = u.totalInvested || 0;
-                const propAmt = u.propertyInvestments?.totalInvested || 0;
                 const goldAmt = u.goldInvestments?.totalInvested || 0;
                 const silverAmt = u.silverInvestments?.totalInvested || 0;
                 return `
@@ -2752,7 +2748,6 @@
         <span class="badge" style="background:var(--accent);color:#000;font-weight:bold">Total: ₹${totalInvested.toLocaleString('en-IN')}</span>
       </div>
       <div style="font-size:12px;margin:8px 0;display:flex;flex-direction:column;gap:4px">
-        <div>🏢 Bricks: ₹${propAmt.toLocaleString('en-IN')}</div>
         <div>🪙 Gold: ₹${goldAmt.toLocaleString('en-IN')}</div>
         <div>🪙 Silver: ₹${silverAmt.toLocaleString('en-IN')}</div>
       </div>
@@ -2763,7 +2758,7 @@
             }).join('');
 
             return `
-    <div class="table-view"><table><thead><tr><th>User</th><th>Email</th><th>Property Bricks</th><th>Digital Gold</th><th>Digital Silver</th><th>Total Invested</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-view"><table><thead><tr><th>User</th><th>Email</th><th>Digital Gold</th><th>Digital Silver</th><th>Total Invested</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="card-list">${cards}</div>`;
         }
 
@@ -2782,19 +2777,6 @@
 
             // Render breakdown
             let breakHtml = '';
-            if (u.propertyInvestments) {
-                const propAmt = u.propertyInvestments.totalInvested || 0;
-                breakHtml += `<div>🏢 <strong>Property Bricks:</strong> ₹${propAmt.toLocaleString('en-IN')}`;
-                if (u.propertyInvestments.items && u.propertyInvestments.items.length) {
-                    breakHtml += `<ul style="margin:4px 0 10px 18px;padding:0;list-style-type:disc;color:var(--muted)">`;
-                    u.propertyInvestments.items.forEach(item => {
-                        breakHtml += `<li>${item.propertyName || 'Property'}: ${item.bricks} bricks (₹${item.totalAmount.toLocaleString('en-IN')})</li>`;
-                    });
-                    breakHtml += `</ul>`;
-                } else {
-                    breakHtml += `</div>`;
-                }
-            }
             if (u.goldInvestments) {
                 const goldAmt = u.goldInvestments.totalInvested || 0;
                 const goldGrams = u.goldInvestments.grams || 0;
