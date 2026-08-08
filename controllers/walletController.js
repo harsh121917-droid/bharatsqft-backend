@@ -19,6 +19,45 @@ async function recordTxn(userId, type, amount, balBefore, balAfter, extra = {}) 
     });
 }
 
+async function checkSellHoldPeriod(userId) {
+    const { GoldTransaction } = require("../models/Gold");
+    const { SilverTransaction } = require("../models/Silver");
+
+    // Earliest successful buy/sip_buy gold transaction
+    const firstGoldTxn = await GoldTransaction.findOne({
+        user: userId,
+        type: { $in: ["buy", "sip_buy"] },
+        status: "success"
+    }).sort({ createdAt: 1 });
+
+    // Earliest successful buy/sip_buy silver transaction
+    const firstSilverTxn = await SilverTransaction.findOne({
+        user: userId,
+        type: { $in: ["buy", "sip_buy"] },
+        status: "success"
+    }).sort({ createdAt: 1 });
+
+    let firstTxnDate = null;
+    if (firstGoldTxn) firstTxnDate = firstGoldTxn.createdAt;
+    if (firstSilverTxn) {
+        if (!firstTxnDate || firstSilverTxn.createdAt < firstTxnDate) {
+            firstTxnDate = firstSilverTxn.createdAt;
+        }
+    }
+
+    if (firstTxnDate) {
+        const daysDiff = (Date.now() - new Date(firstTxnDate).getTime()) / (24 * 60 * 60 * 1000);
+        if (daysDiff < 30) {
+            const daysLeft = Math.ceil(30 - daysDiff);
+            return {
+                allowed: false,
+                message: `For security reasons, new users can only sell gold or silver after 30 days from their first purchase. Please wait another ${daysLeft} day${daysLeft > 1 ? "s" : ""}.`
+            };
+        }
+    }
+    return { allowed: true };
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. GET /api/wallet  — get wallet balance + recent transactions
 // ══════════════════════════════════════════════════════════════════════════════
@@ -239,6 +278,11 @@ exports.sellGoldToWallet = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Minimum sell is 0.001g" });
         }
 
+        const holdCheck = await checkSellHoldPeriod(req.user._id);
+        if (!holdCheck.allowed) {
+            return res.status(400).json({ success: false, message: holdCheck.message });
+        }
+
         const [rates, goldBal, wallet] = await Promise.all([
             fetchLiveRates(),
             GoldBalance.findOne({ user: req.user._id }),
@@ -454,6 +498,11 @@ exports.sellSilverToWallet = async (req, res, next) => {
         const { grams } = req.body;
         if (!grams || grams < 0.001) {
             return res.status(400).json({ success: false, message: "Minimum sell is 0.001g" });
+        }
+
+        const holdCheck = await checkSellHoldPeriod(req.user._id);
+        if (!holdCheck.allowed) {
+            return res.status(400).json({ success: false, message: holdCheck.message });
         }
 
         const [rates, silverBal, wallet] = await Promise.all([
