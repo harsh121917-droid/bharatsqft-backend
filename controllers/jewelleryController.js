@@ -4,7 +4,6 @@ const JewelleryRedemption = require("../models/JewelleryRedemption");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const User = require("../models/User");
-const Transaction = require("../models/Transaction");
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_dummy",
