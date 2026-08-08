@@ -1,18 +1,6 @@
 const { GoldBalance, GoldTransaction, CoinOrder } = require("../models/Gold");
 const { fetchLiveRates } = require("./goldController");
-
-// ─── Static coin catalog ─────────────────────────────────────────────────────
-// Only GOLD coins are redeemable right now (deducted from user's digital gold
-// balance). Silver coins are shown for browsing only — no silver wallet exists
-// yet, so "Buy" is disabled on those until that's built.
-const CATALOG = [
-    { id: "gold-1g", name: "1g Gold Coin (24K)", metal: "gold", grams: 1, makingChargePct: 8 },
-    { id: "gold-2g", name: "2g Gold Coin (24K)", metal: "gold", grams: 2, makingChargePct: 7 },
-    { id: "gold-5g", name: "5g Gold Coin (24K)", metal: "gold", grams: 5, makingChargePct: 6 },
-    { id: "gold-10g", name: "10g Gold Coin (24K)", metal: "gold", grams: 10, makingChargePct: 5 },
-    { id: "silver-10g", name: "10g Silver Coin (999)", metal: "silver", grams: 10, makingChargePct: 10 },
-    { id: "silver-50g", name: "50g Silver Coin (999)", metal: "silver", grams: 50, makingChargePct: 8 },
-];
+const Coin = require("../models/Coin");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/coins  — catalog with live priced value
@@ -20,12 +8,19 @@ const CATALOG = [
 exports.getCoins = async (req, res, next) => {
     try {
         const rates = await fetchLiveRates();
-        const data = CATALOG.map(c => {
+        const coins = await Coin.find({ isActive: true });
+        const data = coins.map(c => {
             const rate = c.metal === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
             const value = parseFloat((c.grams * rate).toFixed(2));
             const making = parseFloat((value * c.makingChargePct / 100).toFixed(2));
             return {
-                ...c,
+                id: c._id.toString(),
+                _id: c._id.toString(),
+                name: c.name,
+                metal: c.metal,
+                grams: c.grams,
+                makingChargePct: c.makingChargePct,
+                image: c.image || "",
                 ratePerGram: rate,
                 value,
                 makingCharge: making,
@@ -46,7 +41,7 @@ exports.redeemCoin = async (req, res, next) => {
     try {
         const { coinId, addressLine, pincode, phone, redeemDigital } = req.body;
         const shouldRedeemDigital = redeemDigital === true || redeemDigital === "true";
-        const coin = CATALOG.find(c => c.id === coinId);
+        const coin = await Coin.findById(coinId);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
         if (!addressLine || !pincode || !phone) {
             return res.status(400).json({ success: false, message: "Address, pincode and phone are required" });

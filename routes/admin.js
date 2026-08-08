@@ -10,6 +10,7 @@ const {
   getRewardSettings,
   updateRewardSettings,
   getAllRewardHistory,
+  getAdminCoins, createCoin, updateCoin, deleteCoin,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -67,5 +68,11 @@ router.get("/schemes/enrollments", getSchemeEnrollments);
 router.get("/rewards/settings", getRewardSettings);
 router.post("/rewards/settings", updateRewardSettings);
 router.get("/rewards/history", getAllRewardHistory);
+
+// Coin Catalog Management
+router.get("/coins", getAdminCoins);
+router.post("/coins", createCoin);
+router.put("/coins/:id", updateCoin);
+router.delete("/coins/:id", deleteCoin);
 
 module.exports = router;

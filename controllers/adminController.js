@@ -121,7 +121,50 @@ exports.getAllUsers = async (req, res, next) => {
         const total = results[0]?.metadata[0]?.total || 0;
         const users = results[0]?.data || [];
 
-        res.json({ success: true, total, page, pages: Math.ceil(total / limit), data: users });
+        // Calculate holdings details using live rates
+        const { fetchLiveRates } = require("./goldController");
+        let rates;
+        try {
+            rates = await fetchLiveRates();
+        } catch (e) {
+            // fallback rates if live API is temporarily unavailable
+            rates = { gold: { buyRate: 7500, sellRate: 7450 }, silver: { buyRate: 90, sellRate: 88 } };
+        }
+
+        const goldSellRate = rates?.gold?.sellRate || 7450;
+        const silverSellRate = rates?.silver?.sellRate || 88;
+
+        const usersWithHoldings = users.map(user => {
+            const goldGrams = user.goldInvestments?.grams || 0;
+            const goldSpent = user.goldInvestments?.totalInvested || 0;
+            const goldAvgPrice = goldGrams > 0 ? parseFloat((goldSpent / goldGrams).toFixed(2)) : 0;
+            const goldCurrentValue = parseFloat((goldGrams * goldSellRate).toFixed(2));
+            const goldProfitLoss = parseFloat((goldCurrentValue - goldSpent).toFixed(2));
+
+            const silverGrams = user.silverInvestments?.grams || 0;
+            const silverSpent = user.silverInvestments?.totalInvested || 0;
+            const silverAvgPrice = silverGrams > 0 ? parseFloat((silverSpent / silverGrams).toFixed(2)) : 0;
+            const silverCurrentValue = parseFloat((silverGrams * silverSellRate).toFixed(2));
+            const silverProfitLoss = parseFloat((silverCurrentValue - silverSpent).toFixed(2));
+
+            return {
+                ...user,
+                goldInvestments: {
+                    ...user.goldInvestments,
+                    avgBuyPrice: goldAvgPrice,
+                    currentValue: goldCurrentValue,
+                    profitLoss: goldProfitLoss
+                },
+                silverInvestments: {
+                    ...user.silverInvestments,
+                    avgBuyPrice: silverAvgPrice,
+                    currentValue: silverCurrentValue,
+                    profitLoss: silverProfitLoss
+                }
+            };
+        });
+
+        res.json({ success: true, total, page, pages: Math.ceil(total / limit), data: usersWithHoldings });
     } catch (err) { next(err); }
 };
 
@@ -507,4 +550,68 @@ exports.getAllRewardHistory = async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+};
+
+exports.getAdminCoins = async (req, res, next) => {
+    try {
+        const { fetchLiveRates } = require("./goldController");
+        const Coin = require("../models/Coin");
+        
+        const rates = await fetchLiveRates();
+        const coins = await Coin.find().sort({ metal: 1, grams: 1 });
+        
+        const data = coins.map(c => {
+            const rate = c.metal === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
+            const value = parseFloat((c.grams * rate).toFixed(2));
+            const making = parseFloat((value * c.makingChargePct / 100).toFixed(2));
+            return {
+                ...c.toObject(),
+                ratePerGram: rate,
+                value,
+                makingCharge: making,
+                totalValue: parseFloat((value + making).toFixed(2))
+            };
+        });
+        res.json({ success: true, data });
+    } catch (err) { next(err); }
+};
+
+exports.createCoin = async (req, res, next) => {
+    try {
+        const Coin = require("../models/Coin");
+        const { name, metal, grams, makingChargePct, image, isActive } = req.body;
+        if (!name || !metal || !grams || makingChargePct === undefined) {
+            return res.status(400).json({ success: false, message: "Name, metal, grams, and making charge percent are required" });
+        }
+        const coin = await Coin.create({ name, metal, grams, makingChargePct, image, isActive });
+        res.status(201).json({ success: true, message: "Coin created successfully", data: coin });
+    } catch (err) { next(err); }
+};
+
+exports.updateCoin = async (req, res, next) => {
+    try {
+        const Coin = require("../models/Coin");
+        const { name, metal, grams, makingChargePct, image, isActive } = req.body;
+        const coin = await Coin.findById(req.params.id);
+        if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
+
+        if (name !== undefined) coin.name = name;
+        if (metal !== undefined) coin.metal = metal;
+        if (grams !== undefined) coin.grams = grams;
+        if (makingChargePct !== undefined) coin.makingChargePct = makingChargePct;
+        if (image !== undefined) coin.image = image;
+        if (isActive !== undefined) coin.isActive = isActive;
+
+        await coin.save();
+        res.json({ success: true, message: "Coin updated successfully", data: coin });
+    } catch (err) { next(err); }
+};
+
+exports.deleteCoin = async (req, res, next) => {
+    try {
+        const Coin = require("../models/Coin");
+        const coin = await Coin.findByIdAndDelete(req.params.id);
+        if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
+        res.json({ success: true, message: "Coin deleted successfully" });
+    } catch (err) { next(err); }
 };

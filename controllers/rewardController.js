@@ -76,9 +76,12 @@ exports.spinWheel = async (req, res, next) => {
             ? settings.spinPoints
             : [10, 20, 50, 100, 150, 200]; // defaults
 
-        // Select spin reward randomly
-        const randomIndex = Math.floor(Math.random() * spinPool.length);
-        const pointsWon = spinPool[randomIndex];
+        // Use client-reported pointsWinner (to sync with mobile wheel animation segment) or fallback
+        let pointsWon = parseInt(req.body.pointsWinner, 10);
+        if (isNaN(pointsWon)) {
+            const randomIndex = Math.floor(Math.random() * spinPool.length);
+            pointsWon = spinPool[randomIndex];
+        }
 
         // Award points and save
         user.rewardPoints = (user.rewardPoints || 0) + pointsWon;

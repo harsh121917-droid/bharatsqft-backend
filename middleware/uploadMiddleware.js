@@ -67,4 +67,19 @@ const uploadKycDocs = multer({
     { name: "aadhaarBack", maxCount: 1 },
 ]);
 
-module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs };
+/* ── General Single Image Upload (useful for coins, avatars, etc) ── */
+const singleImageStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "bharatsqft/uploads",
+        allowed_formats: ["jpg", "jpeg", "png", "webp"],
+        transformation: [{ width: 1000, height: 1000, crop: "limit", quality: "auto" }],
+    },
+});
+
+const uploadSingleImage = multer({
+    storage: singleImageStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+}).single("image");
+
+module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage };
