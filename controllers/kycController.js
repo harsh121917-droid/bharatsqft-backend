@@ -370,6 +370,7 @@ exports.initiateCashfreeOtp = async (req, res, next) => {
                     headers: {
                         "x-client-id": CASHFREE_VERIFICATION_CLIENT_ID,
                         "x-client-secret": CASHFREE_VERIFICATION_CLIENT_SECRET,
+                        "x-api-version": "2023-08-01",
                         "Content-Type": "application/json"
                     }
                 }
@@ -385,13 +386,12 @@ exports.initiateCashfreeOtp = async (req, res, next) => {
                 throw new Error(response.data.message || "Failed to initiate Cashfree OTP");
             }
         } catch (apiErr) {
-            console.error("Cashfree OTP API Error:", apiErr.response ? apiErr.response.data : apiErr.message);
-            // Fallback to mock on API error so that user onboarding doesn't break in staging/testing
-            const mockRefId = `cf_ref_mock_${Math.random().toString(36).substr(2, 9)}`;
-            return res.json({
-                success: true,
-                refId: mockRefId,
-                message: "OTP sent successfully (Mock Fallback)"
+            const errData = apiErr.response ? apiErr.response.data : { message: apiErr.message };
+            console.error("Cashfree OTP API Error:", JSON.stringify(errData));
+            return res.status(502).json({
+                success: false,
+                message: errData.message || "Failed to send OTP via Cashfree. Please try again.",
+                debug: process.env.NODE_ENV !== "production" ? errData : undefined
             });
         }
     } catch (err) {
@@ -422,6 +422,7 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                         headers: {
                             "x-client-id": CASHFREE_VERIFICATION_CLIENT_ID,
                             "x-client-secret": CASHFREE_VERIFICATION_CLIENT_SECRET,
+                            "x-api-version": "2023-08-01",
                             "Content-Type": "application/json"
                         }
                     }
@@ -481,23 +482,24 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                     return res.status(400).json({ success: false, message: resData.message || "Invalid OTP or verification failed" });
                 }
             } catch (apiErr) {
-                console.error("Cashfree Verify API Error:", apiErr.response ? apiErr.response.data : apiErr.message);
+                const errData = apiErr.response ? apiErr.response.data : { message: apiErr.message };
+                console.error("Cashfree Verify API Error:", JSON.stringify(errData));
+                return res.status(502).json({
+                    success: false,
+                    message: errData.message || "OTP verification failed via Cashfree. Please try again.",
+                    debug: process.env.NODE_ENV !== "production" ? errData : undefined
+                });
             }
         }
 
+        // If isMock — real Cashfree credentials not set, can't proceed
         if (!details) {
-            details = {
-                fullName: req.user.name || "Aadhaar User Mock",
-                dob: new Date("1995-05-15"),
-                address: {
-                    line1: "405, Emerald Heights, Linking Road",
-                    city: "Mumbai",
-                    state: "Maharashtra",
-                    pincode: "400054"
-                },
-                panNumber: panNumber || "ABCDE1234F",
-                aadhaarNumber: aadhaarNumber || "987654321012"
-            };
+            return res.status(400).json({
+                success: false,
+                message: isMock
+                    ? "Cashfree credentials not configured on server. Please contact support."
+                    : "OTP verification failed. Please try again."
+            });
         }
 
         let kyc = await Kyc.findOne({ user: req.user._id });
@@ -566,6 +568,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     headers: {
                         "x-client-id": CASHFREE_VERIFICATION_CLIENT_ID,
                         "x-client-secret": CASHFREE_VERIFICATION_CLIENT_SECRET,
+                        "x-api-version": "2023-08-01",
                         "Content-Type": "application/json"
                     }
                 }
@@ -586,12 +589,12 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 });
             }
         } catch (apiErr) {
-            console.error("Cashfree PAN API Error:", apiErr.response ? apiErr.response.data : apiErr.message);
-            return res.json({
-                success: true,
-                valid: true,
-                registeredName: name ? name.toUpperCase() : "MOCK PAN USER (API Fallback)",
-                message: "PAN verified successfully (Mock Fallback)"
+            const errData = apiErr.response ? apiErr.response.data : { message: apiErr.message };
+            console.error("Cashfree PAN API Error:", JSON.stringify(errData));
+            return res.status(502).json({
+                success: false,
+                message: errData.message || "PAN verification failed via Cashfree. Please try again.",
+                debug: process.env.NODE_ENV !== "production" ? errData : undefined
             });
         }
     } catch (err) {
