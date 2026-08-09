@@ -208,12 +208,41 @@ exports.deleteCategory = async (req, res, next) => {
     }
 };
 
-// GET Products
 exports.getProducts = async (req, res, next) => {
     try {
         let count = await Jewellery.countDocuments();
         if (count === 0) {
             await Jewellery.insertMany(DEFAULT_PRODUCTS);
+        }
+
+        // Self-healing check for Coins migration
+        const coinProductCount = await Jewellery.countDocuments({ category: "Coins" });
+        if (coinProductCount === 0) {
+            const Coin = require("../models/Coin");
+            const existingCoins = await Coin.find();
+            if (existingCoins.length > 0) {
+                const migratedProducts = existingCoins.map(c => {
+                    const estimatedMaking = c.grams * (c.metal === "gold" ? 450 : 35);
+                    return {
+                        name: c.name,
+                        category: "Coins",
+                        metalType: c.metal,
+                        purity: c.metal === "gold" ? "24K Gold (999.9)" : "999 Silver",
+                        weightGrams: c.grams,
+                        makingCharges: estimatedMaking,
+                        gstPercentage: 3,
+                        description: `Certified physical ${c.metal} coin. Migrated from old coins catalog.`,
+                        imageUrl: c.image || "",
+                        icon: "monetization_on_outlined",
+                        inStock: c.isActive !== false,
+                        isPopular: false
+                    };
+                });
+                await Jewellery.insertMany(migratedProducts);
+            } else {
+                const defaultCoins = DEFAULT_PRODUCTS.filter(p => p.category === "Coins");
+                await Jewellery.insertMany(defaultCoins);
+            }
         }
 
         const { category, metalType, search, sort } = req.query;
