@@ -1270,7 +1270,7 @@
             <div class="nav-item" onclick="showPage('rewards')" id="nav-rewards"><i class="fas fa-gift"></i>
                 Rewards Config</div>
             <div class="nav-item" onclick="showPage('jewellery')" id="nav-jewellery"><i class="fas fa-gem"></i>
-                Jewellery Catalog</div>
+                Jewellery & Coins</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1785,24 +1785,10 @@
                 </div>
             </div>
 
-            <!-- Coin Catalog Page -->
-            <div class="page" id="page-coins">
-                <div class="section-header">
-                    <div class="section-title">Physical Coin Catalog</div>
-                    <button class="btn-primary" onclick="openCoinModal()"><i class="fas fa-plus"></i> Add New
-                        Coin</button>
-                </div>
-                <div class="table-wrap">
-                    <div id="coins-body">
-                        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Jewellery Catalog Page -->
             <div class="page" id="page-jewellery">
                 <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery Catalog & Categories</div>
+                    <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery & Coins Catalog</div>
                     <div style="display:flex; gap:10px;">
                         <button class="btn-secondary" onclick="openJewelleryCategoryModal()" style="background:var(--surface2); color:#fff; border:1px solid var(--border); padding:8px 14px; border-radius:6px; cursor:pointer;"><i class="fas fa-list"></i> Categories</button>
                         <button class="btn-primary" onclick="openJewelleryModal()" style="background:var(--accent); color:#000; font-weight:600; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;"><i class="fas fa-plus"></i> Add Product</button>
