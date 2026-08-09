@@ -4577,8 +4577,8 @@
         async function _uploadJewelleryImageFile(productId, file) {
             const formData = new FormData();
             formData.append('image', file);
-            const token = localStorage.getItem('adminToken');
-            const res = await fetch(`/jewellery/products/${productId}/upload-image`, {
+            const token = localStorage.getItem('bsqft_token') || '';
+            const res = await fetch(`/api/jewellery/products/${productId}/upload-image`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData
