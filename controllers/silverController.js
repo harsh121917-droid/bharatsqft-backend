@@ -105,6 +105,7 @@ exports.getTransactionDetail = async (req, res, next) => {
 exports.getTransactionInvoice = async (req, res, next) => {
     try {
         const { generateInvoicePDF } = require("../services/invoiceService");
+        const isSample = req.query.sample === "true";
         const txn = await SilverTransaction.findOne({ _id: req.params.id, user: req.user._id });
         if (!txn) {
             return res.status(404).json({ success: false, message: "Transaction not found" });
@@ -114,6 +115,6 @@ exports.getTransactionInvoice = async (req, res, next) => {
         const invoiceLabel = txn.invoiceNo || `TX-${String(txn._id).slice(-8).toUpperCase()}`;
         res.setHeader("Content-Disposition", `attachment; filename="invoice-${invoiceLabel}.pdf"`);
 
-        await generateInvoicePDF(txn, req.user, "silver", res);
+        await generateInvoicePDF(txn, req.user, "silver", res, isSample);
     } catch (err) { next(err); }
 };
