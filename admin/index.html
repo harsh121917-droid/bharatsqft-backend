@@ -1870,8 +1870,35 @@
                     <textarea id="jewellery-desc" rows="2" placeholder="Product details, specs & guarantee"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Image URL (Optional)</label>
-                    <input type="text" id="jewellery-image" placeholder="https://example.com/item.png">
+                    <label>Product Image</label>
+                    <!-- Hidden actual file input -->
+                    <input type="file" id="jewellery-image-file" accept="image/*" style="display:none" onchange="onJewelleryImagePicked(this)">
+                    <!-- Preview zone -->
+                    <div id="jewellery-image-preview-zone" style="
+                        display:flex; align-items:center; gap:16px;
+                        background:var(--surface2); border:1px dashed var(--border);
+                        border-radius:10px; padding:14px 16px; cursor:pointer;
+                    " onclick="document.getElementById('jewellery-image-file').click()">
+                        <div id="jewellery-img-thumb" style="
+                            width:72px; height:72px; border-radius:8px;
+                            background:var(--surface); border:1px solid var(--border);
+                            display:flex; align-items:center; justify-content:center;
+                            overflow:hidden; flex-shrink:0;
+                        ">
+                            <i class="fas fa-image" style="color:var(--muted); font-size:22px;"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600; font-size:13px; color:#fff; margin-bottom:4px;">Click to upload image</div>
+                            <div style="font-size:11px; color:var(--muted)">JPG, PNG, WebP — max 5 MB</div>
+                            <div id="jewellery-img-filename" style="font-size:11px; color:var(--accent); margin-top:4px;"></div>
+                        </div>
+                        <button type="button" onclick="event.stopPropagation(); clearJewelleryImage()" id="jewellery-img-clear-btn"
+                            style="display:none; background:rgba(255,80,80,0.15); color:#ff6060; border:none; border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; cursor:pointer;">
+                            <i class="fas fa-times"></i> Remove
+                        </button>
+                    </div>
+                    <!-- Hidden text field to store final URL (used by save function) -->
+                    <input type="hidden" id="jewellery-image" value="">
                 </div>
                 <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px">
                     <div class="form-group">
@@ -4481,6 +4508,40 @@
             body.innerHTML = `<div class="table-view"><table><thead><tr><th>Product</th><th>Category</th><th>Metal</th><th>Weight</th><th>Making Charge</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div><div class="card-list">${cards}</div>`;
         }
 
+        // Track selected file for new products
+        let jewelleryPendingImageFile = null;
+
+        function _setJewelleryImagePreview(url, filename) {
+            const thumb = document.getElementById('jewellery-img-thumb');
+            const clearBtn = document.getElementById('jewellery-img-clear-btn');
+            const filenameEl = document.getElementById('jewellery-img-filename');
+            if (url) {
+                thumb.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+                clearBtn.style.display = 'flex';
+                filenameEl.textContent = filename || '';
+            } else {
+                thumb.innerHTML = `<i class="fas fa-image" style="color:var(--muted); font-size:22px;"></i>`;
+                clearBtn.style.display = 'none';
+                filenameEl.textContent = '';
+            }
+        }
+
+        function onJewelleryImagePicked(input) {
+            const file = input.files[0];
+            if (!file) return;
+            jewelleryPendingImageFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => _setJewelleryImagePreview(e.target.result, file.name);
+            reader.readAsDataURL(file);
+        }
+
+        function clearJewelleryImage() {
+            jewelleryPendingImageFile = null;
+            document.getElementById('jewellery-image').value = '';
+            document.getElementById('jewellery-image-file').value = '';
+            _setJewelleryImagePreview(null, null);
+        }
+
         function openJewelleryModal(p = null) {
             document.getElementById('jewellery-modal-title').textContent = p ? 'Edit Jewellery Product' : 'Add Jewellery Product';
             document.getElementById('jewellery-id').value = p ? p._id : '';
@@ -4492,15 +4553,37 @@
             document.getElementById('jewellery-making').value = p ? p.makingCharges : 1500;
             document.getElementById('jewellery-gst').value = p ? p.gstPercentage : 3;
             document.getElementById('jewellery-desc').value = p ? p.description : '';
-            document.getElementById('jewellery-image').value = p ? p.imageUrl : '';
+            document.getElementById('jewellery-image').value = p ? (p.imageUrl || '') : '';
             document.getElementById('jewellery-instock').value = p ? String(p.inStock) : 'true';
             document.getElementById('jewellery-popular').value = p ? String(p.isPopular) : 'false';
+
+            // Reset file picker and show existing image preview (if any)
+            jewelleryPendingImageFile = null;
+            document.getElementById('jewellery-image-file').value = '';
+            if (p && p.imageUrl) {
+                _setJewelleryImagePreview(p.imageUrl, 'Current image');
+            } else {
+                _setJewelleryImagePreview(null, null);
+            }
 
             document.getElementById('jewellery-modal').style.display = 'flex';
         }
 
         function closeJewelleryModal() {
             document.getElementById('jewellery-modal').style.display = 'none';
+            jewelleryPendingImageFile = null;
+        }
+
+        async function _uploadJewelleryImageFile(productId, file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            const token = localStorage.getItem('adminToken');
+            const res = await fetch(`/jewellery/products/${productId}/upload-image`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            return await res.json();
         }
 
         async function saveJewelleryProduct() {
@@ -4513,6 +4596,10 @@
                 toast('Name, Category and Weight are required', 'error');
                 return;
             }
+
+            const btn = document.getElementById('jewellery-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
 
             const payload = {
                 name,
@@ -4528,23 +4615,65 @@
                 isPopular: document.getElementById('jewellery-popular').value === 'true'
             };
 
-            const btn = document.getElementById('jewellery-save-btn');
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
+            try {
+                if (id) {
+                    // ── EDIT existing product ─────────────────────────────────
+                    // Upload new image first (if one was picked)
+                    if (jewelleryPendingImageFile) {
+                        btn.textContent = 'Uploading image...';
+                        const uploadRes = await _uploadJewelleryImageFile(id, jewelleryPendingImageFile);
+                        if (!uploadRes.success) {
+                            toast(uploadRes.message || 'Image upload failed', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Save Changes';
+                            return;
+                        }
+                        payload.imageUrl = uploadRes.imageUrl;
+                    }
+                    btn.textContent = 'Saving...';
+                    const res = await api(`/jewellery/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+                    btn.disabled = false;
+                    btn.textContent = 'Save Changes';
+                    if (res.success) {
+                        toast('Product updated ✓', 'success');
+                        closeJewelleryModal();
+                        loadJewellery();
+                    } else {
+                        toast(res.message || 'Failed to update product', 'error');
+                    }
+                } else {
+                    // ── CREATE new product ────────────────────────────────────
+                    const res = await api('/jewellery/products', { method: 'POST', body: JSON.stringify(payload) });
+                    if (!res.success) {
+                        btn.disabled = false;
+                        btn.textContent = 'Save Product';
+                        toast(res.message || 'Failed to create product', 'error');
+                        return;
+                    }
+                    const newId = res.data._id;
 
-            const method = id ? 'PUT' : 'POST';
-            const url = id ? `/jewellery/products/${id}` : '/jewellery/products';
+                    // Upload image to newly created product (if file was picked)
+                    if (jewelleryPendingImageFile) {
+                        btn.textContent = 'Uploading image...';
+                        const uploadRes = await _uploadJewelleryImageFile(newId, jewelleryPendingImageFile);
+                        if (!uploadRes.success) {
+                            toast('Product created but image upload failed: ' + uploadRes.message, 'error');
+                        } else {
+                            toast('Product created with image ✓', 'success');
+                        }
+                    } else {
+                        toast('Product created ✓', 'success');
+                    }
 
-            const res = await api(url, { method, body: JSON.stringify(payload) });
-            btn.disabled = false;
-            btn.textContent = id ? 'Save Changes' : 'Save Product';
-
-            if (res.success) {
-                toast(id ? 'Product updated ✓' : 'Product created ✓', 'success');
-                closeJewelleryModal();
-                loadJewellery();
-            } else {
-                toast(res.message || 'Failed to save product', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Save Product';
+                    closeJewelleryModal();
+                    loadJewellery();
+                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.textContent = id ? 'Save Changes' : 'Save Product';
+                toast('Unexpected error: ' + e.message, 'error');
             }
         }
 

@@ -42,6 +42,16 @@ const kycStorage = new CloudinaryStorage({
     },
 });
 
+/* ── Jewellery / Coin Product Images ── */
+const jewelleryImageStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder: "bharatsqft/jewellery",
+        allowed_formats: ["jpg", "jpeg", "png", "webp"],
+        transformation: [{ width: 800, height: 800, crop: "limit", quality: "auto:best" }],
+    },
+});
+
 const uploadImages = multer({
     storage: imageStorage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per image
@@ -82,4 +92,10 @@ const uploadSingleImage = multer({
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 }).single("image");
 
-module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage };
+/* ── Jewellery / Coin Product Image Upload ── */
+const uploadJewelleryImage = multer({
+    storage: jewelleryImageStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+}).single("image");
+
+module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage, uploadJewelleryImage };

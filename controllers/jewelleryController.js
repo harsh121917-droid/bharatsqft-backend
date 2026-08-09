@@ -4,6 +4,8 @@ const JewelleryRedemption = require("../models/JewelleryRedemption");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const User = require("../models/User");
+const { uploadJewelleryImage } = require("../middleware/uploadMiddleware");
+
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_dummy",
@@ -573,4 +575,35 @@ exports.verifyRedeemOrder = async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+};
+
+// UPLOAD PRODUCT IMAGE (Admin) — multipart/form-data, field name: "image"
+exports.uploadProductImage = (req, res) => {
+    uploadJewelleryImage(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message || "Upload failed" });
+        }
+        try {
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: "No image file provided" });
+            }
+
+            const imageUrl = req.file.path; // Cloudinary URL
+
+            // Update the product's imageUrl
+            const product = await Jewellery.findByIdAndUpdate(
+                req.params.id,
+                { imageUrl },
+                { new: true }
+            );
+
+            if (!product) {
+                return res.status(404).json({ success: false, message: "Product not found" });
+            }
+
+            res.json({ success: true, imageUrl, message: "Image uploaded successfully" });
+        } catch (e) {
+            res.status(500).json({ success: false, message: e.message });
+        }
+    });
 };

@@ -18,4 +18,8 @@ router.post("/products", protect, jewelleryController.addProduct);
 router.put("/products/:id", protect, jewelleryController.updateProduct);
 router.delete("/products/:id", protect, jewelleryController.deleteProduct);
 
+// Image upload route (multipart/form-data, field: "image")
+router.post("/products/:id/upload-image", protect, jewelleryController.uploadProductImage);
+
 module.exports = router;
+
