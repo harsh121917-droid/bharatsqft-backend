@@ -15,12 +15,23 @@ exports.protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id).select("-password");
 
-    if (!req.user || !req.user.isActive) {
+    if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: "User not found or deactivated" });
     }
 
+    // Dynamic backfill/fallback check for KYC status
+    if (user.kycStatus !== "approved") {
+      const Kyc = require("../models/Kyc");
+      const kyc = await Kyc.findOne({ user: user._id });
+      if (kyc && kyc.status !== user.kycStatus) {
+        user.kycStatus = kyc.status;
+        await user.save().catch(() => {});
+      }
+    }
+
+    req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ success: false, message: "Token invalid or expired" });

@@ -104,58 +104,16 @@ exports.getTransactionDetail = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getTransactionInvoice = async (req, res, next) => {
     try {
-        const PDFDocument = require("pdfkit");
+        const { generateInvoicePDF } = require("../services/invoiceService");
         const txn = await SilverTransaction.findOne({ _id: req.params.id, user: req.user._id });
         if (!txn) {
             return res.status(404).json({ success: false, message: "Transaction not found" });
         }
 
-        const isBuy = txn.type === "buy";
-        const doc = new PDFDocument({ size: "A4", margin: 50 });
-
-        const invoiceLabel = txn.invoiceNo || `TX-${String(txn._id).slice(-8).toUpperCase()}`;
         res.setHeader("Content-Type", "application/pdf");
+        const invoiceLabel = txn.invoiceNo || `TX-${String(txn._id).slice(-8).toUpperCase()}`;
         res.setHeader("Content-Disposition", `attachment; filename="invoice-${invoiceLabel}.pdf"`);
-        doc.pipe(res);
 
-        doc.fontSize(20).fillColor("#8A95A5").text("Bharat SQFT", { continued: false });
-        doc.fontSize(10).fillColor("#666").text("Digital Silver — Tax Invoice");
-        doc.moveDown(1.5);
-
-        doc.strokeColor("#8A95A5").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(1);
-
-        doc.fillColor("#000").fontSize(12).text(`Invoice #: ${invoiceLabel}`);
-        doc.text(`Date: ${new Date(txn.createdAt).toLocaleString("en-IN")}`);
-        doc.text(`Transaction Type: ${isBuy ? "Silver Purchase" : "Silver Sale"}`);
-        doc.text(`Status: ${txn.status}`);
-        doc.moveDown(1);
-
-        const row = (label, value) => {
-            doc.fontSize(11).fillColor("#333").text(label, 50, doc.y, { continued: true, width: 300 });
-            doc.fillColor("#000").text(value, { align: "right" });
-        };
-
-        doc.strokeColor("#ccc").lineWidth(0.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(0.5);
-        row("Silver Quantity", `${txn.grams.toFixed(4)} g (999)`);
-        row("Rate per Gram", `Rs. ${txn.ratePerGram.toFixed(2)}`);
-        row("Silver Value", `Rs. ${txn.silverValue.toFixed(2)}`);
-        row(isBuy ? "GST (3%)" : "GST", `Rs. ${(txn.gstAmt || 0).toFixed(2)}`);
-        doc.moveDown(0.3);
-        doc.strokeColor("#ccc").lineWidth(0.5).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-        doc.moveDown(0.5);
-        doc.fontSize(13).fillColor("#8A95A5").text(
-            isBuy ? "Total Paid" : "Total Received", 50, doc.y, { continued: true, width: 300 }
-        );
-        doc.text(`Rs. ${txn.totalAmt.toFixed(2)}`, { align: "right" });
-
-        doc.moveDown(2);
-        doc.fontSize(9).fillColor("#888").text(
-            "This is a system-generated invoice and does not require a signature.",
-            { align: "center" }
-        );
-
-        doc.end();
+        await generateInvoicePDF(txn, req.user, "silver", res);
     } catch (err) { next(err); }
 };
