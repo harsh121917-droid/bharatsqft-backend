@@ -179,16 +179,31 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         const buyRate = rates.gold.buyRate;
         const GST_PCT = 3;
 
-        let { amountInRupees, grams, pointsRedeemed } = req.body;
+        let { amountInRupees, grams, pointsRedeemed, redeemReferral } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         if (!amountInRupees || amountInRupees < 50) {
             return res.status(400).json({ success: false, message: "Minimum purchase is ₹50" });
         }
 
+        // If redeeming referral, validate conditions
+        let isRedeemed = false;
+        let purchaseValue = amountInRupees;
+        const dbUser = await User.findById(req.user._id);
+
+        if (redeemReferral) {
+            if (!dbUser.referralBalance || dbUser.referralBalance < 50) {
+                return res.status(400).json({ success: false, message: "Insufficient referral balance (minimum ₹50 required)." });
+            }
+            if (amountInRupees < 1000) {
+                return res.status(400).json({ success: false, message: "Minimum metal purchase of ₹1000 is required to redeem referral bonus." });
+            }
+            isRedeemed = true;
+            purchaseValue = amountInRupees + 50; // User pays amountInRupees (e.g. ₹1000) but gets ₹1050 worth of gold
+        }
+
         const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
         let pointsDiscount = 0;
         if (pointsRedeemed && pointsRedeemed > 0) {
-            const dbUser = await User.findById(req.user._id);
             if (!dbUser.rewardPoints || dbUser.rewardPoints < pointsRedeemed) {
                 return res.status(400).json({
                     success: false,
@@ -209,8 +224,14 @@ exports.buyGoldFromWallet = async (req, res, next) => {
                 description: `Redeemed ${pointsRedeemed} points for extra gold purchase`,
             });
         }
+
+        if (isRedeemed) {
+            dbUser.referralBalance = Math.max(0, (dbUser.referralBalance || 0) - 50);
+            await dbUser.save();
+        }
+
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
-        const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
+        const gramsToAdd = parseFloat(((purchaseValue + pointsDiscount) / buyRate).toFixed(6));
 
         // Check wallet balance
         const wallet = await getOrCreateWallet(req.user._id);
@@ -231,15 +252,16 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         let goldBal = await GoldBalance.findOne({ user: req.user._id });
         if (!goldBal) goldBal = await GoldBalance.create({ user: req.user._id });
         goldBal.totalGrams = parseFloat((goldBal.totalGrams + gramsToAdd).toFixed(6));
-        goldBal.investedAmt = parseFloat((goldBal.investedAmt + amountInRupees).toFixed(2));
+        goldBal.investedAmt = parseFloat((goldBal.investedAmt + purchaseValue).toFixed(2));
         await goldBal.save();
 
         // Record gold transaction
         const goldTxn = await GoldTransaction.create({
             user: req.user._id, type: "buy", grams: gramsToAdd,
-            ratePerGram: buyRate, goldValue: amountInRupees,
+            ratePerGram: buyRate, goldValue: purchaseValue,
             gstAmt, totalAmt, status: "success",
-            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra gold)` : "Purchased via wallet",
+            isReferralRedeemed: isRedeemed,
+            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra gold)` : (isRedeemed ? "Purchased via wallet (Redeemed ₹50 referral bonus)" : "Purchased via wallet"),
         });
 
         // Record wallet transaction

@@ -5,6 +5,7 @@ const {
     GoldRate,
     GoldTransaction,
 } = require("../models/Gold");
+const User = require("../models/User");
 const paymentGatewayService = require("../services/paymentGatewayService");
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -295,7 +296,7 @@ exports.initiateBuy = async (req, res, next) => {
 
         const rates = await fetchLiveRates();
         const buyRate = rates.gold.buyRate;
-        let { amountInRupees, grams } = req.body;
+        let { amountInRupees, grams, redeemReferral } = req.body;
 
         if (!amountInRupees && !grams) {
             return res.status(400).json({ success: false, message: "Provide amountInRupees or grams" });
@@ -303,11 +304,29 @@ exports.initiateBuy = async (req, res, next) => {
         if (grams && !amountInRupees) {
             amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         }
+
+        // If redeeming referral, validate conditions
+        let isRedeemed = false;
+        let purchaseValue = amountInRupees;
+        if (redeemReferral) {
+            const user = await User.findById(req.user._id);
+            if (!user.referralBalance || user.referralBalance < 50) {
+                return res.status(400).json({ success: false, message: "Insufficient referral balance (minimum ₹50 required)." });
+            }
+            if (amountInRupees < 1000) {
+                return res.status(400).json({ success: false, message: "Minimum metal purchase of ₹1000 is required to redeem referral bonus." });
+            }
+            isRedeemed = true;
+            // The user pays for amountInRupees (e.g. ₹1000) but gets amountInRupees + ₹50 (e.g. ₹1050) worth of gold
+            purchaseValue = amountInRupees + 50;
+        }
+
         if (amountInRupees < MIN_BUY) {
             return res.status(400).json({ success: false, message: `Minimum purchase is ₹${MIN_BUY}` });
         }
 
-        const gramsToAdd = parseFloat((amountInRupees / buyRate).toFixed(6));
+        const gramsToAdd = parseFloat((purchaseValue / buyRate).toFixed(6));
+        // GST is calculated on the actual amount paid by the user (amountInRupees)
         const gstAmt = parseFloat(((amountInRupees * GST_PCT) / 100).toFixed(2));
         const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
 
@@ -327,9 +346,10 @@ exports.initiateBuy = async (req, res, next) => {
 
         const txn = await GoldTransaction.create({
             user: req.user._id, type: "buy", grams: gramsToAdd,
-            ratePerGram: buyRate, goldValue: amountInRupees,
+            ratePerGram: buyRate, goldValue: purchaseValue,
             gstAmt, totalAmt, status: "pending",
             razorpayOrderId: order.id,
+            isReferralRedeemed: isRedeemed,
         });
 
         res.json({
@@ -337,7 +357,7 @@ exports.initiateBuy = async (req, res, next) => {
             data: {
                 order, key: keyId,
                 transaction: { id: txn._id },
-                breakdown: { grams: gramsToAdd, goldValue: amountInRupees, gstAmt, totalAmt, ratePerGram: buyRate },
+                breakdown: { grams: gramsToAdd, goldValue: purchaseValue, gstAmt, totalAmt, ratePerGram: buyRate, isReferralRedeemed: isRedeemed },
             },
         });
     } catch (err) { next(err); }
@@ -376,6 +396,12 @@ exports.verifyBuy = async (req, res, next) => {
         bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
         bal.investedAmt = parseFloat((bal.investedAmt + txn.goldValue).toFixed(2));
         await bal.save();
+
+        if (txn.isReferralRedeemed) {
+            const user = await User.findById(req.user._id);
+            user.referralBalance = Math.max(0, (user.referralBalance || 0) - 50);
+            await user.save();
+        }
 
         txn.status = "success";
         txn.razorpayPaymentId = razorpayPaymentId;

@@ -82,6 +82,7 @@ const GoldTransactionSchema = new mongoose.Schema(
         payoutStatus: { type: String },
         // For SIP
         sipPlanId: { type: mongoose.Schema.Types.ObjectId, ref: "GoldSip" },
+        isReferralRedeemed: { type: Boolean, default: false },
         note: { type: String },
     },
     { timestamps: true }

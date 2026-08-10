@@ -4,22 +4,36 @@ const { consumeVerifiedOtp } = require("./otpController");
 const RewardSettings = require("../models/RewardSettings");
 const RewardTxn = require("../models/RewardTxn");
 
-// Helper to generate a unique referral code
-async function generateUniqueReferralCode() {
-    let code = "";
+// Helper to generate a unique referral code based on email prefix or phone suffix
+async function generateUniqueReferralCode(email, phone) {
+    let base = "";
+    if (email && email.includes("@")) {
+        base = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    } else if (phone) {
+        base = "VIKA" + phone.slice(-6);
+    } else {
+        base = "VIKA" + Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+    
+    let code = base;
     let exists = true;
+    let counter = 1;
     while (exists) {
-        code = "VIKA-" + Math.random().toString(36).substring(2, 8).toUpperCase();
         const user = await User.findOne({ referralCode: code });
-        if (!user) exists = false;
+        if (!user) {
+            exists = false;
+        } else {
+            code = base + counter;
+            counter++;
+        }
     }
     return code;
 }
 
 // Helper to handle registration points & referral rewards
 async function processReferralAndRewards(user, enteredReferralCode) {
-    // 1. Generate and assign a unique referral code to the new user
-    user.referralCode = await generateUniqueReferralCode();
+    // 1. Generate and assign a unique referral code to the new user using email prefix
+    user.referralCode = await generateUniqueReferralCode(user.email, user.phone);
     
     // 2. Fetch active reward settings
     let settings = await RewardSettings.findOne({ isActive: true });
@@ -32,19 +46,21 @@ async function processReferralAndRewards(user, enteredReferralCode) {
         if (referrer) {
             user.referredBy = referrer._id;
             
-            // Credit referrer
+            // Credit referrer with 50 rupees
+            referrer.referralBalance = (referrer.referralBalance || 0) + 50;
+            // Also credit points if configured
             if (refPoints > 0) {
                 referrer.rewardPoints = (referrer.rewardPoints || 0) + refPoints;
-                await referrer.save();
-                
-                await RewardTxn.create({
-                    user: referrer._id,
-                    type: "referral",
-                    points: refPoints,
-                    description: `Referral bonus for inviting ${user.name || user.phone || user.email}`,
-                    extra: { referredUserId: user._id }
-                });
             }
+            await referrer.save();
+            
+            await RewardTxn.create({
+                user: referrer._id,
+                type: "referral",
+                points: refPoints > 0 ? refPoints : 50,
+                description: `Referral bonus of ₹50 for inviting ${user.name || user.phone || user.email}`,
+                extra: { referredUserId: user._id }
+            });
         }
     }
 
@@ -78,6 +94,8 @@ const sendToken = (user, statusCode, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      referralCode: user.referralCode,
+      referralBalance: user.referralBalance || 0,
     },
   });
 };
@@ -118,6 +136,14 @@ exports.login = async (req, res, next) => {
 };
 
 exports.getMe = async (req, res) => {
+  if (req.user && !req.user.referralCode) {
+    try {
+      req.user.referralCode = await generateUniqueReferralCode(req.user.email, req.user.phone);
+      await req.user.save({ validateBeforeSave: false });
+    } catch (err) {
+      console.error("Failed to backfill referral code:", err);
+    }
+  }
   res.json({ success: true, user: req.user });
 };
 
