@@ -517,10 +517,12 @@ exports.verifyRedeemOrder = async (req, res, next) => {
             const rates = await fetchLiveRates();
             const rate = rates.gold.buyRate;
 
-            await GoldBalance.findOneAndUpdate(
-                { user: redemption.user },
-                { $inc: { totalGrams: -weightGrams } }
-            );
+            const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
+            const costBasisOfRedeemedGrams = weightGrams * avgRate;
+            
+            balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
+            balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
+            await balance.save();
             // Create a gold transaction for tracking
             await GoldTransaction.create({
                 user: redemption.user,
@@ -545,10 +547,12 @@ exports.verifyRedeemOrder = async (req, res, next) => {
             const rates = await fetchLiveRates();
             const rate = rates.silver.buyRate;
 
-            await SilverBalance.findOneAndUpdate(
-                { user: redemption.user },
-                { $inc: { totalGrams: -weightGrams } }
-            );
+            const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
+            const costBasisOfRedeemedGrams = weightGrams * avgRate;
+
+            balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
+            balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
+            await balance.save();
             // Create a silver transaction for tracking
             await SilverTransaction.create({
                 user: redemption.user,

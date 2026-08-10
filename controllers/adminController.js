@@ -370,10 +370,13 @@ exports.approveSellPayout = async (req, res, next) => {
             return res.status(404).json({ success: false, message: "User balance/wallet not found" });
         }
 
-        // Deduct the metal (it was only locked, not yet removed, until now)
+        // Deduct the metal and reduce the investedAmt proportionally based on average purchase cost
+        const avgRate = bal.totalGrams > 0 ? (bal.investedAmt / bal.totalGrams) : 0;
+        const costBasisOfSoldGrams = txn.grams * avgRate;
+
         bal.totalGrams = parseFloat((bal.totalGrams - txn.grams).toFixed(6));
         bal.lockedGrams = parseFloat((bal.lockedGrams - txn.grams).toFixed(6));
-        bal.investedAmt = parseFloat(Math.max(0, bal.investedAmt - txn[valueField] * 0.9).toFixed(2));
+        bal.investedAmt = parseFloat(Math.max(0, bal.investedAmt - costBasisOfSoldGrams).toFixed(2));
         await bal.save();
 
         // Move pendingCredit → balance — now withdrawable
