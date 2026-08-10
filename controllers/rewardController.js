@@ -8,27 +8,29 @@ exports.getRewardBalance = async (req, res, next) => {
     try {
         const user = req.user;
 
-        // Fetch last spin transaction to verify daily spin availability
-        const lastSpin = await RewardTxn.findOne({
+        // Fetch spin transactions within last 24h to verify daily spin count (max 3)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const spinCount = await RewardTxn.countDocuments({
             user: user._id,
             type: "spin_win",
-        }).sort({ createdAt: -1 });
+            createdAt: { $gte: oneDayAgo }
+        });
 
         let canSpin = true;
         let timeRemaining = 0; // seconds
         let nextSpinTime = null;
+        const spinsLeft = Math.max(0, 3 - spinCount);
 
-        if (lastSpin) {
-            const lastSpinDate = new Date(lastSpin.createdAt);
-            const now = new Date();
-            const timeDiff = now.getTime() - lastSpinDate.getTime();
-            const dayInMs = 24 * 60 * 60 * 1000;
-
-            if (timeDiff < dayInMs) {
-                canSpin = false;
-                nextSpinTime = new Date(lastSpinDate.getTime() + dayInMs);
-                timeRemaining = Math.ceil((dayInMs - timeDiff) / 1000);
-            }
+        if (spinCount >= 3) {
+            const oldestSpin = await RewardTxn.findOne({
+                user: user._id,
+                type: "spin_win",
+                createdAt: { $gte: oneDayAgo }
+            }).sort({ createdAt: 1 });
+            
+            canSpin = false;
+            nextSpinTime = new Date(oldestSpin.createdAt.getTime() + 24 * 60 * 60 * 1000);
+            timeRemaining = Math.ceil((nextSpinTime.getTime() - Date.now()) / 1000);
         }
 
         res.json({
@@ -38,6 +40,7 @@ exports.getRewardBalance = async (req, res, next) => {
                 referralCode: user.referralCode || "",
                 referredBy: user.referredBy || null,
                 canSpin,
+                spinsLeft,
                 timeRemaining,
                 nextSpinTime,
             },
@@ -52,22 +55,29 @@ exports.spinWheel = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
 
-        // Verify daily spin eligibility (24h limit)
-        const lastSpin = await RewardTxn.findOne({
+        // Verify daily spin count limit (3 spins per 24 hours)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const spinCount = await RewardTxn.countDocuments({
             user: user._id,
             type: "spin_win",
-        }).sort({ createdAt: -1 });
+            createdAt: { $gte: oneDayAgo }
+        });
 
-        if (lastSpin) {
-            const timeDiff = new Date().getTime() - new Date(lastSpin.createdAt).getTime();
+        if (spinCount >= 3) {
+            const oldestSpin = await RewardTxn.findOne({
+                user: user._id,
+                type: "spin_win",
+                createdAt: { $gte: oneDayAgo }
+            }).sort({ createdAt: 1 });
+            
+            const timeDiff = new Date().getTime() - new Date(oldestSpin.createdAt).getTime();
             const dayInMs = 24 * 60 * 60 * 1000;
-            if (timeDiff < dayInMs) {
-                const waitSec = Math.ceil((dayInMs - timeDiff) / 1000);
-                return res.status(400).json({
-                    success: false,
-                    message: `You can only spin once every 24 hours. Wait for ${Math.floor(waitSec / 3600)}h ${Math.floor((waitSec % 3600) / 60)}m.`,
-                });
-            }
+            const waitSec = Math.ceil((dayInMs - timeDiff) / 1000);
+            
+            return res.status(400).json({
+                success: false,
+                message: `Limit reached (3 spins/day). Please wait ${Math.floor(waitSec / 3600)}h ${Math.floor((waitSec % 3600) / 60)}m.`,
+            });
         }
 
         // Fetch reward config settings
