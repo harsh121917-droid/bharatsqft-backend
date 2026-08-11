@@ -8,12 +8,15 @@ exports.getRewardBalance = async (req, res, next) => {
     try {
         const user = req.user;
 
-        // Fetch spin transactions within last 24h to verify daily spin count (max 3)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        // Fetch spin transactions since start of today (IST midnight reset) to verify daily spin count (max 3)
+        const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+        nowIST.setUTCHours(0, 0, 0, 0);
+        const startOfTodayIST = new Date(nowIST.getTime() - 5.5 * 60 * 60 * 1000);
+
         const spinCount = await RewardTxn.countDocuments({
             user: user._id,
             type: "spin_win",
-            createdAt: { $gte: oneDayAgo }
+            createdAt: { $gte: startOfTodayIST }
         });
 
         let canSpin = true;
@@ -22,14 +25,8 @@ exports.getRewardBalance = async (req, res, next) => {
         const spinsLeft = Math.max(0, 3 - spinCount);
 
         if (spinCount >= 3) {
-            const oldestSpin = await RewardTxn.findOne({
-                user: user._id,
-                type: "spin_win",
-                createdAt: { $gte: oneDayAgo }
-            }).sort({ createdAt: 1 });
-            
             canSpin = false;
-            nextSpinTime = new Date(oldestSpin.createdAt.getTime() + 24 * 60 * 60 * 1000);
+            nextSpinTime = new Date(startOfTodayIST.getTime() + 24 * 60 * 60 * 1000);
             timeRemaining = Math.ceil((nextSpinTime.getTime() - Date.now()) / 1000);
         }
 
@@ -55,24 +52,20 @@ exports.spinWheel = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
 
-        // Verify daily spin count limit (3 spins per 24 hours)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        // Verify daily spin count limit (3 spins per calendar day, resetting at IST midnight)
+        const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+        nowIST.setUTCHours(0, 0, 0, 0);
+        const startOfTodayIST = new Date(nowIST.getTime() - 5.5 * 60 * 60 * 1000);
+
         const spinCount = await RewardTxn.countDocuments({
             user: user._id,
             type: "spin_win",
-            createdAt: { $gte: oneDayAgo }
+            createdAt: { $gte: startOfTodayIST }
         });
 
         if (spinCount >= 3) {
-            const oldestSpin = await RewardTxn.findOne({
-                user: user._id,
-                type: "spin_win",
-                createdAt: { $gte: oneDayAgo }
-            }).sort({ createdAt: 1 });
-            
-            const timeDiff = new Date().getTime() - new Date(oldestSpin.createdAt).getTime();
-            const dayInMs = 24 * 60 * 60 * 1000;
-            const waitSec = Math.ceil((dayInMs - timeDiff) / 1000);
+            const nextMidnight = new Date(startOfTodayIST.getTime() + 24 * 60 * 60 * 1000);
+            const waitSec = Math.ceil((nextMidnight.getTime() - Date.now()) / 1000);
             
             return res.status(400).json({
                 success: false,
