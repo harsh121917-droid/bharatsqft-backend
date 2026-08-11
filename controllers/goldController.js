@@ -757,6 +757,20 @@ exports.getHistory = async (req, res, next) => {
                     dates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
                 }
                 break;
+            case "3y":
+                pointsCount = 36;
+                volatility = 0.05;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+                }
+                break;
+            case "5y":
+                pointsCount = 60;
+                volatility = 0.08;
+                for (let i = pointsCount - 1; i >= 0; i--) {
+                    dates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+                }
+                break;
             case "1m":
             default:
                 pointsCount = 30;
