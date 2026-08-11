@@ -11,6 +11,7 @@ const {
   updateRewardSettings,
   getAllRewardHistory,
   getAdminCoins, createCoin, updateCoin, deleteCoin,
+  getAppConfig, updateAppConfig,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -73,6 +74,8 @@ router.get("/rewards/history", getAllRewardHistory);
 router.get("/coins", getAdminCoins);
 router.post("/coins", createCoin);
 router.put("/coins/:id", updateCoin);
-router.delete("/coins/:id", deleteCoin);
+// App Version Configuration Management
+router.get("/app-config", getAppConfig);
+router.post("/app-config", updateAppConfig);
 
 module.exports = router;

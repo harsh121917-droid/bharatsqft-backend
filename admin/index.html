@@ -1271,6 +1271,8 @@
                 Rewards Config</div>
             <div class="nav-item" onclick="showPage('jewellery')" id="nav-jewellery"><i class="fas fa-gem"></i>
                 Jewellery & Coins</div>
+            <div class="nav-item" onclick="showPage('appversion')" id="nav-appversion"><i class="fas fa-mobile-alt"></i>
+                App Version Config</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1811,6 +1813,40 @@
                     <div id="jewellery-body">
                         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
                     </div>
+            </div>
+
+            <!-- App Version Config Page -->
+            <div class="page" id="page-appversion">
+                <div class="section-header" style="margin-bottom:16px;">
+                    <div class="section-title" style="font-size:18px; font-weight:700;">App Version & Force Update Config</div>
+                </div>
+
+                <div class="card" style="background:var(--surface); border:1px solid var(--border); padding:24px; border-radius:8px; max-width:600px;">
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Latest App Version *</label>
+                        <input type="text" id="appversion-latest" placeholder="e.g. 0.9.0"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none;">
+                        <small style="color:var(--muted); font-size:11px;">Must match the version code in your app (e.g. 0.9.0)</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Play Store URL *</label>
+                        <input type="text" id="appversion-url" placeholder="https://play.google.com/store/apps/details?id=com.vikaone.app"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size: 14px; font-weight:600; color:#fff;">
+                            <input type="checkbox" id="appversion-force" style="width:20px; height:20px; accent-color:var(--accent);">
+                            Force Update (Mandatory block popup in the app)
+                        </label>
+                        <small style="color:var(--muted); font-size:11px; display:block; margin-top:4px; margin-left:30px;">If checked, users cannot skip the update screen.</small>
+                    </div>
+
+                    <button onclick="saveAppConfig()" class="btn-save"
+                        style="width:100%; justify-content:center; height:44px; font-size:14px; font-weight:600; background:var(--accent); color:#0f1117; border:none; border-radius:8px; cursor:pointer;">
+                        <i class="fas fa-save" style="margin-right:8px;"></i> Save App Configuration
+                    </button>
                 </div>
             </div>
 
@@ -2564,6 +2600,53 @@
             }
         }
 
+        /* ── App Version Configuration ── */
+        async function loadAppConfig() {
+            try {
+                const res = await api('/admin/app-config');
+                if (res.success && res.data) {
+                    document.getElementById('appversion-latest').value = res.data.latestVersion || "0.9.0";
+                    document.getElementById('appversion-url').value = res.data.playStoreUrl || "";
+                    document.getElementById('appversion-force').checked = res.data.forceUpdate === true;
+                }
+            } catch (err) {
+                console.error("Failed to load app config", err);
+                toast("Failed to load app version configuration", "error");
+            }
+        }
+
+        async function saveAppConfig() {
+            try {
+                const latestVersion = document.getElementById('appversion-latest').value.trim();
+                const playStoreUrl = document.getElementById('appversion-url').value.trim();
+                const forceUpdate = document.getElementById('appversion-force').checked;
+
+                if (!latestVersion) {
+                    toast("App version is required", "error");
+                    return;
+                }
+
+                const res = await api('/admin/app-config', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        latestVersion,
+                        forceUpdate,
+                        playStoreUrl
+                    })
+                });
+
+                if (res.success) {
+                    toast("App configuration saved successfully ✓", "success");
+                    await loadAppConfig();
+                } else {
+                    toast(res.message || "Failed to save app configuration", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                toast("Failed to save app configuration", "error");
+            }
+        }
+
         async function tryAutoLogin() {
             if (!TOKEN) return;
             try {
@@ -2580,7 +2663,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -2596,6 +2679,7 @@
             if (name === 'rewards') loadRewardsPage();
             if (name === 'coins') loadCoins();
             if (name === 'jewellery') loadJewellery();
+            if (name === 'appversion') loadAppConfig();
         }
 
         async function api(path, opts = {}) {

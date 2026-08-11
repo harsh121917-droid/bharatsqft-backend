@@ -617,4 +617,32 @@ exports.deleteCoin = async (req, res, next) => {
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
         res.json({ success: true, message: "Coin deleted successfully" });
     } catch (err) { next(err); }
+};
+
+const AppConfig = require("../models/AppConfig");
+
+exports.getAppConfig = async (req, res, next) => {
+    try {
+        let config = await AppConfig.findOne();
+        if (!config) {
+            config = await AppConfig.create({});
+        }
+        res.json({ success: true, data: config });
+    } catch (err) { next(err); }
+};
+
+exports.updateAppConfig = async (req, res, next) => {
+    try {
+        const { latestVersion, forceUpdate, playStoreUrl } = req.body;
+        let config = await AppConfig.findOne();
+        if (!config) {
+            config = await AppConfig.create({ latestVersion, forceUpdate, playStoreUrl });
+        } else {
+            if (latestVersion !== undefined) config.latestVersion = latestVersion;
+            if (forceUpdate !== undefined) config.forceUpdate = forceUpdate;
+            if (playStoreUrl !== undefined) config.playStoreUrl = playStoreUrl;
+            await config.save();
+        }
+        res.json({ success: true, message: "App version configuration updated successfully", data: config });
+    } catch (err) { next(err); }
 };

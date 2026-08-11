@@ -82,6 +82,25 @@ app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "Bharat SQFT API running", env: process.env.NODE_ENV });
 });
 
+/* ---------- App Version Check ---------- */
+const AppConfig = require("./models/AppConfig");
+app.get("/api/app-version", async (req, res, next) => {
+  try {
+    let config = await AppConfig.findOne();
+    if (!config) {
+      config = await AppConfig.create({});
+    }
+    res.json({
+      success: true,
+      latestVersion: config.latestVersion,
+      forceUpdate: config.forceUpdate,
+      playStoreUrl: config.playStoreUrl
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /* ---------- 404 Handler ---------- */
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
