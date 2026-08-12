@@ -267,7 +267,7 @@ exports.updateProfile = async (req, res, next) => {
 
 exports.resetPassword = async (req, res, next) => {
   try {
-    const { phone, otpRecordId, newPassword } = req.body;
+    const { phone, otpRecordId, newPassword, email } = req.body;
     if (!phone || !otpRecordId || !newPassword) {
       return res.status(400).json({ success: false, message: "phone, otpRecordId and newPassword are required" });
     }
@@ -281,7 +281,8 @@ exports.resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "OTP not verified or expired — verify again" });
     }
 
-    const user = await User.findOne({ phone });
+    const query = email ? { email: email.toLowerCase().trim() } : { phone };
+    const user = await User.findOne(query);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     user.password = newPassword;
