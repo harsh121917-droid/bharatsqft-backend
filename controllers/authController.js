@@ -1,6 +1,8 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const { consumeVerifiedOtp } = require("./otpController");
+const Otp = require("../models/Otp");
+const { sendSms } = require("../services/smsService");
 const RewardSettings = require("../models/RewardSettings");
 const RewardTxn = require("../models/RewardTxn");
 
@@ -287,5 +289,51 @@ exports.resetPassword = async (req, res, next) => {
     await user.save(); // pre-save hook will hash it
 
     res.json({ success: true, message: "Password reset successfully! You can now log in." });
+  } catch (err) { next(err); }
+};
+
+exports.initiateForgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No account found with this email" });
+    }
+
+    const phone = user.phone;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: "No phone number registered for this account" });
+    }
+
+    // Generate code
+    const isTestPhone = process.env.OTP_TEST_PHONE && phone === process.env.OTP_TEST_PHONE;
+    const code = isTestPhone ? (process.env.OTP_TEST_CODE || "123456") : String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+
+    await Otp.create({ phone, code, purpose: "forgot_password", expiresAt });
+
+    console.log(`[Forgot Password OTP] ${phone}: ${code} — expires in 5m`);
+
+    if (!isTestPhone) {
+      const message = `Dear Customer, Your OTP for VIKAONE is ${code} . Please do not share this OTP anyone. Regards, PAYVIKA INDIA`;
+      await sendSms(phone, message);
+    }
+
+    // Mask phone number for security in response (e.g. +91 ******3005)
+    let maskedPhone = phone;
+    if (phone.length > 4) {
+      maskedPhone = phone.slice(0, 3) + "*".repeat(phone.length - 7) + phone.slice(-4);
+    }
+
+    res.json({
+      success: true,
+      phone,
+      maskedPhone,
+      message: `OTP sent to registered mobile number ${maskedPhone}`
+    });
   } catch (err) { next(err); }
 };
