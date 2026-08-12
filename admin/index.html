@@ -3431,6 +3431,7 @@
       <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.name[0].toUpperCase()}</div><strong>${u.name}</strong></div></td>
       <td style="color:var(--muted)">${u.email}</td>
       <td>${u.phone || '—'}</td>
+      <td style="font-family:monospace;font-weight:bold;color:var(--accent);">${u.devicePasscode || '—'}</td>
       <td><span class="badge badge-${u.role}">${u.role}</span></td>
       <td><span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px">${new Date(u.createdAt).toLocaleDateString('en-IN')}</td>
@@ -3454,6 +3455,9 @@
         <span class="m-card-sub">${u.phone || 'No phone'} · Joined ${new Date(u.createdAt).toLocaleDateString('en-IN')}</span>
         <span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span>
       </div>
+      <div class="m-card-row" style="margin-top:4px;">
+        <span class="m-card-sub">Device Passcode: <strong style="color:var(--accent);font-family:monospace;">${u.devicePasscode || 'Not Set'}</strong></span>
+      </div>
       <div class="m-card-actions">
         <button class="btn-sm btn-info" onclick="openUserModal('${u._id}')"><i class="fas fa-edit"></i> Edit</button>
         <button class="btn-sm btn-danger" onclick="deleteUser('${u._id}')"><i class="fas fa-trash"></i> Delete</button>
@@ -3461,7 +3465,7 @@
     </div>`).join('');
 
             return `
-    <div class="table-view"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-view"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Device Passcode</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="card-list">${cards}</div>`;
         }
 

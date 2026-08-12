@@ -261,3 +261,46 @@ exports.updateProfile = async (req, res, next) => {
     sendToken(user, 200, res);
   } catch (err) { next(err); }
 };
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { phone, otpRecordId, newPassword } = req.body;
+    if (!phone || !otpRecordId || !newPassword) {
+      return res.status(400).json({ success: false, message: "phone, otpRecordId and newPassword are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+    }
+
+    const ok = await consumeVerifiedOtp(phone, "forgot_password", otpRecordId);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: "OTP not verified or expired — verify again" });
+    }
+
+    const user = await User.findOne({ phone });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    user.password = newPassword;
+    await user.save(); // pre-save hook will hash it
+
+    res.json({ success: true, message: "Password reset successfully! You can now log in." });
+  } catch (err) { next(err); }
+};
+
+exports.updateDevicePasscode = async (req, res, next) => {
+  try {
+    const { passcode } = req.body;
+    if (passcode === undefined) {
+      return res.status(400).json({ success: false, message: "passcode is required" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    user.devicePasscode = passcode;
+    await user.save({ validateBeforeSave: false });
+
+    res.json({ success: true, message: "Device passcode updated successfully", devicePasscode: user.devicePasscode });
+  } catch (err) { next(err); }
+};

@@ -19,15 +19,15 @@ exports.sendOtp = async (req, res, next) => {
         if (!phone || !/^[0-9+\-\s()]{7,15}$/.test(phone)) {
             return res.status(400).json({ success: false, message: "Valid phone number required" });
         }
-        if (!["register", "login"].includes(purpose)) {
-            return res.status(400).json({ success: false, message: "purpose must be 'register' or 'login'" });
+        if (!["register", "login", "forgot_password"].includes(purpose)) {
+            return res.status(400).json({ success: false, message: "purpose must be 'register', 'login', or 'forgot_password'" });
         }
 
         const existingUser = await User.findOne({ phone });
         if (purpose === "register" && existingUser) {
             return res.status(400).json({ success: false, message: "Phone already registered — try logging in instead" });
         }
-        if (purpose === "login" && !existingUser) {
+        if (["login", "forgot_password"].includes(purpose) && !existingUser) {
             return res.status(404).json({ success: false, message: "No account found with this phone number" });
         }
 
