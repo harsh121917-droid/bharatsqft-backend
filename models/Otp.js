@@ -4,7 +4,7 @@ const OtpSchema = new mongoose.Schema(
     {
         phone: { type: String, required: true, index: true },
         code: { type: String, required: true },          // 6-digit code (stored plain — short-lived, low value target)
-        purpose: { type: String, enum: ["register", "login"], required: true },
+        purpose: { type: String, enum: ["register", "login", "forgot_password"], required: true },
         verified: { type: Boolean, default: false },
         attempts: { type: Number, default: 0 },           // wrong-guess counter, capped
         expiresAt: { type: Date, required: true },
