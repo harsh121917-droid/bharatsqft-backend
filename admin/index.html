@@ -1273,6 +1273,8 @@
                 Jewellery & Coins</div>
             <div class="nav-item" onclick="showPage('appversion')" id="nav-appversion"><i class="fas fa-mobile-alt"></i>
                 App Version Config</div>
+            <div class="nav-item" onclick="showPage('jewelleryorders')" id="nav-jewelleryorders"><i class="fas fa-shipping-fast"></i>
+                Jewellery Orders</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -1851,6 +1853,172 @@
                 </div>
             </div>
 
+            <!-- Jewellery Orders Page -->
+            <div class="page" id="page-jewelleryorders">
+                <div class="section-header" style="margin-bottom:16px;">
+                    <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery Orders & Shipments</div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:16px; margin-bottom:20px;">
+                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                        <div class="stat-label" style="font-size:12px; color:var(--muted)">Total Orders</div>
+                        <div class="stat-value" id="order-stat-total" style="font-size:24px; font-weight:bold; color:#fff; margin-top:8px;">—</div>
+                    </div>
+                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                        <div class="stat-label" style="font-size:12px; color:var(--muted)">Pending</div>
+                        <div class="stat-value" id="order-stat-pending" style="font-size:24px; font-weight:bold; color:var(--warning); margin-top:8px;">—</div>
+                    </div>
+                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                        <div class="stat-label" style="font-size:12px; color:var(--muted)">Processing</div>
+                        <div class="stat-value" id="order-stat-processing" style="font-size:24px; font-weight:bold; color:var(--info); margin-top:8px;">—</div>
+                    </div>
+                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                        <div class="stat-label" style="font-size:12px; color:var(--muted)">Shipped</div>
+                        <div class="stat-value" id="order-stat-shipped" style="font-size:24px; font-weight:bold; color:var(--accent); margin-top:8px;">—</div>
+                    </div>
+                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                        <div class="stat-label" style="font-size:12px; color:var(--muted)">Delivered</div>
+                        <div class="stat-value" id="order-stat-delivered" style="font-size:24px; font-weight:bold; color:var(--success); margin-top:8px;">—</div>
+                    </div>
+                </div>
+
+                <!-- Filters Control Bar -->
+                <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+                    <select id="order-filter-metal" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                        <option value="all">All Metals</option>
+                        <option value="gold">Gold Only</option>
+                        <option value="silver">Silver Only</option>
+                    </select>
+                    <select id="order-filter-payment" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                        <option value="all">All Payments</option>
+                        <option value="completed">Paid / Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <select id="order-filter-delivery" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                        <option value="all">All Deliveries</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <input type="text" id="order-search" placeholder="Search customer name or item..." oninput="loadJewelleryOrders()" style="flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                </div>
+
+                <!-- Data Table -->
+                <div class="table-wrap">
+                    <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+                                <th style="padding:12px 10px;">Date</th>
+                                <th style="padding:12px 10px;">Customer</th>
+                                <th style="padding:12px 10px;">Item / Metal</th>
+                                <th style="padding:12px 10px; text-align:right;">Weight</th>
+                                <th style="padding:12px 10px; text-align:right;">Charges Paid</th>
+                                <th style="padding:12px 10px; text-align:center;">Payment</th>
+                                <th style="padding:12px 10px; text-align:center;">Delivery</th>
+                                <th style="padding:12px 10px; text-align:center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jewellery-orders-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                    <div id="orders-loading" style="text-align:center; padding:30px; display:none;">
+                        <i class="fas fa-spinner fa-spin" style="font-size:20px; color:var(--accent);"></i>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                    <button id="order-prev-btn" onclick="prevOrdersPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Previous</button>
+                    <span id="order-page-info" style="font-size:12px; color:var(--muted);">Page 1 of 1</span>
+                    <button id="order-next-btn" onclick="nextOrdersPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Next</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Jewellery Order Details Modal -->
+    <div class="modal-overlay" id="order-detail-modal" style="display:none">
+        <div class="modal-box" style="max-width:650px;">
+            <div class="modal-header">
+                <h3>Order & Shipment Details</h3>
+                <button class="modal-close" onclick="closeOrderDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+                <input type="hidden" id="edit-order-id">
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Customer Info</h4>
+                        <div id="detail-customer-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—</div>
+                        <div id="detail-customer-email" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—</div>
+                        <div id="detail-customer-phone" style="font-size:12px; color:var(--muted)">—</div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Product Info</h4>
+                        <div id="detail-product-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—</div>
+                        <div id="detail-product-spec" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—</div>
+                        <div id="detail-product-weight" style="font-size:12px; color:var(--muted)">—</div>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border); margin:4px 0;">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Payment Info</h4>
+                        <div style="font-size:13px; margin-bottom:4px;">Total Paid: <span id="detail-payment-total" style="font-weight:bold; color:var(--success)">—</span></div>
+                        <div style="font-size:12px; color:var(--muted); margin-bottom:2px;">Method: <span id="detail-payment-method">—</span></div>
+                        <div style="font-size:12px; color:var(--muted)">ID: <span id="detail-payment-id">—</span></div>
+                    </div>
+                    <div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Status</h4>
+                        <div style="font-size:13px; margin-bottom:4px;">Payment: <span id="detail-payment-status" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span></div>
+                        <div style="font-size:13px;">Delivery: <span id="detail-delivery-status" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span></div>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border); margin:4px 0;">
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Shipping Address</label>
+                    <textarea id="edit-order-address" rows="3" placeholder="Enter delivery address manually..." 
+                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none; resize:none;"></textarea>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery Status</label>
+                        <select id="edit-order-delivery" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
+                            <option value="pending">Pending</option>
+                            <option value="processing">Processing</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking ID</label>
+                        <input type="text" id="edit-order-tracking" placeholder="e.g. AWB1234567" 
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking Link / URL</label>
+                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..." 
+                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeOrderDetailsModal()">Cancel</button>
+                <button class="btn-save" onclick="saveOrderDetails()" id="order-save-btn">Save Shipment Info</button>
+            </div>
         </div>
     </div>
 
@@ -2648,6 +2816,210 @@
             }
         }
 
+        /* ── Jewellery Orders Management ── */
+        let ordersPage = 1;
+        let ordersTotalPages = 1;
+        let currentOrdersList = [];
+
+        async function loadJewelleryOrders() {
+            try {
+                document.getElementById('orders-loading').style.display = 'block';
+                const metal = document.getElementById('order-filter-metal').value;
+                const payment = document.getElementById('order-filter-payment').value;
+                const delivery = document.getElementById('order-filter-delivery').value;
+                const search = document.getElementById('order-search').value.trim();
+
+                let url = `/admin/jewellery-orders?page=${ordersPage}&limit=15`;
+                if (metal !== 'all') url += `&metalType=${metal}`;
+                if (payment !== 'all') url += `&status=${payment}`;
+                if (delivery !== 'all') url += `&deliveryStatus=${delivery}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+
+                const res = await api(url);
+                document.getElementById('orders-loading').style.display = 'none';
+
+                if (res.success && res.data) {
+                    currentOrdersList = res.data;
+                    
+                    // Render Metrics Stats
+                    if (res.stats) {
+                        document.getElementById('order-stat-total').textContent = res.stats.total || 0;
+                        document.getElementById('order-stat-pending').textContent = res.stats.pending || 0;
+                        document.getElementById('order-stat-processing').textContent = res.stats.processing || 0;
+                        document.getElementById('order-stat-shipped').textContent = res.stats.shipped || 0;
+                        document.getElementById('order-stat-delivered').textContent = res.stats.delivered || 0;
+                    }
+
+                    // Render Table
+                    const tbody = document.getElementById('jewellery-orders-body');
+                    if (res.data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--muted)">No orders found.</td></tr>`;
+                    } else {
+                        tbody.innerHTML = res.data.map(order => {
+                            const dateStr = new Date(order.createdAt).toLocaleDateString();
+                            const customerName = order.user ? order.user.name : 'Unknown User';
+                            const customerPhone = order.user ? order.user.phone : 'No Phone';
+                            const itemName = order.jewelleryName || 'Jewellery Item';
+                            const metalLabel = order.metalType === 'gold' ? 
+                                '<span style="color:var(--accent); font-weight:600;"><i class="fas fa-coins"></i> Gold</span>' : 
+                                '<span style="color:#a6b9d0; font-weight:600;"><i class="fas fa-coins"></i> Silver</span>';
+                            
+                            // Payment Status Badge
+                            let payColor = 'rgba(243,156,18,0.15)';
+                            let payText = 'orange';
+                            if (order.status === 'completed') { payColor = 'rgba(46,204,113,0.15)'; payText = 'var(--success)'; }
+                            if (order.status === 'failed') { payColor = 'rgba(231,76,60,0.15)'; payText = 'var(--danger)'; }
+
+                            // Delivery Status Badge
+                            let delColor = 'rgba(243,156,18,0.15)';
+                            let delText = 'var(--warning)';
+                            if (order.deliveryStatus === 'processing') { delColor = 'rgba(52,152,219,0.15)'; delText = 'var(--info)'; }
+                            if (order.deliveryStatus === 'shipped') { delColor = 'rgba(155,89,182,0.15)'; delText = 'var(--accent)'; }
+                            if (order.deliveryStatus === 'delivered') { delColor = 'rgba(46,204,113,0.15)'; delText = 'var(--success)'; }
+                            if (order.deliveryStatus === 'cancelled') { delColor = 'rgba(231,76,60,0.15)'; delText = 'var(--danger)'; }
+
+                            return `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding:12px 10px; color:var(--muted);">${dateStr}</td>
+                                    <td style="padding:12px 10px;">
+                                        <div style="font-weight:600; color:#fff;">${customerName}</div>
+                                        <div style="font-size:11px; color:var(--muted);">${customerPhone}</div>
+                                    </td>
+                                    <td style="padding:12px 10px;">
+                                        <div style="font-weight:600; color:#fff;">${itemName}</div>
+                                        <div style="font-size:11px;">${metalLabel}</div>
+                                    </td>
+                                    <td style="padding:12px 10px; text-align:right;">${(order.weightGrams || 0).toFixed(3)} g</td>
+                                    <td style="padding:12px 10px; text-align:right; font-weight:600; color:var(--success)">₹${(order.totalPaid || 0).toFixed(2)}</td>
+                                    <td style="padding:12px 10px; text-align:center;">
+                                        <span style="background:${payColor}; color:${payText}; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">${order.status.toUpperCase()}</span>
+                                    </td>
+                                    <td style="padding:12px 10px; text-align:center;">
+                                        <span style="background:${delColor}; color:${delText}; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">${(order.deliveryStatus || 'pending').toUpperCase()}</span>
+                                    </td>
+                                    <td style="padding:12px 10px; text-align:center;">
+                                        <button class="btn-sm btn-primary" onclick="showOrderDetails('${order._id}')" style="padding:4px 8px; border-radius:4px; background:var(--surface2); border:1px solid var(--border); color:#fff; cursor:pointer;"><i class="fas fa-eye"></i> Manage</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+
+                    // Render Pagination info
+                    if (res.pagination) {
+                        ordersTotalPages = res.pagination.pages || 1;
+                        document.getElementById('order-page-info').textContent = `Page ${ordersPage} of ${ordersTotalPages}`;
+                        document.getElementById('order-prev-btn').disabled = ordersPage <= 1;
+                        document.getElementById('order-next-btn').disabled = ordersPage >= ordersTotalPages;
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('orders-loading').style.display = 'none';
+                toast("Failed to load jewellery orders", "error");
+            }
+        }
+
+        function prevOrdersPage() {
+            if (ordersPage > 1) {
+                ordersPage--;
+                loadJewelleryOrders();
+            }
+        }
+
+        function nextOrdersPage() {
+            if (ordersPage < ordersTotalPages) {
+                ordersPage++;
+                loadJewelleryOrders();
+            }
+        }
+
+        function showOrderDetails(orderId) {
+            const order = currentOrdersList.find(o => o._id === orderId);
+            if (!order) return;
+
+            document.getElementById('edit-order-id').value = order._id;
+            
+            // Customer
+            document.getElementById('detail-customer-name').textContent = order.user ? order.user.name : 'Unknown User';
+            document.getElementById('detail-customer-email').textContent = order.user ? order.user.email : 'No Email';
+            document.getElementById('detail-customer-phone').textContent = order.user ? order.user.phone : 'No Phone';
+
+            // Product
+            document.getElementById('detail-product-name').textContent = order.jewelleryName || 'Unknown Jewellery';
+            document.getElementById('detail-product-spec').textContent = `Metal: ${(order.metalType || 'gold').toUpperCase()}`;
+            document.getElementById('detail-product-weight').textContent = `Weight: ${(order.weightGrams || 0).toFixed(3)} g`;
+
+            // Payment
+            document.getElementById('detail-payment-total').textContent = `₹${(order.totalPaid || 0).toFixed(2)}`;
+            document.getElementById('detail-payment-method').textContent = (order.paymentMethod || 'razorpay').toUpperCase();
+            document.getElementById('detail-payment-id').textContent = order.razorpayPaymentId || order.razorpayOrderId || 'N/A';
+
+            // Status Badges
+            const payStatus = document.getElementById('detail-payment-status');
+            payStatus.textContent = order.status.toUpperCase();
+            payStatus.style.background = order.status === 'completed' ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)';
+            payStatus.style.color = order.status === 'completed' ? 'var(--success)' : 'var(--danger)';
+
+            const delStatus = document.getElementById('detail-delivery-status');
+            delStatus.textContent = (order.deliveryStatus || 'pending').toUpperCase();
+            delStatus.style.background = order.deliveryStatus === 'delivered' ? 'rgba(46,204,113,0.15)' : 'rgba(243,156,18,0.15)';
+            delStatus.style.color = order.deliveryStatus === 'delivered' ? 'var(--success)' : 'var(--warning)';
+
+            // Editable fields
+            document.getElementById('edit-order-address').value = order.shippingAddress || '';
+            document.getElementById('edit-order-delivery').value = order.deliveryStatus || 'pending';
+            document.getElementById('edit-order-tracking').value = order.trackingId || '';
+            document.getElementById('edit-order-tracking-url').value = order.trackingUrl || '';
+
+            // Show Modal
+            document.getElementById('order-detail-modal').style.display = 'flex';
+        }
+
+        function closeOrderDetailsModal() {
+            document.getElementById('order-detail-modal').style.display = 'none';
+        }
+
+        async function saveOrderDetails() {
+            const id = document.getElementById('edit-order-id').value;
+            const address = document.getElementById('edit-order-address').value.trim();
+            const deliveryStatus = document.getElementById('edit-order-delivery').value;
+            const trackingId = document.getElementById('edit-order-tracking').value.trim();
+            const trackingUrl = document.getElementById('edit-order-tracking-url').value.trim();
+
+            const btn = document.getElementById('order-save-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const res = await api(`/admin/jewellery-orders/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        shippingAddress: address,
+                        deliveryStatus,
+                        trackingId,
+                        trackingUrl
+                    })
+                });
+
+                btn.disabled = false;
+                btn.textContent = 'Save Shipment Info';
+
+                if (res.success) {
+                    toast("Order updated successfully ✓", "success");
+                    closeOrderDetailsModal();
+                    await loadJewelleryOrders();
+                } else {
+                    toast(res.message || "Failed to update order", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                btn.disabled = false;
+                btn.textContent = 'Save Shipment Info';
+                toast("Failed to update order", "error");
+            }
+        }
+
         async function tryAutoLogin() {
             if (!TOKEN) return;
             try {
@@ -2664,7 +3036,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config', jewelleryorders: 'Jewellery Orders' };
             document.getElementById('topbar-title').textContent = titles[name];
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -2681,6 +3053,7 @@
             if (name === 'coins') loadCoins();
             if (name === 'jewellery') loadJewellery();
             if (name === 'appversion') loadAppConfig();
+            if (name === 'jewelleryorders') loadJewelleryOrders();
         }
 
         async function api(path, opts = {}) {

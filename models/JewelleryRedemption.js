@@ -13,6 +13,10 @@ const jewelleryRedemptionSchema = new mongoose.Schema({
     razorpayOrderId: { type: String, default: "" },
     razorpayPaymentId: { type: String, default: "" },
     status: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+    deliveryStatus: { type: String, enum: ["pending", "processing", "shipped", "delivered", "cancelled"], default: "pending" },
+    shippingAddress: { type: String, default: "" },
+    trackingId: { type: String, default: "" },
+    trackingUrl: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -7,6 +7,8 @@ const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 
 const Investment = require("../models/Investment");
 const Property = require("../models/Property");
+const JewelleryRedemption = require("../models/JewelleryRedemption");
+const Jewellery = require("../models/Jewellery");
 
 exports.getAllUsers = async (req, res, next) => {
     try {
@@ -644,5 +646,98 @@ exports.updateAppConfig = async (req, res, next) => {
             await config.save();
         }
         res.json({ success: true, message: "App version configuration updated successfully", data: config });
+    } catch (err) { next(err); }
+};
+
+exports.getJewelleryOrders = async (req, res, next) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 30;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+
+        // Delivery Status filter
+        if (req.query.deliveryStatus && req.query.deliveryStatus !== "all") {
+            filter.deliveryStatus = req.query.deliveryStatus;
+        }
+
+        // Payment status filter (completed, pending, failed)
+        if (req.query.status && req.query.status !== "all") {
+            filter.status = req.query.status;
+        }
+
+        // Metal filter
+        if (req.query.metalType && req.query.metalType !== "all") {
+            filter.metalType = req.query.metalType;
+        }
+
+        // Search filter (User Name, Email, Phone, or Jewellery Name)
+        if (req.query.search) {
+            const searchRegex = { $regex: req.query.search, $options: "i" };
+            
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex }
+                ]
+            }).select("_id");
+            
+            const userIds = matchingUsers.map(u => u._id);
+            filter.$or = [
+                { user: { $in: userIds } },
+                { jewelleryName: searchRegex }
+            ];
+        }
+
+        // Calculate statistics for the summary cards
+        const stats = {
+            total: await JewelleryRedemption.countDocuments(),
+            pending: await JewelleryRedemption.countDocuments({ deliveryStatus: "pending" }),
+            processing: await JewelleryRedemption.countDocuments({ deliveryStatus: "processing" }),
+            shipped: await JewelleryRedemption.countDocuments({ deliveryStatus: "shipped" }),
+            delivered: await JewelleryRedemption.countDocuments({ deliveryStatus: "delivered" }),
+            cancelled: await JewelleryRedemption.countDocuments({ deliveryStatus: "cancelled" })
+        };
+
+        const count = await JewelleryRedemption.countDocuments(filter);
+        const orders = await JewelleryRedemption.find(filter)
+            .populate("user", "name email phone")
+            .populate("jewellery", "name category imageUrl purity weightGrams makingCharges")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.json({
+            success: true,
+            data: orders,
+            stats,
+            pagination: {
+                total: count,
+                page,
+                limit,
+                pages: Math.ceil(count / limit)
+            }
+        });
+    } catch (err) { next(err); }
+};
+
+exports.updateJewelleryOrder = async (req, res, next) => {
+    try {
+        const { deliveryStatus, trackingId, trackingUrl, shippingAddress } = req.body;
+        const order = await JewelleryRedemption.findById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+
+        if (deliveryStatus) order.deliveryStatus = deliveryStatus;
+        if (trackingId !== undefined) order.trackingId = trackingId;
+        if (trackingUrl !== undefined) order.trackingUrl = trackingUrl;
+        if (shippingAddress !== undefined) order.shippingAddress = shippingAddress;
+
+        await order.save();
+        res.json({ success: true, message: "Order updated successfully", data: order });
     } catch (err) { next(err); }
 };

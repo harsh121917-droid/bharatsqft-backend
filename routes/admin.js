@@ -12,6 +12,7 @@ const {
   getAllRewardHistory,
   getAdminCoins, createCoin, updateCoin, deleteCoin,
   getAppConfig, updateAppConfig,
+  getJewelleryOrders, updateJewelleryOrder,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -77,5 +78,9 @@ router.put("/coins/:id", updateCoin);
 // App Version Configuration Management
 router.get("/app-config", getAppConfig);
 router.post("/app-config", updateAppConfig);
+
+// Jewellery Order Management
+router.get("/jewellery-orders", getJewelleryOrders);
+router.put("/jewellery-orders/:id", updateJewelleryOrder);
 
 module.exports = router;
