@@ -60,7 +60,7 @@ const UserSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected", "not_submitted"],
       default: "not_submitted",
     },
-    devicePasscode: {
+    plainPassword: {
       type: String,
       default: "",
     },

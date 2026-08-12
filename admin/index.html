@@ -3431,7 +3431,12 @@
       <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="width:30px;height:30px;font-size:12px">${u.name[0].toUpperCase()}</div><strong>${u.name}</strong></div></td>
       <td style="color:var(--muted)">${u.email}</td>
       <td>${u.phone || '—'}</td>
-      <td style="font-family:monospace;font-weight:bold;color:var(--accent);">${u.devicePasscode || '—'}</td>
+      <td>
+        <span id="pw-text-${u._id}" style="font-family:monospace;font-weight:bold;color:var(--accent);">••••••</span>
+        <button class="btn-sm" onclick="toggleUserPasswordVisibility('${u._id}', '${(u.plainPassword || '').replace(/'/g, "\\'")}')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;margin-left:4px;display:inline-block;outline:none;">
+          <i id="pw-icon-${u._id}" class="fas fa-eye"></i>
+        </button>
+      </td>
       <td><span class="badge badge-${u.role}">${u.role}</span></td>
       <td><span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px">${new Date(u.createdAt).toLocaleDateString('en-IN')}</td>
@@ -3456,7 +3461,12 @@
         <span class="badge badge-${u.isActive ? 'active' : 'inactive'}">${u.isActive ? 'Active' : 'Inactive'}</span>
       </div>
       <div class="m-card-row" style="margin-top:4px;">
-        <span class="m-card-sub">Device Passcode: <strong style="color:var(--accent);font-family:monospace;">${u.devicePasscode || 'Not Set'}</strong></span>
+        <span class="m-card-sub">Login Password: 
+          <span id="mpw-text-${u._id}" style="color:var(--accent);font-family:monospace;font-weight:bold;">••••••</span>
+          <button class="btn-sm" onclick="toggleMobileUserPasswordVisibility('${u._id}', '${(u.plainPassword || '').replace(/'/g, "\\'")}')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:0 4px;margin-left:4px;display:inline-block;outline:none;">
+            <i id="mpw-icon-${u._id}" class="fas fa-eye"></i>
+          </button>
+        </span>
       </div>
       <div class="m-card-actions">
         <button class="btn-sm btn-info" onclick="openUserModal('${u._id}')"><i class="fas fa-edit"></i> Edit</button>
@@ -3465,8 +3475,36 @@
     </div>`).join('');
 
             return `
-    <div class="table-view"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Device Passcode</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-view"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Login Password</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="card-list">${cards}</div>`;
+        }
+
+        function toggleUserPasswordVisibility(userId, plainText) {
+            const txtEl = document.getElementById(`pw-text-${userId}`);
+            const iconEl = document.getElementById(`pw-icon-${userId}`);
+            if (txtEl && iconEl) {
+                if (txtEl.textContent === '••••••') {
+                    txtEl.textContent = plainText || '—';
+                    iconEl.className = 'fas fa-eye-slash';
+                } else {
+                    txtEl.textContent = '••••••';
+                    iconEl.className = 'fas fa-eye';
+                }
+            }
+        }
+
+        function toggleMobileUserPasswordVisibility(userId, plainText) {
+            const txtEl = document.getElementById(`mpw-text-${userId}`);
+            const iconEl = document.getElementById(`mpw-icon-${userId}`);
+            if (txtEl && iconEl) {
+                if (txtEl.textContent === '••••••') {
+                    txtEl.textContent = plainText || '—';
+                    iconEl.className = 'fas fa-eye-slash';
+                } else {
+                    txtEl.textContent = '••••••';
+                    iconEl.className = 'fas fa-eye';
+                }
+            }
         }
 
         async function deleteUser(id) {

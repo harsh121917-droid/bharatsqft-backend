@@ -116,7 +116,7 @@ exports.register = async (req, res, next) => {
     const existsPhone = await User.findOne({ phone });
     if (existsPhone) return res.status(400).json({ success: false, message: "Phone number already registered" });
 
-    const user = await User.create({ name, email, phone, password });
+    const user = await User.create({ name, email, phone, password, plainPassword: password });
     await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);
   } catch (err) { next(err); }
@@ -283,25 +283,9 @@ exports.resetPassword = async (req, res, next) => {
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     user.password = newPassword;
+    user.plainPassword = newPassword;
     await user.save(); // pre-save hook will hash it
 
     res.json({ success: true, message: "Password reset successfully! You can now log in." });
-  } catch (err) { next(err); }
-};
-
-exports.updateDevicePasscode = async (req, res, next) => {
-  try {
-    const { passcode } = req.body;
-    if (passcode === undefined) {
-      return res.status(400).json({ success: false, message: "passcode is required" });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-    user.devicePasscode = passcode;
-    await user.save({ validateBeforeSave: false });
-
-    res.json({ success: true, message: "Device passcode updated successfully", devicePasscode: user.devicePasscode });
   } catch (err) { next(err); }
 };
