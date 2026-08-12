@@ -209,7 +209,7 @@ exports.registerWithOtp = async (req, res, next) => {
 
 exports.loginWithOtp = async (req, res, next) => {
   try {
-    const { phone, otpRecordId } = req.body;
+    const { phone, otpRecordId, email } = req.body;
     if (!phone || !otpRecordId) {
       return res.status(400).json({ success: false, message: "phone and otpRecordId are required" });
     }
@@ -219,8 +219,9 @@ exports.loginWithOtp = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "OTP not verified or expired — verify again" });
     }
 
-    const user = await User.findOne({ phone });
-    if (!user) return res.status(404).json({ success: false, message: "No account found with this phone number" });
+    const query = email ? { phone, email: email.toLowerCase().trim() } : { phone };
+    const user = await User.findOne(query);
+    if (!user) return res.status(404).json({ success: false, message: "No account found with these details" });
     if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
 
     user.lastLogin = Date.now();
