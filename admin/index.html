@@ -378,6 +378,16 @@
             font-size: 14px;
         }
 
+        .form-group input[type="checkbox"] {
+            width: 18px !important;
+            height: 18px !important;
+            min-height: 18px !important;
+            -webkit-appearance: checkbox !important;
+            appearance: checkbox !important;
+            cursor: pointer;
+            margin: 0;
+        }
+
         .btn-primary {
             width: 100%;
             background: var(--accent);
@@ -1273,7 +1283,8 @@
                 Jewellery & Coins</div>
             <div class="nav-item" onclick="showPage('appversion')" id="nav-appversion"><i class="fas fa-mobile-alt"></i>
                 App Version Config</div>
-            <div class="nav-item" onclick="showPage('jewelleryorders')" id="nav-jewelleryorders"><i class="fas fa-shipping-fast"></i>
+            <div class="nav-item" onclick="showPage('jewelleryorders')" id="nav-jewelleryorders"><i
+                    class="fas fa-shipping-fast"></i>
                 Jewellery Orders</div>
         </nav>
         <div class="sidebar-footer">
@@ -1506,16 +1517,22 @@
                         <div class="form-group"
                             style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px">
                             <label style="font-weight:600;color:var(--accent)">User Wallet</label>
-                            <div style="font-size:14px;color:var(--text);margin-top:8px;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border)">
-                                <span>Current Balance: <strong id="user-wallet-balance" style="color:var(--success)">₹0</strong></span>
+                            <div
+                                style="font-size:14px;color:var(--text);margin-top:8px;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border)">
+                                <span>Current Balance: <strong id="user-wallet-balance"
+                                        style="color:var(--success)">₹0</strong></span>
                             </div>
-                            <div style="margin-top:12px;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
-                                <input type="number" id="user-wallet-add-amt" placeholder="Add Amount (₹)" style="margin:0;min-height:36px;padding:4px 8px;font-size:13px">
-                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0">
+                            <div
+                                style="margin-top:12px;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+                                <input type="number" id="user-wallet-add-amt" placeholder="Add Amount (₹)"
+                                    style="margin:0;min-height:36px;padding:4px 8px;font-size:13px">
+                                <label
+                                    style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0">
                                     <input type="checkbox" id="user-wallet-show-tx" style="width:auto;margin:0" checked>
                                     Show TX History
                                 </label>
-                                <button class="btn-save" onclick="addMoneyToUserWallet()" id="user-wallet-add-btn" style="min-height:36px;padding:0 12px;font-size:13px">Add Money</button>
+                                <button class="btn-save" onclick="addMoneyToUserWallet()" id="user-wallet-add-btn"
+                                    style="min-height:36px;padding:0 12px;font-size:13px">Add Money</button>
                             </div>
                         </div>
                         <div class="form-group"
@@ -1806,24 +1823,32 @@
 
             <!-- Jewellery Catalog Page -->
             <div class="page" id="page-jewellery">
-                <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div class="section-header"
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery & Coins Catalog</div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn-secondary" onclick="openJewelleryCategoryModal()" style="background:var(--surface2); color:#fff; border:1px solid var(--border); padding:8px 14px; border-radius:6px; cursor:pointer;"><i class="fas fa-list"></i> Categories</button>
-                        <button class="btn-primary" onclick="openJewelleryModal()" style="background:var(--accent); color:#000; font-weight:600; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;"><i class="fas fa-plus"></i> Add Product</button>
+                        <button class="btn-secondary" onclick="openJewelleryCategoryModal()"
+                            style="background:var(--surface2); color:#fff; border:1px solid var(--border); padding:8px 14px; border-radius:6px; cursor:pointer;"><i
+                                class="fas fa-list"></i> Categories</button>
+                        <button class="btn-primary" onclick="openJewelleryModal()"
+                            style="background:var(--accent); color:#000; font-weight:600; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;"><i
+                                class="fas fa-plus"></i> Add Product</button>
                     </div>
                 </div>
 
                 <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-                    <select id="jewellery-filter-category" onchange="loadJewellery()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                    <select id="jewellery-filter-category" onchange="loadJewellery()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
                         <option value="All">All Categories</option>
                     </select>
-                    <select id="jewellery-filter-metal" onchange="loadJewellery()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                    <select id="jewellery-filter-metal" onchange="loadJewellery()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
                         <option value="all">All Metals</option>
                         <option value="gold">Gold</option>
                         <option value="silver">Silver</option>
                     </select>
-                    <input type="text" id="jewellery-search" placeholder="Search jewellery..." oninput="loadJewellery()" style="flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                    <input type="text" id="jewellery-search" placeholder="Search jewellery..." oninput="loadJewellery()"
+                        style="flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
                 </div>
 
                 <div class="table-wrap">
@@ -1836,29 +1861,41 @@
             <!-- App Version Config Page -->
             <div class="page" id="page-appversion">
                 <div class="section-header" style="margin-bottom:16px;">
-                    <div class="section-title" style="font-size:18px; font-weight:700;">App Version & Force Update Config</div>
+                    <div class="section-title" style="font-size:18px; font-weight:700;">App Version & Force Update
+                        Config</div>
                 </div>
 
-                <div class="card" style="background:var(--surface); border:1px solid var(--border); padding:24px; border-radius:8px; max-width:600px;">
+                <div class="card"
+                    style="background:var(--surface); border:1px solid var(--border); padding:24px; border-radius:8px; max-width:600px;">
                     <div class="form-group" style="margin-bottom: 16px;">
-                        <label style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Latest App Version *</label>
+                        <label
+                            style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Latest
+                            App Version *</label>
                         <input type="text" id="appversion-latest" placeholder="e.g. 0.9.0"
                             style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none;">
-                        <small style="color:var(--muted); font-size:11px;">Must match the version code in your app (e.g. 0.9.0)</small>
+                        <small style="color:var(--muted); font-size:11px;">Must match the version code in your app (e.g.
+                            0.9.0)</small>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 16px;">
-                        <label style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Play Store URL *</label>
-                        <input type="text" id="appversion-url" placeholder="https://play.google.com/store/apps/details?id=com.vikaone.app"
+                        <label
+                            style="display:block; margin-bottom: 6px; font-size: 13px; font-weight:600; color:#fff;">Play
+                            Store URL *</label>
+                        <input type="text" id="appversion-url"
+                            placeholder="https://play.google.com/store/apps/details?id=com.vikaone.app"
                             style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none;">
                     </div>
 
                     <div class="form-group" style="margin-bottom: 20px;">
-                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size: 14px; font-weight:600; color:#fff;">
-                            <input type="checkbox" id="appversion-force" style="width:20px; height:20px; accent-color:var(--accent);">
+                        <label
+                            style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size: 14px; font-weight:600; color:#fff;">
+                            <input type="checkbox" id="appversion-force"
+                                style="width:20px; height:20px; accent-color:var(--accent);">
                             Force Update (Mandatory block popup in the app)
                         </label>
-                        <small style="color:var(--muted); font-size:11px; display:block; margin-top:4px; margin-left:30px;">If checked, users cannot skip the update screen.</small>
+                        <small
+                            style="color:var(--muted); font-size:11px; display:block; margin-top:4px; margin-left:30px;">If
+                            checked, users cannot skip the update screen.</small>
                     </div>
 
                     <button onclick="saveAppConfig()" class="btn-save"
@@ -1871,47 +1908,62 @@
             <!-- Jewellery Orders Page -->
             <div class="page" id="page-jewelleryorders">
                 <div class="section-header" style="margin-bottom:16px;">
-                    <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery Orders & Shipments</div>
+                    <div class="section-title" style="font-size:18px; font-weight:700;">Jewellery Orders & Shipments
+                    </div>
                 </div>
 
                 <!-- Stats Grid -->
-                <div class="stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:16px; margin-bottom:20px;">
-                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                <div class="stats-grid"
+                    style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:16px; margin-bottom:20px;">
+                    <div class="stat-card"
+                        style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
                         <div class="stat-label" style="font-size:12px; color:var(--muted)">Total Orders</div>
-                        <div class="stat-value" id="order-stat-total" style="font-size:24px; font-weight:bold; color:#fff; margin-top:8px;">—</div>
+                        <div class="stat-value" id="order-stat-total"
+                            style="font-size:24px; font-weight:bold; color:#fff; margin-top:8px;">—</div>
                     </div>
-                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                    <div class="stat-card"
+                        style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
                         <div class="stat-label" style="font-size:12px; color:var(--muted)">Pending</div>
-                        <div class="stat-value" id="order-stat-pending" style="font-size:24px; font-weight:bold; color:var(--warning); margin-top:8px;">—</div>
+                        <div class="stat-value" id="order-stat-pending"
+                            style="font-size:24px; font-weight:bold; color:var(--warning); margin-top:8px;">—</div>
                     </div>
-                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                    <div class="stat-card"
+                        style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
                         <div class="stat-label" style="font-size:12px; color:var(--muted)">Processing</div>
-                        <div class="stat-value" id="order-stat-processing" style="font-size:24px; font-weight:bold; color:var(--info); margin-top:8px;">—</div>
+                        <div class="stat-value" id="order-stat-processing"
+                            style="font-size:24px; font-weight:bold; color:var(--info); margin-top:8px;">—</div>
                     </div>
-                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                    <div class="stat-card"
+                        style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
                         <div class="stat-label" style="font-size:12px; color:var(--muted)">Shipped</div>
-                        <div class="stat-value" id="order-stat-shipped" style="font-size:24px; font-weight:bold; color:var(--accent); margin-top:8px;">—</div>
+                        <div class="stat-value" id="order-stat-shipped"
+                            style="font-size:24px; font-weight:bold; color:var(--accent); margin-top:8px;">—</div>
                     </div>
-                    <div class="stat-card" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
+                    <div class="stat-card"
+                        style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:8px;">
                         <div class="stat-label" style="font-size:12px; color:var(--muted)">Delivered</div>
-                        <div class="stat-value" id="order-stat-delivered" style="font-size:24px; font-weight:bold; color:var(--success); margin-top:8px;">—</div>
+                        <div class="stat-value" id="order-stat-delivered"
+                            style="font-size:24px; font-weight:bold; color:var(--success); margin-top:8px;">—</div>
                     </div>
                 </div>
 
                 <!-- Filters Control Bar -->
                 <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
-                    <select id="order-filter-metal" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                    <select id="order-filter-metal" onchange="loadJewelleryOrders()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
                         <option value="all">All Metals</option>
                         <option value="gold">Gold Only</option>
                         <option value="silver">Silver Only</option>
                     </select>
-                    <select id="order-filter-payment" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                    <select id="order-filter-payment" onchange="loadJewelleryOrders()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
                         <option value="all">All Payments</option>
                         <option value="completed">Paid / Completed</option>
                         <option value="pending">Pending</option>
                         <option value="failed">Failed</option>
                     </select>
-                    <select id="order-filter-delivery" onchange="loadJewelleryOrders()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                    <select id="order-filter-delivery" onchange="loadJewelleryOrders()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
                         <option value="all">All Deliveries</option>
                         <option value="pending">Pending</option>
                         <option value="processing">Processing</option>
@@ -1919,7 +1971,9 @@
                         <option value="delivered">Delivered</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
-                    <input type="text" id="order-search" placeholder="Search customer name or item..." oninput="loadJewelleryOrders()" style="flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
+                    <input type="text" id="order-search" placeholder="Search customer name or item..."
+                        oninput="loadJewelleryOrders()"
+                        style="flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px; outline:none; font-size:13px; height:38px;">
                 </div>
 
                 <!-- Data Table -->
@@ -1948,9 +2002,13 @@
 
                 <!-- Pagination -->
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-                    <button id="order-prev-btn" onclick="prevOrdersPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Previous</button>
+                    <button id="order-prev-btn" onclick="prevOrdersPage()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;"
+                        disabled>Previous</button>
                     <span id="order-page-info" style="font-size:12px; color:var(--muted);">Page 1 of 1</span>
-                    <button id="order-next-btn" onclick="nextOrdersPage()" style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;" disabled>Next</button>
+                    <button id="order-next-btn" onclick="nextOrdersPage()"
+                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;"
+                        disabled>Next</button>
                 </div>
             </div>
 
@@ -1966,18 +2024,24 @@
             </div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <input type="hidden" id="edit-order-id">
-                
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div>
-                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Customer Info</h4>
-                        <div id="detail-customer-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—</div>
-                        <div id="detail-customer-email" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—</div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">
+                            Customer Info</h4>
+                        <div id="detail-customer-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—
+                        </div>
+                        <div id="detail-customer-email" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—
+                        </div>
                         <div id="detail-customer-phone" style="font-size:12px; color:var(--muted)">—</div>
                     </div>
                     <div>
-                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Product Info</h4>
-                        <div id="detail-product-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—</div>
-                        <div id="detail-product-spec" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—</div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">
+                            Product Info</h4>
+                        <div id="detail-product-name" style="font-weight:600; font-size:14px; margin-bottom:4px;">—
+                        </div>
+                        <div id="detail-product-spec" style="font-size:12px; color:var(--muted); margin-bottom:2px;">—
+                        </div>
                         <div id="detail-product-weight" style="font-size:12px; color:var(--muted)">—</div>
                     </div>
                 </div>
@@ -1986,30 +2050,43 @@
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div>
-                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Payment Info</h4>
-                        <div style="font-size:13px; margin-bottom:4px;">Total Paid: <span id="detail-payment-total" style="font-weight:bold; color:var(--success)">—</span></div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:2px;">Method: <span id="detail-payment-method">—</span></div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">
+                            Payment Info</h4>
+                        <div style="font-size:13px; margin-bottom:4px;">Total Paid: <span id="detail-payment-total"
+                                style="font-weight:bold; color:var(--success)">—</span></div>
+                        <div style="font-size:12px; color:var(--muted); margin-bottom:2px;">Method: <span
+                                id="detail-payment-method">—</span></div>
                         <div style="font-size:12px; color:var(--muted)">ID: <span id="detail-payment-id">—</span></div>
                     </div>
                     <div>
-                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">Status</h4>
-                        <div style="font-size:13px; margin-bottom:4px;">Payment: <span id="detail-payment-status" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span></div>
-                        <div style="font-size:13px;">Delivery: <span id="detail-delivery-status" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span></div>
+                        <h4 style="color:var(--accent); margin-bottom:8px; font-size:13px; text-transform:uppercase;">
+                            Status</h4>
+                        <div style="font-size:13px; margin-bottom:4px;">Payment: <span id="detail-payment-status"
+                                style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span>
+                        </div>
+                        <div style="font-size:13px;">Delivery: <span id="detail-delivery-status"
+                                style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">—</span>
+                        </div>
                     </div>
                 </div>
 
                 <hr style="border:0; border-top:1px solid var(--border); margin:4px 0;">
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Shipping Address</label>
-                    <textarea id="edit-order-address" rows="3" placeholder="Enter delivery address manually..." 
+                    <label
+                        style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Shipping
+                        Address</label>
+                    <textarea id="edit-order-address" rows="3" placeholder="Enter delivery address manually..."
                         style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-family:var(--font); outline:none; resize:none;"></textarea>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery Status</label>
-                        <select id="edit-order-delivery" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery
+                            Status</label>
+                        <select id="edit-order-delivery"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
                             <option value="pending">Pending</option>
                             <option value="processing">Processing</option>
                             <option value="shipped">Shipped</option>
@@ -2018,15 +2095,19 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking ID</label>
-                        <input type="text" id="edit-order-tracking" placeholder="e.g. AWB1234567" 
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
+                            ID</label>
+                        <input type="text" id="edit-order-tracking" placeholder="e.g. AWB1234567"
                             style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking Link / URL</label>
-                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..." 
+                    <label
+                        style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
+                        Link / URL</label>
+                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..."
                         style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                 </div>
             </div>
@@ -2092,7 +2173,8 @@
                 <div class="form-group">
                     <label>Product Image</label>
                     <!-- Hidden actual file input -->
-                    <input type="file" id="jewellery-image-file" accept="image/*" style="display:none" onchange="onJewelleryImagePicked(this)">
+                    <input type="file" id="jewellery-image-file" accept="image/*" style="display:none"
+                        onchange="onJewelleryImagePicked(this)">
                     <!-- Preview zone -->
                     <div id="jewellery-image-preview-zone" style="
                         display:flex; align-items:center; gap:16px;
@@ -2108,11 +2190,14 @@
                             <i class="fas fa-image" style="color:var(--muted); font-size:22px;"></i>
                         </div>
                         <div style="flex:1;">
-                            <div style="font-weight:600; font-size:13px; color:#fff; margin-bottom:4px;">Click to upload image</div>
+                            <div style="font-weight:600; font-size:13px; color:#fff; margin-bottom:4px;">Click to upload
+                                image</div>
                             <div style="font-size:11px; color:var(--muted)">JPG, PNG, WebP — max 5 MB</div>
-                            <div id="jewellery-img-filename" style="font-size:11px; color:var(--accent); margin-top:4px;"></div>
+                            <div id="jewellery-img-filename"
+                                style="font-size:11px; color:var(--accent); margin-top:4px;"></div>
                         </div>
-                        <button type="button" onclick="event.stopPropagation(); clearJewelleryImage()" id="jewellery-img-clear-btn"
+                        <button type="button" onclick="event.stopPropagation(); clearJewelleryImage()"
+                            id="jewellery-img-clear-btn"
                             style="display:none; background:rgba(255,80,80,0.15); color:#ff6060; border:none; border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; cursor:pointer;">
                             <i class="fas fa-times"></i> Remove
                         </button>
@@ -2153,10 +2238,14 @@
             </div>
             <div class="modal-body">
                 <div style="display:flex; gap:8px; margin-bottom:16px;">
-                    <input type="text" id="new-cat-name" placeholder="Category Name (e.g. Bangles, Coins, Rings)" style="flex:1; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
-                    <button class="btn-primary" onclick="saveJewelleryCategory()" style="background:var(--accent); color:#000; font-weight:600; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;"><i class="fas fa-plus"></i> Add</button>
+                    <input type="text" id="new-cat-name" placeholder="Category Name (e.g. Bangles, Coins, Rings)"
+                        style="flex:1; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:8px 12px; border-radius:6px;">
+                    <button class="btn-primary" onclick="saveJewelleryCategory()"
+                        style="background:var(--accent); color:#000; font-weight:600; border:none; padding:8px 14px; border-radius:6px; cursor:pointer;"><i
+                            class="fas fa-plus"></i> Add</button>
                 </div>
-                <div id="jewellery-categories-list" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;">
+                <div id="jewellery-categories-list"
+                    style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;">
                     <!-- Populated dynamically -->
                 </div>
             </div>
@@ -2855,7 +2944,7 @@
 
                 if (res.success && res.data) {
                     currentOrdersList = res.data;
-                    
+
                     // Render Metrics Stats
                     if (res.stats) {
                         document.getElementById('order-stat-total').textContent = res.stats.total || 0;
@@ -2875,10 +2964,10 @@
                             const customerName = order.user ? order.user.name : 'Unknown User';
                             const customerPhone = order.user ? order.user.phone : 'No Phone';
                             const itemName = order.jewelleryName || 'Jewellery Item';
-                            const metalLabel = order.metalType === 'gold' ? 
-                                '<span style="color:var(--accent); font-weight:600;"><i class="fas fa-coins"></i> Gold</span>' : 
+                            const metalLabel = order.metalType === 'gold' ?
+                                '<span style="color:var(--accent); font-weight:600;"><i class="fas fa-coins"></i> Gold</span>' :
                                 '<span style="color:#a6b9d0; font-weight:600;"><i class="fas fa-coins"></i> Silver</span>';
-                            
+
                             // Payment Status Badge
                             let payColor = 'rgba(243,156,18,0.15)';
                             let payText = 'orange';
@@ -2954,7 +3043,7 @@
             if (!order) return;
 
             document.getElementById('edit-order-id').value = order._id;
-            
+
             // Customer
             document.getElementById('detail-customer-name').textContent = order.user ? order.user.name : 'Unknown User';
             document.getElementById('detail-customer-email').textContent = order.user ? order.user.email : 'No Email';
@@ -3782,7 +3871,7 @@
                     toast('Money added successfully ✓', 'success');
                     document.getElementById('user-wallet-balance').textContent = `₹${data.balance.toLocaleString('en-IN')}`;
                     document.getElementById('user-wallet-add-amt').value = '';
-                    
+
                     // Update locally stored balance so modal re-rendering has correct value
                     let u = allUsers.find(x => x._id === id);
                     if (u) u.walletBalance = data.balance;
@@ -4980,11 +5069,11 @@
                 jewelleryCategories = res.data;
                 const selectEl = document.getElementById('jewellery-filter-category');
                 const modalSelect = document.getElementById('jewellery-category');
-                
-                let optionsHtml = '<option value="All">All Categories</option>' + 
+
+                let optionsHtml = '<option value="All">All Categories</option>' +
                     jewelleryCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
                 if (selectEl) selectEl.innerHTML = optionsHtml;
-                
+
                 let modalOptionsHtml = jewelleryCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
                 if (modalSelect) modalSelect.innerHTML = modalOptionsHtml;
 
@@ -5003,7 +5092,7 @@
         async function loadJewellery() {
             const body = document.getElementById('jewellery-body');
             body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-            
+
             await loadJewelleryCategories();
 
             const cat = document.getElementById('jewellery-filter-category').value;

@@ -105,8 +105,26 @@ exports.getTransactionDetail = async (req, res, next) => {
 exports.getTransactionInvoice = async (req, res, next) => {
     try {
         const { generateInvoicePDF } = require("../services/invoiceService");
-        const isSample = req.query.sample === "true";
-        const txn = await SilverTransaction.findOne({ _id: req.params.id, user: req.user._id });
+        const isSample = req.query.sample === "true" || req.params.id === "sample";
+        
+        let txn;
+        if (req.params.id === "sample") {
+            txn = {
+                _id: "507f1f77bcf86cd799439012",
+                invoiceNo: "SMPL-SLVR-2026-0001",
+                createdAt: new Date(),
+                type: "buy",
+                grams: 11.2359,
+                ratePerGram: 89.00,
+                goldValue: 970.87,
+                silverValue: 970.87,
+                gstAmt: 29.13,
+                totalAmt: 1000.00
+            };
+        } else {
+            txn = await SilverTransaction.findOne({ _id: req.params.id, user: req.user._id });
+        }
+
         if (!txn) {
             return res.status(404).json({ success: false, message: "Transaction not found" });
         }
