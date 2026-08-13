@@ -106,14 +106,15 @@ async function payInstallment({ userId, enrollment, amount, isBonus = false }) {
         await wallet.save();
     }
 
-    let bal = await Balance.findOne({ user: userId });
-    if (!bal) bal = await Balance.create({ user: userId });
-    bal.totalGrams = parseFloat((bal.totalGrams + grams).toFixed(6));
-    if (!isBonus) bal.investedAmt = parseFloat((bal.investedAmt + metalValue).toFixed(2));
-    await bal.save();
+    // Scheme gold/silver is tracked separately inside the enrollment document, not mixed with global DigiGold/Silver balance.
+    // let bal = await Balance.findOne({ user: userId });
+    // if (!bal) bal = await Balance.create({ user: userId });
+    // bal.totalGrams = parseFloat((bal.totalGrams + grams).toFixed(6));
+    // if (!isBonus) bal.investedAmt = parseFloat((bal.investedAmt + metalValue).toFixed(2));
+    // await bal.save();
 
     const txnData = {
-        user: userId, type: metal === "silver" ? "buy" : "sip_buy", grams,
+        user: userId, type: "sip_buy", grams,
         ratePerGram: buyRate, gstAmt, totalAmt: isBonus ? 0 : totalDeduct,
         status: "success",
         note: isBonus
