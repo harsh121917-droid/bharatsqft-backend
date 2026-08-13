@@ -248,6 +248,77 @@ exports.addWalletMoney = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+exports.recalculateVaultBalance = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        
+        // 1. Recalculate Gold Balance
+        const goldTxns = await GoldTransaction.find({ user: userId, status: "success", type: { $ne: "sip_buy" } });
+        let runningGrams = 0;
+        let runningCost = 0;
+        for (const t of goldTxns) {
+            if (["buy", "gift"].includes(t.type)) {
+                runningGrams += t.grams;
+                if (t.type === "buy") {
+                    runningCost += (t.goldValue || t.totalAmt);
+                }
+            } else if (["sell", "redeem"].includes(t.type)) {
+                if (runningGrams > 0) {
+                    const avgRate = runningCost / runningGrams;
+                    runningCost -= (avgRate * t.grams);
+                }
+                runningGrams -= t.grams;
+            }
+        }
+        const totalGoldGrams = Math.max(0, runningGrams);
+        const goldInvestedAmt = Math.max(0, runningCost);
+
+        let goldBal = await GoldBalance.findOne({ user: userId });
+        if (!goldBal) goldBal = new GoldBalance({ user: userId });
+        goldBal.totalGrams = parseFloat(totalGoldGrams.toFixed(6));
+        goldBal.investedAmt = parseFloat(goldInvestedAmt.toFixed(2));
+        await goldBal.save();
+
+        // 2. Recalculate Silver Balance
+        const silverTxns = await SilverTransaction.find({ user: userId, status: "success", type: { $ne: "sip_buy" } });
+        let runningSilverGrams = 0;
+        let runningSilverCost = 0;
+        for (const t of silverTxns) {
+            if (["buy", "gift"].includes(t.type)) {
+                runningSilverGrams += t.grams;
+                if (t.type === "buy") {
+                    runningSilverCost += (t.silverValue || t.totalAmt);
+                }
+            } else if (["sell", "redeem"].includes(t.type)) {
+                if (runningSilverGrams > 0) {
+                    const avgRate = runningSilverCost / runningSilverGrams;
+                    runningSilverCost -= (avgRate * t.grams);
+                }
+                runningSilverGrams -= t.grams;
+            }
+        }
+        const totalSilverGrams = Math.max(0, runningSilverGrams);
+        const silverInvestedAmt = Math.max(0, runningSilverCost);
+
+        let silverBal = await SilverBalance.findOne({ user: userId });
+        if (!silverBal) silverBal = new SilverBalance({ user: userId });
+        silverBal.totalGrams = parseFloat(totalSilverGrams.toFixed(6));
+        silverBal.investedAmt = parseFloat(silverInvestedAmt.toFixed(2));
+        await silverBal.save();
+
+        res.json({
+            success: true,
+            message: `Vault balance recalculated successfully. New Gold: ${goldBal.totalGrams}g, New Silver: ${silverBal.totalGrams}g`,
+            data: {
+                goldGrams: goldBal.totalGrams,
+                silverGrams: silverBal.totalGrams
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.getAllEnquiries = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;

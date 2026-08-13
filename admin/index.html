@@ -1537,6 +1537,15 @@
                         </div>
                         <div class="form-group"
                             style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px">
+                            <label style="font-weight:600;color:var(--accent)">Vault Balances</label>
+                            <div style="margin-top:8px; display:flex; gap:12px; align-items:center">
+                                <button class="btn-save" onclick="recalculateUserVault()" id="user-recalculate-btn"
+                                    style="background-color:#E0A96D;color:#1E1E24;min-height:36px;padding:0 12px;font-size:13px;border:none">Recalculate Vault Balance</button>
+                                <span style="font-size:11px;color:var(--text-muted)">Purges scheme gold from global balance history.</span>
+                            </div>
+                        </div>
+                        <div class="form-group"
+                            style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px">
                             <label style="font-weight:600;color:var(--accent)">Investment Breakdown</label>
                             <div id="user-investment-breakdown" style="font-size:13px;color:var(--text);margin-top:8px">
                             </div>
@@ -3887,6 +3896,32 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Add Money';
+            }
+        }
+
+        async function recalculateUserVault() {
+            const id = document.getElementById('user-id').value;
+            const btn = document.getElementById('user-recalculate-btn');
+            btn.disabled = true;
+            btn.textContent = 'Recalculating...';
+
+            try {
+                const data = await api(`/admin/users/${id}/recalculate-vault`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (data.success) {
+                    toast(data.message || 'Vault balance recalculated successfully ✓', 'success');
+                    loadUsers();
+                } else {
+                    toast(data.message || 'Failed to recalculate vault balance', 'error');
+                }
+            } catch (err) {
+                toast('Network error', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Recalculate Vault Balance';
             }
         }
 

@@ -14,6 +14,7 @@ const {
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
   addWalletMoney,
+  recalculateVaultBalance,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -33,6 +34,7 @@ router.get("/dashboard", getDashboard);
 router.get("/users", getAllUsers);
 router.get("/users/:id", getUserById);
 router.post("/users/:id/add-money", addWalletMoney);
+router.post("/users/:id/recalculate-vault", recalculateVaultBalance);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
 
