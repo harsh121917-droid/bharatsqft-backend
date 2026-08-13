@@ -136,6 +136,13 @@ exports.getAllUsers = async (req, res, next) => {
         const goldSellRate = rates?.gold?.sellRate || 7450;
         const silverSellRate = rates?.silver?.sellRate || 88;
 
+        const userIds = users.map(u => u._id);
+        const wallets = await Wallet.find({ user: { $in: userIds } });
+        const walletMap = {};
+        wallets.forEach(w => {
+            walletMap[w.user.toString()] = w.balance;
+        });
+
         const usersWithHoldings = users.map(user => {
             const goldGrams = user.goldInvestments?.grams || 0;
             const goldSpent = user.goldInvestments?.totalInvested || 0;
@@ -151,6 +158,7 @@ exports.getAllUsers = async (req, res, next) => {
 
             return {
                 ...user,
+                walletBalance: walletMap[user._id.toString()] || 0,
                 goldInvestments: {
                     ...user.goldInvestments,
                     avgBuyPrice: goldAvgPrice,
@@ -174,7 +182,15 @@ exports.getUserById = async (req, res, next) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
-        res.json({ success: true, data: user });
+        const wallet = await Wallet.findOne({ user: user._id });
+        const walletBalance = wallet ? wallet.balance : 0;
+        res.json({
+            success: true,
+            data: {
+                ...user.toObject(),
+                walletBalance
+            }
+        });
     } catch (err) { next(err); }
 };
 
@@ -194,6 +210,41 @@ exports.deleteUser = async (req, res, next) => {
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
         res.json({ success: true, message: "User deleted" });
+    } catch (err) { next(err); }
+};
+
+exports.addWalletMoney = async (req, res, next) => {
+    try {
+        const { amount, showTransaction } = req.body;
+        const userId = req.params.id;
+
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            return res.status(400).json({ success: false, message: "Invalid amount" });
+        }
+
+        let wallet = await Wallet.findOne({ user: userId });
+        if (!wallet) {
+            wallet = new Wallet({ user: userId, balance: 0 });
+        }
+
+        const balanceBefore = wallet.balance;
+        wallet.balance = parseFloat((wallet.balance + parseFloat(amount)).toFixed(2));
+        wallet.totalAdded = parseFloat((wallet.totalAdded + parseFloat(amount)).toFixed(2));
+        await wallet.save();
+
+        if (showTransaction) {
+            await WalletTxn.create({
+                user: userId,
+                type: "add",
+                amount: parseFloat(amount),
+                balanceBefore,
+                balanceAfter: wallet.balance,
+                status: "success",
+                note: "Owner gave you a small gift"
+            });
+        }
+
+        res.json({ success: true, message: "Money added to user's wallet successfully", balance: wallet.balance });
     } catch (err) { next(err); }
 };
 

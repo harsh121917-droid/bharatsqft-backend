@@ -13,6 +13,7 @@ const {
   getAdminCoins, createCoin, updateCoin, deleteCoin,
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
+  addWalletMoney,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -31,6 +32,7 @@ router.get("/dashboard", getDashboard);
 // Users
 router.get("/users", getAllUsers);
 router.get("/users/:id", getUserById);
+router.post("/users/:id/add-money", addWalletMoney);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
 

@@ -1505,6 +1505,21 @@
                         </div>
                         <div class="form-group"
                             style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px">
+                            <label style="font-weight:600;color:var(--accent)">User Wallet</label>
+                            <div style="font-size:14px;color:var(--text);margin-top:8px;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border)">
+                                <span>Current Balance: <strong id="user-wallet-balance" style="color:var(--success)">₹0</strong></span>
+                            </div>
+                            <div style="margin-top:12px;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+                                <input type="number" id="user-wallet-add-amt" placeholder="Add Amount (₹)" style="margin:0;min-height:36px;padding:4px 8px;font-size:13px">
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin:0">
+                                    <input type="checkbox" id="user-wallet-show-tx" style="width:auto;margin:0" checked>
+                                    Show TX History
+                                </label>
+                                <button class="btn-save" onclick="addMoneyToUserWallet()" id="user-wallet-add-btn" style="min-height:36px;padding:0 12px;font-size:13px">Add Money</button>
+                            </div>
+                        </div>
+                        <div class="form-group"
+                            style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px">
                             <label style="font-weight:600;color:var(--accent)">Investment Breakdown</label>
                             <div id="user-investment-breakdown" style="font-size:13px;color:var(--text);margin-top:8px">
                             </div>
@@ -3676,6 +3691,10 @@
             document.getElementById('user-role').value = u.role || 'user';
             document.getElementById('user-active').checked = !!u.isActive;
 
+            document.getElementById('user-wallet-balance').textContent = `₹${(u.walletBalance || 0).toLocaleString('en-IN')}`;
+            document.getElementById('user-wallet-add-amt').value = '';
+            document.getElementById('user-wallet-show-tx').checked = true;
+
             // Render breakdown
             let breakHtml = '';
             if (u.goldInvestments) {
@@ -3736,6 +3755,50 @@
 
         function closeUserModal() {
             document.getElementById('user-modal').style.display = 'none';
+        }
+
+        async function addMoneyToUserWallet() {
+            const id = document.getElementById('user-id').value;
+            const amount = parseFloat(document.getElementById('user-wallet-add-amt').value);
+            const showTransaction = document.getElementById('user-wallet-show-tx').checked;
+
+            if (isNaN(amount) || amount <= 0) {
+                toast('Please enter a valid amount', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('user-wallet-add-btn');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            try {
+                const data = await api(`/admin/users/${id}/add-money`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, showTransaction })
+                });
+
+                if (data.success) {
+                    toast('Money added successfully ✓', 'success');
+                    document.getElementById('user-wallet-balance').textContent = `₹${data.balance.toLocaleString('en-IN')}`;
+                    document.getElementById('user-wallet-add-amt').value = '';
+                    
+                    // Update locally stored balance so modal re-rendering has correct value
+                    let u = allUsers.find(x => x._id === id);
+                    if (u) u.walletBalance = data.balance;
+                    let ui = allUserInvestments.find(x => x._id === id);
+                    if (ui) ui.walletBalance = data.balance;
+
+                    loadUsers();
+                } else {
+                    toast(data.message || 'Failed to add money', 'error');
+                }
+            } catch (err) {
+                toast('Network error', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Money';
+            }
         }
 
         async function saveUser() {
