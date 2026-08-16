@@ -7,9 +7,11 @@ const { protect } = require("../middleware/authMiddleware");
 router.get("/categories", jewelleryController.getCategories);
 router.get("/products", jewelleryController.getProducts);
 
-// Redeem routes (Requires Auth)
+// Redeem & Order routes (Requires Auth)
 router.post("/redeem/initiate", protect, jewelleryController.initiateRedeemOrder);
 router.post("/redeem/verify", protect, jewelleryController.verifyRedeemOrder);
+router.get("/my-orders", protect, jewelleryController.getMyOrders);
+router.get("/my-orders/:id", protect, jewelleryController.getOrderById);
 
 // Admin routes
 router.post("/categories", protect, jewelleryController.addCategory);

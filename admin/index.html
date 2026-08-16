@@ -2091,33 +2091,42 @@
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label
-                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery
-                            Status</label>
-                        <select id="edit-order-delivery"
-                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery Stage</label>
+                        <select id="edit-order-delivery" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
+                            <option value="placed">📦 Placed (Order Confirmed)</option>
+                            <option value="processing">⚙️ Processing (Crafting & Quality Check)</option>
+                            <option value="out_of_warehouse">🏬 Out of Warehouse (Departed Hub)</option>
+                            <option value="shipped">🚚 Shipped via Courier</option>
+                            <option value="out_for_delivery">🛵 Out for Delivery</option>
+                            <option value="delivered">✅ Delivered Successfully</option>
+                            <option value="cancelled">❌ Cancelled</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label
-                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
-                            ID</label>
-                        <input type="text" id="edit-order-tracking" placeholder="e.g. AWB1234567"
-                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking ID / AWB Number</label>
+                        <input type="text" id="edit-order-tracking" placeholder="e.g. VKN9842105 / AWB1234567" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Courier Service Name</label>
+                        <input type="text" id="edit-order-courier" placeholder="e.g. Bluedart / Delhivery / Vikaone Express" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Estimated Delivery Date / Time</label>
+                        <input type="text" id="edit-order-delivery-date" placeholder="e.g. Tomorrow, 2:00 PM or Aug 18, 2026" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label
-                        style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
-                        Link / URL</label>
-                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..."
-                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking Link / URL</label>
+                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..." style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Warehouse / Status Log Note</label>
+                    <input type="text" id="edit-order-note" placeholder="e.g. Out of warehouse. Departing to destination hub." style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                 </div>
             </div>
             <div class="modal-footer">
@@ -3081,9 +3090,12 @@
 
             // Editable fields
             document.getElementById('edit-order-address').value = order.shippingAddress || '';
-            document.getElementById('edit-order-delivery').value = order.deliveryStatus || 'pending';
+            document.getElementById('edit-order-delivery').value = order.deliveryStatus || 'placed';
             document.getElementById('edit-order-tracking').value = order.trackingId || '';
+            document.getElementById('edit-order-courier').value = order.courierName || 'Vikaone Express Secure Logistics';
+            document.getElementById('edit-order-delivery-date').value = order.estimatedDeliveryDate || '';
             document.getElementById('edit-order-tracking-url').value = order.trackingUrl || '';
+            document.getElementById('edit-order-note').value = order.statusNote || '';
 
             // Show Modal
             document.getElementById('order-detail-modal').style.display = 'flex';
@@ -3098,7 +3110,10 @@
             const address = document.getElementById('edit-order-address').value.trim();
             const deliveryStatus = document.getElementById('edit-order-delivery').value;
             const trackingId = document.getElementById('edit-order-tracking').value.trim();
+            const courierName = document.getElementById('edit-order-courier').value.trim();
+            const estimatedDeliveryDate = document.getElementById('edit-order-delivery-date').value.trim();
             const trackingUrl = document.getElementById('edit-order-tracking-url').value.trim();
+            const statusNote = document.getElementById('edit-order-note').value.trim();
 
             const btn = document.getElementById('order-save-btn');
             btn.disabled = true;
@@ -3111,7 +3126,10 @@
                         shippingAddress: address,
                         deliveryStatus,
                         trackingId,
-                        trackingUrl
+                        courierName,
+                        estimatedDeliveryDate,
+                        trackingUrl,
+                        statusNote
                     })
                 });
 

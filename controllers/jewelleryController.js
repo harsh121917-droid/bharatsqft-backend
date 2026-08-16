@@ -611,3 +611,40 @@ exports.uploadProductImage = (req, res) => {
         }
     });
 };
+
+// GET MY ORDERS (User order history)
+exports.getMyOrders = async (req, res, next) => {
+    try {
+        const orders = await JewelleryRedemption.find({ user: req.user._id })
+            .populate("jewellery", "name category imageUrl purity weightGrams makingCharges gstPercentage description")
+            .sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            data: orders
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// GET ORDER BY ID (Detailed order status & tracking)
+exports.getOrderById = async (req, res, next) => {
+    try {
+        const order = await JewelleryRedemption.findOne({
+            _id: req.params.id,
+            user: req.user._id
+        }).populate("jewellery", "name category imageUrl purity weightGrams makingCharges gstPercentage description");
+
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+
+        res.json({
+            success: true,
+            data: order
+        });
+    } catch (err) {
+        next(err);
+    }
+};

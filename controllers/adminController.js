@@ -847,17 +847,56 @@ exports.getJewelleryOrders = async (req, res, next) => {
 
 exports.updateJewelleryOrder = async (req, res, next) => {
     try {
-        const { deliveryStatus, trackingId, trackingUrl, shippingAddress } = req.body;
+        const { deliveryStatus, trackingId, trackingUrl, courierName, estimatedDeliveryDate, statusNote, shippingAddress } = req.body;
         const order = await JewelleryRedemption.findById(req.params.id);
 
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
-        if (deliveryStatus) order.deliveryStatus = deliveryStatus;
+        let statusChanged = false;
+        if (deliveryStatus && deliveryStatus !== order.deliveryStatus) {
+            order.deliveryStatus = deliveryStatus;
+            statusChanged = true;
+        }
+
         if (trackingId !== undefined) order.trackingId = trackingId;
         if (trackingUrl !== undefined) order.trackingUrl = trackingUrl;
+        if (courierName !== undefined) order.courierName = courierName;
+        if (estimatedDeliveryDate !== undefined) order.estimatedDeliveryDate = estimatedDeliveryDate;
+        if (statusNote !== undefined) order.statusNote = statusNote;
         if (shippingAddress !== undefined) order.shippingAddress = shippingAddress;
+
+        if (statusChanged) {
+            const statusTitles = {
+                placed: "Order Placed",
+                pending: "Order Received",
+                processing: "Processing & Quality Check",
+                out_of_warehouse: "Out of Warehouse",
+                shipped: "Shipped via Courier",
+                out_for_delivery: "Out for Delivery",
+                delivered: "Delivered Successfully",
+                cancelled: "Order Cancelled"
+            };
+            const statusDescs = {
+                placed: "Order placed successfully.",
+                pending: "Order is pending verification.",
+                processing: "Item being crafted, inspected, and hallmarked.",
+                out_of_warehouse: "Package has departed from central warehouse hub.",
+                shipped: `Dispatched with ${order.courierName || 'Courier'}. Tracking ID: ${order.trackingId || 'N/A'}`,
+                out_for_delivery: "Courier delivery agent is out to deliver your package today.",
+                delivered: "Item delivered safely to recipient.",
+                cancelled: "Order has been cancelled."
+            };
+
+            if (!order.statusHistory) order.statusHistory = [];
+            order.statusHistory.push({
+                status: deliveryStatus,
+                title: statusTitles[deliveryStatus] || deliveryStatus,
+                description: statusNote || statusDescs[deliveryStatus] || "Status updated by admin",
+                date: new Date()
+            });
+        }
 
         await order.save();
         res.json({ success: true, message: "Order updated successfully", data: order });
