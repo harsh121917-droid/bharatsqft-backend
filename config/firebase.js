@@ -1,8 +1,10 @@
 const admin = require("firebase-admin");
+const { getMessaging } = require("firebase-admin/messaging");
 const path = require("path");
 const fs = require("fs");
 
 let firebaseApp = null;
+let messagingInstance = null;
 let isInitialized = false;
 
 function initFirebase() {
@@ -29,9 +31,14 @@ function initFirebase() {
     }
 
     if (serviceAccount) {
+      const certFn = (admin.credential && admin.credential.cert)
+        ? admin.credential.cert
+        : (admin.cert || admin.default?.cert);
+
       firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+        credential: certFn(serviceAccount),
       });
+      messagingInstance = getMessaging(firebaseApp);
       isInitialized = true;
       console.log("🔥 Firebase Admin SDK initialized successfully.");
     } else {
@@ -68,7 +75,7 @@ module.exports = {
       },
     };
 
-    if (!isInitialized || !admin) {
+    if (!isInitialized || !messagingInstance) {
       console.log("💬 [FCM Simulation Mode] Would send push notification:", { topic, tokensCount: tokens?.length, payload });
       return {
         success: true,
@@ -81,7 +88,7 @@ module.exports = {
 
     try {
       if (topic) {
-        const response = await admin.messaging().send({
+        const response = await messagingInstance.send({
           topic,
           ...payload,
         });
@@ -99,7 +106,7 @@ module.exports = {
           tokens,
           ...payload,
         };
-        const response = await admin.messaging().sendMulticast(message);
+        const response = await messagingInstance.sendEachForMulticast(message);
         console.log(`🔥 FCM Multicast sent: ${response.successCount} success, ${response.failureCount} failed.`);
         return {
           success: true,
