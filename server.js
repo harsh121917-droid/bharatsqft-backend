@@ -72,6 +72,7 @@ app.use("/api/otp", require("./routes/otp"));
 app.use("/api/rewards", require("./routes/reward"));
 app.use("/api/jewellery", require("./routes/jewellery"));
 app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
+app.use("/api/notifications", require("./routes/notification"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
