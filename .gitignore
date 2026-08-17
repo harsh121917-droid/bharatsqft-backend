@@ -47,3 +47,7 @@ build/
 *.swp
 *.swo
 .DS_Store
+
+# Secret keys & service account files
+config/firebase-service-account.json
+*-service-account.json

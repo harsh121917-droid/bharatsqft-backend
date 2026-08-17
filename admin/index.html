@@ -821,6 +821,261 @@
             display: block;
         }
 
+        /* ════════════════════════════════════════════
+   PUSH NOTIFICATIONS & MODERN PHONE MOCKUP
+════════════════════════════════════════════ */
+        .notif-hero {
+            background: linear-gradient(135deg, rgba(245, 166, 35, 0.08) 0%, rgba(24, 28, 39, 0.95) 100%);
+            border: 1px solid rgba(245, 166, 35, 0.18);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        .notif-hero-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .notif-hero-sub {
+            font-size: 13px;
+            color: #9ea7c1;
+            margin-top: 4px;
+        }
+
+        .notif-stats-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .notif-stat-pill {
+            background: rgba(31, 36, 54, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notif-input {
+            width: 100%;
+            background: #12151e !important;
+            border: 1px solid #2a3045 !important;
+            color: #f0f2f8 !important;
+            padding: 12px 14px !important;
+            border-radius: 10px !important;
+            font-size: 13.5px !important;
+            font-family: var(--font) !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .notif-input::placeholder {
+            color: #646b85 !important;
+        }
+
+        .notif-input:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 14px rgba(245, 166, 35, 0.18) !important;
+            outline: none !important;
+        }
+
+        .target-toggle-wrap {
+            display: flex;
+            background: #11141c;
+            border: 1px solid #252b3e;
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .target-toggle-btn {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 9px;
+            border: none;
+            background: transparent;
+            color: #7e87a3;
+            font-weight: 500;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .target-toggle-btn.active {
+            background: linear-gradient(135deg, rgba(245, 166, 35, 0.2), rgba(232, 131, 58, 0.15));
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(245, 166, 35, 0.15);
+        }
+
+        .phone-device {
+            width: 270px;
+            height: 520px;
+            background: #08090d;
+            border: 9px solid #1f2434;
+            border-radius: 44px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .phone-screen-wallpaper {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 20%, #1d2538 0%, #0a0c12 100%);
+            z-index: 1;
+        }
+
+        .phone-dynamic-island {
+            width: 80px;
+            height: 18px;
+            background: #000;
+            border-radius: 20px;
+            margin: 8px auto 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        .phone-status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 18px;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #e0e3ed;
+            position: relative;
+            z-index: 10;
+            margin-top: -14px;
+        }
+
+        .phone-clock {
+            text-align: center;
+            margin-top: 24px;
+            color: #ffffff;
+            position: relative;
+            z-index: 10;
+        }
+
+        .phone-clock-time {
+            font-size: 42px;
+            font-weight: 300;
+            letter-spacing: -1px;
+            line-height: 1;
+            font-family: system-ui, -apple-system, sans-serif;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .phone-clock-date {
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 4px;
+        }
+
+        .phone-notif-card {
+            position: relative;
+            z-index: 10;
+            margin: 20px 12px 0 12px;
+            background: rgba(26, 31, 46, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            padding: 12px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .phone-notif-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .phone-notif-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 5px;
+            background: linear-gradient(135deg, #f5a623, #e8833a);
+            color: #0f1117;
+            font-weight: 800;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .phone-notif-appname {
+            font-size: 11px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .phone-notif-time {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .phone-notif-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 3px;
+            line-height: 1.35;
+        }
+
+        .phone-notif-body {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .phone-notif-banner-img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-top: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .phone-home-bar {
+            width: 100px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 10px;
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
         /* Property image cell */
         .prop-img {
             width: 40px;
@@ -1286,8 +1541,7 @@
             <div class="nav-item" onclick="showPage('jewelleryorders')" id="nav-jewelleryorders"><i
                     class="fas fa-shipping-fast"></i>
                 Jewellery Orders</div>
-            <div class="nav-item" onclick="showPage('notifications')" id="nav-notifications"><i
-                    class="fas fa-bell"></i>
+            <div class="nav-item" onclick="showPage('notifications')" id="nav-notifications"><i class="fas fa-bell"></i>
                 Push Notifications</div>
         </nav>
         <div class="sidebar-footer">
@@ -1543,8 +1797,10 @@
                             <label style="font-weight:600;color:var(--accent)">Vault Balances</label>
                             <div style="margin-top:8px; display:flex; gap:12px; align-items:center">
                                 <button class="btn-save" onclick="recalculateUserVault()" id="user-recalculate-btn"
-                                    style="background-color:#E0A96D;color:#1E1E24;min-height:36px;padding:0 12px;font-size:13px;border:none">Recalculate Vault Balance</button>
-                                <span style="font-size:11px;color:var(--text-muted)">Purges scheme gold from global balance history.</span>
+                                    style="background-color:#E0A96D;color:#1E1E24;min-height:36px;padding:0 12px;font-size:13px;border:none">Recalculate
+                                    Vault Balance</button>
+                                <span style="font-size:11px;color:var(--text-muted)">Purges scheme gold from global
+                                    balance history.</span>
                             </div>
                         </div>
                         <div class="form-group"
@@ -2024,6 +2280,263 @@
                 </div>
             </div>
 
+            <!-- Push Notifications Page -->
+            <div class="page" id="page-notifications">
+                <!-- Sleek Hero Header Card -->
+                <div class="notif-hero">
+                    <div>
+                        <div class="notif-hero-title">
+                            <i class="fas fa-paper-plane" style="color:var(--accent)"></i> Push Notifications &
+                            Broadcasts
+                        </div>
+                        <div class="notif-hero-sub">
+                            Send real-time mobile push notifications, promotional offers & deep-link campaigns to app
+                            users
+                        </div>
+                    </div>
+                    <div class="notif-stats-pills">
+                        <div class="notif-stat-pill">
+                            <i class="fas fa-signal" style="color:var(--success)"></i> FCM Service Ready
+                        </div>
+                        <div class="notif-stat-pill">
+                            <i class="fas fa-bullhorn"></i> Topic: all_users
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-Column Main Layout: Form (Left) + iPhone Device Preview (Right) -->
+                <div style="display:grid; grid-template-columns: 1fr 300px; gap: 1.5rem; margin-bottom: 2rem;"
+                    id="notification-grid-container">
+
+                    <!-- Left: Notification Form -->
+                    <div
+                        style="background:var(--surface); border:1px solid #262c3d; border-radius:18px; padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+                            <h3
+                                style="font-size:15px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-magic" style="color:var(--accent)"></i> Compose Campaign
+                            </h3>
+                            <span
+                                style="font-size:11px; color:var(--accent); background:rgba(245,166,35,0.12); padding:3px 10px; border-radius:12px; font-weight:600;">
+                                Over-The-Air FCM
+                            </span>
+                        </div>
+
+                        <!-- Target Audience Selector -->
+                        <div class="form-group">
+                            <label
+                                style="font-size:12.5px; font-weight:600; color:#c5cbdf; margin-bottom:8px; display:block;">Target
+                                Audience *</label>
+                            <div class="target-toggle-wrap">
+                                <button type="button" id="target-btn-all" class="target-toggle-btn active"
+                                    onclick="selectNotificationTarget('all')">
+                                    <i class="fas fa-globe"></i> Broadcast All Users
+                                </button>
+                                <button type="button" id="target-btn-user" class="target-toggle-btn"
+                                    onclick="selectNotificationTarget('user')">
+                                    <i class="fas fa-user"></i> Specific User
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Specific User Select Dropdown -->
+                        <div class="form-group" id="user-select-group" style="display:none;">
+                            <label
+                                style="font-size:12.5px; font-weight:600; color:#c5cbdf; margin-bottom:6px; display:block;">Select
+                                User *</label>
+                            <select id="notif-target-user" class="notif-input">
+                                <option value="">Select a user from database...</option>
+                            </select>
+                        </div>
+
+                        <!-- Notification Title -->
+                        <div class="form-group">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <label style="font-size:12.5px; font-weight:600; color:#c5cbdf;">Notification Title
+                                    *</label>
+                                <span id="title-char-count"
+                                    style="font-size:11px; color:var(--muted); background:#11141d; padding:2px 8px; border-radius:10px;">0/65</span>
+                            </div>
+                            <input type="text" id="notif-title" class="notif-input"
+                                placeholder="e.g. ⚡ Special Gold Rate Discount Today!" maxlength="65"
+                                oninput="updateNotificationPreview()" />
+                        </div>
+
+                        <!-- Notification Body -->
+                        <div class="form-group">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <label style="font-size:12.5px; font-weight:600; color:#c5cbdf;">Message Body *</label>
+                                <span id="body-char-count"
+                                    style="font-size:11px; color:var(--muted); background:#11141d; padding:2px 8px; border-radius:10px;">0/200</span>
+                            </div>
+                            <textarea id="notif-body" class="notif-input" rows="3"
+                                placeholder="e.g. Buy 24K pure digital gold today and get 1% instant gold reward balance in your wallet!"
+                                maxlength="200" oninput="updateNotificationPreview()"
+                                style="resize:vertical;"></textarea>
+                        </div>
+
+                        <!-- Banner Image URL (Optional) -->
+                        <div class="form-group">
+                            <label
+                                style="font-size:12.5px; font-weight:600; color:#c5cbdf; margin-bottom:6px; display:block;">
+                                Banner Image URL <span
+                                    style="font-size:11px; color:var(--muted); font-weight:400">(Optional
+                                    Thumbnail)</span>
+                            </label>
+                            <input type="url" id="notif-image" class="notif-input"
+                                placeholder="https://example.com/banner.jpg" oninput="updateNotificationPreview()" />
+                        </div>
+
+                        <!-- App Deep Link Page Target -->
+                        <div class="form-group">
+                            <label
+                                style="font-size:12.5px; font-weight:600; color:#c5cbdf; margin-bottom:6px; display:block;">In-App
+                                Action Screen Target</label>
+                            <select id="notif-deeplink" class="notif-input">
+                                <option value="home">🏠 Home Dashboard</option>
+                                <option value="buy_gold">💛 Buy Digital Gold</option>
+                                <option value="schemes">⭐ Gold Savings Schemes</option>
+                                <option value="wallet">👛 Wallet & Passbook</option>
+                                <option value="rewards">🎁 Rewards & Spin to Win</option>
+                                <option value="jewellery">💎 Jewellery & Coins Catalog</option>
+                            </select>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="button" id="send-notif-btn" onclick="sendPushNotification()"
+                            style="width:100%; background:linear-gradient(135deg, #f5a623, #e8833a); color:#0f1117; border:none; padding:15px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all 0.25s; box-shadow:0 6px 20px rgba(245,166,35,0.35);">
+                            <i class="fas fa-paper-plane"></i> Send Push Notification Now
+                        </button>
+                    </div>
+
+                    <!-- Right: Realistic Smartphone Lockscreen Preview -->
+                    <div
+                        style="background:var(--surface); border:1px solid #262c3d; border-radius:18px; padding:1.5rem; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+                        <div
+                            style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-mobile-alt"></i> Live Lockscreen Preview
+                        </div>
+
+                        <!-- Smartphone Frame -->
+                        <div class="phone-device">
+                            <!-- Screen Wallpaper -->
+                            <div class="phone-screen-wallpaper"></div>
+
+                            <!-- Dynamic Island Notch -->
+                            <div class="phone-dynamic-island"></div>
+
+                            <!-- Status Bar -->
+                            <div class="phone-status-bar">
+                                <span>9:41</span>
+                                <span><i class="fas fa-wifi"></i> <i class="fas fa-battery-full"
+                                        style="margin-left:3px"></i></span>
+                            </div>
+
+                            <!-- Clock Widget -->
+                            <div class="phone-clock">
+                                <div class="phone-clock-time">09:41</div>
+                                <div class="phone-clock-date">Tuesday, August 17</div>
+                            </div>
+
+                            <!-- Lockscreen Notification Banner -->
+                            <div class="phone-notif-card">
+                                <div class="phone-notif-header">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <div class="phone-notif-icon">P</div>
+                                        <span class="phone-notif-appname">Payvika</span>
+                                        <span class="phone-notif-time">• now</span>
+                                    </div>
+                                    <i class="fas fa-chevron-down"
+                                        style="font-size:9px; color:rgba(255,255,255,0.5)"></i>
+                                </div>
+
+                                <div id="preview-title" class="phone-notif-title">
+                                    ⚡ Special Gold Rate Discount Today!
+                                </div>
+                                <div id="preview-body" class="phone-notif-body">
+                                    Buy 24K pure digital gold today and get 1% instant gold reward balance in your
+                                    wallet!
+                                </div>
+
+                                <!-- Image Banner Preview -->
+                                <div id="preview-image-wrap" style="display:none;">
+                                    <img id="preview-image" class="phone-notif-banner-img" src="" alt="Banner" />
+                                </div>
+                            </div>
+
+                            <!-- Home Bar -->
+                            <div class="phone-home-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sent Notification History Table Card -->
+                <div
+                    style="background:var(--surface); border:1px solid #262c3d; border-radius:18px; padding:1.5rem; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h3
+                                style="font-size:16px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-history" style="color:var(--accent)"></i> Notification Broadcast Log
+                            </h3>
+                            <p style="color:var(--muted); font-size:12px; margin-top:2px;">Track delivery counts and
+                                past push notifications</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <div style="position:relative;">
+                                <i class="fas fa-search"
+                                    style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:12px;"></i>
+                                <input type="text" id="notif-search" placeholder="Search notification title..."
+                                    oninput="filterNotificationHistory()" class="notif-input"
+                                    style="padding-left:32px !important; width:230px;" />
+                            </div>
+                            <button onclick="loadNotificationHistory()" class="btn-sm btn-info"
+                                style="padding:0 16px; border-radius:10px; font-size:13px; font-weight:600;"><i
+                                    class="fas fa-sync-alt"></i> Refresh</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap" style="border:1px solid #252b3e; border-radius:12px;">
+                        <div class="table-view">
+                            <table>
+                                <thead>
+                                    <tr style="background:#11141d;">
+                                        <th style="padding:14px 16px;">Date & Time</th>
+                                        <th style="padding:14px 16px;">Target</th>
+                                        <th style="padding:14px 16px;">Content</th>
+                                        <th style="padding:14px 16px;">In-App Action</th>
+                                        <th style="padding:14px 16px;">Delivered</th>
+                                        <th style="padding:14px 16px;">Status</th>
+                                        <th style="padding:14px 16px;">Sent By</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="notification-history-body">
+                                    <tr>
+                                        <td colspan="7" style="text-align:center; padding:24px; color:var(--muted);">
+                                            Loading notification log...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; font-size:12px; color:var(--muted);">
+                        <span id="notif-page-info">Page 1 of 1</span>
+                        <div style="display:flex; gap:6px;">
+                            <button id="notif-prev-btn" onclick="prevNotifPage()" class="btn-sm btn-cancel"
+                                disabled>Previous</button>
+                            <button id="notif-next-btn" onclick="nextNotifPage()" class="btn-sm btn-cancel"
+                                disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -2094,8 +2607,11 @@
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery Stage</label>
-                        <select id="edit-order-delivery" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Delivery
+                            Stage</label>
+                        <select id="edit-order-delivery"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; height:38px;">
                             <option value="placed">📦 Placed (Order Confirmed)</option>
                             <option value="processing">⚙️ Processing (Crafting & Quality Check)</option>
                             <option value="out_of_warehouse">🏬 Out of Warehouse (Departed Hub)</option>
@@ -2106,30 +2622,48 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking ID / AWB Number</label>
-                        <input type="text" id="edit-order-tracking" placeholder="e.g. VKN9842105 / AWB1234567" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
+                            ID / AWB Number</label>
+                        <input type="text" id="edit-order-tracking" placeholder="e.g. VKN9842105 / AWB1234567"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                     </div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Courier Service Name</label>
-                        <input type="text" id="edit-order-courier" placeholder="e.g. Bluedart / Delhivery / Vikaone Express" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Courier
+                            Service Name</label>
+                        <input type="text" id="edit-order-courier"
+                            placeholder="e.g. Bluedart / Delhivery / Vikaone Express"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Estimated Delivery Date / Time</label>
-                        <input type="text" id="edit-order-delivery-date" placeholder="e.g. Tomorrow, 2:00 PM or Aug 18, 2026" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                        <label
+                            style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Estimated
+                            Delivery Date / Time</label>
+                        <input type="text" id="edit-order-delivery-date"
+                            placeholder="e.g. Tomorrow, 2:00 PM or Aug 18, 2026"
+                            style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking Link / URL</label>
-                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..." style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    <label
+                        style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Tracking
+                        Link / URL</label>
+                    <input type="text" id="edit-order-tracking-url" placeholder="https://delhivery.com/track?id=..."
+                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Warehouse / Status Log Note</label>
-                    <input type="text" id="edit-order-note" placeholder="e.g. Out of warehouse. Departing to destination hub." style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
+                    <label
+                        style="font-weight:600; font-size:13px; margin-bottom:6px; display:block; color:#fff;">Warehouse
+                        / Status Log Note</label>
+                    <input type="text" id="edit-order-note"
+                        placeholder="e.g. Out of warehouse. Departing to destination hub."
+                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; outline:none; font-family:var(--font); height:38px;">
                 </div>
             </div>
             <div class="modal-footer">
@@ -2596,197 +3130,6 @@
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closePropertyModal()">Cancel</button>
                 <button class="btn-save" onclick="saveProperty()" id="save-btn">Save Property</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Push Notifications Page -->
-    <div class="page" id="page-notifications">
-        <div class="section-header" style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <h2 style="font-size:1.5rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:10px;">
-                    <i class="fas fa-paper-plane" style="color:var(--accent)"></i> Push Notifications & Broadcasts
-                </h2>
-                <p style="color:var(--muted); font-size:13px; margin-top:4px;">
-                    Send real-time mobile push notifications to all users or specific users with live phone preview
-                </p>
-            </div>
-        </div>
-
-        <!-- Grid layout: Form (Left) + Device Preview (Right) -->
-        <div style="display:grid; grid-template-columns: 1fr 340px; gap: 1.5rem; margin-bottom: 2rem;" id="notification-grid-container">
-            
-            <!-- Left: Form -->
-            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
-                <h3 style="font-size:15px; font-weight:600; color:var(--accent); display:flex; align-items:center; gap:8px;">
-                    <i class="fas fa-edit"></i> Create Push Notification
-                </h3>
-
-                <!-- Target Audience Selector -->
-                <div class="form-group">
-                    <label style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px; display:block;">Target Audience *</label>
-                    <div style="display:flex; gap:10px;">
-                        <button type="button" id="target-btn-all" onclick="selectNotificationTarget('all')" 
-                            style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--accent); background:rgba(245,166,35,0.15); color:var(--accent); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
-                            <i class="fas fa-globe"></i> Broadcast All Users
-                        </button>
-                        <button type="button" id="target-btn-user" onclick="selectNotificationTarget('user')" 
-                            style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--muted); font-weight:500; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
-                            <i class="fas fa-user"></i> Specific User
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Specific User Select Dropdown -->
-                <div class="form-group" id="user-select-group" style="display:none;">
-                    <label style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px; display:block;">Select User *</label>
-                    <select id="notif-target-user" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; font-size:13px;">
-                        <option value="">Select a user...</option>
-                    </select>
-                </div>
-
-                <!-- Notification Title -->
-                <div class="form-group">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <label style="font-size:13px; font-weight:600; color:var(--text);">Notification Title *</label>
-                        <span id="title-char-count" style="font-size:11px; color:var(--muted);">0/65</span>
-                    </div>
-                    <input type="text" id="notif-title" placeholder="e.g. ⚡ Special Gold Rate Discount Today!" 
-                        maxlength="65" oninput="updateNotificationPreview()" 
-                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:8px; font-size:14px; font-family:var(--font);" />
-                </div>
-
-                <!-- Notification Body -->
-                <div class="form-group">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <label style="font-size:13px; font-weight:600; color:var(--text);">Message Body *</label>
-                        <span id="body-char-count" style="font-size:11px; color:var(--muted);">0/200</span>
-                    </div>
-                    <textarea id="notif-body" rows="3" placeholder="e.g. Buy 24K pure digital gold today and get 1% instant gold reward balance in your wallet!" 
-                        maxlength="200" oninput="updateNotificationPreview()" 
-                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:8px; font-size:13px; font-family:var(--font); resize:vertical;"></textarea>
-                </div>
-
-                <!-- Banner Image URL (Optional) -->
-                <div class="form-group">
-                    <label style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px; display:block;">Banner Image URL <span style="font-size:11px; color:var(--muted); font-weight:400">(Optional)</span></label>
-                    <input type="url" id="notif-image" placeholder="https://example.com/banner.jpg" 
-                        oninput="updateNotificationPreview()" 
-                        style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:8px; font-size:13px;" />
-                </div>
-
-                <!-- App Deep Link Page Target -->
-                <div class="form-group">
-                    <label style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px; display:block;">In-App Action Page</label>
-                    <select id="notif-deeplink" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; font-size:13px;">
-                        <option value="home">🏠 Home Dashboard</option>
-                        <option value="buy_gold">💛 Buy Digital Gold</option>
-                        <option value="schemes">⭐ Gold Savings Schemes</option>
-                        <option value="wallet">👛 Wallet & Passbook</option>
-                        <option value="rewards">🎁 Rewards & Spin to Win</option>
-                        <option value="jewellery">💎 Jewellery & Coins Catalog</option>
-                    </select>
-                </div>
-
-                <!-- Submit Button -->
-                <button type="button" id="send-notif-btn" onclick="sendPushNotification()" 
-                    style="width:100%; background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0f1117; border:none; padding:14px; border-radius:10px; font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:transform 0.2s, box-shadow 0.2s; box-shadow:0 4px 15px rgba(245,166,35,0.3);">
-                    <i class="fas fa-paper-plane"></i> Send Push Notification Now
-                </button>
-            </div>
-
-            <!-- Right: Live Smartphone Mockup Preview -->
-            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.5rem; display:flex; flex-direction:column; align-items:center;">
-                <h3 style="font-size:13px; font-weight:600; color:var(--muted); margin-bottom:1.25rem; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
-                    <i class="fas fa-mobile-alt" style="color:var(--accent)"></i> Live Device Preview
-                </h3>
-
-                <!-- Phone Shell -->
-                <div style="width:260px; background:#0b0d12; border:7px solid #222736; border-radius:32px; padding:10px; box-shadow:0 20px 40px rgba(0,0,0,0.6); position:relative; overflow:hidden;">
-                    
-                    <!-- Top Status Bar -->
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:2px 8px; font-size:10px; color:#888; margin-bottom:12px;">
-                        <span>9:41</span>
-                        <div style="width:45px; height:10px; background:#181c27; border-radius:8px;"></div>
-                        <span><i class="fas fa-wifi"></i> <i class="fas fa-battery-full" style="margin-left:2px"></i></span>
-                    </div>
-
-                    <!-- Notification Card Mockup -->
-                    <div style="background:rgba(30, 36, 52, 0.95); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:10px; box-shadow:0 8px 24px rgba(0,0,0,0.4); transition:all 0.3s ease;">
-                        
-                        <!-- App Header -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <div style="width:18px; height:18px; border-radius:4px; background:linear-gradient(135deg, var(--accent), var(--accent2)); display:flex; align-items:center; justify-content:center; color:#0f1117; font-size:9px; font-weight:bold;">
-                                    P
-                                </div>
-                                <span style="font-size:11px; font-weight:700; color:#fff; letter-spacing:0.5px;">Payvika</span>
-                                <span style="font-size:9px; color:#7a8099;">• now</span>
-                            </div>
-                            <span style="font-size:9px; color:var(--accent); font-weight:600;"><i class="fas fa-chevron-down"></i></span>
-                        </div>
-
-                        <!-- Title & Body -->
-                        <div id="preview-title" style="font-size:12px; font-weight:700; color:#fff; margin-bottom:3px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            ⚡ Special Gold Rate Discount Today!
-                        </div>
-                        <div id="preview-body" style="font-size:10px; color:#b0b6cf; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
-                            Buy 24K pure digital gold today and get 1% instant gold reward balance in your wallet!
-                        </div>
-
-                        <!-- Image Banner Preview -->
-                        <div id="preview-image-wrap" style="margin-top:6px; border-radius:6px; overflow:hidden; display:none;">
-                            <img id="preview-image" src="" alt="Notification banner" style="width:100%; height:90px; object-fit:cover; border-radius:6px;" />
-                        </div>
-                    </div>
-
-                    <!-- Phone Home Indicator Bar -->
-                    <div style="width:80px; height:3px; background:#444; border-radius:2px; margin:20px auto 4px auto;"></div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- Sent Notification History Table -->
-        <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.5rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:12px;">
-                <h3 style="font-size:16px; font-weight:600; color:#fff; display:flex; align-items:center; gap:8px;">
-                    <i class="fas fa-history" style="color:var(--accent)"></i> Sent Notifications History
-                </h3>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="notif-search" placeholder="Search title or body..." oninput="filterNotificationHistory()" 
-                        style="background:var(--surface2); border:1px solid var(--border); color:#fff; padding:6px 12px; border-radius:8px; font-size:12px; width:220px;" />
-                    <button onclick="loadNotificationHistory()" class="btn-sm btn-info" style="padding:6px 12px;"><i class="fas fa-sync-alt"></i> Refresh</button>
-                </div>
-            </div>
-
-            <div class="table-wrap">
-                <div class="table-view">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date & Time</th>
-                                <th>Target</th>
-                                <th>Notification Content</th>
-                                <th>Deep Link</th>
-                                <th>Delivered</th>
-                                <th>Status</th>
-                                <th>Sent By</th>
-                            </tr>
-                        </thead>
-                        <tbody id="notification-history-body">
-                            <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">Loading history...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; font-size:12px; color:var(--muted);">
-                <span id="notif-page-info">Page 1 of 1</span>
-                <div style="display:flex; gap:6px;">
-                    <button id="notif-prev-btn" onclick="prevNotifPage()" class="btn-sm btn-cancel" disabled>Previous</button>
-                    <button id="notif-next-btn" onclick="nextNotifPage()" class="btn-sm btn-cancel" disabled>Next</button>
-                </div>
             </div>
         </div>
     </div>
@@ -3361,7 +3704,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config', jewelleryorders: 'Jewellery Orders', notifications: 'Push Notifications & Broadcasts' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config', jewelleryorders: 'Jewellery Orders', notifications: 'Push Notifications' };
             document.getElementById('topbar-title').textContent = titles[name] || 'Admin';
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -3395,28 +3738,12 @@
             const userGroup = document.getElementById('user-select-group');
 
             if (target === 'all') {
-                btnAll.style.border = '1px solid var(--accent)';
-                btnAll.style.background = 'rgba(245,166,35,0.15)';
-                btnAll.style.color = 'var(--accent)';
-                btnAll.style.fontWeight = '600';
-
-                btnUser.style.border = '1px solid var(--border)';
-                btnUser.style.background = 'var(--surface2)';
-                btnUser.style.color = 'var(--muted)';
-                btnUser.style.fontWeight = '500';
-
+                btnAll.classList.add('active');
+                btnUser.classList.remove('active');
                 userGroup.style.display = 'none';
             } else {
-                btnUser.style.border = '1px solid var(--accent)';
-                btnUser.style.background = 'rgba(245,166,35,0.15)';
-                btnUser.style.color = 'var(--accent)';
-                btnUser.style.fontWeight = '600';
-
-                btnAll.style.border = '1px solid var(--border)';
-                btnAll.style.background = 'var(--surface2)';
-                btnAll.style.color = 'var(--muted)';
-                btnAll.style.fontWeight = '500';
-
+                btnUser.classList.add('active');
+                btnAll.classList.remove('active');
                 userGroup.style.display = 'block';
                 populateNotifUserDropdown();
             }
@@ -3429,7 +3756,7 @@
             try {
                 const res = await api('/admin/users?limit=200');
                 if (res.success && res.data) {
-                    select.innerHTML = '<option value="">Select a user...</option>' + 
+                    select.innerHTML = '<option value="">Select a user...</option>' +
                         res.data.map(u => `<option value="${u._id}">${u.name} (${u.phone || u.email})</option>`).join('');
                 }
             } catch (e) {
@@ -3537,10 +3864,10 @@
 
                     tbody.innerHTML = res.notifications.map(item => {
                         const dateStr = new Date(item.createdAt).toLocaleString();
-                        const targetLabel = item.targetType === 'all' 
+                        const targetLabel = item.targetType === 'all'
                             ? '<span style="background:rgba(245,166,35,0.15); color:var(--accent); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-globe"></i> Broadcast</span>'
                             : `<span style="background:rgba(52,152,219,0.15); color:var(--info); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-user"></i> ${item.targetUser ? item.targetUser.name : 'User'}</span>`;
-                        
+
                         let statusBadge = '<span style="background:rgba(46,204,113,0.15); color:var(--success); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">Sent</span>';
                         if (item.status === 'simulated') {
                             statusBadge = '<span style="background:rgba(243,156,18,0.15); color:var(--warning); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;" title="FCM Credentials missing in server - simulated response">Simulated</span>';
