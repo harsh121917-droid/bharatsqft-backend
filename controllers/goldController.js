@@ -114,9 +114,9 @@ async function fetchLiveRates() {
             fetchFromGoldAPI("HG"),
         ]);
 
-        // Calibrate API rates to match live Indian domestic bullion market rates (Augmont / IBJA benchmark including import duty, AIDC & GST)
-        const GOLD_CALIBRATION = 1.17847; 
-        const SILVER_CALIBRATION = 1.2319;
+        // Calibrate API rates with a slight premium over base market rates
+        const GOLD_CALIBRATION = 1.1865; 
+        const SILVER_CALIBRATION = 1.2442;
         const PLATINUM_CALIBRATION = 1.2008;
         const PALLADIUM_CALIBRATION = 1.1910;
         const COPPER_CALIBRATION = 0.9853;
