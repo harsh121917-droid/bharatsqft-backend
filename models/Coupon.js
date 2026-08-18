@@ -47,6 +47,14 @@ const CouponSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isRandom: {
+            type: Boolean,
+            default: false,
+        },
+        minRandomValue: {
+            type: Number,
+            default: 1,
+        },
         isActive: {
             type: Boolean,
             default: true,

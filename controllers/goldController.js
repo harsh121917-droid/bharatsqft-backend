@@ -14,7 +14,7 @@ const SELL_SPREAD = 0.007; // sell rate = buyRate × (1 - 0.7%) — typical deal
 const MIN_BUY = 50;   // ₹ minimum
 const MIN_SELL = 0.001; // grams minimum
 const TROY_OZ_GRAMS = 31.1035; // 1 troy oz = 31.1035g
-const CACHE_TTL_MS = 5 * 60 * 1000; // cache rate 5 min to save API quota
+const CACHE_TTL_MS = 60 * 1000; // cache rate 1 min for live market tracking
 
 // In-memory rate cache (survives restarts briefly)
 let _rateCache = null;
@@ -54,6 +54,54 @@ function fetchFromGoldAPI(symbol = "XAU") {
 // ─── Fetch + cache all 5 metals ───────────────────────────────────────────────
 async function fetchLiveRates() {
     const now = Date.now();
+
+    // Check if a manual rate override is currently active in DB
+    try {
+        const manualRate = await GoldRate.findOne({ source: "manual", isActive: true }).catch(() => null);
+        if (manualRate && manualRate.buyRate > 0) {
+            _rateCache = {
+                gold: {
+                    buyRate: manualRate.buyRate,
+                    sellRate: manualRate.sellRate,
+                    change24h: manualRate.change24h || 0,
+                    changePct: manualRate.changePct || 0,
+                    high: manualRate.buyRate,
+                    low: manualRate.buyRate,
+                },
+                silver: {
+                    buyRate: manualRate.silverBuyRate || Math.round(manualRate.buyRate * 0.0153),
+                    sellRate: manualRate.silverSellRate || Math.round(manualRate.silverSellRate * 0.0151),
+                    change24h: 0,
+                    changePct: 0,
+                },
+                platinum: {
+                    buyRate: manualRate.platinumBuyRate || 6380.33,
+                    sellRate: manualRate.platinumSellRate || 6335.67,
+                    change24h: 0,
+                    changePct: 0,
+                },
+                palladium: {
+                    buyRate: manualRate.palladiumBuyRate || 4807.57,
+                    sellRate: manualRate.palladiumSellRate || 4773.92,
+                    change24h: 0,
+                    changePct: 0,
+                },
+                copper: {
+                    buyRate: manualRate.copperBuyRate || 1.36,
+                    sellRate: manualRate.copperSellRate || 1.35,
+                    change24h: 0,
+                    changePct: 0,
+                },
+                updatedAt: manualRate.updatedAt || new Date(),
+                source: "manual",
+            };
+            _cacheTime = now;
+            return _rateCache;
+        }
+    } catch (err) {
+        // DB not connected, proceed to live API
+    }
+
     // Return cache if fresh
     if (_rateCache && now - _cacheTime < CACHE_TTL_MS) return _rateCache;
 
@@ -66,9 +114,9 @@ async function fetchLiveRates() {
             fetchFromGoldAPI("HG"),
         ]);
 
-        // Calibrate API rates to match current Indian market rates (including Indian import duty, GST & market tariff)
-        const GOLD_CALIBRATION = 1.1544; 
-        const SILVER_CALIBRATION = 1.2113;
+        // Calibrate API rates to match live Indian domestic bullion market rates (Augmont / IBJA benchmark including import duty, AIDC & GST)
+        const GOLD_CALIBRATION = 1.17847; 
+        const SILVER_CALIBRATION = 1.2319;
         const PLATINUM_CALIBRATION = 1.2008;
         const PALLADIUM_CALIBRATION = 1.1910;
         const COPPER_CALIBRATION = 0.9853;
@@ -147,7 +195,7 @@ async function fetchLiveRates() {
                 isActive: true,
             },
             { upsert: true, new: true }
-        );
+        ).catch(() => null);
 
         return _rateCache;
     } catch (err) {
@@ -169,7 +217,7 @@ async function fetchLiveRates() {
                         change24h: dbRate.silverChange24h,
                         changePct: dbRate.silverChangePct,
                     }
-                    : { buyRate: 175, sellRate: 173, change24h: 0, changePct: 0 },
+                    : { buyRate: 242.43, sellRate: 240.73, change24h: 0, changePct: 0 },
                 platinum: (dbRate.platinumBuyRate > 0)
                     ? {
                         buyRate: dbRate.platinumBuyRate,

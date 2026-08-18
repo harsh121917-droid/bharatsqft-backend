@@ -2382,19 +2382,26 @@
 
                         <!-- Banner Image URL & File Upload (Optional) -->
                         <div class="form-group">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                                 <label style="font-size:12.5px; font-weight:600; color:#c5cbdf;">
-                                    Banner Image URL <span style="font-size:11px; color:var(--muted); font-weight:400">(Optional)</span>
+                                    Banner Image URL <span
+                                        style="font-size:11px; color:var(--muted); font-weight:400">(Optional)</span>
                                 </label>
                                 <span id="notif-upload-status" style="font-size:11px; font-weight:600;"></span>
                             </div>
                             <div style="display:flex; gap:10px; align-items:center;">
                                 <input type="url" id="notif-image" class="notif-input" style="flex:1;"
-                                    placeholder="https://example.com/banner.jpg" oninput="updateNotificationPreview()" />
-                                <label for="notif-image-file" style="background:var(--border); color:#fff; border:1px solid #3b4256; padding:10px 15px; border-radius:10px; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='#2f364a'" onmouseout="this.style.background='var(--border)'">
+                                    placeholder="https://example.com/banner.jpg"
+                                    oninput="updateNotificationPreview()" />
+                                <label for="notif-image-file"
+                                    style="background:var(--border); color:#fff; border:1px solid #3b4256; padding:10px 15px; border-radius:10px; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;"
+                                    onmouseover="this.style.background='#2f364a'"
+                                    onmouseout="this.style.background='var(--border)'">
                                     <i class="fas fa-upload"></i> Upload
                                 </label>
-                                <input type="file" id="notif-image-file" style="display:none;" accept="image/*" onchange="uploadNotificationImage(this)" />
+                                <input type="file" id="notif-image-file" style="display:none;" accept="image/*"
+                                    onchange="uploadNotificationImage(this)" />
                             </div>
                         </div>
 
@@ -2549,9 +2556,10 @@
             <div class="page" id="page-coupons">
                 <div class="section-header">
                     <div class="section-title">Coupons & Promotional Offers</div>
-                    <button class="btn-primary" onclick="openCouponModal()"><i class="fas fa-plus"></i> New Coupon</button>
+                    <button class="btn-primary" onclick="openCouponModal()"><i class="fas fa-plus"></i> New
+                        Coupon</button>
                 </div>
-                
+
                 <div class="table-wrap">
                     <div class="table-view">
                         <table>
@@ -2595,25 +2603,35 @@
                 <input type="hidden" id="coupon-id">
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Code *</label>
-                    <input type="text" id="coupon-code" class="notif-input" placeholder="e.g. WELCOME50" style="text-transform: uppercase;" />
+                    <label
+                        style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon
+                        Code *</label>
+                    <input type="text" id="coupon-code" class="notif-input" placeholder="e.g. WELCOME50"
+                        style="text-transform: uppercase;" />
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Description *</label>
-                    <input type="text" id="coupon-description" class="notif-input" placeholder="e.g. Get flat ₹50 off on your first purchase" />
+                    <label
+                        style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Description
+                        *</label>
+                    <input type="text" id="coupon-description" class="notif-input"
+                        placeholder="e.g. Get flat ₹50 off on your first purchase" />
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Type *</label>
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon
+                            Type *</label>
                         <select id="coupon-type" class="notif-input">
                             <option value="discount">Discount / Cash Off</option>
                             <option value="extra_gold">Extra Gold Benefit</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Value Type *</label>
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Value
+                            Type *</label>
                         <select id="coupon-value-type" class="notif-input">
                             <option value="flat">Flat Value (₹)</option>
                             <option value="percentage">Percentage (%)</option>
@@ -2623,22 +2641,33 @@
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Value *</label>
-                        <input type="number" id="coupon-value" class="notif-input" placeholder="e.g. 50" min="0" step="any" />
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon
+                            Value *</label>
+                        <input type="number" id="coupon-value" class="notif-input" placeholder="e.g. 50" min="0"
+                            step="any" />
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Min Purchase Amount (₹)</label>
-                        <input type="number" id="coupon-min-purchase" class="notif-input" placeholder="0 (No limit)" min="0" />
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Min
+                            Purchase Amount (₹)</label>
+                        <input type="number" id="coupon-min-purchase" class="notif-input" placeholder="0 (No limit)"
+                            min="0" />
                     </div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Max Discount Amount (₹)</label>
-                        <input type="number" id="coupon-max-discount" class="notif-input" placeholder="0 (No limit)" min="0" />
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Max
+                            Discount Amount (₹)</label>
+                        <input type="number" id="coupon-max-discount" class="notif-input" placeholder="0 (No limit)"
+                            min="0" />
                     </div>
                     <div class="form-group">
-                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Metal Restriction</label>
+                        <label
+                            style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Metal
+                            Restriction</label>
                         <select id="coupon-metal" class="notif-input">
                             <option value="both">Both Gold & Silver</option>
                             <option value="gold">Gold Only</option>
@@ -2648,27 +2677,48 @@
                 </div>
 
                 <div class="form-group">
-                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Expiry Date</label>
+                    <label
+                        style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Expiry
+                        Date</label>
                     <input type="date" id="coupon-expiry" class="notif-input" />
+                </div>
+
+                <div
+                    style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:center; margin-top:4px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+                        <input type="checkbox" id="coupon-random"
+                            style="width:16px; height:16px; accent-color:var(--accent);"
+                            onchange="toggleRandomFields()" />
+                        Randomize Reward (up to Value)
+                    </label>
+                    <div class="form-group" id="min-random-group" style="display:none; margin-bottom:0;">
+                        <input type="number" id="coupon-min-random" class="notif-input"
+                            placeholder="Min Random Value (₹)" min="1" value="1"
+                            style="height: 38px; padding: 6px 10px;" />
+                    </div>
                 </div>
 
                 <div style="display:flex; gap:20px; align-items:center; margin-top:8px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
-                        <input type="checkbox" id="coupon-popular" style="width:16px; height:16px; accent-color:var(--accent);" />
+                        <input type="checkbox" id="coupon-popular"
+                            style="width:16px; height:16px; accent-color:var(--accent);" />
                         Set as Popular Coupon (Displays "Popular" badge)
                     </label>
                 </div>
-                
+
                 <div style="display:flex; gap:20px; align-items:center; margin-top:4px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
-                        <input type="checkbox" id="coupon-active" style="width:16px; height:16px; accent-color:var(--accent);" checked />
+                        <input type="checkbox" id="coupon-active"
+                            style="width:16px; height:16px; accent-color:var(--accent);" checked />
                         Is Active (Available for customers)
                     </label>
                 </div>
 
                 <div style="display:flex; gap:12px; margin-top:12px; justify-content:flex-end;">
-                    <button class="btn-cancel" onclick="closeCouponModal()" style="padding:10px 20px; border-radius:8px;">Cancel</button>
-                    <button class="btn-primary" id="coupon-save-btn" onclick="saveCoupon()" style="padding:10px 24px; border-radius:8px;">Save Coupon</button>
+                    <button class="btn-cancel" onclick="closeCouponModal()"
+                        style="padding:10px 20px; border-radius:8px;">Cancel</button>
+                    <button class="btn-primary" id="coupon-save-btn" onclick="saveCoupon()"
+                        style="padding:10px 24px; border-radius:8px;">Save Coupon</button>
                 </div>
             </div>
         </div>
@@ -6360,18 +6410,20 @@
                     }
 
                     tbody.innerHTML = allCoupons.map(coupon => {
-                        const expiry = coupon.expiryDate 
-                            ? new Date(coupon.expiryDate).toLocaleDateString() 
+                        const expiry = coupon.expiryDate
+                            ? new Date(coupon.expiryDate).toLocaleDateString()
                             : 'Never';
                         const isExpired = coupon.expiryDate && new Date(coupon.expiryDate) < new Date();
-                        
-                        const typeLabel = coupon.type === 'extra_gold' 
+
+                        const typeLabel = coupon.type === 'extra_gold'
                             ? '<span style="background:rgba(245,166,35,0.15); color:var(--accent); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-coins"></i> Extra Gold</span>'
                             : '<span style="background:rgba(52,152,219,0.15); color:var(--info); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-tags"></i> Discount</span>';
 
-                        const valueLabel = coupon.valueType === 'percentage'
-                            ? `${coupon.value}%`
-                            : `₹${coupon.value}`;
+                        const valueLabel = coupon.isRandom
+                            ? `Up to ₹${coupon.value}`
+                            : coupon.valueType === 'percentage'
+                                ? `${coupon.value}%`
+                                : `₹${coupon.value}`;
 
                         const metalLabel = coupon.metalType === 'both'
                             ? 'Gold & Silver'
@@ -6428,8 +6480,11 @@
             document.getElementById('coupon-max-discount').value = '';
             document.getElementById('coupon-metal').value = 'both';
             document.getElementById('coupon-expiry').value = '';
+            document.getElementById('coupon-random').checked = false;
+            document.getElementById('coupon-min-random').value = '1';
             document.getElementById('coupon-popular').checked = false;
             document.getElementById('coupon-active').checked = true;
+            toggleRandomFields();
 
             const titleEl = document.getElementById('coupon-modal-title');
             const codeInput = document.getElementById('coupon-code');
@@ -6439,7 +6494,7 @@
                 if (coupon) {
                     titleEl.textContent = 'Edit Coupon';
                     codeInput.disabled = true; // disable changing code on edit
-                    
+
                     document.getElementById('coupon-id').value = coupon._id;
                     document.getElementById('coupon-code').value = coupon.code;
                     document.getElementById('coupon-description').value = coupon.description;
@@ -6449,13 +6504,16 @@
                     document.getElementById('coupon-min-purchase').value = coupon.minPurchaseAmount;
                     document.getElementById('coupon-max-discount').value = coupon.maxDiscountAmount;
                     document.getElementById('coupon-metal').value = coupon.metalType;
-                    
+
                     if (coupon.expiryDate) {
                         document.getElementById('coupon-expiry').value = new Date(coupon.expiryDate).toISOString().split('T')[0];
                     }
-                    
+
+                    document.getElementById('coupon-random').checked = coupon.isRandom || false;
+                    document.getElementById('coupon-min-random').value = coupon.minRandomValue || '1';
                     document.getElementById('coupon-popular').checked = coupon.isPopular;
                     document.getElementById('coupon-active').checked = coupon.isActive;
+                    toggleRandomFields();
                 }
             } else {
                 titleEl.textContent = 'Create New Coupon';
@@ -6481,6 +6539,8 @@
             const metalType = document.getElementById('coupon-metal').value;
             const expiryDate = document.getElementById('coupon-expiry').value;
             const isPopular = document.getElementById('coupon-popular').checked;
+            const isRandom = document.getElementById('coupon-random').checked;
+            const minRandomValue = parseFloat(document.getElementById('coupon-min-random').value) || 1;
             const isActive = document.getElementById('coupon-active').checked;
 
             if (!code) { toast('Please enter coupon code', 'error'); return; }
@@ -6498,6 +6558,8 @@
                 metalType,
                 expiryDate,
                 isPopular,
+                isRandom,
+                minRandomValue,
                 isActive
             };
 
@@ -6553,7 +6615,10 @@
                 toast('Failed to delete coupon: connection error', 'error');
             }
         }
-
+        function toggleRandomFields() {
+            const isChecked = document.getElementById('coupon-random').checked;
+            document.getElementById('min-random-group').style.display = isChecked ? 'block' : 'none';
+        }
         tryAutoLogin();
     </script>
 </body>

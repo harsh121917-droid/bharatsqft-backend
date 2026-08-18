@@ -16,6 +16,8 @@ exports.createCoupon = async (req, res, next) => {
             metalType,
             expiryDate,
             isPopular,
+            isRandom,
+            minRandomValue,
             isActive,
         } = req.body;
 
@@ -48,6 +50,8 @@ exports.createCoupon = async (req, res, next) => {
             metalType: metalType || "both",
             expiryDate: expiryDate || null,
             isPopular: isPopular !== undefined ? isPopular : false,
+            isRandom: isRandom !== undefined ? isRandom : false,
+            minRandomValue: minRandomValue || 1,
             isActive: isActive !== undefined ? isActive : true,
         });
 
@@ -93,6 +97,8 @@ exports.updateCoupon = async (req, res, next) => {
             metalType,
             expiryDate,
             isPopular,
+            isRandom,
+            minRandomValue,
             isActive,
         } = req.body;
 
@@ -125,6 +131,8 @@ exports.updateCoupon = async (req, res, next) => {
         if (metalType !== undefined) updates.metalType = metalType;
         if (expiryDate !== undefined) updates.expiryDate = expiryDate || null;
         if (isPopular !== undefined) updates.isPopular = isPopular;
+        if (isRandom !== undefined) updates.isRandom = isRandom;
+        if (minRandomValue !== undefined) updates.minRandomValue = minRandomValue;
         if (isActive !== undefined) updates.isActive = isActive;
 
         coupon = await Coupon.findByIdAndUpdate(req.params.id, updates, {
@@ -258,6 +266,8 @@ exports.validateCoupon = async (req, res, next) => {
             valueType: coupon.valueType,
             value: coupon.value,
             benefitValue,
+            isRandom: coupon.isRandom,
+            minRandomValue: coupon.minRandomValue,
             description: coupon.description,
         };
 
