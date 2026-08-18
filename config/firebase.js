@@ -64,7 +64,7 @@ module.exports = {
       notification: {
         title,
         body,
-        ...(imageUrl && { imageUrl }),
+        ...(imageUrl && { image: imageUrl }),
       },
       data: {
         title,
@@ -72,6 +72,7 @@ module.exports = {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         deepLink: deepLink || "home",
         ...(imageUrl && { imageUrl }),
+        ...(imageUrl && { image: imageUrl }),
       },
     };
 

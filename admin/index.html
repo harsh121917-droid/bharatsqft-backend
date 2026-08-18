@@ -2378,16 +2378,22 @@
                                 style="resize:vertical;"></textarea>
                         </div>
 
-                        <!-- Banner Image URL (Optional) -->
+                        <!-- Banner Image URL & File Upload (Optional) -->
                         <div class="form-group">
-                            <label
-                                style="font-size:12.5px; font-weight:600; color:#c5cbdf; margin-bottom:6px; display:block;">
-                                Banner Image URL <span
-                                    style="font-size:11px; color:var(--muted); font-weight:400">(Optional
-                                    Thumbnail)</span>
-                            </label>
-                            <input type="url" id="notif-image" class="notif-input"
-                                placeholder="https://example.com/banner.jpg" oninput="updateNotificationPreview()" />
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <label style="font-size:12.5px; font-weight:600; color:#c5cbdf;">
+                                    Banner Image URL <span style="font-size:11px; color:var(--muted); font-weight:400">(Optional)</span>
+                                </label>
+                                <span id="notif-upload-status" style="font-size:11px; font-weight:600;"></span>
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <input type="url" id="notif-image" class="notif-input" style="flex:1;"
+                                    placeholder="https://example.com/banner.jpg" oninput="updateNotificationPreview()" />
+                                <label for="notif-image-file" style="background:var(--border); color:#fff; border:1px solid #3b4256; padding:10px 15px; border-radius:10px; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='#2f364a'" onmouseout="this.style.background='var(--border)'">
+                                    <i class="fas fa-upload"></i> Upload
+                                </label>
+                                <input type="file" id="notif-image-file" style="display:none;" accept="image/*" onchange="uploadNotificationImage(this)" />
+                            </div>
                         </div>
 
                         <!-- App Deep Link Page Target -->
@@ -3785,6 +3791,44 @@
             }
         }
 
+        async function uploadNotificationImage(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('image', file);
+
+            const uploadStatus = document.getElementById('notif-upload-status');
+            uploadStatus.textContent = 'Uploading...';
+            uploadStatus.style.color = 'var(--accent)';
+
+            try {
+                const res = await fetch(`${API}/upload/single`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${TOKEN}`
+                    },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('notif-image').value = data.url;
+                    updateNotificationPreview();
+                    uploadStatus.textContent = 'Uploaded ✓';
+                    uploadStatus.style.color = 'var(--success)';
+                    toast('Image uploaded successfully!', 'success');
+                } else {
+                    uploadStatus.textContent = 'Upload failed';
+                    uploadStatus.style.color = 'var(--danger)';
+                    toast(data.message || 'Image upload failed', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                uploadStatus.textContent = 'Upload error';
+                uploadStatus.style.color = 'var(--danger)';
+                toast('Image upload failed: connection error', 'error');
+            }
+        }
+
         async function sendPushNotification() {
             const title = document.getElementById('notif-title').value.trim();
             const body = document.getElementById('notif-body').value.trim();
@@ -3823,6 +3867,8 @@
                     document.getElementById('notif-title').value = '';
                     document.getElementById('notif-body').value = '';
                     document.getElementById('notif-image').value = '';
+                    document.getElementById('notif-upload-status').textContent = '';
+                    document.getElementById('notif-image-file').value = '';
                     updateNotificationPreview();
                     await loadNotificationHistory();
                 } else {
