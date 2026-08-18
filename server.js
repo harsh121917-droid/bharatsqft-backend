@@ -73,6 +73,7 @@ app.use("/api/rewards", require("./routes/reward"));
 app.use("/api/jewellery", require("./routes/jewellery"));
 app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
 app.use("/api/notifications", require("./routes/notification"));
+app.use("/api/coupons", require("./routes/coupon"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");

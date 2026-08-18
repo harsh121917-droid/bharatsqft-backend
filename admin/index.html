@@ -1543,6 +1543,8 @@
                 Jewellery Orders</div>
             <div class="nav-item" onclick="showPage('notifications')" id="nav-notifications"><i class="fas fa-bell"></i>
                 Push Notifications</div>
+            <div class="nav-item" onclick="showPage('coupons')" id="nav-coupons"><i class="fas fa-ticket-alt"></i>
+                Coupons & Offers</div>
         </nav>
         <div class="sidebar-footer">
             <div class="admin-badge">
@@ -2543,6 +2545,132 @@
                 </div>
             </div>
 
+            <!-- Coupons Page -->
+            <div class="page" id="page-coupons">
+                <div class="section-header">
+                    <div class="section-title">Coupons & Promotional Offers</div>
+                    <button class="btn-primary" onclick="openCouponModal()"><i class="fas fa-plus"></i> New Coupon</button>
+                </div>
+                
+                <div class="table-wrap">
+                    <div class="table-view">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Min Purchase</th>
+                                    <th>Metal Restriction</th>
+                                    <th>Expiry</th>
+                                    <th>Popular?</th>
+                                    <th>Status</th>
+                                    <th style="text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="coupons-table-body">
+                                <tr>
+                                    <td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading coupons...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Coupon Modal (Create/Edit) -->
+    <div class="modal-overlay" id="coupon-modal" style="display:none">
+        <div class="modal-box" style="max-width:550px;">
+            <div class="modal-header">
+                <h3 id="coupon-modal-title">Create New Coupon</h3>
+                <button class="modal-close" onclick="closeCouponModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+                <input type="hidden" id="coupon-id">
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Code *</label>
+                    <input type="text" id="coupon-code" class="notif-input" placeholder="e.g. WELCOME50" style="text-transform: uppercase;" />
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Description *</label>
+                    <input type="text" id="coupon-description" class="notif-input" placeholder="e.g. Get flat ₹50 off on your first purchase" />
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Type *</label>
+                        <select id="coupon-type" class="notif-input">
+                            <option value="discount">Discount / Cash Off</option>
+                            <option value="extra_gold">Extra Gold Benefit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Value Type *</label>
+                        <select id="coupon-value-type" class="notif-input">
+                            <option value="flat">Flat Value (₹)</option>
+                            <option value="percentage">Percentage (%)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Coupon Value *</label>
+                        <input type="number" id="coupon-value" class="notif-input" placeholder="e.g. 50" min="0" step="any" />
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Min Purchase Amount (₹)</label>
+                        <input type="number" id="coupon-min-purchase" class="notif-input" placeholder="0 (No limit)" min="0" />
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Max Discount Amount (₹)</label>
+                        <input type="number" id="coupon-max-discount" class="notif-input" placeholder="0 (No limit)" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Metal Restriction</label>
+                        <select id="coupon-metal" class="notif-input">
+                            <option value="both">Both Gold & Silver</option>
+                            <option value="gold">Gold Only</option>
+                            <option value="silver">Silver Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight:600; font-size:13px; color:#c5cbdf; display:block; margin-bottom:6px;">Expiry Date</label>
+                    <input type="date" id="coupon-expiry" class="notif-input" />
+                </div>
+
+                <div style="display:flex; gap:20px; align-items:center; margin-top:8px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+                        <input type="checkbox" id="coupon-popular" style="width:16px; height:16px; accent-color:var(--accent);" />
+                        Set as Popular Coupon (Displays "Popular" badge)
+                    </label>
+                </div>
+                
+                <div style="display:flex; gap:20px; align-items:center; margin-top:4px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+                        <input type="checkbox" id="coupon-active" style="width:16px; height:16px; accent-color:var(--accent);" checked />
+                        Is Active (Available for customers)
+                    </label>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:12px; justify-content:flex-end;">
+                    <button class="btn-cancel" onclick="closeCouponModal()" style="padding:10px 20px; border-radius:8px;">Cancel</button>
+                    <button class="btn-primary" id="coupon-save-btn" onclick="saveCoupon()" style="padding:10px 24px; border-radius:8px;">Save Coupon</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -3710,7 +3838,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`page-${name}`).classList.add('active');
             document.getElementById(`nav-${name}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config', jewelleryorders: 'Jewellery Orders', notifications: 'Push Notifications' };
+            const titles = { dashboard: 'Dashboard', properties: 'Properties', userinvestments: 'User Investments', enquiries: 'Enquiries', users: 'Users', investments: 'Investments', kyc: 'KYC', schemes: 'Gold Schemes', withdrawals: 'Withdrawal Requests', sellapprovals: 'Sell Payout Approvals', gateways: 'Payment Gateways', rewards: 'Rewards & Spin to Win', coins: 'Coin Catalog', jewellery: 'Jewellery Catalog', appversion: 'App Version Config', jewelleryorders: 'Jewellery Orders', notifications: 'Push Notifications', coupons: 'Coupons & Offers' };
             document.getElementById('topbar-title').textContent = titles[name] || 'Admin';
             closeSidebar();
             if (name === 'properties') loadProperties();
@@ -3729,6 +3857,7 @@
             if (name === 'appversion') loadAppConfig();
             if (name === 'jewelleryorders') loadJewelleryOrders();
             if (name === 'notifications') loadNotificationPage();
+            if (name === 'coupons') loadCouponsPage();
         }
 
         /* ── Push Notifications Module ── */
@@ -6206,6 +6335,222 @@
                 loadJewelleryCategories();
             } else {
                 toast(res.message || 'Failed to delete category', 'error');
+            }
+        }
+
+        /* ── Coupons Module ── */
+        let allCoupons = [];
+
+        async function loadCouponsPage() {
+            closeCouponModal();
+            await loadCouponsList();
+        }
+
+        async function loadCouponsList() {
+            const tbody = document.getElementById('coupons-table-body');
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading coupons...</td></tr>`;
+
+            try {
+                const res = await api('/coupons/admin-list');
+                if (res.success && res.coupons) {
+                    allCoupons = res.coupons;
+                    if (allCoupons.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">No coupons created yet.</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = allCoupons.map(coupon => {
+                        const expiry = coupon.expiryDate 
+                            ? new Date(coupon.expiryDate).toLocaleDateString() 
+                            : 'Never';
+                        const isExpired = coupon.expiryDate && new Date(coupon.expiryDate) < new Date();
+                        
+                        const typeLabel = coupon.type === 'extra_gold' 
+                            ? '<span style="background:rgba(245,166,35,0.15); color:var(--accent); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-coins"></i> Extra Gold</span>'
+                            : '<span style="background:rgba(52,152,219,0.15); color:var(--info); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;"><i class="fas fa-tags"></i> Discount</span>';
+
+                        const valueLabel = coupon.valueType === 'percentage'
+                            ? `${coupon.value}%`
+                            : `₹${coupon.value}`;
+
+                        const metalLabel = coupon.metalType === 'both'
+                            ? 'Gold & Silver'
+                            : coupon.metalType === 'gold'
+                                ? 'Gold Only'
+                                : 'Silver Only';
+
+                        const popularBadge = coupon.isPopular
+                            ? '<span style="background:rgba(230,126,34,0.2); color:#e67e22; border:1px solid rgba(230,126,34,0.4); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;"><i class="fas fa-star"></i> Popular</span>'
+                            : '<span style="color:var(--muted); font-size:11px;">No</span>';
+
+                        const statusBadge = isExpired
+                            ? '<span style="background:rgba(231,76,60,0.15); color:#e74c3c; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Expired</span>'
+                            : coupon.isActive
+                                ? '<span style="background:rgba(46,204,113,0.15); color:var(--success); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Active</span>'
+                                : '<span style="background:rgba(149,165,166,0.15); color:#95a5a6; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;">Inactive</span>';
+
+                        return `
+                            <tr>
+                                <td style="font-weight:700; color:#fff; font-size:13.5px;">${coupon.code}</td>
+                                <td style="font-size:12.5px; color:#c5cbdf;">${coupon.description}</td>
+                                <td>${typeLabel}</td>
+                                <td style="font-weight:600; color:#fff;">${valueLabel}</td>
+                                <td>₹${coupon.minPurchaseAmount}</td>
+                                <td>${metalLabel}</td>
+                                <td style="font-size:12px; color:${isExpired ? '#e74c3c' : '#c5cbdf'};">${expiry}</td>
+                                <td>${popularBadge}</td>
+                                <td>${statusBadge}</td>
+                                <td style="text-align:center;">
+                                    <button class="btn-sm btn-info" onclick="openCouponModal('${coupon._id}')" style="padding:4px 10px; margin-right:6px;"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="btn-sm btn-cancel" onclick="deleteCoupon('${coupon._id}')" style="padding:4px 10px;"><i class="fas fa-trash-alt"></i> Delete</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--danger);">${res.message || 'Failed to load coupons'}</td></tr>`;
+                }
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--danger);">Error loading coupons from server.</td></tr>`;
+            }
+        }
+
+        function openCouponModal(couponId = '') {
+            // Reset form fields
+            document.getElementById('coupon-id').value = '';
+            document.getElementById('coupon-code').value = '';
+            document.getElementById('coupon-description').value = '';
+            document.getElementById('coupon-type').value = 'discount';
+            document.getElementById('coupon-value-type').value = 'flat';
+            document.getElementById('coupon-value').value = '';
+            document.getElementById('coupon-min-purchase').value = '';
+            document.getElementById('coupon-max-discount').value = '';
+            document.getElementById('coupon-metal').value = 'both';
+            document.getElementById('coupon-expiry').value = '';
+            document.getElementById('coupon-popular').checked = false;
+            document.getElementById('coupon-active').checked = true;
+
+            const titleEl = document.getElementById('coupon-modal-title');
+            const codeInput = document.getElementById('coupon-code');
+
+            if (couponId) {
+                const coupon = allCoupons.find(c => c._id === couponId);
+                if (coupon) {
+                    titleEl.textContent = 'Edit Coupon';
+                    codeInput.disabled = true; // disable changing code on edit
+                    
+                    document.getElementById('coupon-id').value = coupon._id;
+                    document.getElementById('coupon-code').value = coupon.code;
+                    document.getElementById('coupon-description').value = coupon.description;
+                    document.getElementById('coupon-type').value = coupon.type;
+                    document.getElementById('coupon-value-type').value = coupon.valueType;
+                    document.getElementById('coupon-value').value = coupon.value;
+                    document.getElementById('coupon-min-purchase').value = coupon.minPurchaseAmount;
+                    document.getElementById('coupon-max-discount').value = coupon.maxDiscountAmount;
+                    document.getElementById('coupon-metal').value = coupon.metalType;
+                    
+                    if (coupon.expiryDate) {
+                        document.getElementById('coupon-expiry').value = new Date(coupon.expiryDate).toISOString().split('T')[0];
+                    }
+                    
+                    document.getElementById('coupon-popular').checked = coupon.isPopular;
+                    document.getElementById('coupon-active').checked = coupon.isActive;
+                }
+            } else {
+                titleEl.textContent = 'Create New Coupon';
+                codeInput.disabled = false;
+            }
+
+            document.getElementById('coupon-modal').style.display = 'flex';
+        }
+
+        function closeCouponModal() {
+            document.getElementById('coupon-modal').style.display = 'none';
+        }
+
+        async function saveCoupon() {
+            const id = document.getElementById('coupon-id').value;
+            const code = document.getElementById('coupon-code').value.trim();
+            const description = document.getElementById('coupon-description').value.trim();
+            const type = document.getElementById('coupon-type').value;
+            const valueType = document.getElementById('coupon-value-type').value;
+            const value = parseFloat(document.getElementById('coupon-value').value);
+            const minPurchaseAmount = parseFloat(document.getElementById('coupon-min-purchase').value) || 0;
+            const maxDiscountAmount = parseFloat(document.getElementById('coupon-max-discount').value) || 0;
+            const metalType = document.getElementById('coupon-metal').value;
+            const expiryDate = document.getElementById('coupon-expiry').value;
+            const isPopular = document.getElementById('coupon-popular').checked;
+            const isActive = document.getElementById('coupon-active').checked;
+
+            if (!code) { toast('Please enter coupon code', 'error'); return; }
+            if (!description) { toast('Please enter coupon description', 'error'); return; }
+            if (isNaN(value) || value <= 0) { toast('Please enter a valid coupon value', 'error'); return; }
+
+            const payload = {
+                code,
+                description,
+                type,
+                valueType,
+                value,
+                minPurchaseAmount,
+                maxDiscountAmount,
+                metalType,
+                expiryDate,
+                isPopular,
+                isActive
+            };
+
+            const saveBtn = document.getElementById('coupon-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                let res;
+                if (id) {
+                    res = await api(`/coupons/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await api('/coupons/create', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Coupon';
+
+                if (res.success) {
+                    toast(id ? 'Coupon updated successfully ✓' : 'Coupon created successfully ✓', 'success');
+                    closeCouponModal();
+                    loadCouponsList();
+                } else {
+                    toast(res.message || 'Failed to save coupon', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Coupon';
+                toast('Failed to save coupon: connection error', 'error');
+            }
+        }
+
+        async function deleteCoupon(id) {
+            if (!confirm('Are you sure you want to delete this coupon?')) return;
+
+            try {
+                const res = await api(`/coupons/${id}`, { method: 'DELETE' });
+                if (res.success) {
+                    toast('Coupon deleted successfully ✓', 'success');
+                    loadCouponsList();
+                } else {
+                    toast(res.message || 'Failed to delete coupon', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                toast('Failed to delete coupon: connection error', 'error');
             }
         }
 
