@@ -122,13 +122,12 @@ exports.generateInvoicePDF = async (txn, user, type, res, isSample = false) => {
     doc.fillColor("#555")
        .font("Helvetica")
        .fontSize(7.5)
-       .text("CIN: U72900DL2023PTC412345 | GSTIN: 07AABCP1234A1Z1", 40, 44);
+       .text("CIN: U66190DL2026PTC464009 | GSTIN: 09AAQCP7680Q1Z4", 40, 44);
 
     doc.fontSize(7)
        .fillColor("#444")
        .text("Registered Office: D36 S/F Ganesh Nagar, Pandav Nagar Complex, New Delhi - 110092", 40, 56)
-       .text("Corporate Office: Khasra No. 150, A2Z Road, Almaspur, Muzaffarnagar, U.P - 251001", 40, 66)
-       .text("Tel: +91 1800 123 4567 | Email: info@vikaone.com | Web: www.vikaone.com", 40, 76);
+       .text("Email: info@vikaone.com | Web: www.vikaone.com", 40, 66);
 
     // --- BRAND LOGO BOX (TOP RIGHT) ---
     doc.rect(440, 24, 115, 65).fill(primaryColor);

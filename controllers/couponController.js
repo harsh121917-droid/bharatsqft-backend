@@ -247,7 +247,8 @@ exports.validateCoupon = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "This coupon has expired" });
         }
 
-        if (purchaseAmount < coupon.minPurchaseAmount) {
+        const grossAmt = purchaseAmount * 1.03;
+        if (purchaseAmount < coupon.minPurchaseAmount && Math.round(grossAmt) < coupon.minPurchaseAmount) {
             return res.status(400).json({
                 success: false,
                 message: `Minimum purchase of ₹${coupon.minPurchaseAmount} is required for this coupon`,

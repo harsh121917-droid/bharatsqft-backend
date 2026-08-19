@@ -202,7 +202,8 @@ exports.buyGoldFromWallet = async (req, res, next) => {
             if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
                 return res.status(400).json({ success: false, message: "This coupon has expired." });
             }
-            if (amountInRupees < coupon.minPurchaseAmount) {
+            const grossPurchaseAmt = amountInRupees * (1 + GST_PCT / 100);
+            if (amountInRupees < coupon.minPurchaseAmount && Math.round(grossPurchaseAmt) < coupon.minPurchaseAmount) {
                 return res.status(400).json({
                     success: false,
                     message: "Minimum purchase of ₹" + coupon.minPurchaseAmount + " is required for coupon " + upperCode,
