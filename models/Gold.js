@@ -83,6 +83,10 @@ const GoldTransactionSchema = new mongoose.Schema(
         // For SIP
         sipPlanId: { type: mongoose.Schema.Types.ObjectId, ref: "GoldSip" },
         isReferralRedeemed: { type: Boolean, default: false },
+        couponCode: { type: String },
+        couponBonus: { type: Number, default: 0 },
+        couponDiscount: { type: Number, default: 0 },
+        isCouponApplied: { type: Boolean, default: false },
         note: { type: String },
     },
     { timestamps: true }

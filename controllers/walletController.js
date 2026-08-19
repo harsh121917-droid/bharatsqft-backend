@@ -174,21 +174,70 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         const { fetchLiveRates } = require("./goldController");
         const User = require("../models/User");
         const RewardTxn = require("../models/RewardTxn");
+        const Coupon = require("../models/Coupon");
 
         const rates = await fetchLiveRates();
         const buyRate = rates.gold.buyRate;
         const GST_PCT = 3;
 
-        let { amountInRupees, grams, pointsRedeemed, redeemReferral } = req.body;
+        let { amountInRupees, grams, pointsRedeemed, redeemReferral, couponCode } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         if (!amountInRupees || amountInRupees < 50) {
             return res.status(400).json({ success: false, message: "Minimum purchase is ₹50" });
         }
 
+        const dbUser = await User.findById(req.user._id);
+
+        // ── Coupon Validation (One time use only) ──────────────────────────────
+        let couponBonus = 0;
+        let couponDiscount = 0;
+        let appliedCoupon = null;
+
+        if (couponCode) {
+            const upperCode = couponCode.toUpperCase().trim();
+            const coupon = await Coupon.findOne({ code: upperCode, isActive: true });
+            if (!coupon) {
+                return res.status(400).json({ success: false, message: "Invalid or inactive coupon code." });
+            }
+            if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
+                return res.status(400).json({ success: false, message: "This coupon has expired." });
+            }
+            if (amountInRupees < coupon.minPurchaseAmount) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Minimum purchase of ₹" + coupon.minPurchaseAmount + " is required for coupon " + upperCode,
+                });
+            }
+            if (coupon.metalType !== "both" && coupon.metalType !== "gold") {
+                return res.status(400).json({ success: false, message: "This coupon is not valid for Gold purchases." });
+            }
+
+            // Check if user has ALREADY USED this coupon once
+            const alreadyUsed = await GoldTransaction.findOne({
+                user: req.user._id,
+                couponCode: upperCode,
+                status: "success",
+            });
+            if (alreadyUsed) {
+                return res.status(400).json({
+                    success: false,
+                    message: "You have already used coupon '" + upperCode + "'. This coupon can only be used once per user.",
+                });
+            }
+
+            appliedCoupon = coupon;
+            if (coupon.type === "extra_gold") {
+                couponBonus = coupon.valueType === "percentage" ? (amountInRupees * coupon.value / 100) : coupon.value;
+                if (coupon.maxDiscountAmount > 0) couponBonus = Math.min(couponBonus, coupon.maxDiscountAmount);
+            } else if (coupon.type === "discount") {
+                couponDiscount = coupon.valueType === "percentage" ? (amountInRupees * coupon.value / 100) : coupon.value;
+                if (coupon.maxDiscountAmount > 0) couponDiscount = Math.min(couponDiscount, coupon.maxDiscountAmount);
+            }
+        }
+
         // If redeeming referral, validate conditions
         let isRedeemed = false;
-        let purchaseValue = amountInRupees;
-        const dbUser = await User.findById(req.user._id);
+        let referralBonus = 0;
 
         if (redeemReferral) {
             if (!dbUser.referralBalance || dbUser.referralBalance < 50) {
@@ -198,30 +247,27 @@ exports.buyGoldFromWallet = async (req, res, next) => {
                 return res.status(400).json({ success: false, message: "Minimum metal purchase of ₹1000 is required to redeem referral bonus." });
             }
             isRedeemed = true;
-            purchaseValue = amountInRupees + 50; // User pays amountInRupees (e.g. ₹1000) but gets ₹1050 worth of gold
+            referralBonus = 50;
         }
 
-        const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
         let pointsDiscount = 0;
         if (pointsRedeemed && pointsRedeemed > 0) {
             if (!dbUser.rewardPoints || dbUser.rewardPoints < pointsRedeemed) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
+                    message: "Insufficient reward points. You have " + (dbUser.rewardPoints || 0) + " points, trying to redeem " + pointsRedeemed,
                 });
             }
             pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
             
-            // Deduct points
             dbUser.rewardPoints -= pointsRedeemed;
             await dbUser.save();
 
-            // Record in RewardTxn
             await RewardTxn.create({
                 user: req.user._id,
                 type: "redeem",
                 points: -pointsRedeemed,
-                description: `Redeemed ${pointsRedeemed} points for extra gold purchase`,
+                description: "Redeemed " + pointsRedeemed + " points for extra gold purchase",
             });
         }
 
@@ -230,15 +276,21 @@ exports.buyGoldFromWallet = async (req, res, next) => {
             await dbUser.save();
         }
 
-        const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
-        const gramsToAdd = parseFloat(((purchaseValue + pointsDiscount) / buyRate).toFixed(6));
+        // User is charged: amountInRupees (minus discount) + GST
+        const effectiveAmountPaid = Math.max(0, amountInRupees - couponDiscount);
+        const gstAmt = parseFloat((effectiveAmountPaid * GST_PCT / 100).toFixed(2));
+        const totalAmt = parseFloat((effectiveAmountPaid + gstAmt).toFixed(2));
+
+        // User receives gold worth: Base Amount + Coupon Bonus (e.g. ₹100 + ₹15 = ₹115) + Referral + Points
+        const totalGoldCreditedValue = parseFloat((amountInRupees + couponBonus + referralBonus + pointsDiscount).toFixed(2));
+        const gramsToAdd = parseFloat((totalGoldCreditedValue / buyRate).toFixed(6));
 
         // Check wallet balance
         const wallet = await getOrCreateWallet(req.user._id);
         if (wallet.balance < totalAmt) {
             return res.status(400).json({
                 success: false,
-                message: `Insufficient wallet balance. Have ₹${wallet.balance.toFixed(2)}, need ₹${totalAmt.toFixed(2)}`,
+                message: "Insufficient wallet balance. Have ₹" + wallet.balance.toFixed(2) + ", need ₹" + totalAmt.toFixed(2),
                 data: { walletBalance: wallet.balance, required: totalAmt },
             });
         }
@@ -252,34 +304,55 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         let goldBal = await GoldBalance.findOne({ user: req.user._id });
         if (!goldBal) goldBal = await GoldBalance.create({ user: req.user._id });
         goldBal.totalGrams = parseFloat((goldBal.totalGrams + gramsToAdd).toFixed(6));
-        goldBal.investedAmt = parseFloat((goldBal.investedAmt + purchaseValue).toFixed(2));
+        goldBal.investedAmt = parseFloat((goldBal.investedAmt + totalGoldCreditedValue).toFixed(2));
         await goldBal.save();
+
+        let txnNote = "Purchased via wallet";
+        if (appliedCoupon) {
+            txnNote = "Purchased via wallet (Used coupon " + appliedCoupon.code + " for ₹" + couponBonus + " Free Gold)";
+        } else if (pointsRedeemed) {
+            txnNote = "Purchased via wallet (Redeemed " + pointsRedeemed + " pts for extra gold)";
+        } else if (isRedeemed) {
+            txnNote = "Purchased via wallet (Redeemed ₹50 referral bonus)";
+        }
 
         // Record gold transaction
         const goldTxn = await GoldTransaction.create({
-            user: req.user._id, type: "buy", grams: gramsToAdd,
-            ratePerGram: buyRate, goldValue: purchaseValue,
-            gstAmt, totalAmt, status: "success",
+            user: req.user._id,
+            type: "buy",
+            grams: gramsToAdd,
+            ratePerGram: buyRate,
+            goldValue: totalGoldCreditedValue, // ₹115 worth
+            gstAmt,
+            totalAmt, // amount actually paid (₹100 + GST)
+            status: "success",
             isReferralRedeemed: isRedeemed,
-            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra gold)` : (isRedeemed ? "Purchased via wallet (Redeemed ₹50 referral bonus)" : "Purchased via wallet"),
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            couponBonus,
+            couponDiscount,
+            isCouponApplied: !!appliedCoupon,
+            note: txnNote,
         });
 
         // Record wallet transaction
         await recordTxn(req.user._id, "gold_buy", totalAmt, balBefore, wallet.balance, {
             goldTxnId: goldTxn._id,
-            note: pointsRedeemed ? `Bought ${gramsToAdd}g gold @ ₹${buyRate}/g (Redeemed ${pointsRedeemed} pts for extra gold)` : `Bought ${gramsToAdd}g gold @ ₹${buyRate}/g`,
+            note: "Bought " + gramsToAdd + "g gold @ ₹" + buyRate + "/g" + (appliedCoupon ? " (Coupon: " + appliedCoupon.code + " +₹" + couponBonus + " Free Gold)" : ""),
             status: "success",
         });
 
         res.json({
             success: true,
-            message: `${gramsToAdd}g gold credited to your account`,
+            message: gramsToAdd + "g gold credited to your account (Worth ₹" + totalGoldCreditedValue + ")",
             data: {
                 grams: gramsToAdd,
                 totalGrams: goldBal.totalGrams,
+                goldValue: totalGoldCreditedValue,
                 amountDeducted: totalAmt,
+                couponCode: appliedCoupon ? appliedCoupon.code : null,
+                couponBonus,
                 walletBalance: wallet.balance,
-                breakdown: { goldValue: amountInRupees, gstAmt, totalAmt, ratePerGram: buyRate },
+                breakdown: { goldValue: totalGoldCreditedValue, gstAmt, totalAmt, ratePerGram: buyRate },
             },
         });
     } catch (err) { next(err); }
@@ -287,8 +360,6 @@ exports.buyGoldFromWallet = async (req, res, next) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 5. POST /api/wallet/sell-gold  — sell gold → credit wallet (locked)
-// body: { grams }
-// Money goes to wallet.lockedBalance first, then released after 24h
 // ══════════════════════════════════════════════════════════════════════════════
 exports.sellGoldToWallet = async (req, res, next) => {
     try {

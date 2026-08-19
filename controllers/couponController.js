@@ -176,6 +176,7 @@ exports.deleteCoupon = async (req, res, next) => {
 // @access  Private (User)
 exports.getCouponsUser = async (req, res, next) => {
     try {
+        const { GoldTransaction } = require("../models/Gold");
         const now = new Date();
         const query = {
             isActive: true,
@@ -187,10 +188,29 @@ exports.getCouponsUser = async (req, res, next) => {
 
         const coupons = await Coupon.find(query).sort({ isPopular: -1, createdAt: -1 });
 
+        // If user is authenticated, check which coupons have already been used
+        let usedCouponCodes = [];
+        if (req.user && req.user._id) {
+            const usedTxns = await GoldTransaction.find({
+                user: req.user._id,
+                status: "success",
+                couponCode: { $ne: null }
+            }).select("couponCode");
+            usedCouponCodes = usedTxns.map(t => t.couponCode);
+        }
+
+        const formatted = coupons.map(c => {
+            const isUsed = usedCouponCodes.includes(c.code);
+            return {
+                ...c.toObject(),
+                isUsed,
+            };
+        });
+
         res.json({
             success: true,
-            count: coupons.length,
-            coupons,
+            count: formatted.length,
+            coupons: formatted,
         });
     } catch (err) {
         next(err);
@@ -198,8 +218,6 @@ exports.getCouponsUser = async (req, res, next) => {
 };
 
 // @desc    Validate coupon code
-// @route   POST /api/coupons/validate
-// @access  Private (User)
 exports.validateCoupon = async (req, res, next) => {
     try {
         const { code, purchaseAmount, metalType } = req.body;
