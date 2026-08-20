@@ -24,6 +24,11 @@ const SilverTransactionSchema = new mongoose.Schema(
         gstAmt: { type: Number, default: 0 },                    // 3% GST on buy
         totalAmt: { type: Number, required: true },              // silverValue + gstAmt
         status: { type: String, enum: ["pending", "success", "failed", "processing"], default: "pending" },
+        isReferralRedeemed: { type: Boolean, default: false },
+        couponCode: { type: String },
+        couponBonus: { type: Number, default: 0 },
+        couponDiscount: { type: Number, default: 0 },
+        isCouponApplied: { type: Boolean, default: false },
         note: { type: String },
     },
     { timestamps: true }

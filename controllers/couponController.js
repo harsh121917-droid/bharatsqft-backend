@@ -177,6 +177,7 @@ exports.deleteCoupon = async (req, res, next) => {
 exports.getCouponsUser = async (req, res, next) => {
     try {
         const { GoldTransaction } = require("../models/Gold");
+        const { SilverTransaction } = require("../models/Silver");
         const now = new Date();
         const query = {
             isActive: true,
@@ -188,29 +189,38 @@ exports.getCouponsUser = async (req, res, next) => {
 
         const coupons = await Coupon.find(query).sort({ isPopular: -1, createdAt: -1 });
 
-        // If user is authenticated, check which coupons have already been used
+        // If user is authenticated, find all coupons already used by this user in successful gold or silver txns
         let usedCouponCodes = [];
         if (req.user && req.user._id) {
-            const usedTxns = await GoldTransaction.find({
-                user: req.user._id,
-                status: "success",
-                couponCode: { $ne: null }
-            }).select("couponCode");
-            usedCouponCodes = usedTxns.map(t => t.couponCode);
+            const [goldTxns, silverTxns] = await Promise.all([
+                GoldTransaction.find({
+                    user: req.user._id,
+                    status: "success",
+                    couponCode: { $ne: null }
+                }).select("couponCode"),
+                SilverTransaction ? SilverTransaction.find({
+                    user: req.user._id,
+                    status: "success",
+                    couponCode: { $ne: null }
+                }).select("couponCode") : []
+            ]);
+
+            const allCodes = [...goldTxns, ...silverTxns]
+                .map(t => t.couponCode?.toUpperCase().trim())
+                .filter(Boolean);
+            usedCouponCodes = [...new Set(allCodes)];
         }
 
-        const formatted = coupons.map(c => {
-            const isUsed = usedCouponCodes.includes(c.code);
-            return {
-                ...c.toObject(),
-                isUsed,
-            };
+        // Filter out used coupons completely so they NEVER show to this user
+        const availableCoupons = coupons.filter(c => {
+            const code = c.code?.toUpperCase().trim();
+            return !usedCouponCodes.includes(code);
         });
 
         res.json({
             success: true,
-            count: formatted.length,
-            coupons: formatted,
+            count: availableCoupons.length,
+            coupons: availableCoupons,
         });
     } catch (err) {
         next(err);
@@ -232,7 +242,8 @@ exports.validateCoupon = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Metal type is required ('gold' or 'silver')" });
         }
 
-        const coupon = await Coupon.findOne({ code: code.toUpperCase().trim() });
+        const upperCode = code.toUpperCase().trim();
+        const coupon = await Coupon.findOne({ code: upperCode });
 
         if (!coupon) {
             return res.status(404).json({ success: false, message: "Invalid coupon code" });
@@ -247,18 +258,34 @@ exports.validateCoupon = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "This coupon has expired" });
         }
 
+        // Check if user has already used this coupon
+        if (req.user && req.user._id) {
+            const { GoldTransaction } = require("../models/Gold");
+            const { SilverTransaction } = require("../models/Silver");
+            const [alreadyGold, alreadySilver] = await Promise.all([
+                GoldTransaction.findOne({ user: req.user._id, couponCode: upperCode, status: "success" }),
+                SilverTransaction ? SilverTransaction.findOne({ user: req.user._id, couponCode: upperCode, status: "success" }) : null,
+            ]);
+            if (alreadyGold || alreadySilver) {
+                return res.status(400).json({
+                    success: false,
+                    message: "You have already used coupon '" + upperCode + "'. This coupon can only be used once per user.",
+                });
+            }
+        }
+
         const grossAmt = purchaseAmount * 1.03;
         if (purchaseAmount < coupon.minPurchaseAmount && Math.round(grossAmt) < coupon.minPurchaseAmount) {
             return res.status(400).json({
                 success: false,
-                message: `Minimum purchase of ₹${coupon.minPurchaseAmount} is required for this coupon`,
+                message: "Minimum purchase of ₹" + coupon.minPurchaseAmount + " is required for this coupon",
             });
         }
 
         if (coupon.metalType !== "both" && coupon.metalType !== metalType) {
             return res.status(400).json({
                 success: false,
-                message: `This coupon is only valid for ${coupon.metalType} purchases`,
+                message: "This coupon is only valid for " + coupon.metalType + " purchases",
             });
         }
 
@@ -270,14 +297,12 @@ exports.validateCoupon = async (req, res, next) => {
                 benefitValue = Math.min(benefitValue, coupon.maxDiscountAmount);
             }
         } else {
-            // flat
             benefitValue = Math.min(coupon.value, purchaseAmount);
         }
 
-        // Round to 2 decimal places
         benefitValue = parseFloat(benefitValue.toFixed(2));
 
-        const result = {
+        res.json({
             success: true,
             valid: true,
             code: coupon.code,
@@ -288,9 +313,7 @@ exports.validateCoupon = async (req, res, next) => {
             isRandom: coupon.isRandom,
             minRandomValue: coupon.minRandomValue,
             description: coupon.description,
-        };
-
-        res.json(result);
+        });
     } catch (err) {
         next(err);
     }

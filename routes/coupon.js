@@ -8,11 +8,11 @@ const {
     getCouponsUser,
     validateCoupon,
 } = require("../controllers/couponController");
-const { protect, authorize } = require("../middleware/authMiddleware");
+const { protect, authorize, optionalProtect } = require("../middleware/authMiddleware");
 
 // User routes (app users)
-router.get("/", getCouponsUser);
-router.post("/validate", validateCoupon);
+router.get("/", optionalProtect, getCouponsUser);
+router.post("/validate", optionalProtect, validateCoupon);
 
 // Admin-only routes
 router.post("/create", protect, authorize("admin"), createCoupon);
