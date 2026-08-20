@@ -10,6 +10,7 @@ const jewellerySchema = new mongoose.Schema({
     gstPercentage: { type: Number, default: 3 }, // 3% GST
     description: { type: String, default: "" },
     imageUrl: { type: String, default: "" },
+    images: { type: [String], default: [] },
     icon: { type: String, default: "diamond_outlined" },
     inStock: { type: Boolean, default: true },
     isPopular: { type: Boolean, default: false },

@@ -98,4 +98,10 @@ const uploadJewelleryImage = multer({
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 }).single("image");
 
-module.exports = { uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage, uploadJewelleryImage };
+const uploadJewelleryImages = multer({
+    storage: jewelleryImageStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+}).array("images", 10); // allow up to 10 images
+
+module.exports = {
+    uploadJewelleryImages, uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage, uploadJewelleryImage };

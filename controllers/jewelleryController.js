@@ -4,7 +4,7 @@ const JewelleryRedemption = require("../models/JewelleryRedemption");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const User = require("../models/User");
-const { uploadJewelleryImage } = require("../middleware/uploadMiddleware");
+const { uploadJewelleryImage, uploadJewelleryImages } = require("../middleware/uploadMiddleware");
 
 
 const razorpay = new Razorpay({
@@ -279,10 +279,19 @@ exports.getProducts = async (req, res, next) => {
 // ADD Product (Admin)
 exports.addProduct = async (req, res, next) => {
     try {
-        const { name, category, metalType, purity, weightGrams, makingCharges, gstPercentage, description, imageUrl, inStock, isPopular } = req.body;
+        const { name, category, metalType, purity, weightGrams, makingCharges, gstPercentage, description, imageUrl, images, inStock, isPopular } = req.body;
         if (!name || !category || !weightGrams) {
             return res.status(400).json({ success: false, message: "Name, category, and weight are required" });
         }
+
+        let imageList = [];
+        if (Array.isArray(images) && images.length > 0) {
+            imageList = images.map(img => String(img).trim()).filter(Boolean);
+        } else if (imageUrl && String(imageUrl).trim()) {
+            imageList = [String(imageUrl).trim()];
+        }
+
+        const primaryImage = imageList.length > 0 ? imageList[0] : (imageUrl || "");
 
         const product = await Jewellery.create({
             name,
@@ -293,7 +302,8 @@ exports.addProduct = async (req, res, next) => {
             makingCharges: Number(makingCharges || 1500),
             gstPercentage: Number(gstPercentage || 3),
             description: description || "",
-            imageUrl: imageUrl || "",
+            imageUrl: primaryImage,
+            images: imageList,
             inStock: inStock !== undefined ? inStock : true,
             isPopular: Boolean(isPopular)
         });
@@ -307,7 +317,17 @@ exports.addProduct = async (req, res, next) => {
 // UPDATE Product (Admin)
 exports.updateProduct = async (req, res, next) => {
     try {
-        const updated = await Jewellery.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        let updateData = { ...req.body };
+        if (updateData.images && Array.isArray(updateData.images)) {
+            updateData.images = updateData.images.map(img => String(img).trim()).filter(Boolean);
+            if (!updateData.imageUrl || !updateData.images.includes(updateData.imageUrl)) {
+                updateData.imageUrl = updateData.images[0] || "";
+            }
+        } else if (updateData.imageUrl) {
+            updateData.images = [updateData.imageUrl];
+        }
+
+        const updated = await Jewellery.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.json({ success: true, message: "Product updated", data: updated });
     } catch (err) {
         next(err);
@@ -579,6 +599,25 @@ exports.verifyRedeemOrder = async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+};
+
+// UPLOAD MULTIPLE PRODUCT IMAGES (Admin) — multipart/form-data, field name: "images"
+exports.uploadMultipleImages = (req, res) => {
+    uploadJewelleryImages(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message || "Upload failed" });
+        }
+        try {
+            if (!req.files || req.files.length === 0) {
+                return res.status(400).json({ success: false, message: "No image files provided" });
+            }
+
+            const urls = req.files.map(f => f.path);
+            res.json({ success: true, urls, message: "Images uploaded successfully" });
+        } catch (e) {
+            res.status(500).json({ success: false, message: e.message });
+        }
+    });
 };
 
 // UPLOAD PRODUCT IMAGE (Admin) — multipart/form-data, field name: "image"

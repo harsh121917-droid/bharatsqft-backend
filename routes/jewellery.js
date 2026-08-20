@@ -22,6 +22,7 @@ router.delete("/products/:id", protect, jewelleryController.deleteProduct);
 
 // Image upload route (multipart/form-data, field: "image")
 router.post("/products/:id/upload-image", protect, jewelleryController.uploadProductImage);
+router.post("/upload-images", protect, jewelleryController.uploadMultipleImages);
 
 module.exports = router;
 
