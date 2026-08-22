@@ -263,7 +263,7 @@ exports.recalculateVaultBalance = async (req, res, next) => {
             if (["buy", "gift"].includes(t.type)) {
                 runningGrams += t.grams;
                 if (t.type === "buy") {
-                    runningCost += (t.goldValue || t.totalAmt);
+                    runningCost += (t.totalAmt || t.goldValue);
                 }
             } else if (["sell", "redeem"].includes(t.type)) {
                 if (runningGrams > 0) {
@@ -290,7 +290,7 @@ exports.recalculateVaultBalance = async (req, res, next) => {
             if (["buy", "gift"].includes(t.type)) {
                 runningSilverGrams += t.grams;
                 if (t.type === "buy") {
-                    runningSilverCost += (t.silverValue || t.totalAmt);
+                    runningSilverCost += (t.totalAmt || t.silverValue);
                 }
             } else if (["sell", "redeem"].includes(t.type)) {
                 if (runningSilverGrams > 0) {

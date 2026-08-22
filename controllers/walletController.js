@@ -305,7 +305,7 @@ exports.buyGoldFromWallet = async (req, res, next) => {
         let goldBal = await GoldBalance.findOne({ user: req.user._id });
         if (!goldBal) goldBal = await GoldBalance.create({ user: req.user._id });
         goldBal.totalGrams = parseFloat((goldBal.totalGrams + gramsToAdd).toFixed(6));
-        goldBal.investedAmt = parseFloat((goldBal.investedAmt + totalGoldCreditedValue).toFixed(2));
+        goldBal.investedAmt = parseFloat((goldBal.investedAmt + (totalAmt || totalGoldCreditedValue)).toFixed(2));
         await goldBal.save();
 
         let txnNote = "Purchased via wallet";
@@ -549,7 +549,7 @@ exports.buySilverFromWallet = async (req, res, next) => {
         let silverBal = await SilverBalance.findOne({ user: req.user._id });
         if (!silverBal) silverBal = await SilverBalance.create({ user: req.user._id });
         silverBal.totalGrams = parseFloat((silverBal.totalGrams + gramsToAdd).toFixed(6));
-        silverBal.investedAmt = parseFloat((silverBal.investedAmt + amountInRupees).toFixed(2));
+        silverBal.investedAmt = parseFloat((silverBal.investedAmt + (totalAmt || amountInRupees)).toFixed(2));
         await silverBal.save();
 
         const silverTxn = await SilverTransaction.create({

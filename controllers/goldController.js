@@ -442,7 +442,7 @@ exports.verifyBuy = async (req, res, next) => {
 
         const bal = await getOrCreateBalance(req.user._id);
         bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
-        bal.investedAmt = parseFloat((bal.investedAmt + txn.goldValue).toFixed(2));
+        bal.investedAmt = parseFloat((bal.investedAmt + (txn.totalAmt || txn.goldValue)).toFixed(2));
         await bal.save();
 
         if (txn.isReferralRedeemed) {
