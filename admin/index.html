@@ -32,9 +32,16 @@
     <div id="login-page">
         <div class="login-card">
             <div class="login-logo">
-                <div class="icon"><i class="fas fa-gem"></i></div>
-                <h1>Payvika Admin</h1>
-                <p>Digi Gold & Real Estate Executive Console</p>
+                <div class="logo-icon-wrap">
+                    <div class="logo-p-emblem emblem-lg">
+                        <span class="logo-p-letter">P</span>
+                    </div>
+                </div>
+                <div class="logo-title-row">
+                    <span class="brand-text-main">Payvika</span>
+                    <span class="brand-text-accent">Admin</span>
+                </div>
+                <p class="brand-subline">Digi Bullion & Asset Management Executive Suite</p>
             </div>
             <form onsubmit="doLogin(event)">
                 <div class="form-group">
@@ -64,10 +71,18 @@
     <aside class="sidebar" id="sidebar" style="display:none">
         <div class="logo-container">
             <div class="logo-brand">
-                <div class="logo-icon"><i class="fas fa-gem"></i></div>
-                <div class="logo-text">Payvika Admin</div>
+                <div class="logo-p-emblem">
+                    <span class="logo-p-letter">P</span>
+                </div>
+                <div class="logo-text-group">
+                    <div class="logo-title">
+                        <span class="logo-title-main">Payvika</span>
+                        <span class="logo-title-sub">Admin</span>
+                    </div>
+                    <div class="logo-tagline">Executive</div>
+                </div>
             </div>
-            <span class="logo-badge">PRO</span>
+            <!-- <span class="logo-badge"><i class="fas fa-bolt"></i> PRO</span> -->
         </div>
 
         <nav class="nav">
@@ -165,7 +180,7 @@
                         <div class="sidebar-profile-role">Super Admin</div>
                     </div>
                 </div>
-                <button class="sidebar-logout-btn" onclick="doLogout()" title="Logout">
+                <button class="sidebar-logout-btn" onclick="confirmLogout()" title="Logout">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
@@ -216,7 +231,7 @@
                 </div>
 
                 <!-- Admin Profile Pill -->
-                <div class="admin-profile-pill" onclick="doLogout()" title="Click to Logout">
+                <div class="admin-profile-pill" onclick="confirmLogout()" title="Click to Logout">
                     <div class="admin-profile-avatar" id="admin-avatar">A</div>
                     <div class="admin-profile-info">
                         <div class="admin-profile-name" id="admin-name">Admin</div>
@@ -1155,13 +1170,15 @@
                     <!-- Total Redemptions -->
                     <div class="fulfillment-kpi-card card-purple">
                         <div class="fulfillment-card-top">
-                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-boxes-stacked"></i></div>
+                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-boxes-stacked"></i>
+                            </div>
                             <span class="fulfillment-tag tag-purple">All Time</span>
                         </div>
                         <div class="fulfillment-card-body">
                             <div class="fulfillment-label">Total Redemptions</div>
                             <div class="fulfillment-val val-purple" id="order-stat-total">0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-layer-group"></i> Physical delivery requests</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-layer-group"></i> Physical delivery
+                                requests</div>
                         </div>
                     </div>
 
@@ -1174,7 +1191,8 @@
                         <div class="fulfillment-card-body">
                             <div class="fulfillment-label">Pending Minting</div>
                             <div class="fulfillment-val val-amber" id="order-stat-pending">0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-hourglass-half"></i> Awaiting dispatch / minting</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-hourglass-half"></i> Awaiting dispatch /
+                                minting</div>
                         </div>
                     </div>
 
@@ -1187,7 +1205,8 @@
                         <div class="fulfillment-card-body">
                             <div class="fulfillment-label">In Logistics Transit</div>
                             <div class="fulfillment-val val-blue" id="order-stat-shipped">0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-route"></i> Armored courier logistics</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-route"></i> Armored courier logistics
+                            </div>
                         </div>
                     </div>
 
@@ -1200,7 +1219,8 @@
                         <div class="fulfillment-card-body">
                             <div class="fulfillment-label">Delivered Orders</div>
                             <div class="fulfillment-val val-green" id="order-stat-delivered">0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-shield-alt"></i> Successfully fulfilled</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-shield-alt"></i> Successfully fulfilled
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1532,7 +1552,7 @@
                         <input class="form-control" id="user-email" readonly style="opacity:0.75" />
                     </div>
                 </div>
-                <div class="form-grid-3">
+                <div class="form-grid-4">
                     <div class="form-group">
                         <label class="form-label">Phone Number</label>
                         <input class="form-control" id="user-phone" placeholder="Phone Number" />
@@ -1544,11 +1564,20 @@
                             <option value="admin">Administrator</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">KYC Verification</label>
+                        <select class="form-control" id="user-kyc-status">
+                            <option value="not_submitted">Not Submitted</option>
+                            <option value="pending">Pending Review</option>
+                            <option value="approved">Approved (Verified)</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
                     <div class="form-group" style="display:flex;flex-direction:column;justify-content:center">
                         <label class="form-label">Account Status</label>
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px">
                             <input type="checkbox" id="user-active" checked />
-                            <span style="font-size:13px;font-weight:600;color:#fff">Active Account</span>
+                            <span style="font-size:13px;font-weight:600;color:#fff">Active</span>
                         </label>
                     </div>
                 </div>
@@ -2142,6 +2171,32 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveGateway()">Save Gateway</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         Logout Confirmation Popup Modal
+         ══════════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="logout-modal" style="display:none">
+        <div class="modal modal-sm logout-modal-card">
+            <div class="logout-modal-content">
+                <div class="logout-icon-glow">
+                    <i class="fas fa-sign-out-alt"></i>
+                </div>
+                <div class="logout-modal-title">Sign Out of Console?</div>
+                <div class="logout-modal-desc">
+                    Are you sure you want to end your current session? You will need to log back in with your
+                    credentials to access the admin suite.
+                </div>
+                <div class="logout-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeLogoutModal()" style="flex:1;height:42px">
+                        Cancel
+                    </button>
+                    <button class="btn btn-danger" onclick="doLogout()" style="flex:1;height:42px">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
+                </div>
             </div>
         </div>
     </div>

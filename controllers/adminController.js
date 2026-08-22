@@ -33,6 +33,14 @@ exports.getAllUsers = async (req, res, next) => {
             { $match: filter },
             {
                 $lookup: {
+                    from: "kycs",
+                    localField: "_id",
+                    foreignField: "user",
+                    as: "kycDoc"
+                }
+            },
+            {
+                $lookup: {
                     from: "investments",
                     let: { userId: "$_id" },
                     pipeline: [
@@ -61,6 +69,18 @@ exports.getAllUsers = async (req, res, next) => {
             },
             {
                 $addFields: {
+                    kycStatus: {
+                        $cond: {
+                            if: { $eq: [ { $arrayElemAt: ["$kycDoc.status", 0] }, "approved" ] },
+                            then: "approved",
+                            else: {
+                                $ifNull: [
+                                    "$kycStatus",
+                                    { $ifNull: [ { $arrayElemAt: ["$kycDoc.status", 0] }, "not_submitted" ] }
+                                ]
+                            }
+                        }
+                    },
                     propertyInvestments: {
                         totalInvested: { $sum: "$propertyTxns.totalAmount" },
                         items: {
@@ -199,11 +219,17 @@ exports.getUserById = async (req, res, next) => {
 
 exports.updateUser = async (req, res, next) => {
     try {
-        const allowed = ["name", "phone", "role", "isActive"];
+        const allowed = ["name", "phone", "role", "isActive", "kycStatus"];
         const updates = {};
         allowed.forEach((k) => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
         const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        // If kycStatus was changed, sync to Kyc model if exists
+        if (updates.kycStatus) {
+            await Kyc.findOneAndUpdate({ user: user._id }, { status: updates.kycStatus });
+        }
+
         res.json({ success: true, data: user });
     } catch (err) { next(err); }
 };

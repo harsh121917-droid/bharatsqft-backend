@@ -72,7 +72,18 @@ async function doLogin(e) {
     }
 }
 
+function confirmLogout() {
+    const modal = document.getElementById("logout-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeLogoutModal() {
+    const modal = document.getElementById("logout-modal");
+    if (modal) modal.style.display = "none";
+}
+
 function doLogout() {
+    closeLogoutModal();
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     const loginPage = document.getElementById("login-page");

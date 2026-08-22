@@ -98,9 +98,16 @@ function renderUsersTable(users) {
             <tbody>`;
 
     users.forEach(u => {
-        const kycBadge = u.kycVerified
-            ? `<span class="badge badge-success"><i class="fas fa-check-circle"></i> Verified</span>`
-            : `<span class="badge badge-pending"><i class="fas fa-clock"></i> Pending</span>`;
+        const rawStatus = (u.kycStatus || (u.kycVerified ? "approved" : "not_submitted")).toLowerCase().trim();
+        let kycBadge = `<span class="badge badge-secondary" style="background:rgba(255,255,255,0.06);color:var(--text-dim)"><i class="fas fa-minus-circle"></i> Not Submitted</span>`;
+
+        if (rawStatus === "approved" || rawStatus === "verified" || u.kycVerified === true) {
+            kycBadge = `<span class="badge badge-success"><i class="fas fa-check-circle"></i> Approved</span>`;
+        } else if (rawStatus === "pending") {
+            kycBadge = `<span class="badge badge-warning"><i class="fas fa-clock"></i> Pending Review</span>`;
+        } else if (rawStatus === "rejected") {
+            kycBadge = `<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Rejected</span>`;
+        }
 
         const statusBadge = u.isActive !== false
             ? `<span class="badge badge-success">Active</span>`
@@ -175,6 +182,11 @@ async function openUserModal(id) {
     document.getElementById("user-phone").value = u.phone || "";
     document.getElementById("user-role").value = u.role || "user";
     document.getElementById("user-active").checked = u.isActive !== false;
+
+    const kycSelect = document.getElementById("user-kyc-status");
+    if (kycSelect) {
+        kycSelect.value = u.kycStatus || (u.kycVerified ? "approved" : "not_submitted");
+    }
 
     // 2. User Wallet
     const walletBal = u.walletBalance !== undefined ? u.walletBalance : (u.wallet?.balance || 0);
@@ -361,6 +373,7 @@ async function saveUser() {
         name: document.getElementById("user-name")?.value.trim(),
         phone: document.getElementById("user-phone")?.value.trim(),
         role: document.getElementById("user-role")?.value || "user",
+        kycStatus: document.getElementById("user-kyc-status")?.value || "not_submitted",
         isActive: document.getElementById("user-active")?.checked !== false,
     };
 
