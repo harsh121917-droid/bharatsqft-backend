@@ -1,9 +1,12 @@
 const User = require("../models/User");
 const Enquiry = require("../models/Enquiry");
 const { Wallet, WalletTxn } = require("../models/Wallet");
-const { GoldBalance, GoldTransaction } = require("../models/Gold");
+const { GoldBalance, GoldTransaction, GoldRate } = require("../models/Gold");
 const { SilverBalance, SilverTransaction } = require("../models/Silver");
 const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
+const Kyc = require("../models/Kyc");
+const Saving = require("../models/Saving");
+const Coupon = require("../models/Coupon");
 
 const Investment = require("../models/Investment");
 const Property = require("../models/Property");
@@ -363,14 +366,518 @@ exports.deleteEnquiry = async (req, res, next) => {
 
 exports.getDashboard = async (req, res, next) => {
     try {
-        const [totalUsers, totalEnquiries, newEnquiries, resolvedEnquiries] = await Promise.all([
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+        thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+        // Fetch live rates
+        let liveRates = {
+            gold: { buyRate: 7500, sellRate: 7450, change24h: 0, changePct: 0, purity: "24K 99.9%" },
+            silver: { buyRate: 90, sellRate: 88, change24h: 0, changePct: 0, purity: "999 Pure" }
+        };
+
+        try {
+            const { fetchLiveRates } = require("./goldController");
+            if (typeof fetchLiveRates === "function") {
+                const fetched = await fetchLiveRates();
+                if (fetched) {
+                    if (fetched.gold) liveRates.gold = { ...liveRates.gold, ...fetched.gold, purity: "24K 99.9%" };
+                    if (fetched.silver) liveRates.silver = { ...liveRates.silver, ...fetched.silver, purity: "999 Pure" };
+                }
+            }
+        } catch (e) {
+            console.log("Live rate fetch fallback in dashboard:", e.message);
+        }
+
+        const goldSellRate = liveRates.gold.sellRate || 7450;
+        const silverSellRate = liveRates.silver.sellRate || 88;
+        const goldBuyRate = liveRates.gold.buyRate || 7500;
+        const silverBuyRate = liveRates.silver.buyRate || 90;
+
+        const [
+            // User stats
+            totalUsers,
+            activeUsers,
+            kycVerifiedUsers,
+            kycPendingCount,
+            kycRejectedCount,
+
+            // Gold & Silver balance aggregations
+            goldHoldingAgg,
+            silverHoldingAgg,
+
+            // Gold lifetime buy/sell transactions
+            goldBuyAgg,
+            goldSellAgg,
+            todayGoldBuyAgg,
+            todayGoldSellAgg,
+
+            // Silver lifetime buy/sell transactions
+            silverBuyAgg,
+            silverSellAgg,
+            todaySilverBuyAgg,
+            todaySilverSellAgg,
+
+            // Properties / Investments
+            propertyInvestmentsAgg,
+            totalProperties,
+            publishedProperties,
+
+            // SIPs & Schemes
+            activeSipsCount,
+            sipSavedAgg,
+            activeSchemesCount,
+            totalEnrollmentsCount,
+            schemeInvestedAgg,
+
+            // Pendings / Action items
+            pendingWithdrawalsAgg,
+            pendingSellGoldCount,
+            pendingSellSilverCount,
+            pendingGoldPayments,
+            pendingSilverPayments,
+            pendingWalletPayments,
+            pendingRedemptionsCount,
+            newEnquiriesCount,
+            totalEnquiriesCount,
+
+            // Coupons & Discounts
+            activeCouponsCount,
+            totalCouponsCount,
+            goldCouponAgg,
+            silverCouponAgg,
+
+            // Recent Transactions
+            recentGoldTxns,
+            recentSilverTxns,
+            recentWalletTxns,
+
+            // Chart data aggregations (last 30 days)
+            chartGoldDaily,
+            chartSilverDaily
+        ] = await Promise.all([
+            // Users
             User.countDocuments({ role: "user" }),
-            Enquiry.countDocuments(),
+            User.countDocuments({ role: "user", isActive: { $ne: false } }),
+            User.countDocuments({ role: "user", kycVerified: true }),
+            Kyc.countDocuments({ status: "pending" }),
+            Kyc.countDocuments({ status: "rejected" }),
+
+            // Gold Holdings
+            GoldBalance.aggregate([
+                { $group: { _id: null, totalGrams: { $sum: "$totalGrams" }, totalInvested: { $sum: "$investedAmt" } } }
+            ]),
+            // Silver Holdings
+            SilverBalance.aggregate([
+                { $group: { _id: null, totalGrams: { $sum: "$totalGrams" }, totalInvested: { $sum: "$investedAmt" } } }
+            ]),
+
+            // Gold Lifetime Buy (success)
+            GoldTransaction.aggregate([
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success" } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" }, count: { $sum: 1 }, gst: { $sum: "$gstAmt" } } }
+            ]),
+            // Gold Lifetime Sell (success/processing)
+            GoldTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$goldValue" }, count: { $sum: 1 } } }
+            ]),
+            // Today Gold Buy
+            GoldTransaction.aggregate([
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success", createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" } } }
+            ]),
+            // Today Gold Sell
+            GoldTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] }, createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$goldValue" } } }
+            ]),
+
+            // Silver Lifetime Buy
+            SilverTransaction.aggregate([
+                { $match: { type: "buy", status: "success" } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" }, count: { $sum: 1 }, gst: { $sum: "$gstAmt" } } }
+            ]),
+            // Silver Lifetime Sell
+            SilverTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$silverValue" }, count: { $sum: 1 } } }
+            ]),
+            // Today Silver Buy
+            SilverTransaction.aggregate([
+                { $match: { type: "buy", status: "success", createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" } } }
+            ]),
+            // Today Silver Sell
+            SilverTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] }, createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$silverValue" } } }
+            ]),
+
+            // Properties / Investments
+            Investment.aggregate([
+                { $match: { status: "paid" } },
+                { $group: { _id: null, totalAmount: { $sum: "$totalAmount" } } }
+            ]),
+            Property.countDocuments(),
+            Property.countDocuments({ isPublished: true }),
+
+            // SIPs & Schemes
+            Saving.countDocuments({ isActive: true }),
+            Saving.aggregate([
+                { $group: { _id: null, totalSaved: { $sum: "$savedAmount" } } }
+            ]),
+            GoldScheme.countDocuments({ active: true }),
+            SchemeEnrollment.countDocuments({ status: "active" }),
+            SchemeEnrollment.aggregate([
+                { $group: { _id: null, totalInvested: { $sum: "$totalInvested" } } }
+            ]),
+
+            // Pendings / Action Items
+            WalletTxn.aggregate([
+                { $match: { type: "withdraw", status: "pending" } },
+                { $group: { _id: null, count: { $sum: 1 }, totalAmt: { $sum: "$amount" } } }
+            ]),
+            GoldTransaction.countDocuments({ type: "sell", status: "processing" }),
+            SilverTransaction.countDocuments({ type: "sell", status: "processing" }),
+            GoldTransaction.countDocuments({ status: "pending" }),
+            SilverTransaction.countDocuments({ status: "pending" }),
+            WalletTxn.countDocuments({ status: "pending" }),
+            JewelleryRedemption.countDocuments({ status: "pending" }),
             Enquiry.countDocuments({ status: "new" }),
-            Enquiry.countDocuments({ status: "resolved" }),
+            Enquiry.countDocuments(),
+
+            // Coupons & Discounts
+            Coupon.countDocuments({ isActive: true }),
+            Coupon.countDocuments(),
+            GoldTransaction.aggregate([
+                { $match: { isCouponApplied: true } },
+                { $group: { _id: null, count: { $sum: 1 }, discount: { $sum: "$couponDiscount" }, bonus: { $sum: "$couponBonus" } } }
+            ]),
+            SilverTransaction.aggregate([
+                { $match: { isCouponApplied: true } },
+                { $group: { _id: null, count: { $sum: 1 }, discount: { $sum: "$couponDiscount" }, bonus: { $sum: "$couponBonus" } } }
+            ]),
+
+            // Recent Transactions
+            GoldTransaction.find().populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
+            SilverTransaction.find().populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
+            WalletTxn.find({ type: { $in: ["add", "withdraw"] } }).populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
+
+            // Daily chart trend (Gold 30d)
+            GoldTransaction.aggregate([
+                { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $in: ["success", "processing"] } } },
+                {
+                    $group: {
+                        _id: {
+                            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                            type: "$type"
+                        },
+                        totalAmt: { $sum: "$totalAmt" },
+                        grams: { $sum: "$grams" }
+                    }
+                }
+            ]),
+            // Daily chart trend (Silver 30d)
+            SilverTransaction.aggregate([
+                { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $in: ["success", "processing"] } } },
+                {
+                    $group: {
+                        _id: {
+                            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                            type: "$type"
+                        },
+                        totalAmt: { $sum: "$totalAmt" },
+                        grams: { $sum: "$grams" }
+                    }
+                }
+            ])
         ]);
-        res.json({ success: true, data: { totalUsers, totalEnquiries, newEnquiries, resolvedEnquiries } });
-    } catch (err) { next(err); }
+
+        // Process Gold Holdings
+        const totalGoldGramsHeld = parseFloat((goldHoldingAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalGoldInvestedAmt = parseFloat((goldHoldingAgg[0]?.totalInvested || 0).toFixed(2));
+        const totalGoldCurrentVal = parseFloat((totalGoldGramsHeld * goldSellRate).toFixed(2));
+
+        // Process Silver Holdings
+        const totalSilverGramsHeld = parseFloat((silverHoldingAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalSilverInvestedAmt = parseFloat((silverHoldingAgg[0]?.totalInvested || 0).toFixed(2));
+        const totalSilverCurrentVal = parseFloat((totalSilverGramsHeld * silverSellRate).toFixed(2));
+
+        // Process Property Investments
+        const totalPropertyInvested = parseFloat((propertyInvestmentsAgg[0]?.totalAmount || 0).toFixed(2));
+
+        // Total Investment Value
+        const totalInvestmentValue = parseFloat((totalGoldCurrentVal + totalSilverCurrentVal + totalPropertyInvested).toFixed(2));
+
+        // Lifetime Gold Purchases & Sales
+        const totalGoldPurchasedGrams = parseFloat((goldBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalGoldPurchasedAmt = parseFloat((goldBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const totalGoldSoldGrams = parseFloat((goldSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalGoldSoldAmt = parseFloat((goldSellAgg[0]?.totalAmt || 0).toFixed(2));
+
+        // Lifetime Silver Purchases & Sales
+        const totalSilverPurchasedGrams = parseFloat((silverBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalSilverPurchasedAmt = parseFloat((silverBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const totalSilverSoldGrams = parseFloat((silverSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalSilverSoldAmt = parseFloat((silverSellAgg[0]?.totalAmt || 0).toFixed(2));
+
+        // Today's Buy & Sell Volumes
+        const todayGoldBuyGrams = parseFloat((todayGoldBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const todayGoldBuyAmt = parseFloat((todayGoldBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const todayGoldSellGrams = parseFloat((todayGoldSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const todayGoldSellAmt = parseFloat((todayGoldSellAgg[0]?.totalAmt || 0).toFixed(2));
+
+        const todaySilverBuyGrams = parseFloat((todaySilverBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const todaySilverBuyAmt = parseFloat((todaySilverBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const todaySilverSellGrams = parseFloat((todaySilverSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const todaySilverSellAmt = parseFloat((todaySilverSellAgg[0]?.totalAmt || 0).toFixed(2));
+
+        const todayBuyVolumeAmt = parseFloat((todayGoldBuyAmt + todaySilverBuyAmt).toFixed(2));
+        const todaySellVolumeAmt = parseFloat((todayGoldSellAmt + todaySilverSellAmt).toFixed(2));
+
+        // SIPs & Schemes
+        const totalSipSaved = parseFloat((sipSavedAgg[0]?.totalSaved || 0).toFixed(2));
+        const totalSchemeInvested = parseFloat((schemeInvestedAgg[0]?.totalInvested || 0).toFixed(2));
+
+        // Action Items & Pendings
+        const pendingWithdrawalsCount = pendingWithdrawalsAgg[0]?.count || 0;
+        const pendingWithdrawalsAmt = parseFloat((pendingWithdrawalsAgg[0]?.totalAmt || 0).toFixed(2));
+        const pendingSellApprovalsCount = (pendingSellGoldCount || 0) + (pendingSellSilverCount || 0);
+        const pendingPaymentsCount = (pendingGoldPayments || 0) + (pendingSilverPayments || 0) + (pendingWalletPayments || 0);
+
+        // Coupons & Revenue
+        const couponUsageCount = (goldCouponAgg[0]?.count || 0) + (silverCouponAgg[0]?.count || 0);
+        const totalCouponDiscounts = parseFloat(
+            ((goldCouponAgg[0]?.discount || 0) + (goldCouponAgg[0]?.bonus || 0) +
+             (silverCouponAgg[0]?.discount || 0) + (silverCouponAgg[0]?.bonus || 0)).toFixed(2)
+        );
+
+        // GST & Platform Revenue Estimation
+        const totalGstCollected = parseFloat(((goldBuyAgg[0]?.gst || 0) + (silverBuyAgg[0]?.gst || 0)).toFixed(2));
+        const totalTurnover = totalGoldPurchasedAmt + totalSilverPurchasedAmt + totalGoldSoldAmt + totalSilverSoldAmt;
+        const estimatedRevenue = parseFloat((totalGstCollected + (totalTurnover * 0.005)).toFixed(2)); // estimated platform margin + fees
+
+        // Combine and sort recent transactions
+        const unifiedTxns = [];
+
+        (recentGoldTxns || []).forEach(t => {
+            unifiedTxns.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `GLD-${String(t._id).slice(-6).toUpperCase()}`,
+                asset: "Gold",
+                metal: "gold",
+                type: t.type,
+                user: t.user ? { name: t.user.name, email: t.user.email, phone: t.user.phone } : null,
+                grams: t.grams || 0,
+                rate: t.ratePerGram || 0,
+                amount: t.totalAmt || t.goldValue || 0,
+                status: t.status,
+                createdAt: t.createdAt
+            });
+        });
+
+        (recentSilverTxns || []).forEach(t => {
+            unifiedTxns.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `SLV-${String(t._id).slice(-6).toUpperCase()}`,
+                asset: "Silver",
+                metal: "silver",
+                type: t.type,
+                user: t.user ? { name: t.user.name, email: t.user.email, phone: t.user.phone } : null,
+                grams: t.grams || 0,
+                rate: t.ratePerGram || 0,
+                amount: t.totalAmt || t.silverValue || 0,
+                status: t.status,
+                createdAt: t.createdAt
+            });
+        });
+
+        (recentWalletTxns || []).forEach(t => {
+            unifiedTxns.push({
+                id: t._id,
+                invoiceNo: `WLT-${String(t._id).slice(-6).toUpperCase()}`,
+                asset: "Wallet",
+                metal: "wallet",
+                type: t.type,
+                user: t.user ? { name: t.user.name, email: t.user.email, phone: t.user.phone } : null,
+                grams: 0,
+                rate: 0,
+                amount: t.amount || 0,
+                status: t.status,
+                createdAt: t.createdAt
+            });
+        });
+
+        unifiedTxns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const recentTransactions = unifiedTxns.slice(0, 12);
+
+        // Build 30-day continuous timeline for chart
+        const chartDays = 30;
+        const chartLabels = [];
+        const goldBuySeries = [];
+        const goldSellSeries = [];
+        const silverBuySeries = [];
+        const silverSellSeries = [];
+        const totalBuySeries = [];
+        const totalSellSeries = [];
+
+        const goldMap = {};
+        chartGoldDaily.forEach(item => {
+            const key = `${item._id.date}_${item._id.type}`;
+            goldMap[key] = (goldMap[key] || 0) + (item.totalAmt || 0);
+        });
+
+        const silverMap = {};
+        chartSilverDaily.forEach(item => {
+            const key = `${item._id.date}_${item._id.type}`;
+            silverMap[key] = (silverMap[key] || 0) + (item.totalAmt || 0);
+        });
+
+        for (let i = chartDays - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split("T")[0];
+            const labelStr = d.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+            chartLabels.push(labelStr);
+
+            const gBuy = (goldMap[`${dateStr}_buy`] || 0) + (goldMap[`${dateStr}_sip_buy`] || 0);
+            const gSell = goldMap[`${dateStr}_sell`] || 0;
+            const sBuy = silverMap[`${dateStr}_buy`] || 0;
+            const sSell = silverMap[`${dateStr}_sell`] || 0;
+
+            goldBuySeries.push(parseFloat(gBuy.toFixed(2)));
+            goldSellSeries.push(parseFloat(gSell.toFixed(2)));
+            silverBuySeries.push(parseFloat(sBuy.toFixed(2)));
+            silverSellSeries.push(parseFloat(sSell.toFixed(2)));
+
+            totalBuySeries.push(parseFloat((gBuy + sBuy).toFixed(2)));
+            totalSellSeries.push(parseFloat((gSell + sSell).toFixed(2)));
+        }
+
+        res.json({
+            success: true,
+            data: {
+                // 1. Users
+                users: {
+                    total: totalUsers,
+                    active: activeUsers,
+                    kycVerified: kycVerifiedUsers,
+                    kycPending: kycPendingCount,
+                    kycRejected: kycRejectedCount
+                },
+                // 2. Gold Stats
+                gold: {
+                    totalGramsHeld: totalGoldGramsHeld,
+                    totalInvestedAmt: totalGoldInvestedAmt,
+                    currentValue: totalGoldCurrentVal,
+                    totalPurchasedGrams: totalGoldPurchasedGrams,
+                    totalPurchasedAmt: totalGoldPurchasedAmt,
+                    totalSoldGrams: totalGoldSoldGrams,
+                    totalSoldAmt: totalGoldSoldAmt,
+                    todayBuyGrams: todayGoldBuyGrams,
+                    todayBuyAmt: todayGoldBuyAmt,
+                    todaySellGrams: todayGoldSellGrams,
+                    todaySellAmt: todayGoldSellAmt
+                },
+                // 3. Silver Stats
+                silver: {
+                    totalGramsHeld: totalSilverGramsHeld,
+                    totalInvestedAmt: totalSilverInvestedAmt,
+                    currentValue: totalSilverCurrentVal,
+                    totalPurchasedGrams: totalSilverPurchasedGrams,
+                    totalPurchasedAmt: totalSilverPurchasedAmt,
+                    totalSoldGrams: totalSilverSoldGrams,
+                    totalSoldAmt: totalSilverSoldAmt,
+                    todayBuyGrams: todaySilverBuyGrams,
+                    todayBuyAmt: todaySilverBuyAmt,
+                    todaySellGrams: todaySilverSellGrams,
+                    todaySellAmt: todaySilverSellAmt
+                },
+                // 4. Combined Volume & Portfolio Value
+                investments: {
+                    totalInvestmentValue,
+                    totalPropertyInvested,
+                    totalGoldCurrentVal,
+                    totalSilverCurrentVal,
+                    totalProperties,
+                    publishedProperties
+                },
+                // 5. Today's Volumes
+                today: {
+                    totalBuyAmt: todayBuyVolumeAmt,
+                    totalBuyGoldGrams: todayGoldBuyGrams,
+                    totalBuySilverGrams: todaySilverBuyGrams,
+                    totalSellAmt: todaySellVolumeAmt,
+                    totalSellGoldGrams: todayGoldSellGrams,
+                    totalSellSilverGrams: todaySilverSellGrams
+                },
+                // 6. SIPs & Schemes
+                schemesAndSips: {
+                    activeSips: activeSipsCount,
+                    totalSipSaved,
+                    activeSchemes: activeSchemesCount,
+                    totalEnrollments: totalEnrollmentsCount,
+                    totalSchemeInvested
+                },
+                // 7. Pendings & Action Items
+                actionItems: {
+                    pendingWithdrawals: pendingWithdrawalsCount,
+                    pendingWithdrawalsAmt,
+                    pendingSellApprovals: pendingSellApprovalsCount,
+                    pendingKyc: kycPendingCount,
+                    pendingPayments: pendingPaymentsCount,
+                    pendingRedemptions: pendingRedemptionsCount,
+                    newEnquiries: newEnquiriesCount,
+                    totalEnquiries: totalEnquiriesCount
+                },
+                // 8. Coupons & Revenue
+                commercials: {
+                    totalCoupons: totalCouponsCount,
+                    activeCoupons: activeCouponsCount,
+                    couponUsageCount,
+                    totalDiscountDistributed: totalCouponDiscounts,
+                    revenue: estimatedRevenue,
+                    gstCollected: totalGstCollected
+                },
+                // 9. Live Rate Cards
+                rates: {
+                    gold: {
+                        buyRate: goldBuyRate,
+                        sellRate: goldSellRate,
+                        change24h: liveRates.gold.change24h || 0,
+                        changePct: liveRates.gold.changePct || 0,
+                        purity: "24K 99.9%"
+                    },
+                    silver: {
+                        buyRate: silverBuyRate,
+                        sellRate: silverSellRate,
+                        change24h: liveRates.silver.change24h || 0,
+                        changePct: liveRates.silver.changePct || 0,
+                        purity: "999 Pure"
+                    },
+                    updatedAt: new Date()
+                },
+                // 10. Recent Transactions Feed
+                recentTransactions,
+                // 11. Interactive Chart Data
+                charts: {
+                    labels: chartLabels,
+                    goldBuy: goldBuySeries,
+                    goldSell: goldSellSeries,
+                    silverBuy: silverBuySeries,
+                    silverSell: silverSellSeries,
+                    totalBuy: totalBuySeries,
+                    totalSell: totalSellSeries
+                }
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
 };
 // ══════════════════════════════════════════════════════════════════════════════
 // ── Withdrawals ──────────────────────────────────────────────────────────────
