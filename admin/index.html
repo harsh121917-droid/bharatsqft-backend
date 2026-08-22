@@ -1150,46 +1150,57 @@
                     </div>
                 </div>
 
-                <!-- Order Status KPIs -->
-                <div class="kpi-grid-4" style="margin-bottom:1.5rem">
-                    <div class="kpi-card" style="border-left:4px solid var(--primary)">
-                        <div class="kpi-card-top">
-                            <span class="kpi-label">Total Redemptions</span>
-                            <div class="kpi-icon-wrap kpi-icon-blue"><i class="fas fa-box"></i></div>
+                <!-- Modern Order Status Fulfillment KPIs -->
+                <div class="fulfillment-kpi-grid">
+                    <!-- Total Redemptions -->
+                    <div class="fulfillment-kpi-card card-purple">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-boxes-stacked"></i></div>
+                            <span class="fulfillment-tag tag-purple">All Time</span>
                         </div>
-                        <div class="kpi-value-wrap">
-                            <div class="kpi-main-value" id="order-stat-total">0</div>
-                            <div class="kpi-sub-value">Physical delivery requests</div>
-                        </div>
-                    </div>
-                    <div class="kpi-card" style="border-left:4px solid var(--amber)">
-                        <div class="kpi-card-top">
-                            <span class="kpi-label">Pending Minting</span>
-                            <div class="kpi-icon-wrap kpi-icon-amber"><i class="fas fa-clock"></i></div>
-                        </div>
-                        <div class="kpi-value-wrap">
-                            <div class="kpi-main-value" id="order-stat-pending">0</div>
-                            <div class="kpi-sub-value">Awaiting dispatch</div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Total Redemptions</div>
+                            <div class="fulfillment-val val-purple" id="order-stat-total">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-layer-group"></i> Physical delivery requests</div>
                         </div>
                     </div>
-                    <div class="kpi-card" style="border-left:4px solid var(--teal)">
-                        <div class="kpi-card-top">
-                            <span class="kpi-label">In Transit</span>
-                            <div class="kpi-icon-wrap kpi-icon-cyan"><i class="fas fa-truck"></i></div>
+
+                    <!-- Pending Minting -->
+                    <div class="fulfillment-kpi-card card-amber">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-amber-glow"><i class="fas fa-clock"></i></div>
+                            <span class="fulfillment-tag tag-amber">Action Req</span>
                         </div>
-                        <div class="kpi-value-wrap">
-                            <div class="kpi-main-value" id="order-stat-shipped">0</div>
-                            <div class="kpi-sub-value">With courier logistics</div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Pending Minting</div>
+                            <div class="fulfillment-val val-amber" id="order-stat-pending">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-hourglass-half"></i> Awaiting dispatch / minting</div>
                         </div>
                     </div>
-                    <div class="kpi-card" style="border-left:4px solid var(--success)">
-                        <div class="kpi-card-top">
-                            <span class="kpi-label">Delivered</span>
-                            <div class="kpi-icon-wrap kpi-icon-green"><i class="fas fa-check-circle"></i></div>
+
+                    <!-- In Transit -->
+                    <div class="fulfillment-kpi-card card-blue">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-blue-glow"><i class="fas fa-truck"></i></div>
+                            <span class="fulfillment-tag tag-blue">In Transit</span>
                         </div>
-                        <div class="kpi-value-wrap">
-                            <div class="kpi-main-value" id="order-stat-delivered">0</div>
-                            <div class="kpi-sub-value">Successfully fulfilled</div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">In Logistics Transit</div>
+                            <div class="fulfillment-val val-blue" id="order-stat-shipped">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-route"></i> Armored courier logistics</div>
+                        </div>
+                    </div>
+
+                    <!-- Delivered -->
+                    <div class="fulfillment-kpi-card card-green">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-check-circle"></i></div>
+                            <span class="fulfillment-tag tag-green">Completed</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Delivered Orders</div>
+                            <div class="fulfillment-val val-green" id="order-stat-delivered">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-shield-alt"></i> Successfully fulfilled</div>
                         </div>
                     </div>
                 </div>

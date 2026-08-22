@@ -155,3 +155,19 @@ exports.getUserNotifications = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Delete notification log
+// @route   DELETE /api/notifications/:id
+// @access  Private (Admin)
+exports.deleteNotificationLog = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await NotificationLog.findByIdAndDelete(id);
+    res.json({
+      success: true,
+      message: "Notification log deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};

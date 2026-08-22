@@ -5,6 +5,7 @@ const {
   sendNotification,
   getNotificationHistory,
   getUserNotifications,
+  deleteNotificationLog,
 } = require("../controllers/notificationController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
@@ -15,5 +16,6 @@ router.get("/my-notifications", protect, getUserNotifications);
 // Admin routes
 router.post("/send", protect, authorize("admin"), sendNotification);
 router.get("/history", protect, authorize("admin"), getNotificationHistory);
+router.delete("/:id", protect, authorize("admin"), deleteNotificationLog);
 
 module.exports = router;

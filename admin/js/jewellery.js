@@ -67,16 +67,14 @@ async function loadJewellery() {
             api("/jewellery/products")
         ]);
 
-        if (catRes.success) {
-            allCategories = catRes.data || [];
-            renderCategoryFilterPills(allCategories);
-            populateCategoryDropdown(allCategories);
-        }
+        allCategories = catRes.success ? (catRes.data || []) : [];
+        allJewellery = prodRes.success ? (prodRes.data || []) : [];
 
-        if (prodRes.success) {
-            allJewellery = prodRes.data || [];
-            filterAndRenderJewellery();
-        } else {
+        populateCategoryDropdown(allCategories);
+        renderCategoryFilterPills(allCategories);
+        filterAndRenderJewellery();
+
+        if (!prodRes.success && allJewellery.length === 0) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${prodRes.message || "Failed to load jewellery"}</div></div>`;
         }
     } catch (e) {
@@ -88,11 +86,23 @@ function renderCategoryFilterPills(categories) {
     const container = document.getElementById("jewellery-category-pills");
     if (!container) return;
 
+    // Collect all distinct category names from categories & products
+    const catMap = new Map();
+    (categories || []).forEach(c => {
+        if (c.name) catMap.set(c.name.trim().toLowerCase(), c.name.trim());
+    });
+    (allJewellery || []).forEach(j => {
+        if (j.category) catMap.set(j.category.trim().toLowerCase(), j.category.trim());
+    });
+
+    const categoryList = Array.from(catMap.values());
+
     let html = `<button class="filter-pill ${selectedJewelleryCategory === 'all' ? 'active' : ''}" onclick="filterJewelleryByCategory('all')">All Items (${allJewellery.length})</button>`;
     
-    categories.forEach(cat => {
-        const count = allJewellery.filter(j => (j.category || "").toLowerCase() === (cat.name || "").toLowerCase()).length;
-        html += `<button class="filter-pill ${selectedJewelleryCategory === cat.name ? 'active' : ''}" onclick="filterJewelleryByCategory('${cat.name}')">${cat.name} (${count})</button>`;
+    categoryList.forEach(catName => {
+        const count = allJewellery.filter(j => (j.category || "").toLowerCase().trim() === catName.toLowerCase().trim()).length;
+        const isActive = selectedJewelleryCategory.toLowerCase() === catName.toLowerCase();
+        html += `<button class="filter-pill ${isActive ? 'active' : ''}" onclick="filterJewelleryByCategory('${catName}')">${catName} (${count})</button>`;
     });
 
     container.innerHTML = html;
@@ -129,11 +139,11 @@ function filterAndRenderJewellery() {
     let filtered = allJewellery;
 
     if (selectedJewelleryCategory !== "all") {
-        filtered = filtered.filter(j => (j.category || "").toLowerCase() === selectedJewelleryCategory.toLowerCase());
+        filtered = filtered.filter(j => (j.category || "").toLowerCase().trim() === selectedJewelleryCategory.toLowerCase().trim());
     }
 
     if (selectedJewelleryMetal !== "all") {
-        filtered = filtered.filter(j => (j.metalType || "gold").toLowerCase() === selectedJewelleryMetal.toLowerCase());
+        filtered = filtered.filter(j => (j.metalType || "gold").toLowerCase().trim() === selectedJewelleryMetal.toLowerCase().trim());
     }
 
     if (jewellerySearchQuery) {
