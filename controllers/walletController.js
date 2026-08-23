@@ -259,7 +259,7 @@ exports.buyGoldFromWallet = async (req, res, next) => {
                     message: "Insufficient reward points. You have " + (dbUser.rewardPoints || 0) + " points, trying to redeem " + pointsRedeemed,
                 });
             }
-            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            pointsDiscount = parseFloat((pointsRedeemed * 0.01).toFixed(2));
             
             dbUser.rewardPoints -= pointsRedeemed;
             await dbUser.save();
@@ -516,7 +516,7 @@ exports.buySilverFromWallet = async (req, res, next) => {
                     message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
                 });
             }
-            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            pointsDiscount = parseFloat((pointsRedeemed * 0.01).toFixed(2));
             
             // Deduct points
             dbUser.rewardPoints -= pointsRedeemed;
@@ -691,7 +691,7 @@ exports.buyCopperFromWallet = async (req, res, next) => {
                     message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
                 });
             }
-            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            pointsDiscount = parseFloat((pointsRedeemed * 0.01).toFixed(2));
             
             // Deduct points
             dbUser.rewardPoints -= pointsRedeemed;
