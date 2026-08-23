@@ -18,6 +18,7 @@ const {
   recalculateVaultBalance,
   resetUserVault,
   resetUserWallet,
+  resetUserRewards,
   resetAllUserData,
 } = require("../controllers/adminController");
 const {
@@ -42,6 +43,7 @@ router.post("/users/:id/deduct-money", deductWalletMoney);
 router.post("/users/:id/recalculate-vault", recalculateVaultBalance);
 router.post("/users/:id/reset-vault", resetUserVault);
 router.post("/users/:id/reset-wallet", resetUserWallet);
+router.post("/users/:id/reset-rewards", resetUserRewards);
 router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);

@@ -265,9 +265,27 @@ exports.updateUser = async (req, res, next) => {
 
 exports.deleteUser = async (req, res, next) => {
     try {
-        const user = await User.findByIdAndDelete(req.params.id);
+        const userId = req.params.id;
+        const user = await User.findByIdAndDelete(userId);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
-        res.json({ success: true, message: "User deleted" });
+
+        // Clean up all related data to prevent orphaned documents
+        const RewardTxn = require("../models/RewardTxn");
+        await Promise.all([
+            GoldBalance.deleteMany({ user: userId }),
+            GoldTransaction.deleteMany({ user: userId }),
+            SilverBalance.deleteMany({ user: userId }),
+            SilverTransaction.deleteMany({ user: userId }),
+            CopperBalance.deleteMany({ user: userId }),
+            CopperTransaction.deleteMany({ user: userId }),
+            Wallet.deleteMany({ user: userId }),
+            WalletTxn.deleteMany({ user: userId }),
+            RewardTxn.deleteMany({ user: userId }),
+            Saving.deleteMany({ user: userId }),
+            SchemeEnrollment.deleteMany({ user: userId }),
+        ]);
+
+        res.json({ success: true, message: "User and all associated data deleted successfully" });
     } catch (err) { next(err); }
 };
 
@@ -517,9 +535,29 @@ exports.resetUserWallet = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+exports.resetUserRewards = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const RewardTxn = require("../models/RewardTxn");
+
+        // Delete all points transactions & spin logs (resets spin count back to 3)
+        await RewardTxn.deleteMany({ user: userId });
+
+        // Reset user points balance & referral balance
+        await User.findByIdAndUpdate(userId, { rewardPoints: 0, referralBalance: 0 });
+
+        res.json({
+            success: true,
+            message: "Reward points (0 pts), spin count (3 spins available), and rewards history have been completely reset.",
+            data: { rewardPoints: 0, spinsLeft: 3 }
+        });
+    } catch (err) { next(err); }
+};
+
 exports.resetAllUserData = async (req, res, next) => {
     try {
         const userId = req.params.id;
+        const RewardTxn = require("../models/RewardTxn");
 
         // Reset Gold
         await GoldBalance.findOneAndUpdate(
@@ -557,13 +595,14 @@ exports.resetAllUserData = async (req, res, next) => {
         );
         await WalletTxn.deleteMany({ user: userId });
 
-        // Reset Reward Points & Referral balance
+        // Reset Reward Points, Referral balance & purge all Reward Transactions (so spins and history reset to 0/3)
+        await RewardTxn.deleteMany({ user: userId });
         await User.findByIdAndUpdate(userId, { rewardPoints: 0, referralBalance: 0 });
 
         res.json({
             success: true,
-            message: "All testing data (Bullion Vault, Wallet Balance & all Transaction history) for this user has been wiped clean to 0.",
-            data: { goldGrams: 0, silverGrams: 0, copperGrams: 0, balance: 0 }
+            message: "All testing data (Bullion Vault, Wallet Balance, Reward Points, Spin Count & all Transaction history) for this user has been wiped clean to 0.",
+            data: { goldGrams: 0, silverGrams: 0, copperGrams: 0, balance: 0, rewardPoints: 0, spinsLeft: 3 }
         });
     } catch (err) { next(err); }
 };

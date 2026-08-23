@@ -562,11 +562,50 @@ async function resetUserVaultData(paramId) {
     }
 }
 
+async function resetUserRewardsData(paramId) {
+    const id = paramId || document.getElementById("user-id")?.value || activeUserId;
+    if (!id) return;
+
+    if (!confirm("Are you sure you want to reset Reward Points (0 pts), Spin Count (3 spins available), and clear all points history for this user?")) {
+        return;
+    }
+
+    const btn = document.getElementById("user-reset-rewards-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Resetting Rewards...`;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-rewards`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "Reward points, spins, and history reset to 0 ✓", "success");
+
+            // Update in-memory user lists
+            let u = allUsers.find(x => x._id === id);
+            if (u) {
+                u.rewardPoints = 0;
+                u.referralBalance = 0;
+            }
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+        } else {
+            toast(data.message || "Failed to reset rewards", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting rewards", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-gift"></i> Reset Rewards & Spins (0 pts, 3 spins)`;
+        }
+    }
+}
+
 async function resetAllUserTestingData(paramId) {
     const id = paramId || document.getElementById("user-id")?.value || activeUserId;
     if (!id) return;
 
-    if (!confirm("⚠️ FULL RESET CONFIRMATION:\n\nAre you sure you want to completely wipe all testing data for this user?\n\n• Bullion Vault (Gold, Silver, Copper → 0.0000g)\n• All Buy/Sell Trade Logs (Purged)\n• Wallet Balance (→ ₹0)\n• Wallet Transaction History (Purged)\n\nThis action cannot be undone.")) {
+    if (!confirm("⚠️ FULL RESET CONFIRMATION:\n\nAre you sure you want to completely wipe all testing data for this user?\n\n• Bullion Vault (Gold, Silver, Copper → 0.0000g)\n• All Buy/Sell Trade Logs (Purged)\n• Wallet Balance (→ ₹0) & Logs (Purged)\n• Reward Points (→ 0 pts) & Spin Count (→ 3 Spins)\n• Reward & Referral History (Purged)\n\nThis action cannot be undone.")) {
         return;
     }
 
@@ -611,6 +650,8 @@ async function resetAllUserTestingData(paramId) {
             let u = allUsers.find(x => x._id === id);
             if (u) {
                 u.walletBalance = 0;
+                u.rewardPoints = 0;
+                u.referralBalance = 0;
                 u.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
                 u.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
                 u.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
@@ -620,6 +661,8 @@ async function resetAllUserTestingData(paramId) {
                 let ui = userInvestmentsData.find(x => x._id === id);
                 if (ui) {
                     ui.walletBalance = 0;
+                    ui.rewardPoints = 0;
+                    ui.referralBalance = 0;
                     ui.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
                     ui.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
                     ui.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
