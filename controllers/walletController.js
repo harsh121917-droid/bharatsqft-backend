@@ -653,6 +653,178 @@ exports.sellSilverToWallet = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// 4c. POST /api/wallet/buy-copper  — buy copper using wallet balance
+// body: { amountInRupees } OR { grams }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.buyCopperFromWallet = async (req, res, next) => {
+    try {
+        if (req.user.kycStatus !== "approved") {
+            return res.status(400).json({ success: false, message: "Please complete your KYC to buy bullion metals." });
+        }
+
+        const { CopperBalance, CopperTransaction } = require("../models/Copper");
+        const { fetchLiveRates } = require("./goldController");
+        const User = require("../models/User");
+        const RewardTxn = require("../models/RewardTxn");
+
+        const rates = await fetchLiveRates();
+        const buyRate = rates.copper.buyRate;
+        if (!buyRate || buyRate <= 0) {
+            return res.status(503).json({ success: false, message: "Copper rate unavailable right now" });
+        }
+        const GST_PCT = 3;
+
+        let { amountInRupees, grams, pointsRedeemed } = req.body;
+        if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));
+        if (!amountInRupees || amountInRupees < 50) {
+            return res.status(400).json({ success: false, message: "Minimum purchase is ₹50" });
+        }
+
+        const gstAmt = parseFloat((amountInRupees * GST_PCT / 100).toFixed(2));
+        let pointsDiscount = 0;
+        if (pointsRedeemed && pointsRedeemed > 0) {
+            const dbUser = await User.findById(req.user._id);
+            if (!dbUser.rewardPoints || dbUser.rewardPoints < pointsRedeemed) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient reward points. You have ${dbUser.rewardPoints || 0} points, trying to redeem ${pointsRedeemed}`,
+                });
+            }
+            pointsDiscount = parseFloat((pointsRedeemed * 0.1).toFixed(2));
+            
+            // Deduct points
+            dbUser.rewardPoints -= pointsRedeemed;
+            await dbUser.save();
+
+            // Record in RewardTxn
+            await RewardTxn.create({
+                user: req.user._id,
+                type: "redeem",
+                points: -pointsRedeemed,
+                description: `Redeemed ${pointsRedeemed} points for extra copper purchase`,
+            });
+        }
+        const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
+        const gramsToAdd = parseFloat(((amountInRupees + pointsDiscount) / buyRate).toFixed(6));
+
+        const wallet = await getOrCreateWallet(req.user._id);
+        if (wallet.balance < totalAmt) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient wallet balance. Have ₹${wallet.balance.toFixed(2)}, need ₹${totalAmt.toFixed(2)}`,
+                data: { walletBalance: wallet.balance, required: totalAmt },
+            });
+        }
+
+        const balBefore = wallet.balance;
+        wallet.balance = parseFloat((wallet.balance - totalAmt).toFixed(2));
+        await wallet.save();
+
+        let copperBal = await CopperBalance.findOne({ user: req.user._id });
+        if (!copperBal) copperBal = await CopperBalance.create({ user: req.user._id });
+        copperBal.totalGrams = parseFloat((copperBal.totalGrams + gramsToAdd).toFixed(6));
+        copperBal.investedAmt = parseFloat((copperBal.investedAmt + (totalAmt || amountInRupees)).toFixed(2));
+        await copperBal.save();
+
+        const copperTxn = await CopperTransaction.create({
+            user: req.user._id, type: "buy", grams: gramsToAdd,
+            ratePerGram: buyRate, copperValue: amountInRupees,
+            gstAmt, totalAmt, status: "success",
+            note: pointsRedeemed ? `Purchased via wallet (Redeemed ${pointsRedeemed} pts for extra copper)` : "Purchased via wallet",
+        });
+
+        await recordTxn(req.user._id, "copper_buy", totalAmt, balBefore, wallet.balance, {
+            copperTxnId: copperTxn._id,
+            note: pointsRedeemed ? `Bought ${gramsToAdd}g copper @ ₹${buyRate}/g (Redeemed ${pointsRedeemed} pts for extra copper)` : `Bought ${gramsToAdd}g copper @ ₹${buyRate}/g`,
+            status: "success",
+        });
+
+        res.json({
+            success: true,
+            message: `${gramsToAdd}g copper credited to your account`,
+            data: {
+                grams: gramsToAdd,
+                totalGrams: copperBal.totalGrams,
+                amountDeducted: totalAmt,
+                walletBalance: wallet.balance,
+                breakdown: { copperValue: amountInRupees, gstAmt, totalAmt, ratePerGram: buyRate },
+                invoiceNo: copperTxn.invoiceNo,
+            },
+        });
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5c. POST /api/wallet/sell-copper  — sell copper → credit wallet (locked)
+// body: { grams }
+// ══════════════════════════════════════════════════════════════════════════════
+exports.sellCopperToWallet = async (req, res, next) => {
+    try {
+        const { CopperBalance, CopperTransaction } = require("../models/Copper");
+        const { fetchLiveRates } = require("./goldController");
+
+        const { grams } = req.body;
+        if (!grams || grams < 0.001) {
+            return res.status(400).json({ success: false, message: "Minimum sell is 0.001g" });
+        }
+
+        const holdCheck = await checkSellHoldPeriod(req.user._id);
+        if (!holdCheck.allowed) {
+            return res.status(400).json({ success: false, message: holdCheck.message });
+        }
+
+        const [rates, copperBal, wallet] = await Promise.all([
+            fetchLiveRates(),
+            CopperBalance.findOne({ user: req.user._id }),
+            getOrCreateWallet(req.user._id),
+        ]);
+
+        if (!copperBal || copperBal.totalGrams - copperBal.lockedGrams < grams) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient copper. Available: ${(copperBal?.totalGrams - copperBal?.lockedGrams || 0).toFixed(4)}g`,
+            });
+        }
+
+        const sellRate = rates.copper.sellRate;
+        if (!sellRate || sellRate <= 0) {
+            return res.status(503).json({ success: false, message: "Copper rate unavailable right now" });
+        }
+        const sellValue = parseFloat((grams * sellRate).toFixed(2));
+
+        copperBal.lockedGrams = parseFloat((copperBal.lockedGrams + grams).toFixed(6));
+        await copperBal.save();
+
+        const balBefore = wallet.balance;
+        wallet.pendingCredit = parseFloat((wallet.pendingCredit + sellValue).toFixed(2));
+        await wallet.save();
+
+        const copperTxn = await CopperTransaction.create({
+            user: req.user._id, type: "sell", grams,
+            ratePerGram: sellRate, copperValue: sellValue,
+            gstAmt: 0, totalAmt: sellValue, status: "processing",
+            note: "Sold — pending wallet credit",
+        });
+
+        await recordTxn(req.user._id, "copper_sell", sellValue, balBefore, wallet.balance, {
+            copperTxnId: copperTxn._id,
+            note: `Sold ${grams}g copper @ ₹${sellRate}/g — releasing in 24h`,
+            status: "pending",
+        });
+
+        res.json({
+            success: true,
+            message: `₹${sellValue} will be credited to your wallet within 24 hours`,
+            data: {
+                grams, sellValue, ratePerGram: sellRate,
+                walletPendingCredit: wallet.pendingCredit,
+                releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                invoiceNo: copperTxn.invoiceNo,
+            },
+        });
+    } catch (err) { next(err); }
+};
 
 // Exported for reuse by schemeController (installment payments deduct from wallet)
 exports.getOrCreateWallet = getOrCreateWallet;

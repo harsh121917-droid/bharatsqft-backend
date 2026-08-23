@@ -20,11 +20,14 @@ const WalletTxnSchema = new mongoose.Schema(
         type: {
             type: String,
             enum: [
-                "add",          // user added money to wallet via Razorpay
+                "add",          // user added money to wallet via Razorpay or admin credit
+                "deduct",       // admin or system deducted money
                 "gold_buy",     // deducted for gold purchase
                 "gold_sell",    // credited from gold sale (locked first)
                 "silver_buy",   // deducted for silver purchase
                 "silver_sell",  // credited from silver sale (locked first)
+                "copper_buy",   // deducted for copper purchase
+                "copper_sell",  // credited from copper sale (locked first)
                 "withdraw",     // withdrawn to bank
                 "refund",       // refund on failed gold buy
                 "coin_redeem",  // coin delivery payment
@@ -40,6 +43,7 @@ const WalletTxnSchema = new mongoose.Schema(
         razorpaySignature: { type: String },
         goldTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "GoldTransaction" },
         silverTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "SilverTransaction" },
+        copperTxnId: { type: mongoose.Schema.Types.ObjectId, ref: "CopperTransaction" },
         note: { type: String },
     },
     { timestamps: true }

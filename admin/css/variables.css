@@ -40,6 +40,13 @@
     --silver-bg: rgba(148, 163, 184, 0.12);
     --silver-border: rgba(148, 163, 184, 0.25);
 
+    --copper: #ea580c;
+    --copper-light: #f97316;
+    --copper-dark: #c2410c;
+    --copper-bg: rgba(234, 88, 12, 0.12);
+    --copper-border: rgba(234, 88, 12, 0.25);
+    --copper-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%);
+
     --accent: #f59e0b;
     --accent-glow: rgba(245, 158, 11, 0.25);
 

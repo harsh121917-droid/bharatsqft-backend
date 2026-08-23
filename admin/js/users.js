@@ -258,14 +258,67 @@ async function openUserModal(id) {
 
         const totalInv = (u.goldInvestments?.totalInvested || 0) + (u.silverInvestments?.totalInvested || 0);
         const totalVal = (u.goldInvestments?.currentValue || 0) + (u.silverInvestments?.currentValue || 0);
-        const totalPL = (u.goldInvestments?.profitLoss || 0) + (u.silverInvestments?.profitLoss || 0);
-        const totalPLC = totalPL >= 0 ? "var(--success)" : "var(--danger)";
+        // Real Estate Bricks Breakdown
+        const propItems = u.propertyInvestments?.items || [];
+        if (propItems.length > 0) {
+            breakHtml += `
+            <div style="font-size:12.5px;font-weight:700;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-building" style="color:var(--purple)"></i> Fractional Real Estate (${propItems.length} Bricks)
+            </div>
+            <div class="table-wrap" style="margin-bottom:1rem;background:var(--surface2);border-radius:var(--radius-sm)">
+                <table style="font-size:12px">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Bricks</th>
+                            <th>Invested</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${propItems.map(p => `
+                            <tr>
+                                <td style="font-weight:600;color:#fff">${p.title}</td>
+                                <td><span class="badge badge-info">${p.bricks} Bricks</span></td>
+                                <td style="color:var(--gold);font-family:var(--font-mono)">${formatINR(p.amount)}</td>
+                                <td style="color:var(--text-dim)">${formatDate(p.date)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        } else {
+            breakHtml += `
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:1rem">
+                <i class="fas fa-building" style="opacity:0.5"></i> No active real estate brick investments.
+            </div>`;
+        }
+
+        // Digi Bullion Breakdown (Gold, Silver, Copper)
+        const goldGrams = u.goldInvestments?.grams || 0;
+        const goldWorth = u.goldInvestments?.totalInvested || 0;
+        const silverGrams = u.silverInvestments?.grams || 0;
+        const silverWorth = u.silverInvestments?.totalInvested || 0;
+        const copperGrams = u.copperInvestments?.grams || 0;
+        const copperWorth = u.copperInvestments?.totalInvested || 0;
 
         breakHtml += `
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-            <div style="font-size:13px;margin-bottom:4px">💰 Total Bullion Investment: <strong style="color:#fff">${formatINR(totalInv)}</strong></div>
-            <div style="font-size:13px;margin-bottom:4px">📈 Current Valuation: <strong style="color:var(--gold)">${formatINR(totalVal)}</strong></div>
-            <div style="font-size:14px;font-weight:700;color:${totalPLC}">💼 Net Portfolio P/L: ${totalPL >= 0 ? '+' : ''}${formatINR(totalPL)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:0.5rem">
+            <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);padding:10px;border-radius:var(--radius-sm)">
+                <div style="font-size:10.5px;color:var(--gold);font-weight:700;text-transform:uppercase"><i class="fas fa-coins"></i> 24K Digital Gold</div>
+                <div style="font-size:1.05rem;font-weight:800;color:var(--gold);margin-top:2px;font-family:var(--font-mono)">${formatGrams(goldGrams)}</div>
+                <div style="font-size:10.5px;color:var(--text-dim)">Invested: ${formatINR(goldWorth)}</div>
+            </div>
+            <div style="background:rgba(148,163,184,0.06);border:1px solid rgba(148,163,184,0.2);padding:10px;border-radius:var(--radius-sm)">
+                <div style="font-size:10.5px;color:var(--silver);font-weight:700;text-transform:uppercase"><i class="fas fa-cubes"></i> 999 Fine Silver</div>
+                <div style="font-size:1.05rem;font-weight:800;color:var(--silver);margin-top:2px;font-family:var(--font-mono)">${formatGrams(silverGrams)}</div>
+                <div style="font-size:10.5px;color:var(--text-dim)">Invested: ${formatINR(silverWorth)}</div>
+            </div>
+            <div style="background:rgba(234,88,12,0.06);border:1px solid rgba(234,88,12,0.25);padding:10px;border-radius:var(--radius-sm)">
+                <div style="font-size:10.5px;color:var(--copper);font-weight:700;text-transform:uppercase"><i class="fas fa-layer-group"></i> 999 Pure Copper</div>
+                <div style="font-size:1.05rem;font-weight:800;color:var(--copper);margin-top:2px;font-family:var(--font-mono)">${formatGrams(copperGrams)}</div>
+                <div style="font-size:10.5px;color:var(--text-dim)">Invested: ${formatINR(copperWorth)}</div>
+            </div>
         </div>`;
 
         breakdownEl.innerHTML = breakHtml;
@@ -280,35 +333,52 @@ function closeUserModal() {
     activeUserId = null;
 }
 
-async function addMoneyToUserWallet() {
+// ── Wallet Management: Add (+) and Deduct (-) Money ───────────
+async function adjustUserWallet(action = "add") {
     const id = document.getElementById("user-id")?.value || activeUserId;
-    const amount = parseFloat(document.getElementById("user-wallet-add-amt")?.value);
-    const showTransaction = document.getElementById("user-wallet-show-tx")?.checked !== false;
-
-    if (isNaN(amount) || amount <= 0) {
-        toast("Please enter a valid amount greater than 0", "warning");
+    if (!id) {
+        toast("No user selected", "warning");
         return;
     }
 
-    const btn = document.getElementById("user-wallet-add-btn");
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Adding...`;
+    const amtInput = document.getElementById("user-wallet-amt") || document.getElementById("user-wallet-add-amt");
+    const amount = parseFloat(amtInput?.value);
+    const note = document.getElementById("user-wallet-note")?.value?.trim() || "";
+    const showTransaction = document.getElementById("user-wallet-show-tx")?.checked === true;
+
+    if (isNaN(amount) || amount <= 0) {
+        toast("Please enter a valid amount greater than ₹0", "warning");
+        if (amtInput) amtInput.focus();
+        return;
     }
 
+    const isAdd = action === "add";
+    const btn = document.getElementById(isAdd ? "user-wallet-add-btn" : "user-wallet-deduct-btn");
+    const otherBtn = document.getElementById(isAdd ? "user-wallet-deduct-btn" : "user-wallet-add-btn");
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isAdd ? "Adding..." : "Deducting..."}`;
+    }
+    if (otherBtn) otherBtn.disabled = true;
+
+    const endpoint = isAdd ? `/admin/users/${id}/add-money` : `/admin/users/${id}/deduct-money`;
+
     try {
-        const data = await api(`/admin/users/${id}/add-money`, {
+        const data = await api(endpoint, {
             method: "POST",
-            body: JSON.stringify({ amount, showTransaction })
+            body: JSON.stringify({ amount, showTransaction, note })
         });
 
         if (data.success) {
-            toast("Money added successfully ✓", "success");
+            toast(data.message || (isAdd ? "Money added successfully ✓" : "Money deducted successfully ✓"), "success");
+            
             const balEl = document.getElementById("user-wallet-balance");
             if (balEl) balEl.textContent = formatINR(data.balance);
             
-            const addAmtInput = document.getElementById("user-wallet-add-amt");
-            if (addAmtInput) addAmtInput.value = "";
+            if (amtInput) amtInput.value = "";
+            const noteInput = document.getElementById("user-wallet-note");
+            if (noteInput) noteInput.value = "";
 
             // Update in-memory user lists
             let u = allUsers.find(x => x._id === id);
@@ -321,16 +391,22 @@ async function addMoneyToUserWallet() {
             if (typeof loadUsers === "function") loadUsers(usersPage);
             if (typeof loadUserInvestments === "function") loadUserInvestments();
         } else {
-            toast(data.message || "Failed to add money", "danger");
+            toast(data.message || (isAdd ? "Failed to add money" : "Failed to deduct money"), "danger");
         }
     } catch (err) {
-        toast("Network error adding money", "danger");
+        toast(`Network error ${isAdd ? "adding" : "deducting"} money`, "danger");
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = `<i class="fas fa-plus-circle"></i> Add Money`;
+            btn.innerHTML = isAdd ? `<i class="fas fa-plus-circle"></i> Add Money (+)` : `<i class="fas fa-minus-circle"></i> Deduct Money (-)`;
         }
+        if (otherBtn) otherBtn.disabled = false;
     }
+}
+
+// Backward compatibility alias
+function addMoneyToUserWallet() {
+    return adjustUserWallet("add");
 }
 
 async function recalculateUserVault(paramId) {
@@ -361,6 +437,207 @@ async function recalculateUserVault(paramId) {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = `<i class="fas fa-sync-alt"></i> Recalculate Vault Balance`;
+        }
+    }
+}
+
+// ── Developer / Admin Testing Reset Functions ──────────────────────────────
+async function resetUserWalletData(paramId) {
+    const id = paramId || document.getElementById("user-id")?.value || activeUserId;
+    if (!id) return;
+
+    if (!confirm("Are you sure you want to reset this user's wallet balance and transaction history to ₹0?")) {
+        return;
+    }
+
+    const btn = document.getElementById("user-reset-wallet-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Resetting...`;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-wallet`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "Wallet reset to ₹0 successfully ✓", "success");
+            
+            const balEl = document.getElementById("user-wallet-balance");
+            if (balEl) balEl.textContent = formatINR(0);
+
+            // Update in-memory user lists
+            let u = allUsers.find(x => x._id === id);
+            if (u) u.walletBalance = 0;
+            if (typeof userInvestmentsData !== "undefined") {
+                let ui = userInvestmentsData.find(x => x._id === id);
+                if (ui) ui.walletBalance = 0;
+            }
+
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+        } else {
+            toast(data.message || "Failed to reset wallet", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting wallet", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-wallet"></i> Reset Wallet & Logs (₹0)`;
+        }
+    }
+}
+
+async function resetUserVaultData(paramId) {
+    const id = paramId || document.getElementById("user-id")?.value || activeUserId;
+    if (!id) return;
+
+    if (!confirm("Are you sure you want to clear all Gold, Silver, and Copper trades and reset vault holdings to 0.0000g for this user?")) {
+        return;
+    }
+
+    const btn = document.getElementById("user-reset-vault-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Clearing...`;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-vault`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "Bullion trades and vault holdings reset to 0 ✓", "success");
+
+            // Update modal breakdown if open
+            const breakdownEl = document.getElementById("user-investment-breakdown");
+            if (breakdownEl) {
+                breakdownEl.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:0.5rem">
+                    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--gold);font-weight:700;text-transform:uppercase"><i class="fas fa-coins"></i> 24K Digital Gold</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--gold);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                    <div style="background:rgba(148,163,184,0.06);border:1px solid rgba(148,163,184,0.2);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--silver);font-weight:700;text-transform:uppercase"><i class="fas fa-cubes"></i> 999 Fine Silver</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--silver);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                    <div style="background:rgba(234,88,12,0.06);border:1px solid rgba(234,88,12,0.25);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--copper);font-weight:700;text-transform:uppercase"><i class="fas fa-layer-group"></i> 999 Pure Copper</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--copper);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                </div>`;
+            }
+
+            // Update in-memory user lists
+            let u = allUsers.find(x => x._id === id);
+            if (u) {
+                u.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.totalInvested = 0;
+            }
+            if (typeof userInvestmentsData !== "undefined") {
+                let ui = userInvestmentsData.find(x => x._id === id);
+                if (ui) {
+                    ui.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.totalInvested = 0;
+                }
+            }
+
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+        } else {
+            toast(data.message || "Failed to reset vault", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting vault", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-coins"></i> Clear Bullion Trades & Vault (0g)`;
+        }
+    }
+}
+
+async function resetAllUserTestingData(paramId) {
+    const id = paramId || document.getElementById("user-id")?.value || activeUserId;
+    if (!id) return;
+
+    if (!confirm("⚠️ FULL RESET CONFIRMATION:\n\nAre you sure you want to completely wipe all testing data for this user?\n\n• Bullion Vault (Gold, Silver, Copper → 0.0000g)\n• All Buy/Sell Trade Logs (Purged)\n• Wallet Balance (→ ₹0)\n• Wallet Transaction History (Purged)\n\nThis action cannot be undone.")) {
+        return;
+    }
+
+    const btn = document.getElementById("user-reset-all-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Wiping Data...`;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-all`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "All user testing data reset to 0 ✓", "success");
+
+            // Update UI elements in modal
+            const balEl = document.getElementById("user-wallet-balance");
+            if (balEl) balEl.textContent = formatINR(0);
+
+            const breakdownEl = document.getElementById("user-investment-breakdown");
+            if (breakdownEl) {
+                breakdownEl.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:0.5rem">
+                    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--gold);font-weight:700;text-transform:uppercase"><i class="fas fa-coins"></i> 24K Digital Gold</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--gold);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                    <div style="background:rgba(148,163,184,0.06);border:1px solid rgba(148,163,184,0.2);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--silver);font-weight:700;text-transform:uppercase"><i class="fas fa-cubes"></i> 999 Fine Silver</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--silver);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                    <div style="background:rgba(234,88,12,0.06);border:1px solid rgba(234,88,12,0.25);padding:10px;border-radius:var(--radius-sm)">
+                        <div style="font-size:10.5px;color:var(--copper);font-weight:700;text-transform:uppercase"><i class="fas fa-layer-group"></i> 999 Pure Copper</div>
+                        <div style="font-size:1.05rem;font-weight:800;color:var(--copper);margin-top:2px;font-family:var(--font-mono)">0.0000 g</div>
+                        <div style="font-size:10.5px;color:var(--text-dim)">Invested: ₹0</div>
+                    </div>
+                </div>`;
+            }
+
+            // Update in-memory user lists
+            let u = allUsers.find(x => x._id === id);
+            if (u) {
+                u.walletBalance = 0;
+                u.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                u.totalInvested = 0;
+            }
+            if (typeof userInvestmentsData !== "undefined") {
+                let ui = userInvestmentsData.find(x => x._id === id);
+                if (ui) {
+                    ui.walletBalance = 0;
+                    ui.goldInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.silverInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.copperInvestments = { grams: 0, totalInvested: 0, currentValue: 0, profitLoss: 0 };
+                    ui.totalInvested = 0;
+                }
+            }
+
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+        } else {
+            toast(data.message || "Failed to wipe user data", "danger");
+        }
+    } catch (err) {
+        toast("Network error wiping user data", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-bomb"></i> Wipe All User Data (Full Reset)`;
         }
     }
 }

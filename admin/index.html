@@ -721,11 +721,11 @@
                 <div class="section-header">
                     <div>
                         <div class="section-title">
-                            <i class="fas fa-coins" style="color:var(--gold)"></i> Digi Gold User Investments
+                            <i class="fas fa-coins" style="color:var(--gold)"></i> Digi Bullion User Investments
                             <span class="badge badge-gold" id="userinvestments-count-badge"
                                 style="font-size:12px;margin-left:6px">0 Investors</span>
                         </div>
-                        <div class="section-subtitle">Customers with active Gold and Silver vault holdings, current
+                        <div class="section-subtitle">Customers with active Gold, Silver, and Copper vault holdings, current
                             valuation, and P&L</div>
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -736,13 +736,14 @@
                             <option value="">All Metals</option>
                             <option value="gold">Gold Only</option>
                             <option value="silver">Silver Only</option>
+                            <option value="copper">Copper Only</option>
                         </select>
                         <button class="btn btn-secondary" onclick="loadUserInvestments()"><i
                                 class="fas fa-sync-alt"></i> Refresh</button>
                     </div>
                 </div>
 
-                <!-- Modern Bullion Custody Holdings Suite -->
+                <!-- Modern Bullion Custody Holdings Suite (Gold, Silver, Copper, Total) -->
                 <div class="custody-suite-grid">
                     <!-- Gold 24K Vault -->
                     <div class="custody-vault-card card-gold">
@@ -824,6 +825,48 @@
                             <span class="custody-security-badge"><i class="fas fa-check-circle"
                                     style="color:var(--silver)"></i> IDBI / Sequel Secure Vaults</span>
                             <span style="font-family:var(--font-mono);font-weight:600;color:var(--silver)">999
+                                Pure</span>
+                        </div>
+                    </div>
+
+                    <!-- Copper 999 Vault -->
+                    <div class="custody-vault-card card-copper">
+                        <div class="custody-vault-header">
+                            <div class="custody-vault-title-wrap">
+                                <div class="custody-vault-icon icon-copper-glow"><i class="fas fa-layer-group"></i></div>
+                                <div>
+                                    <div class="custody-vault-title">Copper 999 Vault</div>
+                                    <div style="font-size:10.5px;color:var(--text-dim)">99.9% Pure Industrial Bullion</div>
+                                </div>
+                            </div>
+                            <span class="custody-vault-tag tag-copper"><i class="fas fa-shield-alt"></i> 100%
+                                Insured</span>
+                        </div>
+
+                        <div class="custody-vault-hero">
+                            <div class="custody-vault-hero-label">Total Vault Custody</div>
+                            <div class="custody-vault-hero-val val-copper" id="summary-total-copper">0.0000 g</div>
+                        </div>
+
+                        <div class="custody-vault-split-box">
+                            <div class="custody-split-col">
+                                <span class="custody-split-label">Market Valuation</span>
+                                <span class="custody-split-val" id="summary-copper-valuation">₹0</span>
+                            </div>
+                            <div class="custody-split-col" style="text-align:center">
+                                <span class="custody-split-label">Gross Invested</span>
+                                <span class="custody-split-val" id="summary-copper-invested">₹0</span>
+                            </div>
+                            <div class="custody-split-col" style="text-align:right">
+                                <span class="custody-split-label">Unrealized P&L</span>
+                                <span class="custody-split-val" id="summary-copper-pl">₹0</span>
+                            </div>
+                        </div>
+
+                        <div class="custody-vault-footer">
+                            <span class="custody-security-badge"><i class="fas fa-check-circle"
+                                    style="color:var(--copper)"></i> Secure Bullion Depository</span>
+                            <span style="font-family:var(--font-mono);font-weight:600;color:var(--copper)">999
                                 Pure</span>
                         </div>
                     </div>
@@ -965,6 +1008,7 @@
                             <option value="all">All Metals</option>
                             <option value="gold">Gold Only</option>
                             <option value="silver">Silver Only</option>
+                            <option value="copper">Copper Only</option>
                         </select>
                         <select class="form-control" id="sell-status-filter"
                             onchange="loadSellApprovals(document.getElementById('sell-metal-filter').value, this.value)"
@@ -1584,35 +1628,50 @@
 
                 <!-- 2. User Wallet Section -->
                 <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1.25rem">
-                    <div
-                        style="font-weight:700;color:var(--gold);margin-bottom:0.75rem;display:flex;align-items:center;gap:6px">
-                        <i class="fas fa-wallet"></i> User Wallet Management
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px">
+                        <div style="font-weight:700;color:var(--gold);display:flex;align-items:center;gap:6px">
+                            <i class="fas fa-wallet"></i> User Wallet Management
+                        </div>
                     </div>
-                    <div
-                        style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+
+                    <!-- Current Balance Card -->
+                    <div style="background:var(--surface2);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
                         <div>
-                            <div style="font-size:12px;color:var(--text-dim)">Current Wallet Balance</div>
-                            <div style="font-size:1.4rem;font-weight:700;color:var(--gold);font-family:var(--font-mono)"
-                                id="user-wallet-balance">₹0</div>
+                            <div style="font-size:12px;color:var(--text-dim)">Available Wallet Balance</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--gold);font-family:var(--font-mono)" id="user-wallet-balance">₹0</div>
+                        </div>
+                        <div style="text-align:right">
+                            <span class="badge badge-gold" style="font-size:11.5px"><i class="fas fa-shield-alt"></i> Instant Settlement</span>
                         </div>
                     </div>
-                    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-                        <div style="flex:1;min-width:180px">
-                            <label class="form-label">Add Money (₹)</label>
-                            <input class="form-control" type="number" id="user-wallet-add-amt"
-                                placeholder="e.g. 5000" />
+
+                    <!-- Wallet Adjust Controls Grid -->
+                    <div class="form-grid-2" style="margin-bottom:0.75rem">
+                        <div class="form-group" style="margin-bottom:0">
+                            <label class="form-label">Amount (₹)</label>
+                            <input class="form-control" type="number" id="user-wallet-amt" placeholder="e.g. 5000" min="1" step="any" />
                         </div>
-                        <div style="display:flex;flex-direction:column;justify-content:center;padding-bottom:10px">
-                            <label
-                                style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-muted);cursor:pointer">
-                                <input type="checkbox" id="user-wallet-show-tx" checked />
-                                <span>Show in user transaction history</span>
-                            </label>
+                        <div class="form-group" style="margin-bottom:0">
+                            <label class="form-label">Note / Reason (Optional)</label>
+                            <input class="form-control" id="user-wallet-note" placeholder="e.g. Bonus, Adjustment, Refund" />
                         </div>
-                        <button class="btn btn-primary" id="user-wallet-add-btn" onclick="addMoneyToUserWallet()"
-                            style="height:42px">
-                            <i class="fas fa-plus-circle"></i> Add Money
-                        </button>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:0.75rem">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none">
+                            <input type="checkbox" id="user-wallet-show-tx" checked />
+                            <span>Show in user transaction history</span>
+                        </label>
+
+                        <!-- Action Buttons: Add (+) & Deduct (-) -->
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                            <button class="btn btn-success" id="user-wallet-add-btn" onclick="adjustUserWallet('add')" style="height:40px;padding:0 18px">
+                                <i class="fas fa-plus-circle"></i> Add Money (+)
+                            </button>
+                            <button class="btn btn-danger" id="user-wallet-deduct-btn" onclick="adjustUserWallet('deduct')" style="height:40px;padding:0 18px">
+                                <i class="fas fa-minus-circle"></i> Deduct Money (-)
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1640,6 +1699,28 @@
                     </div>
                     <div id="user-investment-breakdown">
                         <div style="font-size:12.5px;color:var(--text-dim)">No investment holdings recorded.</div>
+                    </div>
+                </div>
+
+                <!-- 5. Testing & Developer Reset Section -->
+                <div style="margin-top:1.25rem;border-top:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.04);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px dashed rgba(239,68,68,0.35)">
+                    <div style="font-weight:700;color:var(--danger);margin-bottom:0.35rem;display:flex;align-items:center;justify-content:space-between">
+                        <span style="display:flex;align-items:center;gap:6px"><i class="fas fa-flask"></i> Testing & Reset Utilities</span>
+                        <span class="badge badge-danger" style="font-size:10px;text-transform:uppercase">Developer / Admin Mode</span>
+                    </div>
+                    <div style="font-size:12px;color:var(--text-dim);margin-bottom:0.85rem">
+                        Quickly wipe testing trades, buy/sell transaction logs, and wallet balances back to 0.00 without having to delete the user account.
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="btn btn-outline-danger btn-sm" id="user-reset-wallet-btn" onclick="resetUserWalletData()" style="font-size:12px">
+                            <i class="fas fa-wallet"></i> Reset Wallet & Logs (₹0)
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" id="user-reset-vault-btn" onclick="resetUserVaultData()" style="font-size:12px">
+                            <i class="fas fa-coins"></i> Clear Bullion Trades & Vault (0g)
+                        </button>
+                        <button class="btn btn-danger btn-sm" id="user-reset-all-btn" onclick="resetAllUserTestingData()" style="font-size:12px;font-weight:700">
+                            <i class="fas fa-bomb"></i> Wipe All User Data (Full Reset)
+                        </button>
                     </div>
                 </div>
             </div>

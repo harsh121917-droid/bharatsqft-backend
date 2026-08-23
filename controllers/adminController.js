@@ -3,6 +3,7 @@ const Enquiry = require("../models/Enquiry");
 const { Wallet, WalletTxn } = require("../models/Wallet");
 const { GoldBalance, GoldTransaction, GoldRate } = require("../models/Gold");
 const { SilverBalance, SilverTransaction } = require("../models/Silver");
+const { CopperBalance, CopperTransaction } = require("../models/Copper");
 const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 const Kyc = require("../models/Kyc");
 const Saving = require("../models/Saving");
@@ -68,6 +69,14 @@ exports.getAllUsers = async (req, res, next) => {
                 }
             },
             {
+                $lookup: {
+                    from: "copperbalances",
+                    localField: "_id",
+                    foreignField: "user",
+                    as: "copperBal"
+                }
+            },
+            {
                 $addFields: {
                     kycStatus: {
                         $cond: {
@@ -104,6 +113,10 @@ exports.getAllUsers = async (req, res, next) => {
                     silverInvestments: {
                         totalInvested: { $ifNull: [ { $arrayElemAt: ["$silverBal.investedAmt", 0] }, 0 ] },
                         grams: { $ifNull: [ { $arrayElemAt: ["$silverBal.totalGrams", 0] }, 0 ] }
+                    },
+                    copperInvestments: {
+                        totalInvested: { $ifNull: [ { $arrayElemAt: ["$copperBal.investedAmt", 0] }, 0 ] },
+                        grams: { $ifNull: [ { $arrayElemAt: ["$copperBal.totalGrams", 0] }, 0 ] }
                     }
                 }
             },
@@ -112,7 +125,8 @@ exports.getAllUsers = async (req, res, next) => {
                     totalInvested: {
                         $add: [
                             "$goldInvestments.totalInvested",
-                            "$silverInvestments.totalInvested"
+                            "$silverInvestments.totalInvested",
+                            "$copperInvestments.totalInvested"
                         ]
                     }
                 }
@@ -133,6 +147,8 @@ exports.getAllUsers = async (req, res, next) => {
             pipeline.push({ $match: { "goldInvestments.totalInvested": { $gt: 0 } } });
         } else if (req.query.investmentType === "silver") {
             pipeline.push({ $match: { "silverInvestments.totalInvested": { $gt: 0 } } });
+        } else if (req.query.investmentType === "copper") {
+            pipeline.push({ $match: { "copperInvestments.totalInvested": { $gt: 0 } } });
         }
 
         pipeline.push({
@@ -153,11 +169,12 @@ exports.getAllUsers = async (req, res, next) => {
             rates = await fetchLiveRates();
         } catch (e) {
             // fallback rates if live API is temporarily unavailable
-            rates = { gold: { buyRate: 7500, sellRate: 7450 }, silver: { buyRate: 90, sellRate: 88 } };
+            rates = { gold: { buyRate: 7500, sellRate: 7450 }, silver: { buyRate: 90, sellRate: 88 }, copper: { buyRate: 1.36, sellRate: 1.35 } };
         }
 
         const goldSellRate = rates?.gold?.sellRate || 7450;
         const silverSellRate = rates?.silver?.sellRate || 88;
+        const copperSellRate = rates?.copper?.sellRate || 1.35;
 
         const userIds = users.map(u => u._id);
         const wallets = await Wallet.find({ user: { $in: userIds } });
@@ -179,6 +196,12 @@ exports.getAllUsers = async (req, res, next) => {
             const silverCurrentValue = parseFloat((silverGrams * silverSellRate).toFixed(2));
             const silverProfitLoss = parseFloat((silverCurrentValue - silverSpent).toFixed(2));
 
+            const copperGrams = user.copperInvestments?.grams || 0;
+            const copperSpent = user.copperInvestments?.totalInvested || 0;
+            const copperAvgPrice = copperGrams > 0 ? parseFloat((copperSpent / copperGrams).toFixed(2)) : 0;
+            const copperCurrentValue = parseFloat((copperGrams * copperSellRate).toFixed(2));
+            const copperProfitLoss = parseFloat((copperCurrentValue - copperSpent).toFixed(2));
+
             return {
                 ...user,
                 walletBalance: walletMap[user._id.toString()] || 0,
@@ -193,6 +216,12 @@ exports.getAllUsers = async (req, res, next) => {
                     avgBuyPrice: silverAvgPrice,
                     currentValue: silverCurrentValue,
                     profitLoss: silverProfitLoss
+                },
+                copperInvestments: {
+                    ...user.copperInvestments,
+                    avgBuyPrice: copperAvgPrice,
+                    currentValue: copperCurrentValue,
+                    profitLoss: copperProfitLoss
                 }
             };
         });
@@ -244,36 +273,85 @@ exports.deleteUser = async (req, res, next) => {
 
 exports.addWalletMoney = async (req, res, next) => {
     try {
-        const { amount, showTransaction } = req.body;
+        const { amount, showTransaction, note } = req.body;
         const userId = req.params.id;
 
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-            return res.status(400).json({ success: false, message: "Invalid amount" });
+            return res.status(400).json({ success: false, message: "Please enter a valid amount greater than 0" });
         }
 
+        const addAmt = parseFloat(parseFloat(amount).toFixed(2));
         let wallet = await Wallet.findOne({ user: userId });
         if (!wallet) {
             wallet = new Wallet({ user: userId, balance: 0 });
         }
 
-        const balanceBefore = wallet.balance;
-        wallet.balance = parseFloat((wallet.balance + parseFloat(amount)).toFixed(2));
-        wallet.totalAdded = parseFloat((wallet.totalAdded + parseFloat(amount)).toFixed(2));
+        const balanceBefore = wallet.balance || 0;
+        wallet.balance = parseFloat((balanceBefore + addAmt).toFixed(2));
+        wallet.totalAdded = parseFloat(((wallet.totalAdded || 0) + addAmt).toFixed(2));
         await wallet.save();
 
         if (showTransaction) {
             await WalletTxn.create({
                 user: userId,
                 type: "add",
-                amount: parseFloat(amount),
+                amount: addAmt,
                 balanceBefore,
                 balanceAfter: wallet.balance,
                 status: "success",
-                note: "Owner gave you a small gift"
+                note: note || "Admin wallet credit"
             });
         }
 
-        res.json({ success: true, message: "Money added to user's wallet successfully", balance: wallet.balance });
+        res.json({
+            success: true,
+            message: `₹${addAmt.toLocaleString("en-IN")} added to wallet successfully`,
+            balance: wallet.balance
+        });
+    } catch (err) { next(err); }
+};
+
+exports.deductWalletMoney = async (req, res, next) => {
+    try {
+        const { amount, showTransaction, note } = req.body;
+        const userId = req.params.id;
+
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            return res.status(400).json({ success: false, message: "Please enter a valid amount greater than 0" });
+        }
+
+        const deductAmt = parseFloat(parseFloat(amount).toFixed(2));
+        let wallet = await Wallet.findOne({ user: userId });
+        const currentBal = wallet ? (wallet.balance || 0) : 0;
+
+        if (!wallet || currentBal < deductAmt) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient wallet balance. Current balance is ₹${currentBal.toLocaleString("en-IN")}, cannot deduct ₹${deductAmt.toLocaleString("en-IN")}.`
+            });
+        }
+
+        const balanceBefore = currentBal;
+        wallet.balance = parseFloat((currentBal - deductAmt).toFixed(2));
+        await wallet.save();
+
+        if (showTransaction) {
+            await WalletTxn.create({
+                user: userId,
+                type: "deduct",
+                amount: deductAmt,
+                balanceBefore,
+                balanceAfter: wallet.balance,
+                status: "success",
+                note: note || "Admin wallet deduction"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `₹${deductAmt.toLocaleString("en-IN")} deducted from wallet successfully`,
+            balance: wallet.balance
+        });
     } catch (err) { next(err); }
 };
 
@@ -335,17 +413,159 @@ exports.recalculateVaultBalance = async (req, res, next) => {
         silverBal.investedAmt = parseFloat(silverInvestedAmt.toFixed(2));
         await silverBal.save();
 
+        // 3. Recalculate Copper Balance
+        const copperTxns = await CopperTransaction.find({ user: userId, status: "success", type: { $ne: "sip_buy" } });
+        let runningCopperGrams = 0;
+        let runningCopperCost = 0;
+        for (const t of copperTxns) {
+            if (["buy", "gift"].includes(t.type)) {
+                runningCopperGrams += t.grams;
+                if (t.type === "buy") {
+                    runningCopperCost += (t.totalAmt || t.copperValue);
+                }
+            } else if (["sell", "redeem"].includes(t.type)) {
+                if (runningCopperGrams > 0) {
+                    const avgRate = runningCopperCost / runningCopperGrams;
+                    runningCopperCost -= (avgRate * t.grams);
+                }
+                runningCopperGrams -= t.grams;
+            }
+        }
+        const totalCopperGrams = Math.max(0, runningCopperGrams);
+        const copperInvestedAmt = Math.max(0, runningCopperCost);
+
+        let copperBal = await CopperBalance.findOne({ user: userId });
+        if (!copperBal) copperBal = new CopperBalance({ user: userId });
+        copperBal.totalGrams = parseFloat(totalCopperGrams.toFixed(6));
+        copperBal.investedAmt = parseFloat(copperInvestedAmt.toFixed(2));
+        await copperBal.save();
+
         res.json({
             success: true,
-            message: `Vault balance recalculated successfully. New Gold: ${goldBal.totalGrams}g, New Silver: ${silverBal.totalGrams}g`,
+            message: `Vault balance recalculated successfully. New Gold: ${goldBal.totalGrams}g, New Silver: ${silverBal.totalGrams}g, New Copper: ${copperBal.totalGrams}g`,
             data: {
                 goldGrams: goldBal.totalGrams,
-                silverGrams: silverBal.totalGrams
+                silverGrams: silverBal.totalGrams,
+                copperGrams: copperBal.totalGrams
             }
         });
     } catch (err) {
         next(err);
     }
+};
+
+// ── Testing & Admin Data Reset Handlers ──────────────────────────────────────
+exports.resetUserVault = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+
+        // Reset Gold
+        await GoldBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await GoldTransaction.deleteMany({ user: userId });
+
+        // Reset Silver
+        await SilverBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await SilverTransaction.deleteMany({ user: userId });
+
+        // Reset Copper
+        await CopperBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await CopperTransaction.deleteMany({ user: userId });
+
+        // Reset Schemes & Savings
+        await Saving.deleteMany({ user: userId });
+        await SchemeEnrollment.deleteMany({ user: userId });
+
+        res.json({
+            success: true,
+            message: "User bullion holdings (Gold, Silver, Copper) and all trading transactions have been reset to 0.",
+            data: { goldGrams: 0, silverGrams: 0, copperGrams: 0 }
+        });
+    } catch (err) { next(err); }
+};
+
+exports.resetUserWallet = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+
+        // Reset Wallet
+        await Wallet.findOneAndUpdate(
+            { user: userId },
+            { balance: 0, lockedBalance: 0, pendingCredit: 0, totalAdded: 0, totalWithdrawn: 0 },
+            { upsert: true }
+        );
+
+        // Delete Wallet Transactions
+        await WalletTxn.deleteMany({ user: userId });
+
+        res.json({
+            success: true,
+            message: "User wallet balance and transaction logs have been reset to ₹0.",
+            balance: 0
+        });
+    } catch (err) { next(err); }
+};
+
+exports.resetAllUserData = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+
+        // Reset Gold
+        await GoldBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await GoldTransaction.deleteMany({ user: userId });
+
+        // Reset Silver
+        await SilverBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await SilverTransaction.deleteMany({ user: userId });
+
+        // Reset Copper
+        await CopperBalance.findOneAndUpdate(
+            { user: userId },
+            { totalGrams: 0, investedAmt: 0, lockedGrams: 0 },
+            { upsert: true }
+        );
+        await CopperTransaction.deleteMany({ user: userId });
+
+        // Reset Schemes & Savings
+        await Saving.deleteMany({ user: userId });
+        await SchemeEnrollment.deleteMany({ user: userId });
+
+        // Reset Wallet & Wallet Transactions
+        await Wallet.findOneAndUpdate(
+            { user: userId },
+            { balance: 0, lockedBalance: 0, pendingCredit: 0, totalAdded: 0, totalWithdrawn: 0 },
+            { upsert: true }
+        );
+        await WalletTxn.deleteMany({ user: userId });
+
+        // Reset Reward Points & Referral balance
+        await User.findByIdAndUpdate(userId, { rewardPoints: 0, referralBalance: 0 });
+
+        res.json({
+            success: true,
+            message: "All testing data (Bullion Vault, Wallet Balance & all Transaction history) for this user has been wiped clean to 0.",
+            data: { goldGrams: 0, silverGrams: 0, copperGrams: 0, balance: 0 }
+        });
+    } catch (err) { next(err); }
 };
 
 exports.getAllEnquiries = async (req, res, next) => {
@@ -969,7 +1189,7 @@ exports.completeWithdrawal = async (req, res, next) => {
 // pendingCredit → balance and becomes withdrawable.
 // ══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/admin/sell-approvals?metal=gold|silver|all&status=processing
+// GET /api/admin/sell-approvals?metal=gold|silver|copper|all&status=processing
 exports.getSellApprovals = async (req, res, next) => {
     try {
         const { metal = "all", status = "processing", page = 1, limit = 30 } = req.query;
@@ -978,15 +1198,18 @@ exports.getSellApprovals = async (req, res, next) => {
 
         const wantGold = metal === "all" || metal === "gold";
         const wantSilver = metal === "all" || metal === "silver";
+        const wantCopper = metal === "all" || metal === "copper";
 
-        const [goldTxns, silverTxns] = await Promise.all([
+        const [goldTxns, silverTxns, copperTxns] = await Promise.all([
             wantGold ? GoldTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
             wantSilver ? SilverTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
+            wantCopper ? CopperTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
         ]);
 
         const combined = [
             ...goldTxns.map(t => ({ ...t.toObject(), metal: "gold", value: t.goldValue })),
             ...silverTxns.map(t => ({ ...t.toObject(), metal: "silver", value: t.silverValue })),
+            ...copperTxns.map(t => ({ ...t.toObject(), metal: "copper", value: t.copperValue })),
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         const total = combined.length;
@@ -997,19 +1220,28 @@ exports.getSellApprovals = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// PATCH /api/admin/sell-approvals/:id/approve?metal=gold|silver
+// PATCH /api/admin/sell-approvals/:id/approve?metal=gold|silver|copper
 // Moves pendingCredit → balance, deducts locked grams, marks the sale complete.
 exports.approveSellPayout = async (req, res, next) => {
     try {
         const { metal } = req.query;
-        if (metal !== "gold" && metal !== "silver") {
-            return res.status(400).json({ success: false, message: "metal query param must be 'gold' or 'silver'" });
+        if (metal !== "gold" && metal !== "silver" && metal !== "copper") {
+            return res.status(400).json({ success: false, message: "metal query param must be 'gold', 'silver', or 'copper'" });
         }
 
-        const Transaction = metal === "gold" ? GoldTransaction : SilverTransaction;
-        const Balance = metal === "gold" ? GoldBalance : SilverBalance;
-        const valueField = metal === "gold" ? "goldValue" : "silverValue";
-        const linkField = metal === "gold" ? "goldTxnId" : "silverTxnId";
+        let Transaction = GoldTransaction;
+        let Balance = GoldBalance;
+        let linkField = "goldTxnId";
+
+        if (metal === "silver") {
+            Transaction = SilverTransaction;
+            Balance = SilverBalance;
+            linkField = "silverTxnId";
+        } else if (metal === "copper") {
+            Transaction = CopperTransaction;
+            Balance = CopperBalance;
+            linkField = "copperTxnId";
+        }
 
         const txn = await Transaction.findById(req.params.id);
         if (!txn || txn.type !== "sell") {

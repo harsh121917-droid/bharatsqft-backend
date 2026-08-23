@@ -87,12 +87,12 @@ exports.generateInvoicePDF = async (txn, user, type, res, isSample = false) => {
     });
 
     const isBuy = ["buy", "sip_buy"].includes(txn.type);
-    const assetName = type === "gold" ? "GOLD" : "SILVER";
-    const purity = type === "gold" ? "999 - 24K" : "999";
-    const hsn = type === "gold" ? "711419" : "711411";
+    const assetName = type === "gold" ? "GOLD" : (type === "copper" ? "COPPER" : "SILVER");
+    const purity = type === "gold" ? "999 - 24K" : (type === "copper" ? "999 - Pure Industrial" : "999");
+    const hsn = type === "gold" ? "711419" : (type === "copper" ? "740311" : "711411");
     const grams = txn.grams;
     const rate = txn.ratePerGram;
-    const value = type === "gold" ? txn.goldValue : (txn.silverValue || txn.goldValue || (grams * rate));
+    const value = type === "gold" ? txn.goldValue : (type === "copper" ? (txn.copperValue || (grams * rate)) : (txn.silverValue || txn.goldValue || (grams * rate)));
     const gstAmt = txn.gstAmt || 0;
     const totalAmt = txn.totalAmt;
 

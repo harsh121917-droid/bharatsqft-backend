@@ -598,8 +598,8 @@ input:checked + .slider:before {
    ══════════════════════════════════════════════════════════════ */
 .custody-suite-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
     margin-bottom: 1.5rem;
 }
 
@@ -607,7 +607,7 @@ input:checked + .slider:before {
     background: linear-gradient(135deg, #141924 0%, #10141e 100%);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-lg);
-    padding: 1.25rem 1.35rem;
+    padding: 1.15rem 1.25rem;
     position: relative;
     overflow: hidden;
     display: flex;
@@ -630,6 +630,11 @@ input:checked + .slider:before {
 .custody-vault-card.card-silver {
     border-top: 3px solid #94a3b8;
     box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.2);
+}
+
+.custody-vault-card.card-copper {
+    border-top: 3px solid #ea580c;
+    box-shadow: inset 0 1px 0 rgba(234, 88, 12, 0.25);
 }
 
 .custody-vault-card.card-total {
@@ -673,6 +678,12 @@ input:checked + .slider:before {
     border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+.icon-copper-glow {
+    background: radial-gradient(circle, rgba(234, 88, 12, 0.28) 0%, rgba(234, 88, 12, 0.08) 100%);
+    color: #f97316;
+    border: 1px solid rgba(234, 88, 12, 0.35);
+}
+
 .icon-emerald-glow {
     background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 100%);
     color: #10b981;
@@ -708,6 +719,12 @@ input:checked + .slider:before {
     border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+.tag-copper {
+    background: rgba(234, 88, 12, 0.18);
+    color: #f97316;
+    border: 1px solid rgba(234, 88, 12, 0.35);
+}
+
 .tag-emerald {
     background: rgba(16, 185, 129, 0.15);
     color: #10b981;
@@ -727,7 +744,7 @@ input:checked + .slider:before {
 
 .custody-vault-hero-val {
     font-family: var(--font-heading);
-    font-size: 23px;
+    font-size: 21px;
     font-weight: 800;
     color: #fff;
     letter-spacing: -0.5px;
@@ -735,6 +752,7 @@ input:checked + .slider:before {
 
 .val-gold { color: #f59e0b; }
 .val-silver { color: #e2e8f0; }
+.val-copper { color: #f97316; }
 .val-emerald { color: #10b981; }
 
 .custody-vault-split-box {

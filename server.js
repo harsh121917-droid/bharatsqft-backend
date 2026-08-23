@@ -68,6 +68,7 @@ app.use("/api/bank", require("./routes/bank"));
 app.use("/api/coins", require("./routes/coins"));
 app.use("/api/schemes", require("./routes/schemes"));
 app.use("/api/silver", require("./routes/silver"));
+app.use("/api/copper", require("./routes/copper"));
 app.use("/api/otp", require("./routes/otp"));
 app.use("/api/rewards", require("./routes/reward"));
 app.use("/api/jewellery", require("./routes/jewellery"));

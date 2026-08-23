@@ -49,6 +49,8 @@ function filterDigiGoldUserInvestments() {
         filtered = filtered.filter(u => (u.goldInvestments?.grams || 0) > 0);
     } else if (metalFilter === "silver") {
         filtered = filtered.filter(u => (u.silverInvestments?.grams || 0) > 0);
+    } else if (metalFilter === "copper") {
+        filtered = filtered.filter(u => (u.copperInvestments?.grams || 0) > 0);
     }
     renderDigiGoldUserInvestmentsTable(filtered);
 }
@@ -65,9 +67,14 @@ function renderDigiGoldUserInvestmentsTable(users) {
     let totalSilverInvested = 0;
     let totalSilverVal = 0;
 
+    let totalCopperGrams = 0;
+    let totalCopperInvested = 0;
+    let totalCopperVal = 0;
+
     (users || []).forEach(u => {
         const gold = u.goldInvestments || {};
         const silver = u.silverInvestments || {};
+        const copper = u.copperInvestments || {};
 
         totalGoldGrams += (gold.grams || 0);
         totalGoldInvested += (gold.totalInvested || 0);
@@ -76,13 +83,18 @@ function renderDigiGoldUserInvestmentsTable(users) {
         totalSilverGrams += (silver.grams || 0);
         totalSilverInvested += (silver.totalInvested || 0);
         totalSilverVal += (silver.currentValue || 0);
+
+        totalCopperGrams += (copper.grams || 0);
+        totalCopperInvested += (copper.totalInvested || 0);
+        totalCopperVal += (copper.currentValue || 0);
     });
 
-    const totalVal = (totalGoldVal + totalSilverVal);
-    const totalInvested = (totalGoldInvested + totalSilverInvested);
+    const totalVal = (totalGoldVal + totalSilverVal + totalCopperVal);
+    const totalInvested = (totalGoldInvested + totalSilverInvested + totalCopperInvested);
     const totalPl = parseFloat((totalVal - totalInvested).toFixed(2));
     const goldPl = parseFloat((totalGoldVal - totalGoldInvested).toFixed(2));
     const silverPl = parseFloat((totalSilverVal - totalSilverInvested).toFixed(2));
+    const copperPl = parseFloat((totalCopperVal - totalCopperInvested).toFixed(2));
 
     // Update Gold Custody Vault Card
     const goldEl = document.getElementById("summary-total-gold");
@@ -116,6 +128,22 @@ function renderDigiGoldUserInvestmentsTable(users) {
         silverPlEl.textContent = `${silverPl >= 0 ? '+' : ''}${formatINR(silverPl)}`;
     }
 
+    // Update Copper Custody Vault Card
+    const copperEl = document.getElementById("summary-total-copper");
+    if (copperEl) copperEl.textContent = formatGrams(totalCopperGrams);
+
+    const copperValEl = document.getElementById("summary-copper-valuation");
+    if (copperValEl) copperValEl.textContent = formatINR(totalCopperVal);
+
+    const copperInvEl = document.getElementById("summary-copper-invested");
+    if (copperInvEl) copperInvEl.textContent = formatINR(totalCopperInvested);
+
+    const copperPlEl = document.getElementById("summary-copper-pl");
+    if (copperPlEl) {
+        copperPlEl.style.color = copperPl >= 0 ? "var(--success)" : "var(--danger)";
+        copperPlEl.textContent = `${copperPl >= 0 ? '+' : ''}${formatINR(copperPl)}`;
+    }
+
     // Update Total Bullion Custody Card
     const totalValEl = document.getElementById("summary-total-valuation");
     if (totalValEl) totalValEl.textContent = formatINR(totalVal);
@@ -142,6 +170,7 @@ function renderDigiGoldUserInvestmentsTable(users) {
                     <th>Customer</th>
                     <th>Gold 24K Holdings</th>
                     <th>Silver 999 Holdings</th>
+                    <th>Copper 999 Holdings</th>
                     <th>Total Invested</th>
                     <th>Current Value</th>
                     <th>Bullion P&L</th>
@@ -154,19 +183,22 @@ function renderDigiGoldUserInvestmentsTable(users) {
     users.forEach(u => {
         const gold = u.goldInvestments || {};
         const silver = u.silverInvestments || {};
+        const copper = u.copperInvestments || {};
 
         const goldGrams = gold.grams || 0;
         const goldSpent = gold.totalInvested || 0;
         const goldVal = gold.currentValue || 0;
-        const goldPl = gold.profitLoss || 0;
 
         const silverGrams = silver.grams || 0;
         const silverSpent = silver.totalInvested || 0;
         const silverVal = silver.currentValue || 0;
-        const silverPl = silver.profitLoss || 0;
 
-        const totalInvested = (goldSpent + silverSpent);
-        const totalVal = (goldVal + silverVal);
+        const copperGrams = copper.grams || 0;
+        const copperSpent = copper.totalInvested || 0;
+        const copperVal = copper.currentValue || 0;
+
+        const totalInvested = (goldSpent + silverSpent + copperSpent);
+        const totalVal = (goldVal + silverVal + copperVal);
         const totalPl = parseFloat((totalVal - totalInvested).toFixed(2));
         const walletBal = u.walletBalance !== undefined ? u.walletBalance : 0;
 
@@ -183,6 +215,10 @@ function renderDigiGoldUserInvestmentsTable(users) {
             <td>
                 <div style="font-family:var(--font-mono);font-weight:700;color:var(--silver)">${formatGrams(silverGrams)}</div>
                 <div style="font-size:11.5px;color:var(--text-dim)">Spent: ${formatINR(silverSpent)} • Val: ${formatINR(silverVal)}</div>
+            </td>
+            <td>
+                <div style="font-family:var(--font-mono);font-weight:700;color:var(--copper)">${formatGrams(copperGrams)}</div>
+                <div style="font-size:11.5px;color:var(--text-dim)">Spent: ${formatINR(copperSpent)} • Val: ${formatINR(copperVal)}</div>
             </td>
             <td style="font-weight:700;color:#fff">${formatINR(totalInvested)}</td>
             <td style="font-weight:700;color:var(--gold)">${formatINR(totalVal)}</td>

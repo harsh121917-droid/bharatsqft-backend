@@ -14,7 +14,11 @@ const {
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
   addWalletMoney,
+  deductWalletMoney,
   recalculateVaultBalance,
+  resetUserVault,
+  resetUserWallet,
+  resetAllUserData,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -34,7 +38,11 @@ router.get("/dashboard", getDashboard);
 router.get("/users", getAllUsers);
 router.get("/users/:id", getUserById);
 router.post("/users/:id/add-money", addWalletMoney);
+router.post("/users/:id/deduct-money", deductWalletMoney);
 router.post("/users/:id/recalculate-vault", recalculateVaultBalance);
+router.post("/users/:id/reset-vault", resetUserVault);
+router.post("/users/:id/reset-wallet", resetUserWallet);
+router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
 
