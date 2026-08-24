@@ -1128,9 +1128,9 @@
                 <div class="section-header">
                     <div>
                         <div class="section-title"><i class="fas fa-check-double" style="color:var(--gold)"></i> Sell
-                            Approvals</div>
+                            Approvals & Holding Policy</div>
                         <div class="section-subtitle">Review customer gold/silver liquidation before releasing wallet
-                            credit</div>
+                            credit & configure new user sell holding rules</div>
                     </div>
                     <div style="display:flex;gap:10px">
                         <select class="form-control" id="sell-metal-filter"
@@ -1150,6 +1150,64 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- ⚙️ New User Sell Holding Period Control Card -->
+                <div
+                    style="background:linear-gradient(135deg, rgba(212,160,23,0.08), rgba(30,41,59,0.7));border:1px solid rgba(212,160,23,0.3);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:1.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+                        <div style="display:flex;align-items:center;gap:14px">
+                            <div
+                                style="width:44px;height:44px;border-radius:12px;background:rgba(212,160,23,0.15);border:1px solid rgba(212,160,23,0.35);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:20px;flex-shrink:0">
+                                <i class="fas fa-user-clock"></i>
+                            </div>
+                            <div>
+                                <div
+                                    style="font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                    <span>New User Sell Holding Period (Lock-in Days)</span>
+                                    <span class="badge badge-gold" id="sell-holding-current-badge"
+                                        style="font-size:11px;padding:3px 8px">Active: 30 Days</span>
+                                </div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                                    New users can only sell metal once this number of days have elapsed since their 1st
+                                    purchase. Change to e.g. <strong style="color:var(--gold)">15</strong> to enforce a
+                                    15-day rule.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                            <div
+                                style="display:flex;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px">
+                                <input type="number" id="sell-holding-days-input" class="form-control" value="30"
+                                    min="0" max="365"
+                                    style="width:75px;border:none;background:transparent;text-align:center;font-weight:700;font-family:var(--font-mono);font-size:14px;color:#fff" />
+                                <span
+                                    style="font-size:12px;color:var(--text-dim);font-weight:600;padding-right:4px">Days</span>
+                            </div>
+
+                            <!-- Quick Preset Buttons -->
+                            <div style="display:flex;gap:4px">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="setSellHoldingPreset(0)"
+                                    style="font-size:11px;padding:5px 8px" title="Disable holding period (0 days)">0d
+                                    (Off)</button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="setSellHoldingPreset(7)"
+                                    style="font-size:11px;padding:5px 8px">7d</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="setSellHoldingPreset(15)"
+                                    style="font-size:11px;padding:5px 8px">15d</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="setSellHoldingPreset(30)"
+                                    style="font-size:11px;padding:5px 8px">30d</button>
+                            </div>
+
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveSellHoldingSetting()"
+                                id="btn-save-sell-holding">
+                                <i class="fas fa-check"></i> Save Holding Period
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-wrap">
                     <div id="sellapprovals-body">
                         <div class="loading-box">
@@ -2452,31 +2510,39 @@
                     </div>
 
                     <!-- Product Photos & Main Image Manager -->
-                    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-                            <div style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                    <div
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
+                        <div
+                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                            <div
+                                style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
                                 <i class="fas fa-images"></i> Product Photos & Main Image Selector
                             </div>
                             <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;font-size:11.5px">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload Photos
-                                <input type="file" id="jewellery-file-input" multiple accept="image/*" style="display:none" onchange="handleJewelleryModalUpload(this.files)" />
+                                <input type="file" id="jewellery-file-input" multiple accept="image/*"
+                                    style="display:none" onchange="handleJewelleryModalUpload(this.files)" />
                             </label>
                         </div>
 
                         <!-- URL Input & Add Button -->
                         <div style="display:flex;gap:8px;margin-bottom:10px">
-                            <input class="form-control" id="jewellery-image-url-input" placeholder="Or enter Image URL (https://...)" style="flex:1" />
+                            <input class="form-control" id="jewellery-image-url-input"
+                                placeholder="Or enter Image URL (https://...)" style="flex:1" />
                             <button class="btn btn-secondary btn-sm" type="button" onclick="addJewelleryUrlImage()">
                                 <i class="fas fa-plus"></i> Add Photo
                             </button>
                         </div>
 
                         <!-- Live Gallery Strip with Set as Main -->
-                        <div id="jewellery-modal-gallery" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
+                        <div id="jewellery-modal-gallery"
+                            style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
                             <!-- Thumbnails rendered dynamically -->
                         </div>
                         <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
-                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★ Main Image</strong> will be the primary image displayed in the mobile app. Tap "Make Main" on any photo to set it as primary.
+                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★
+                                Main Image</strong> will be the primary image displayed in the mobile app. Tap "Make
+                            Main" on any photo to set it as primary.
                         </div>
                     </div>
 
@@ -2625,31 +2691,38 @@
                     </div>
 
                     <!-- Product Photos & Main Image Manager for Coin -->
-                    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-                            <div style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                    <div
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
+                        <div
+                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                            <div
+                                style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
                                 <i class="fas fa-images"></i> Coin Photos & Main Image Selector
                             </div>
                             <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;font-size:11.5px">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload Photos
-                                <input type="file" id="coin-file-input" multiple accept="image/*" style="display:none" onchange="handleCoinModalUpload(this.files)" />
+                                <input type="file" id="coin-file-input" multiple accept="image/*" style="display:none"
+                                    onchange="handleCoinModalUpload(this.files)" />
                             </label>
                         </div>
 
                         <!-- URL Input & Add Button -->
                         <div style="display:flex;gap:8px;margin-bottom:10px">
-                            <input class="form-control" id="coin-image-url-input" placeholder="Or enter Image URL (https://...)" style="flex:1" />
+                            <input class="form-control" id="coin-image-url-input"
+                                placeholder="Or enter Image URL (https://...)" style="flex:1" />
                             <button class="btn btn-secondary btn-sm" type="button" onclick="addCoinUrlImage()">
                                 <i class="fas fa-plus"></i> Add Photo
                             </button>
                         </div>
 
                         <!-- Live Gallery Strip with Set as Main -->
-                        <div id="coin-modal-gallery" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
+                        <div id="coin-modal-gallery"
+                            style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
                             <!-- Thumbnails rendered dynamically -->
                         </div>
                         <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
-                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★ Main Image</strong> will be the primary coin image in the customer app.
+                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★
+                                Main Image</strong> will be the primary coin image in the customer app.
                         </div>
                     </div>
 

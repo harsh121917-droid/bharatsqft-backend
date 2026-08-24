@@ -404,11 +404,90 @@ async function completeWithdrawal(id, amt) {
     }
 }
 
-// ── 4. Sell Payout Approvals (Gold + Silver) ───────────────────
+// ── 4. Sell Payout Approvals (Gold + Silver + Copper) ─────────
+let activeSellHoldingDays = 30;
+
+async function loadSellSettings() {
+    try {
+        const res = await api("/admin/sell-settings");
+        if (res.success && res.data) {
+            activeSellHoldingDays = res.data.newUsersSellHoldingDays !== undefined ? res.data.newUsersSellHoldingDays : 30;
+            const badge = document.getElementById("sell-holding-current-badge");
+            const input = document.getElementById("sell-holding-days-input");
+            if (badge) {
+                badge.textContent = activeSellHoldingDays > 0 ? `Active: ${activeSellHoldingDays} Days` : "Active: Disabled (0d)";
+                badge.className = activeSellHoldingDays > 0 ? "badge badge-gold" : "badge badge-gray";
+            }
+            if (input && document.activeElement !== input) {
+                input.value = activeSellHoldingDays;
+            }
+        }
+    } catch (e) {
+        console.error("Error loading sell holding settings:", e);
+    }
+}
+
+function setSellHoldingPreset(days) {
+    const input = document.getElementById("sell-holding-days-input");
+    if (input) {
+        input.value = days;
+        input.focus();
+    }
+}
+
+async function saveSellHoldingSetting() {
+    const input = document.getElementById("sell-holding-days-input");
+    const val = Number(input?.value ?? 30);
+
+    if (isNaN(val) || val < 0) {
+        return toast("Please enter a valid non-negative number of days", "warning");
+    }
+
+    const btn = document.getElementById("btn-save-sell-holding");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+    }
+
+    try {
+        const res = await api("/admin/sell-settings", {
+            method: "POST",
+            body: JSON.stringify({ newUsersSellHoldingDays: val })
+        });
+
+        if (res.success) {
+            activeSellHoldingDays = val;
+            toast(res.message || `New user sell holding period updated to ${val} days!`, "success");
+            const badge = document.getElementById("sell-holding-current-badge");
+            if (badge) {
+                badge.textContent = val > 0 ? `Active: ${val} Days` : "Active: Disabled (0d)";
+                badge.className = val > 0 ? "badge badge-gold" : "badge badge-gray";
+            }
+            // Reload approvals table to reflect updated holding calculations
+            loadSellApprovals(
+                document.getElementById("sell-metal-filter")?.value || "all",
+                document.getElementById("sell-status-filter")?.value || "processing"
+            );
+        } else {
+            toast(res.message || "Failed to update holding period", "danger");
+        }
+    } catch (e) {
+        toast("Network error updating holding period", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-check"></i> Save Holding Period`;
+        }
+    }
+}
+
 async function loadSellApprovals(metal = "all", status = "processing") {
     const body = document.getElementById("sellapprovals-body");
     if (!body) return;
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading sell payout approvals...</div></div>`;
+
+    // Also sync sell holding period setting
+    loadSellSettings();
 
     try {
         const res = await api(`/admin/sell-approvals?metal=${metal}&status=${status}`);
@@ -438,6 +517,7 @@ function renderSellApprovalsTable(txns) {
             <thead>
                 <tr>
                     <th>Customer</th>
+                    <th>Holding Rule Status</th>
                     <th>Asset</th>
                     <th>Grams Sold</th>
                     <th>Rate Locked</th>
@@ -452,6 +532,23 @@ function renderSellApprovalsTable(txns) {
     txns.forEach(t => {
         const u = t.user || {};
         const isProcessing = t.status === "processing";
+        const holdingDays = t.holdingDaysConfigured !== undefined ? t.holdingDaysConfigured : activeSellHoldingDays;
+        const meetsHold = t.isHoldingPeriodMet !== false;
+        const daysSinceBuy = t.daysSinceFirstBuy !== null && t.daysSinceFirstBuy !== undefined ? t.daysSinceFirstBuy : null;
+        const daysRemaining = t.daysRemainingInHold || 0;
+
+        let holdingBadge = "";
+        if (holdingDays <= 0) {
+            holdingBadge = `<span class="badge" style="background:rgba(148,163,184,0.15);color:#94a3b8;font-size:10.5px"><i class="fas fa-infinity"></i> No Hold Policy</span>`;
+        } else if (meetsHold) {
+            holdingBadge = `<span class="badge badge-pill-success" style="font-size:10.5px" title="${daysSinceBuy !== null ? daysSinceBuy + ' days since 1st purchase' : 'Account active'}">
+                <i class="fas fa-check-circle"></i> Meets ${holdingDays}d Rule ${daysSinceBuy !== null ? `(${daysSinceBuy}d)` : ''}
+            </span>`;
+        } else {
+            holdingBadge = `<span class="badge badge-danger" style="font-size:10.5px" title="${daysRemaining} days remaining in lock-in period">
+                <i class="fas fa-lock"></i> Under Hold (${daysSinceBuy || 0}/${holdingDays}d · ${daysRemaining}d left)
+            </span>`;
+        }
 
         html += `
         <tr>
@@ -460,17 +557,20 @@ function renderSellApprovalsTable(txns) {
                 <div style="font-size:12px;color:var(--text-dim)">${u.phone || u.email || ''}</div>
             </td>
             <td>
-                <span class="badge ${t.metal === 'silver' ? 'badge-silver' : 'badge-gold'}">
+                ${holdingBadge}
+            </td>
+            <td>
+                <span class="badge ${t.metal === 'silver' ? 'badge-silver' : (t.metal === 'copper' ? 'badge-purple' : 'badge-gold')}">
                     ${(t.metal || 'gold').toUpperCase()}
                 </span>
             </td>
             <td style="font-family:var(--font-mono);font-size:13px">${formatGrams(t.grams)}</td>
             <td style="font-family:var(--font-mono)">${formatINR(t.ratePerGram)}/g</td>
-            <td style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold)">${formatINR(t.value || t.goldValue || t.silverValue)}</td>
+            <td style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gold)">${formatINR(t.value || t.goldValue || t.silverValue || t.copperValue)}</td>
             <td><span class="badge ${isProcessing ? 'badge-pending' : 'badge-success'}">${t.status}</span></td>
             <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(t.createdAt)}</td>
             <td style="text-align:right">
-                ${isProcessing ? `<button class="btn btn-success btn-sm" onclick="approveSellPayout('${t._id}', '${t.metal}', ${t.value || t.goldValue || t.silverValue})"><i class="fas fa-check"></i> Approve Payout</button>` : `<span style="font-size:12px;color:var(--text-dim)">Approved</span>`}
+                ${isProcessing ? `<button class="btn btn-success btn-sm" onclick="approveSellPayout('${t._id}', '${t.metal}', ${t.value || t.goldValue || t.silverValue || t.copperValue})"><i class="fas fa-check"></i> Approve Payout</button>` : `<span style="font-size:12px;color:var(--text-dim)">Approved</span>`}
             </td>
         </tr>`;
     });
@@ -482,7 +582,7 @@ function renderSellApprovalsTable(txns) {
 async function approveSellPayout(id, metal, amt) {
     if (!confirm(`Approve ₹${amt} ${metal} sell payout release to user's wallet?`)) return;
     try {
-        const res = await api(`/admin/sell-approvals/${id}/approve`, {
+        const res = await api(`/admin/sell-approvals/${id}/approve?metal=${metal}`, {
             method: "PATCH",
             body: JSON.stringify({ metal })
         });

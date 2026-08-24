@@ -20,8 +20,19 @@ async function recordTxn(userId, type, amount, balBefore, balAfter, extra = {}) 
 }
 
 async function checkSellHoldPeriod(userId) {
+    const AppConfig = require("../models/AppConfig");
+    let config = await AppConfig.findOne();
+    const holdingDays = (config && config.newUsersSellHoldingDays !== undefined) ? Number(config.newUsersSellHoldingDays) : 30;
+
+    // If holding period is set to 0, sell restriction is disabled
+    if (holdingDays <= 0) {
+        return { allowed: true, holdingDays: 0 };
+    }
+
     const { GoldTransaction } = require("../models/Gold");
     const { SilverTransaction } = require("../models/Silver");
+    const Copper = require("../models/Copper");
+    const CopperTransaction = Copper && Copper.CopperTransaction ? Copper.CopperTransaction : null;
 
     // Earliest successful buy/sip_buy gold transaction
     const firstGoldTxn = await GoldTransaction.findOne({
@@ -37,6 +48,13 @@ async function checkSellHoldPeriod(userId) {
         status: "success"
     }).sort({ createdAt: 1 });
 
+    // Earliest successful buy/sip_buy copper transaction
+    const firstCopperTxn = CopperTransaction ? await CopperTransaction.findOne({
+        user: userId,
+        type: { $in: ["buy", "sip_buy"] },
+        status: "success"
+    }).sort({ createdAt: 1 }) : null;
+
     let firstTxnDate = null;
     if (firstGoldTxn) firstTxnDate = firstGoldTxn.createdAt;
     if (firstSilverTxn) {
@@ -44,18 +62,26 @@ async function checkSellHoldPeriod(userId) {
             firstTxnDate = firstSilverTxn.createdAt;
         }
     }
+    if (firstCopperTxn) {
+        if (!firstTxnDate || firstCopperTxn.createdAt < firstTxnDate) {
+            firstTxnDate = firstCopperTxn.createdAt;
+        }
+    }
 
     if (firstTxnDate) {
         const daysDiff = (Date.now() - new Date(firstTxnDate).getTime()) / (24 * 60 * 60 * 1000);
-        if (daysDiff < 30) {
-            const daysLeft = Math.ceil(30 - daysDiff);
+        if (daysDiff < holdingDays) {
+            const daysLeft = Math.max(1, Math.ceil(holdingDays - daysDiff));
             return {
                 allowed: false,
-                message: `For security reasons, new users can only sell gold or silver after 30 days from their first purchase. Please wait another ${daysLeft} day${daysLeft > 1 ? "s" : ""}.`
+                holdingDays,
+                daysLeft,
+                firstTxnDate,
+                message: `For security reasons, new users can only sell gold or silver after ${holdingDays} days from their first purchase. Please wait another ${daysLeft} day${daysLeft > 1 ? "s" : ""}.`
             };
         }
     }
-    return { allowed: true };
+    return { allowed: true, holdingDays, firstTxnDate };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -826,5 +852,6 @@ exports.sellCopperToWallet = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// Exported for reuse by schemeController (installment payments deduct from wallet)
+// Exported for reuse by schemeController and gold/silver controllers
 exports.getOrCreateWallet = getOrCreateWallet;
+exports.checkSellHoldPeriod = checkSellHoldPeriod;

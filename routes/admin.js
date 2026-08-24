@@ -6,6 +6,7 @@ const {
   getDashboard,
   getWithdrawals, completeWithdrawal,
   getSellApprovals, approveSellPayout,
+  getSellSettings, updateSellSettings,
   getSchemeEnrollments,
   getRewardSettings,
   updateRewardSettings,
@@ -80,9 +81,11 @@ router.patch("/kyc/:id", reviewKyc);
 router.get("/withdrawals", getWithdrawals);
 router.patch("/withdrawals/:id/complete", completeWithdrawal);
 
-// Sell Payout Approvals (gold + silver)
+// Sell Payout Approvals (gold + silver + copper)
 router.get("/sell-approvals", getSellApprovals);
 router.patch("/sell-approvals/:id/approve", approveSellPayout);
+router.get("/sell-settings", getSellSettings);
+router.post("/sell-settings", updateSellSettings);
 
 // Gold Scheme Enrollments
 router.get("/schemes/enrollments", getSchemeEnrollments);

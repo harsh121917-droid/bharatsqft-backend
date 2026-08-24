@@ -1412,14 +1412,18 @@ exports.getSellApprovals = async (req, res, next) => {
         const filter = { type: "sell" };
         if (status !== "all") filter.status = status;
 
+        const AppConfig = require("../models/AppConfig");
+        let appConfig = await AppConfig.findOne();
+        const holdingDays = (appConfig && appConfig.newUsersSellHoldingDays !== undefined) ? Number(appConfig.newUsersSellHoldingDays) : 30;
+
         const wantGold = metal === "all" || metal === "gold";
         const wantSilver = metal === "all" || metal === "silver";
         const wantCopper = metal === "all" || metal === "copper";
 
         const [goldTxns, silverTxns, copperTxns] = await Promise.all([
-            wantGold ? GoldTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
-            wantSilver ? SilverTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
-            wantCopper ? CopperTransaction.find(filter).populate("user", "name email phone").sort({ createdAt: -1 }) : [],
+            wantGold ? GoldTransaction.find(filter).populate("user", "name email phone createdAt").sort({ createdAt: -1 }) : [],
+            wantSilver ? SilverTransaction.find(filter).populate("user", "name email phone createdAt").sort({ createdAt: -1 }) : [],
+            wantCopper ? CopperTransaction.find(filter).populate("user", "name email phone createdAt").sort({ createdAt: -1 }) : [],
         ]);
 
         const combined = [
@@ -1428,11 +1432,76 @@ exports.getSellApprovals = async (req, res, next) => {
             ...copperTxns.map(t => ({ ...t.toObject(), metal: "copper", value: t.copperValue })),
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+        // Annotate each transaction with first buy date and holding period info
+        const userIds = [...new Set(combined.map(t => t.user?._id || t.user).filter(Boolean))];
+        const [userGoldFirstBuys, userSilverFirstBuys, userCopperFirstBuys] = await Promise.all([
+            GoldTransaction.aggregate([
+                { $match: { user: { $in: userIds }, type: { $in: ["buy", "sip_buy"] }, status: "success" } },
+                { $group: { _id: "$user", firstDate: { $min: "$createdAt" } } }
+            ]),
+            SilverTransaction.aggregate([
+                { $match: { user: { $in: userIds }, type: { $in: ["buy", "sip_buy"] }, status: "success" } },
+                { $group: { _id: "$user", firstDate: { $min: "$createdAt" } } }
+            ]),
+            CopperTransaction ? CopperTransaction.aggregate([
+                { $match: { user: { $in: userIds }, type: { $in: ["buy", "sip_buy"] }, status: "success" } },
+                { $group: { _id: "$user", firstDate: { $min: "$createdAt" } } }
+            ]) : []
+        ]);
+
+        const firstBuyMap = {};
+        userGoldFirstBuys.forEach(x => {
+            firstBuyMap[String(x._id)] = x.firstDate;
+        });
+        userSilverFirstBuys.forEach(x => {
+            const uid = String(x._id);
+            if (!firstBuyMap[uid] || x.firstDate < firstBuyMap[uid]) {
+                firstBuyMap[uid] = x.firstDate;
+            }
+        });
+        userCopperFirstBuys.forEach(x => {
+            const uid = String(x._id);
+            if (!firstBuyMap[uid] || x.firstDate < firstBuyMap[uid]) {
+                firstBuyMap[uid] = x.firstDate;
+            }
+        });
+
         const total = combined.length;
         const start = (page - 1) * limit;
-        const paged = combined.slice(start, start + Number(limit));
+        const paged = combined.slice(start, start + Number(limit)).map(t => {
+            const uid = String(t.user?._id || t.user || "");
+            const firstBuyDate = firstBuyMap[uid] || t.user?.createdAt || null;
+            let daysSinceFirstBuy = null;
+            let isHoldingPeriodMet = true;
+            let daysRemainingInHold = 0;
 
-        res.json({ success: true, data: paged, total, page: +page, pages: Math.ceil(total / limit) });
+            if (firstBuyDate && holdingDays > 0) {
+                const elapsedMs = new Date(t.createdAt).getTime() - new Date(firstBuyDate).getTime();
+                daysSinceFirstBuy = Math.max(0, Math.floor(elapsedMs / (24 * 60 * 60 * 1000)));
+                isHoldingPeriodMet = daysSinceFirstBuy >= holdingDays;
+                if (!isHoldingPeriodMet) {
+                    daysRemainingInHold = Math.max(1, Math.ceil(holdingDays - (elapsedMs / (24 * 60 * 60 * 1000))));
+                }
+            }
+
+            return {
+                ...t,
+                holdingDaysConfigured: holdingDays,
+                firstBuyDate,
+                daysSinceFirstBuy,
+                isHoldingPeriodMet,
+                daysRemainingInHold
+            };
+        });
+
+        res.json({
+            success: true,
+            data: paged,
+            total,
+            page: +page,
+            pages: Math.ceil(total / limit),
+            newUsersSellHoldingDays: holdingDays
+        });
     } catch (err) { next(err); }
 };
 
@@ -2135,17 +2204,60 @@ exports.getAppConfig = async (req, res, next) => {
 
 exports.updateAppConfig = async (req, res, next) => {
     try {
-        const { latestVersion, forceUpdate, playStoreUrl } = req.body;
+        const { latestVersion, forceUpdate, playStoreUrl, newUsersSellHoldingDays } = req.body;
         let config = await AppConfig.findOne();
         if (!config) {
-            config = await AppConfig.create({ latestVersion, forceUpdate, playStoreUrl });
+            config = await AppConfig.create({ latestVersion, forceUpdate, playStoreUrl, newUsersSellHoldingDays });
         } else {
             if (latestVersion !== undefined) config.latestVersion = latestVersion;
             if (forceUpdate !== undefined) config.forceUpdate = forceUpdate;
             if (playStoreUrl !== undefined) config.playStoreUrl = playStoreUrl;
+            if (newUsersSellHoldingDays !== undefined) config.newUsersSellHoldingDays = Math.max(0, Math.floor(Number(newUsersSellHoldingDays)));
             await config.save();
         }
-        res.json({ success: true, message: "App version configuration updated successfully", data: config });
+        res.json({ success: true, message: "App configuration updated successfully", data: config });
+    } catch (err) { next(err); }
+};
+
+// ── NEW USER SELL HOLDING SETTINGS (Lock-in Period) ───────────────
+exports.getSellSettings = async (req, res, next) => {
+    try {
+        let config = await AppConfig.findOne();
+        if (!config) {
+            config = await AppConfig.create({});
+        }
+        res.json({
+            success: true,
+            data: {
+                newUsersSellHoldingDays: config.newUsersSellHoldingDays !== undefined ? config.newUsersSellHoldingDays : 30
+            }
+        });
+    } catch (err) { next(err); }
+};
+
+exports.updateSellSettings = async (req, res, next) => {
+    try {
+        let { newUsersSellHoldingDays } = req.body;
+        if (newUsersSellHoldingDays === undefined || isNaN(Number(newUsersSellHoldingDays)) || Number(newUsersSellHoldingDays) < 0) {
+            return res.status(400).json({ success: false, message: "Valid number of days is required (0 to disable restriction)" });
+        }
+        newUsersSellHoldingDays = Math.max(0, Math.floor(Number(newUsersSellHoldingDays)));
+
+        let config = await AppConfig.findOne();
+        if (!config) {
+            config = await AppConfig.create({ newUsersSellHoldingDays });
+        } else {
+            config.newUsersSellHoldingDays = newUsersSellHoldingDays;
+            await config.save();
+        }
+
+        res.json({
+            success: true,
+            message: `New user sell holding period updated to ${newUsersSellHoldingDays} days`,
+            data: {
+                newUsersSellHoldingDays: config.newUsersSellHoldingDays
+            }
+        });
     } catch (err) { next(err); }
 };
 

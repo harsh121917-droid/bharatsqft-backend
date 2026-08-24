@@ -478,6 +478,12 @@ exports.sellGold = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Bank account required" });
         }
 
+        const { checkSellHoldPeriod } = require("./walletController");
+        const holdCheck = await checkSellHoldPeriod(req.user._id);
+        if (!holdCheck.allowed) {
+            return res.status(400).json({ success: false, message: holdCheck.message });
+        }
+
         const [bal, rates] = await Promise.all([
             getOrCreateBalance(req.user._id),
             fetchLiveRates(),
