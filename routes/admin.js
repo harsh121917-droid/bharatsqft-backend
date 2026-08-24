@@ -13,6 +13,7 @@ const {
   getAdminCoins, createCoin, updateCoin, deleteCoin,
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
+  getInventory, updateInventoryStock, backfillInventorySkus,
   addWalletMoney,
   deductWalletMoney,
   recalculateVaultBalance,
@@ -97,5 +98,10 @@ router.post("/app-config", updateAppConfig);
 // Jewellery Order Management
 router.get("/jewellery-orders", getJewelleryOrders);
 router.put("/jewellery-orders/:id", updateJewelleryOrder);
+
+// Inventory & SKU Management
+router.get("/inventory", getInventory);
+router.put("/inventory/:type/:id", updateInventoryStock);
+router.post("/inventory/backfill-skus", backfillInventorySkus);
 
 module.exports = router;

@@ -148,6 +148,7 @@ const pageTitles = {
     sellapprovals: "Sell Payout Approvals",
     rewards: "Rewards Program",
     jewellery: "Jewellery & Bullion Catalog",
+    inventory: "Jewellery & Bullion Inventory Suite",
     jewelleryorders: "Jewellery & Bullion Orders",
     coupons: "Coupons & Promotional Offers",
     notifications: "Push Notifications Hub",
@@ -211,6 +212,9 @@ function showPage(pageId) {
         case "jewellery":
             loadJewellery();
             loadCoins();
+            break;
+        case "inventory":
+            loadInventory();
             break;
         case "jewelleryorders":
             loadJewelleryOrders(1);

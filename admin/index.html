@@ -130,6 +130,10 @@
                 <div class="nav-item-icon"><i class="fas fa-gem"></i></div>
                 <span class="nav-item-label">Jewellery & Coins</span>
             </div>
+            <div class="nav-item" onclick="showPage('inventory')" id="nav-inventory">
+                <div class="nav-item-icon"><i class="fas fa-boxes"></i></div>
+                <span class="nav-item-label">Inventory & SKUs</span>
+            </div>
             <div class="nav-item" onclick="showPage('jewelleryorders')" id="nav-jewelleryorders">
                 <div class="nav-item-icon"><i class="fas fa-shipping-fast"></i></div>
                 <span class="nav-item-label">Jewellery Orders</span>
@@ -725,7 +729,8 @@
                             <span class="badge badge-gold" id="userinvestments-count-badge"
                                 style="font-size:12px;margin-left:6px">0 Investors</span>
                         </div>
-                        <div class="section-subtitle">Customers with active Gold, Silver, and Copper vault holdings, current
+                        <div class="section-subtitle">Customers with active Gold, Silver, and Copper vault holdings,
+                            current
                             valuation, and P&L</div>
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -833,10 +838,12 @@
                     <div class="custody-vault-card card-copper">
                         <div class="custody-vault-header">
                             <div class="custody-vault-title-wrap">
-                                <div class="custody-vault-icon icon-copper-glow"><i class="fas fa-layer-group"></i></div>
+                                <div class="custody-vault-icon icon-copper-glow"><i class="fas fa-layer-group"></i>
+                                </div>
                                 <div>
                                     <div class="custody-vault-title">Copper 999 Vault</div>
-                                    <div style="font-size:10.5px;color:var(--text-dim)">99.9% Pure Industrial Bullion</div>
+                                    <div style="font-size:10.5px;color:var(--text-dim)">99.9% Pure Industrial Bullion
+                                    </div>
                                 </div>
                             </div>
                             <span class="custody-vault-tag tag-copper"><i class="fas fa-shield-alt"></i> 100%
@@ -1108,6 +1115,9 @@
                                 onclick="switchJewelleryTab('products')">Jewellery Products</button>
                             <button class="chart-pill-btn jewellery-tab-btn" id="tab-jewellery-coins-btn"
                                 onclick="switchJewelleryTab('coins')">Bullion Mint Coins</button>
+                            <button class="chart-pill-btn jewellery-tab-btn" id="tab-jewellery-inventory-btn"
+                                onclick="switchJewelleryTab('inventory')"><i class="fas fa-boxes"></i> Inventory &
+                                SKUs</button>
                             <button class="chart-pill-btn jewellery-tab-btn" id="tab-jewellery-categories-btn"
                                 onclick="switchJewelleryTab('categories')">Categories</button>
                         </div>
@@ -1117,6 +1127,8 @@
                             style="display:none"><i class="fas fa-plus"></i> Add Coin</button>
                         <button class="btn btn-primary" id="btn-add-category-top" onclick="openCategoryModal()"
                             style="display:none"><i class="fas fa-plus"></i> Add Category</button>
+                        <button class="btn btn-primary" id="btn-backfill-skus-top" onclick="runBackfillSkus()"
+                            style="display:none"><i class="fas fa-magic"></i> Auto-Generate SKUs</button>
                     </div>
                 </div>
 
@@ -1129,8 +1141,8 @@
                             <!-- Populated dynamically -->
                         </div>
                         <div style="display:flex;gap:10px;align-items:center">
-                            <input class="search-bar" placeholder="🔍 Search product..."
-                                oninput="onJewellerySearch(this.value)" style="width:200px" />
+                            <input class="search-bar" placeholder="🔍 Search product or SKU..."
+                                oninput="onJewellerySearch(this.value)" style="width:220px" />
                             <select class="form-control" onchange="onJewelleryMetalFilter(this.value)"
                                 style="width:130px">
                                 <option value="all">All Metals</option>
@@ -1154,7 +1166,7 @@
                 <div id="jewellery-coins-panel" style="display:none">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
                         <div style="font-weight:700;font-size:14px;color:#fff">Configured Bullion Physical Delivery
-                            Coins</div>
+                            Coins & Bars</div>
                         <button class="btn btn-secondary" onclick="loadCoins()"><i class="fas fa-sync-alt"></i> Refresh
                             Coins</button>
                     </div>
@@ -1166,7 +1178,133 @@
                     </div>
                 </div>
 
-                <!-- Tab 3: Categories Panel -->
+                <!-- Tab 3: Inventory & SKU Management Suite -->
+                <div id="jewellery-inventory-panel" style="display:none">
+                    <!-- Inventory KPI Statistics -->
+                    <div class="fulfillment-kpi-grid" style="margin-bottom:1.25rem">
+                        <div class="fulfillment-kpi-card card-purple">
+                            <div class="fulfillment-card-top">
+                                <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-barcode"></i></div>
+                                <span class="fulfillment-tag tag-purple">Tracked SKUs</span>
+                            </div>
+                            <div class="fulfillment-card-body">
+                                <div class="fulfillment-label">Total Products / SKUs</div>
+                                <div class="fulfillment-val val-purple" id="inv-stat-total">0</div>
+                                <div class="fulfillment-subtext"><i class="fas fa-layer-group"></i> Active catalog lines
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="fulfillment-kpi-card card-green">
+                            <div class="fulfillment-card-top">
+                                <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-check-double"></i>
+                                </div>
+                                <span class="fulfillment-tag tag-green">In Stock</span>
+                            </div>
+                            <div class="fulfillment-card-body">
+                                <div class="fulfillment-label">In Stock Lines</div>
+                                <div class="fulfillment-val val-green" id="inv-stat-instock">0</div>
+                                <div class="fulfillment-subtext"><i class="fas fa-boxes"></i> Healthy inventory</div>
+                            </div>
+                        </div>
+
+                        <div class="fulfillment-kpi-card card-amber">
+                            <div class="fulfillment-card-top">
+                                <div class="fulfillment-icon-box icon-amber-glow"><i
+                                        class="fas fa-exclamation-triangle"></i></div>
+                                <span class="fulfillment-tag tag-amber">Low Stock Alert</span>
+                            </div>
+                            <div class="fulfillment-card-body">
+                                <div class="fulfillment-label">Low Stock Warnings</div>
+                                <div class="fulfillment-val val-amber" id="inv-stat-lowstock">0</div>
+                                <div class="fulfillment-subtext"><i class="fas fa-bell"></i> Reorder recommended</div>
+                            </div>
+                        </div>
+
+                        <div class="fulfillment-kpi-card card-danger"
+                            style="border:1px solid rgba(239,68,68,0.3);background:linear-gradient(145deg, rgba(239,68,68,0.06), var(--surface))">
+                            <div class="fulfillment-card-top">
+                                <div class="fulfillment-icon-box" style="background:rgba(239,68,68,0.15);color:#ef4444">
+                                    <i class="fas fa-times-circle"></i></div>
+                                <span class="fulfillment-tag"
+                                    style="background:rgba(239,68,68,0.15);color:#ef4444">Depleted</span>
+                            </div>
+                            <div class="fulfillment-card-body">
+                                <div class="fulfillment-label">Out of Stock</div>
+                                <div class="fulfillment-val" style="color:#ef4444" id="inv-stat-outofstock">0</div>
+                                <div class="fulfillment-subtext"><i class="fas fa-ban"></i> Blocked from purchase</div>
+                            </div>
+                        </div>
+
+                        <div class="fulfillment-kpi-card card-blue">
+                            <div class="fulfillment-card-top">
+                                <div class="fulfillment-icon-box icon-blue-glow"><i class="fas fa-truck-loading"></i>
+                                </div>
+                                <span class="fulfillment-tag tag-blue">Fulfilled</span>
+                            </div>
+                            <div class="fulfillment-card-body">
+                                <div class="fulfillment-label">Total Units Sold</div>
+                                <div class="fulfillment-val val-blue" id="inv-stat-sold">0</div>
+                                <div class="fulfillment-subtext"><i class="fas fa-hand-holding-usd"></i> Delivered to
+                                    customers</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inventory Search & Filter Controls -->
+                    <div
+                        style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem;background:var(--surface2);padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border)">
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1">
+                            <input class="search-bar" id="inventory-search-input"
+                                placeholder="🔍 Search SKU, Product Name, Category, Purity..."
+                                oninput="onInventorySearch(this.value)" style="min-width:280px;flex:1" />
+
+                            <select class="form-control" id="inventory-type-filter" onchange="onInventoryFilterChange()"
+                                style="width:150px">
+                                <option value="all">All Types</option>
+                                <option value="jewellery">Jewellery</option>
+                                <option value="coin">Coins & Bars</option>
+                            </select>
+
+                            <select class="form-control" id="inventory-metal-filter"
+                                onchange="onInventoryFilterChange()" style="width:130px">
+                                <option value="all">All Metals</option>
+                                <option value="gold">Gold</option>
+                                <option value="silver">Silver</option>
+                            </select>
+
+                            <select class="form-control" id="inventory-status-filter"
+                                onchange="onInventoryFilterChange()" style="width:150px">
+                                <option value="all">All Stock Status</option>
+                                <option value="in_stock">🟢 In Stock</option>
+                                <option value="low_stock">🟡 Low Stock</option>
+                                <option value="out_of_stock">🔴 Out of Stock</option>
+                            </select>
+                        </div>
+
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <button class="btn btn-secondary" onclick="runBackfillSkus()"
+                                title="Generate Unique SKUs for products missing SKU">
+                                <i class="fas fa-barcode"></i> Sync SKUs
+                            </button>
+                            <button class="btn btn-secondary" onclick="loadInventory()" title="Refresh Inventory Data">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Inventory Data Table -->
+                    <div class="table-wrap">
+                        <div id="inventory-table-body">
+                            <div class="loading-box">
+                                <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                                <div>Loading SKU inventory database...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Categories Panel -->
                 <div id="jewellery-categories-panel" style="display:none">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
                         <div style="font-weight:700;font-size:14px;color:#fff">Jewellery & Bullion Product Categories
@@ -1180,6 +1318,29 @@
                             <div>Loading categories...</div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Standalone Inventory Page (Direct Sidebar Destination) -->
+            <div class="page" id="page-inventory">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fas fa-boxes" style="color:var(--gold)"></i> Jewellery &
+                            Bullion Inventory Suite</div>
+                        <div class="section-subtitle">Real-time stock control, SKU tracking, reserved units, and
+                            automated order synchronization</div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center">
+                        <button class="btn btn-primary" onclick="openJewelleryModal()"><i class="fas fa-plus"></i> Add
+                            Jewellery</button>
+                        <button class="btn btn-primary" onclick="openCoinModal()"><i class="fas fa-plus"></i> Add
+                            Coin</button>
+                        <button class="btn btn-secondary" onclick="runBackfillSkus()"><i class="fas fa-barcode"></i>
+                            Sync SKUs</button>
+                    </div>
+                </div>
+                <div id="standalone-inventory-mount">
+                    <!-- Cloned dynamically from inventory panel for unified interaction -->
                 </div>
             </div>
 
@@ -1628,20 +1789,24 @@
 
                 <!-- 2. User Wallet Section -->
                 <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1.25rem">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px">
                         <div style="font-weight:700;color:var(--gold);display:flex;align-items:center;gap:6px">
                             <i class="fas fa-wallet"></i> User Wallet Management
                         </div>
                     </div>
 
                     <!-- Current Balance Card -->
-                    <div style="background:var(--surface2);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                    <div
+                        style="background:var(--surface2);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
                         <div>
                             <div style="font-size:12px;color:var(--text-dim)">Available Wallet Balance</div>
-                            <div style="font-size:1.5rem;font-weight:800;color:var(--gold);font-family:var(--font-mono)" id="user-wallet-balance">₹0</div>
+                            <div style="font-size:1.5rem;font-weight:800;color:var(--gold);font-family:var(--font-mono)"
+                                id="user-wallet-balance">₹0</div>
                         </div>
                         <div style="text-align:right">
-                            <span class="badge badge-gold" style="font-size:11.5px"><i class="fas fa-shield-alt"></i> Instant Settlement</span>
+                            <span class="badge badge-gold" style="font-size:11.5px"><i class="fas fa-shield-alt"></i>
+                                Instant Settlement</span>
                         </div>
                     </div>
 
@@ -1649,26 +1814,32 @@
                     <div class="form-grid-2" style="margin-bottom:0.75rem">
                         <div class="form-group" style="margin-bottom:0">
                             <label class="form-label">Amount (₹)</label>
-                            <input class="form-control" type="number" id="user-wallet-amt" placeholder="e.g. 5000" min="1" step="any" />
+                            <input class="form-control" type="number" id="user-wallet-amt" placeholder="e.g. 5000"
+                                min="1" step="any" />
                         </div>
                         <div class="form-group" style="margin-bottom:0">
                             <label class="form-label">Note / Reason (Optional)</label>
-                            <input class="form-control" id="user-wallet-note" placeholder="e.g. Bonus, Adjustment, Refund" />
+                            <input class="form-control" id="user-wallet-note"
+                                placeholder="e.g. Bonus, Adjustment, Refund" />
                         </div>
                     </div>
 
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:0.75rem">
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:0.75rem">
+                        <label
+                            style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none">
                             <input type="checkbox" id="user-wallet-show-tx" checked />
                             <span>Show in user transaction history</span>
                         </label>
 
                         <!-- Action Buttons: Add (+) & Deduct (-) -->
                         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                            <button class="btn btn-success" id="user-wallet-add-btn" onclick="adjustUserWallet('add')" style="height:40px;padding:0 18px">
+                            <button class="btn btn-success" id="user-wallet-add-btn" onclick="adjustUserWallet('add')"
+                                style="height:40px;padding:0 18px">
                                 <i class="fas fa-plus-circle"></i> Add Money (+)
                             </button>
-                            <button class="btn btn-danger" id="user-wallet-deduct-btn" onclick="adjustUserWallet('deduct')" style="height:40px;padding:0 18px">
+                            <button class="btn btn-danger" id="user-wallet-deduct-btn"
+                                onclick="adjustUserWallet('deduct')" style="height:40px;padding:0 18px">
                                 <i class="fas fa-minus-circle"></i> Deduct Money (-)
                             </button>
                         </div>
@@ -1703,25 +1874,34 @@
                 </div>
 
                 <!-- 5. Testing & Developer Reset Section -->
-                <div style="margin-top:1.25rem;border-top:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.04);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px dashed rgba(239,68,68,0.35)">
-                    <div style="font-weight:700;color:var(--danger);margin-bottom:0.35rem;display:flex;align-items:center;justify-content:space-between">
-                        <span style="display:flex;align-items:center;gap:6px"><i class="fas fa-flask"></i> Testing & Reset Utilities</span>
-                        <span class="badge badge-danger" style="font-size:10px;text-transform:uppercase">Developer / Admin Mode</span>
+                <div
+                    style="margin-top:1.25rem;border-top:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.04);padding:1rem 1.25rem;border-radius:var(--radius-md);border:1px dashed rgba(239,68,68,0.35)">
+                    <div
+                        style="font-weight:700;color:var(--danger);margin-bottom:0.35rem;display:flex;align-items:center;justify-content:space-between">
+                        <span style="display:flex;align-items:center;gap:6px"><i class="fas fa-flask"></i> Testing &
+                            Reset Utilities</span>
+                        <span class="badge badge-danger" style="font-size:10px;text-transform:uppercase">Developer /
+                            Admin Mode</span>
                     </div>
                     <div style="font-size:12px;color:var(--text-dim);margin-bottom:0.85rem">
-                        Quickly wipe testing trades, buy/sell transaction logs, and wallet balances back to 0.00 without having to delete the user account.
+                        Quickly wipe testing trades, buy/sell transaction logs, and wallet balances back to 0.00 without
+                        having to delete the user account.
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <button class="btn btn-outline-danger btn-sm" id="user-reset-wallet-btn" onclick="resetUserWalletData()" style="font-size:12px">
+                        <button class="btn btn-outline-danger btn-sm" id="user-reset-wallet-btn"
+                            onclick="resetUserWalletData()" style="font-size:12px">
                             <i class="fas fa-wallet"></i> Reset Wallet & Logs (₹0)
                         </button>
-                        <button class="btn btn-outline-danger btn-sm" id="user-reset-vault-btn" onclick="resetUserVaultData()" style="font-size:12px">
+                        <button class="btn btn-outline-danger btn-sm" id="user-reset-vault-btn"
+                            onclick="resetUserVaultData()" style="font-size:12px">
                             <i class="fas fa-coins"></i> Clear Bullion Trades & Vault (0g)
                         </button>
-                        <button class="btn btn-outline-danger btn-sm" id="user-reset-rewards-btn" onclick="resetUserRewardsData()" style="font-size:12px">
+                        <button class="btn btn-outline-danger btn-sm" id="user-reset-rewards-btn"
+                            onclick="resetUserRewardsData()" style="font-size:12px">
                             <i class="fas fa-gift"></i> Reset Rewards & Spins (0 pts, 3 spins)
                         </button>
-                        <button class="btn btn-danger btn-sm" id="user-reset-all-btn" onclick="resetAllUserTestingData()" style="font-size:12px;font-weight:700">
+                        <button class="btn btn-danger btn-sm" id="user-reset-all-btn"
+                            onclick="resetAllUserTestingData()" style="font-size:12px;font-weight:700">
                             <i class="fas fa-bomb"></i> Wipe All User Data (Full Reset)
                         </button>
                     </div>
@@ -1981,11 +2161,17 @@
             </div>
             <div class="modal-body">
                 <form id="jewellery-form" onsubmit="event.preventDefault()">
-                    <div class="form-grid-2">
+                    <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Product Name</label>
                             <input class="form-control" id="jewellery-name" placeholder="22K Kundan Choker Necklace"
                                 required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Product SKU (Stock Keeping Unit)</label>
+                            <input class="form-control font-mono" id="jewellery-sku"
+                                placeholder="e.g. VIKA-GOLD-NECK-001 (Auto if empty)"
+                                style="text-transform:uppercase" />
                         </div>
                         <div class="form-group">
                             <label class="form-label">Category</label>
@@ -2015,7 +2201,14 @@
                         </div>
                     </div>
 
-                    <div class="form-grid-3">
+                    <div class="form-grid-4">
+                        <div class="form-group">
+                            <label class="form-label">Selling Price / MRP (₹)</label>
+                            <input class="form-control" type="number" id="jewellery-price"
+                                placeholder="e.g. 45000 (0 = auto-calc)" value="0" />
+                            <div style="font-size:11px;color:var(--text-dim);margin-top:3px">Direct price or 0 for live
+                                rate</div>
+                        </div>
                         <div class="form-group">
                             <label class="form-label">Making Charges (₹)</label>
                             <input class="form-control" type="number" id="jewellery-making" placeholder="2500"
@@ -2028,6 +2221,27 @@
                         <div class="form-group">
                             <label class="form-label">Image URL</label>
                             <input class="form-control" id="jewellery-image-url" placeholder="https://..." />
+                        </div>
+                    </div>
+
+                    <!-- Inventory & Stock Controls -->
+                    <div
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1rem">
+                        <div
+                            style="font-size:12.5px;font-weight:700;color:var(--gold);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-boxes"></i> Inventory Stock Management
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group" style="margin-bottom:0">
+                                <label class="form-label">Available Physical Stock (Units)</label>
+                                <input class="form-control" type="number" id="jewellery-available-qty" value="10"
+                                    min="0" placeholder="10" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0">
+                                <label class="form-label">Low Stock Warning Threshold</label>
+                                <input class="form-control" type="number" id="jewellery-low-threshold" value="5" min="0"
+                                    placeholder="5" />
+                            </div>
                         </div>
                     </div>
 
@@ -2058,18 +2272,36 @@
 
     <!-- Bullion Coin Modal -->
     <div class="modal-overlay" id="coin-modal" style="display:none">
-        <div class="modal">
+        <div class="modal modal-lg">
             <div class="modal-header">
-                <div class="modal-title" id="coin-modal-title">Bullion Coin</div>
+                <div class="modal-title" id="coin-modal-title">Bullion Coin / Bar</div>
                 <button class="modal-close" onclick="closeCoinModal()">×</button>
             </div>
             <div class="modal-body">
                 <form id="coin-form" onsubmit="event.preventDefault()">
-                    <div class="form-group">
-                        <label class="form-label">Coin Name</label>
-                        <input class="form-control" id="coin-name" placeholder="10g 24K Lakshmi Gold Coin" required />
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Coin / Bar Name</label>
+                            <input class="form-control" id="coin-name" placeholder="10g 24K Lakshmi Gold Coin"
+                                required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Coin SKU (Stock Keeping Unit)</label>
+                            <input class="form-control font-mono" id="coin-sku"
+                                placeholder="e.g. VIKA-GOLD-COIN-10G-001 (Auto if empty)"
+                                style="text-transform:uppercase" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <select class="form-control" id="coin-category">
+                                <option value="Coins & Bars">Coins & Bars</option>
+                                <option value="Gold Coins">Gold Coins</option>
+                                <option value="Silver Coins">Silver Coins</option>
+                                <option value="Bullion Bars">Bullion Bars</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-grid-2">
+                    <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Metal</label>
                             <select class="form-control" id="coin-metal">
@@ -2078,12 +2310,24 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label class="form-label">Purity</label>
+                            <input class="form-control" id="coin-purity" value="24K 999 Purity"
+                                placeholder="24K 999 Purity" />
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">Weight (Grams)</label>
                             <input class="form-control" type="number" step="0.01" id="coin-grams" placeholder="10"
                                 required />
                         </div>
                     </div>
-                    <div class="form-grid-2">
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Selling Price / MRP (₹)</label>
+                            <input class="form-control" type="number" id="coin-price"
+                                placeholder="e.g. 8500 (0 = auto-calc)" value="0" />
+                            <div style="font-size:11px;color:var(--text-dim);margin-top:3px">Direct price or 0 for live
+                                rate</div>
+                        </div>
                         <div class="form-group">
                             <label class="form-label">Making / Minting Charge (%)</label>
                             <input class="form-control" type="number" step="0.1" id="coin-making-pct" value="5"
@@ -2094,6 +2338,28 @@
                             <input class="form-control" id="coin-image-url" placeholder="https://..." />
                         </div>
                     </div>
+
+                    <!-- Inventory Stock Controls for Bullion Coin -->
+                    <div
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1rem">
+                        <div
+                            style="font-size:12.5px;font-weight:700;color:var(--gold);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-boxes"></i> Minting & Inventory Stock
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group" style="margin-bottom:0">
+                                <label class="form-label">Available Physical Stock (Units)</label>
+                                <input class="form-control" type="number" id="coin-available-qty" value="50" min="0"
+                                    placeholder="50" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0">
+                                <label class="form-label">Low Stock Warning Threshold</label>
+                                <input class="form-control" type="number" id="coin-low-threshold" value="10" min="0"
+                                    placeholder="10" />
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="margin-top:6px">
                         <label
                             style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:#fff;font-size:13px">
@@ -2160,6 +2426,9 @@
                             <div style="font-size:12.5px;color:var(--text-muted);margin-top:2px"
                                 id="order-detail-product-info">Product info</div>
                         </div>
+                        <div id="order-detail-sku-badge" style="display:inline-block">
+                            <!-- SKU Pill -->
+                        </div>
                     </div>
                     <div
                         style="font-size:12.5px;color:var(--text-dim);margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
@@ -2171,7 +2440,7 @@
 
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label class="form-label">Delivery Status</label>
+                        <label class="form-label">Delivery Status (Auto-syncs Inventory)</label>
                         <select class="form-control" id="order-detail-status">
                             <option value="placed">Placed</option>
                             <option value="pending">Pending</option>
@@ -2179,8 +2448,10 @@
                             <option value="out_of_warehouse">Out of Warehouse</option>
                             <option value="shipped">Shipped</option>
                             <option value="out_for_delivery">Out for Delivery</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
+                            <option value="delivered">Delivered (Move Reserved -> Sold)</option>
+                            <option value="cancelled">Cancelled (Restore Stock)</option>
+                            <option value="returned">Returned (Restock Inventory)</option>
+                            <option value="refunded">Refunded (Restock Inventory)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -2221,87 +2492,152 @@
         </div>
     </div>
 
-    <!-- Payment Gateway Modal -->
-    <div class="modal-overlay" id="gateway-modal" style="display:none">
+    <!-- Quick Restock / Stock Adjust Modal -->
+    <div class="modal-overlay" id="inventory-restock-modal" style="display:none">
         <div class="modal">
             <div class="modal-header">
-                <div class="modal-title" id="gateway-modal-title">Payment Gateway</div>
-                <button class="modal-close" onclick="closeGatewayModal()">×</button>
+                <div class="modal-title">Quick Restock & Stock Control</div>
+                <button class="modal-close" onclick="closeRestockModal()">×</button>
             </div>
             <div class="modal-body">
-                <form id="gateway-form" onsubmit="event.preventDefault()">
+                <div
+                    style="background:var(--surface2);padding:14px;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="font-weight:700;color:#fff;font-size:15px" id="restock-product-name">Product Name</div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+                        <span class="badge badge-purple font-mono" id="restock-product-sku">SKU: VIKA-GOLD-001</span>
+                        <span class="badge" id="restock-stock-status-pill">In Stock</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Current Available Quantity</label>
+                    <div style="font-size:24px;font-weight:800;color:#fff;font-family:var(--font-mono)"
+                        id="restock-current-qty">0</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Quick Add Units</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyQuickStockAdd(5)">+5
+                            Units</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyQuickStockAdd(10)">+10
+                            Units</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyQuickStockAdd(25)">+25
+                            Units</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyQuickStockAdd(50)">+50
+                            Units</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyQuickStockAdd(100)">+100
+                            Units</button>
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
                     <div class="form-group">
-                        <label class="form-label">Gateway Name</label>
-                        <input class="form-control" id="gateway-name" placeholder="Razorpay Primary" required />
+                        <label class="form-label">Set New Available Stock</label>
+                        <input class="form-control" type="number" id="restock-new-qty" min="0"
+                            placeholder="New stock count" />
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Provider Type</label>
-                        <select class="form-control" id="gateway-type">
-                            <option value="razorpay">Razorpay</option>
-                            <option value="cashfree">Cashfree</option>
-                            <option value="phonepe">PhonePe</option>
-                        </select>
+                        <label class="form-label">Low Stock Threshold</label>
+                        <input class="form-control" type="number" id="restock-low-threshold" min="0" placeholder="5" />
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">API Key / Merchant ID</label>
-                        <input class="form-control" id="gateway-key" placeholder="rzp_live_..." required />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">API Secret (Leave blank to keep unchanged)</label>
-                        <input class="form-control" type="password" id="gateway-secret" placeholder="••••••••••••" />
-                    </div>
-                </form>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Edit SKU Reference</label>
+                    <input class="form-control font-mono" id="restock-edit-sku" placeholder="VIKA-GOLD-RING-001"
+                        style="text-transform:uppercase" />
+                </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveGateway()">Save Gateway</button>
+                <button class="btn btn-secondary" onclick="closeRestockModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRestock()"><i class="fas fa-check"></i> Update Inventory
+                    Stock</button>
             </div>
         </div>
-    </div>
 
-    <!-- ══════════════════════════════════════════════════════════
+        <!-- Payment Gateway Modal -->
+        <div class="modal-overlay" id="gateway-modal" style="display:none">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title" id="gateway-modal-title">Payment Gateway</div>
+                    <button class="modal-close" onclick="closeGatewayModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="gateway-form" onsubmit="event.preventDefault()">
+                        <div class="form-group">
+                            <label class="form-label">Gateway Name</label>
+                            <input class="form-control" id="gateway-name" placeholder="Razorpay Primary" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Provider Type</label>
+                            <select class="form-control" id="gateway-type">
+                                <option value="razorpay">Razorpay</option>
+                                <option value="cashfree">Cashfree</option>
+                                <option value="phonepe">PhonePe</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Key / Merchant ID</label>
+                            <input class="form-control" id="gateway-key" placeholder="rzp_live_..." required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Secret (Leave blank to keep unchanged)</label>
+                            <input class="form-control" type="password" id="gateway-secret"
+                                placeholder="••••••••••••" />
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveGateway()">Save Gateway</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════
          Logout Confirmation Popup Modal
          ══════════════════════════════════════════════════════════ -->
-    <div class="modal-overlay" id="logout-modal" style="display:none">
-        <div class="modal modal-sm logout-modal-card">
-            <div class="logout-modal-content">
-                <div class="logout-icon-glow">
-                    <i class="fas fa-sign-out-alt"></i>
-                </div>
-                <div class="logout-modal-title">Sign Out of Console?</div>
-                <div class="logout-modal-desc">
-                    Are you sure you want to end your current session? You will need to log back in with your
-                    credentials to access the admin suite.
-                </div>
-                <div class="logout-modal-actions">
-                    <button class="btn btn-secondary" onclick="closeLogoutModal()" style="flex:1;height:42px">
-                        Cancel
-                    </button>
-                    <button class="btn btn-danger" onclick="doLogout()" style="flex:1;height:42px">
-                        <i class="fas fa-sign-out-alt"></i> Sign Out
-                    </button>
+        <div class="modal-overlay" id="logout-modal" style="display:none">
+            <div class="modal modal-sm logout-modal-card">
+                <div class="logout-modal-content">
+                    <div class="logout-icon-glow">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </div>
+                    <div class="logout-modal-title">Sign Out of Console?</div>
+                    <div class="logout-modal-desc">
+                        Are you sure you want to end your current session? You will need to log back in with your
+                        credentials to access the admin suite.
+                    </div>
+                    <div class="logout-modal-actions">
+                        <button class="btn btn-secondary" onclick="closeLogoutModal()" style="flex:1;height:42px">
+                            Cancel
+                        </button>
+                        <button class="btn btn-danger" onclick="doLogout()" style="flex:1;height:42px">
+                            <i class="fas fa-sign-out-alt"></i> Sign Out
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- ══════════════════════════════════════════════════════════
+        <!-- ══════════════════════════════════════════════════════════
          5. MODULAR JAVASCRIPT BUNDLE
          ══════════════════════════════════════════════════════════ -->
-    <script src="js/config.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/users.js"></script>
-    <script src="js/kyc.js"></script>
-    <script src="js/properties.js"></script>
-    <script src="js/schemes.js"></script>
-    <script src="js/transactions.js"></script>
-    <script src="js/jewellery.js"></script>
-    <script src="js/gateways.js"></script>
-    <script src="js/rewards.js"></script>
-    <script src="js/notifications.js"></script>
-    <script src="js/coupons.js"></script>
-    <script src="js/app.js"></script>
+        <script src="js/config.js"></script>
+        <script src="js/api.js"></script>
+        <script src="js/dashboard.js"></script>
+        <script src="js/users.js"></script>
+        <script src="js/kyc.js"></script>
+        <script src="js/properties.js"></script>
+        <script src="js/schemes.js"></script>
+        <script src="js/transactions.js"></script>
+        <script src="js/jewellery.js"></script>
+        <script src="js/gateways.js"></script>
+        <script src="js/rewards.js"></script>
+        <script src="js/notifications.js"></script>
+        <script src="js/coupons.js"></script>
+        <script src="js/app.js"></script>
 </body>
 
 </html>

@@ -276,13 +276,44 @@ exports.getProducts = async (req, res, next) => {
     }
 };
 
+// Helper: Generate Unique SKU for Jewellery
+async function generateUniqueJewellerySku(metalType, category) {
+    const metal = (metalType || "gold").toUpperCase();
+    const cat = (category || "JEWEL").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4) || "JWEL";
+    const count = await Jewellery.countDocuments();
+    let serial = count + 1;
+    let sku = `VIKA-${metal}-${cat}-${String(serial).padStart(3, "0")}`;
+    let exists = await Jewellery.findOne({ sku });
+    while (exists) {
+        serial++;
+        sku = `VIKA-${metal}-${cat}-${String(serial).padStart(3, "0")}`;
+        exists = await Jewellery.findOne({ sku });
+    }
+    return sku;
+}
+
 // ADD Product (Admin)
 exports.addProduct = async (req, res, next) => {
     try {
-        const { name, category, metalType, purity, weightGrams, makingCharges, gstPercentage, description, imageUrl, images, inStock, isPopular } = req.body;
+        let { name, sku, category, metalType, purity, weightGrams, price, makingCharges, gstPercentage, description, imageUrl, images, availableQty, lowStockThreshold, inStock, isPopular } = req.body;
         if (!name || !category || !weightGrams) {
             return res.status(400).json({ success: false, message: "Name, category, and weight are required" });
         }
+
+        // Handle or generate SKU
+        if (sku && String(sku).trim()) {
+            sku = String(sku).trim().toUpperCase();
+            const existing = await Jewellery.findOne({ sku });
+            if (existing) {
+                return res.status(400).json({ success: false, message: `SKU "${sku}" is already in use by another product.` });
+            }
+        } else {
+            sku = await generateUniqueJewellerySku(metalType, category);
+        }
+
+        const qty = availableQty !== undefined ? Number(availableQty) : 10;
+        const lowThreshold = lowStockThreshold !== undefined ? Number(lowStockThreshold) : 5;
+        const sellingPrice = price !== undefined && Number(price) > 0 ? Number(price) : 0;
 
         let imageList = [];
         if (Array.isArray(images) && images.length > 0) {
@@ -295,16 +326,22 @@ exports.addProduct = async (req, res, next) => {
 
         const product = await Jewellery.create({
             name,
+            sku,
             category,
             metalType: metalType || "gold",
             purity: purity || "22K Gold",
             weightGrams: Number(weightGrams),
+            price: sellingPrice,
             makingCharges: Number(makingCharges || 1500),
             gstPercentage: Number(gstPercentage || 3),
             description: description || "",
             imageUrl: primaryImage,
             images: imageList,
-            inStock: inStock !== undefined ? inStock : true,
+            availableQty: qty,
+            reservedQty: 0,
+            soldQty: 0,
+            lowStockThreshold: lowThreshold,
+            inStock: qty > 0 && (inStock !== undefined ? inStock : true),
             isPopular: Boolean(isPopular)
         });
 
@@ -318,6 +355,23 @@ exports.addProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         let updateData = { ...req.body };
+        if (updateData.sku) {
+            updateData.sku = String(updateData.sku).trim().toUpperCase();
+            const existing = await Jewellery.findOne({ sku: updateData.sku, _id: { $ne: req.params.id } });
+            if (existing) {
+                return res.status(400).json({ success: false, message: `SKU "${updateData.sku}" is already assigned to "${existing.name}".` });
+            }
+        }
+
+        if (updateData.price !== undefined) {
+            updateData.price = Math.max(0, Number(updateData.price));
+        }
+
+        if (updateData.availableQty !== undefined) {
+            updateData.availableQty = Math.max(0, Number(updateData.availableQty));
+            updateData.inStock = updateData.availableQty > 0;
+        }
+
         if (updateData.images && Array.isArray(updateData.images)) {
             updateData.images = updateData.images.map(img => String(img).trim()).filter(Boolean);
             if (!updateData.imageUrl || !updateData.images.includes(updateData.imageUrl)) {
@@ -351,6 +405,11 @@ exports.initiateRedeemOrder = async (req, res, next) => {
         const jewellery = await Jewellery.findById(jewelleryId);
 
         if (!jewellery) return res.status(404).json({ success: false, message: "Product not found" });
+
+        // Stock check
+        if (jewellery.availableQty <= 0 || jewellery.inStock === false) {
+            return res.status(400).json({ success: false, message: "Sorry, this product is currently Out of Stock." });
+        }
 
         const weightGrams = jewellery.weightGrams;
         const metalType = jewellery.metalType;
@@ -433,18 +492,27 @@ exports.initiateRedeemOrder = async (req, res, next) => {
             user.walletBalance -= totalAmount;
             await user.save();
 
+            // Auto-update Inventory: decrement availableQty, increment reservedQty
+            jewellery.availableQty = Math.max(0, (jewellery.availableQty || 1) - 1);
+            jewellery.reservedQty = (jewellery.reservedQty || 0) + 1;
+            jewellery.inStock = jewellery.availableQty > 0;
+            await jewellery.save();
+
             // Record redemption directly
             const redemption = await JewelleryRedemption.create({
                 user: req.user._id,
                 jewellery: jewellery._id,
+                sku: jewellery.sku || "",
                 jewelleryName: jewellery.name,
                 metalType: jewellery.metalType,
                 weightGrams: jewellery.weightGrams,
+                quantity: 1,
                 makingCharges: making,
                 gstAmount: gst,
                 totalPaid: totalAmount,
                 paymentMethod: "wallet",
-                status: "completed"
+                status: "completed",
+                deliveryStatus: "placed"
             });
 
             return res.json({
@@ -470,19 +538,28 @@ exports.initiateRedeemOrder = async (req, res, next) => {
 
         const order = await razorpay.orders.create(options);
 
-        // Save pending redemption
+        // Auto-update Inventory: reserve item
+        jewellery.availableQty = Math.max(0, (jewellery.availableQty || 1) - 1);
+        jewellery.reservedQty = (jewellery.reservedQty || 0) + 1;
+        jewellery.inStock = jewellery.availableQty > 0;
+        await jewellery.save();
+
+        // Save pending redemption with SKU
         const redemption = await JewelleryRedemption.create({
             user: req.user._id,
             jewellery: jewellery._id,
+            sku: jewellery.sku || "",
             jewelleryName: jewellery.name,
             metalType: jewellery.metalType,
             weightGrams: jewellery.weightGrams,
+            quantity: 1,
             makingCharges: making,
             gstAmount: gst,
             totalPaid: totalAmount,
             paymentMethod: "razorpay",
             razorpayOrderId: order.id,
-            status: "pending"
+            status: "pending",
+            deliveryStatus: "placed"
         });
 
         res.json({

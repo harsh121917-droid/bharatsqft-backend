@@ -1,24 +1,27 @@
 /* ══════════════════════════════════════════════════════════════
-   Payvika / Bharat SQFT — Modern Jewellery, Bullion Coins & Orders Suite
+   Payvika / Bharat SQFT — Modern Jewellery, Bullion Coins, SKUs & Inventory Suite
    ══════════════════════════════════════════════════════════════ */
 
 let allJewellery = [];
 let allCategories = [];
 let allCoins = [];
+let allInventory = [];
 let allOrders = [];
 let activeJewelleryTab = "products";
 let selectedJewelleryCategory = "all";
 let selectedJewelleryMetal = "all";
 let jewellerySearchQuery = "";
+let inventorySearchQuery = "";
 let editingJewelleryId = null;
 let editingCoinId = null;
+let activeRestockItem = null;
 let activeOrder = null;
 let ordersPage = 1;
 
 let liveGoldRate = 7500;
 let liveSilverRate = 90;
 
-// ── 1. Tab Switching (Products, Coins, Categories) ─────────────
+// ── 1. Tab Switching (Products, Coins, Inventory, Categories) ──
 function switchJewelleryTab(tab) {
     activeJewelleryTab = tab;
     
@@ -28,22 +31,45 @@ function switchJewelleryTab(tab) {
     if (activeBtn) activeBtn.classList.add("active");
 
     // Toggle Panels
-    document.getElementById("jewellery-products-panel").style.display = tab === "products" ? "block" : "none";
-    document.getElementById("jewellery-coins-panel").style.display = tab === "coins" ? "block" : "none";
-    document.getElementById("jewellery-categories-panel").style.display = tab === "categories" ? "block" : "none";
+    const prodPanel = document.getElementById("jewellery-products-panel");
+    const coinPanel = document.getElementById("jewellery-coins-panel");
+    const invPanel = document.getElementById("jewellery-inventory-panel");
+    const catPanel = document.getElementById("jewellery-categories-panel");
 
-    // Toggle Top Action Button
+    if (prodPanel) prodPanel.style.display = tab === "products" ? "block" : "none";
+    if (coinPanel) coinPanel.style.display = tab === "coins" ? "block" : "none";
+    if (invPanel) invPanel.style.display = tab === "inventory" ? "block" : "none";
+    if (catPanel) catPanel.style.display = tab === "categories" ? "block" : "none";
+
+    // Toggle Top Action Buttons
     const addJewelleryBtn = document.getElementById("btn-add-jewellery-top");
     const addCoinBtn = document.getElementById("btn-add-coin-top");
     const addCategoryBtn = document.getElementById("btn-add-category-top");
+    const backfillBtn = document.getElementById("btn-backfill-skus-top");
 
     if (addJewelleryBtn) addJewelleryBtn.style.display = tab === "products" ? "inline-flex" : "none";
     if (addCoinBtn) addCoinBtn.style.display = tab === "coins" ? "inline-flex" : "none";
     if (addCategoryBtn) addCategoryBtn.style.display = tab === "categories" ? "inline-flex" : "none";
+    if (backfillBtn) backfillBtn.style.display = tab === "inventory" ? "inline-flex" : "none";
 
     if (tab === "products") loadJewellery();
     else if (tab === "coins") loadCoins();
+    else if (tab === "inventory") loadInventory();
     else if (tab === "categories") loadCategories();
+}
+
+// ── Helper: Copy SKU to Clipboard ───────────────────────────────
+function copySkuToClipboard(sku) {
+    if (!sku) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(sku).then(() => {
+            toast(`SKU "${sku}" copied to clipboard!`, "success");
+        }).catch(() => {
+            prompt("Copy SKU:", sku);
+        });
+    } else {
+        prompt("Copy SKU:", sku);
+    }
 }
 
 // ── 2. Jewellery Catalog ──────────────────────────────────────
@@ -86,7 +112,6 @@ function renderCategoryFilterPills(categories) {
     const container = document.getElementById("jewellery-category-pills");
     if (!container) return;
 
-    // Collect all distinct category names from categories & products
     const catMap = new Map();
     (categories || []).forEach(c => {
         if (c.name) catMap.set(c.name.trim().toLowerCase(), c.name.trim());
@@ -148,6 +173,7 @@ function filterAndRenderJewellery() {
 
     if (jewellerySearchQuery) {
         filtered = filtered.filter(j =>
+            (j.sku || "").toLowerCase().includes(jewellerySearchQuery) ||
             (j.name || "").toLowerCase().includes(jewellerySearchQuery) ||
             (j.category || "").toLowerCase().includes(jewellerySearchQuery) ||
             (j.purity || "").toLowerCase().includes(jewellerySearchQuery)
@@ -181,8 +207,12 @@ function renderJewelleryGrid(items) {
         const gst = Number(j.gstPercentage || 3);
         const subtotal = metalBaseVal + making;
         const totalEstValue = Math.round(subtotal * (1 + gst / 100));
+        const hasFixedPrice = j.price && Number(j.price) > 0;
+        const displayPrice = hasFixedPrice ? Number(j.price) : totalEstValue;
 
         const imgUrl = j.imageUrl || (j.images && j.images[0]) || "";
+        const sku = j.sku || `VIKA-${(j.metalType || 'GOLD').toUpperCase()}-JEWEL-${String(j._id).slice(-4).toUpperCase()}`;
+        const avail = j.availableQty !== undefined ? j.availableQty : (j.inStock ? 10 : 0);
 
         html += `
         <div class="product-card">
@@ -197,13 +227,18 @@ function renderJewelleryGrid(items) {
                     ${j.isPopular ? `<span class="product-badge badge-popular"><i class="fas fa-fire"></i> Popular</span>` : ''}
                 </div>
 
-                <span class="product-stock-tag ${j.inStock !== false ? 'stock-in' : 'stock-out'}">
-                    ${j.inStock !== false ? '● In Stock' : '✕ Out of Stock'}
+                <span class="product-stock-tag ${avail > 0 ? 'stock-in' : 'stock-out'}">
+                    ${avail > 0 ? `● ${avail} In Stock` : '✕ Out of Stock'}
                 </span>
             </div>
 
             <div class="product-card-body">
-                <div class="product-cat-pill">${j.category || 'Jewellery'}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div class="product-cat-pill">${j.category || 'Jewellery'}</div>
+                    <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:10.5px;cursor:pointer" onclick="copySkuToClipboard('${sku}')" title="Click to copy SKU">
+                        <i class="fas fa-barcode"></i> ${sku}
+                    </span>
+                </div>
                 <div class="product-name" title="${j.name}">${j.name || 'Untitled Jewellery'}</div>
                 <div class="product-desc-snippet">${j.description || 'Hallmarked handcrafted jewellery piece.'}</div>
 
@@ -213,21 +248,21 @@ function renderJewelleryGrid(items) {
                 </div>
 
                 <div class="product-pricing-box">
-                    <div class="pricing-label">Estimated Retail Value (Inc. ${gst}% GST)</div>
-                    <div class="pricing-total-val">₹ ${totalEstValue.toLocaleString("en-IN")}</div>
+                    <div class="pricing-label">${hasFixedPrice ? 'Fixed Retail Selling Price' : `Estimated Retail Value (Inc. ${gst}% GST)`}</div>
+                    <div class="pricing-total-val">₹ ${displayPrice.toLocaleString("en-IN")}</div>
                 </div>
 
                 <div class="product-card-actions">
                     <button class="btn btn-secondary btn-sm" onclick="openJewelleryModal('${j._id}')" title="Edit Product">
                         <i class="fas fa-edit"></i> Edit
                     </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openRestockModal('jewellery', '${j._id}', '${escapeQuotes(j.name)}', '${sku}', ${avail}, ${j.lowStockThreshold || 5}, '${avail > 0 ? 'in_stock' : 'out_of_stock'}')" title="Quick Restock">
+                        <i class="fas fa-boxes"></i> Stock (${avail})
+                    </button>
                     <label class="btn btn-secondary btn-sm" title="Upload Photo" style="cursor:pointer;margin:0">
-                        <i class="fas fa-camera"></i> Photo
+                        <i class="fas fa-camera"></i>
                         <input type="file" accept="image/*" style="display:none" onchange="uploadJewelleryPhoto('${j._id}', this.files[0])" />
                     </label>
-                    <button class="btn btn-secondary btn-sm" onclick="toggleJewelleryStock('${j._id}', ${j.inStock === false})" title="Toggle Stock">
-                        <i class="fas ${j.inStock !== false ? 'fa-toggle-on' : 'fa-toggle-off'}" style="color:${j.inStock !== false ? 'var(--success)' : 'var(--danger)'}"></i>
-                    </button>
                     <button class="btn-icon-danger" onclick="deleteJewellery('${j._id}')" title="Delete Product">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -238,6 +273,11 @@ function renderJewelleryGrid(items) {
 
     html += `</div>`;
     body.innerHTML = html;
+}
+
+function escapeQuotes(str) {
+    if (!str) return "";
+    return String(str).replace(/'/g, "\\'").replace(/"/g, "&quot;");
 }
 
 function openJewelleryModal(id = null) {
@@ -252,13 +292,17 @@ function openJewelleryModal(id = null) {
         if (j) {
             document.getElementById("jewellery-modal-title").textContent = "Edit Jewellery Product";
             document.getElementById("jewellery-name").value = j.name || "";
+            document.getElementById("jewellery-sku").value = j.sku || "";
             document.getElementById("jewellery-category-select").value = j.category || "";
             document.getElementById("jewellery-metal").value = j.metalType || "gold";
             document.getElementById("jewellery-purity").value = j.purity || "22K Gold";
             document.getElementById("jewellery-weight").value = j.weightGrams || "";
+            document.getElementById("jewellery-price").value = j.price || 0;
             document.getElementById("jewellery-making").value = j.makingCharges || "";
             document.getElementById("jewellery-gst").value = j.gstPercentage || 3;
             document.getElementById("jewellery-image-url").value = j.imageUrl || "";
+            document.getElementById("jewellery-available-qty").value = j.availableQty !== undefined ? j.availableQty : (j.inStock ? 10 : 0);
+            document.getElementById("jewellery-low-threshold").value = j.lowStockThreshold || 5;
             document.getElementById("jewellery-desc").value = j.description || "";
             document.getElementById("jewellery-instock").checked = j.inStock !== false;
             document.getElementById("jewellery-ispopular").checked = !!j.isPopular;
@@ -266,6 +310,10 @@ function openJewelleryModal(id = null) {
     } else {
         document.getElementById("jewellery-modal-title").textContent = "Add New Jewellery Product";
         document.getElementById("jewellery-form")?.reset();
+        document.getElementById("jewellery-sku").value = "";
+        document.getElementById("jewellery-price").value = 0;
+        document.getElementById("jewellery-available-qty").value = 10;
+        document.getElementById("jewellery-low-threshold").value = 5;
         document.getElementById("jewellery-instock").checked = true;
         document.getElementById("jewellery-ispopular").checked = false;
         document.getElementById("jewellery-gst").value = 3;
@@ -282,13 +330,17 @@ function closeJewelleryModal() {
 
 async function saveJewellery() {
     const name = document.getElementById("jewellery-name")?.value.trim();
+    const sku = document.getElementById("jewellery-sku")?.value.trim();
     const category = document.getElementById("jewellery-category-select")?.value;
     const metalType = document.getElementById("jewellery-metal")?.value;
     const purity = document.getElementById("jewellery-purity")?.value.trim();
     const weightGrams = Number(document.getElementById("jewellery-weight")?.value);
+    const price = Number(document.getElementById("jewellery-price")?.value || 0);
     const makingCharges = Number(document.getElementById("jewellery-making")?.value);
     const gstPercentage = Number(document.getElementById("jewellery-gst")?.value) || 3;
     const imageUrl = document.getElementById("jewellery-image-url")?.value.trim();
+    const availableQty = Number(document.getElementById("jewellery-available-qty")?.value || 0);
+    const lowStockThreshold = Number(document.getElementById("jewellery-low-threshold")?.value || 5);
     const description = document.getElementById("jewellery-desc")?.value.trim();
     const inStock = document.getElementById("jewellery-instock")?.checked;
     const isPopular = document.getElementById("jewellery-ispopular")?.checked;
@@ -300,15 +352,19 @@ async function saveJewellery() {
 
     const payload = {
         name,
+        sku: sku ? sku.toUpperCase() : undefined,
         category,
         metalType,
         purity,
         weightGrams,
+        price,
         makingCharges,
         gstPercentage,
         imageUrl,
+        availableQty,
+        lowStockThreshold,
         description,
-        inStock,
+        inStock: availableQty > 0 && inStock,
         isPopular
     };
 
@@ -324,26 +380,12 @@ async function saveJewellery() {
             toast(res.message || "Jewellery product saved successfully", "success");
             closeJewelleryModal();
             loadJewellery();
+            if (activeJewelleryTab === "inventory") loadInventory();
         } else {
             toast(res.message || "Failed to save product", "danger");
         }
     } catch (e) {
         toast("Network error saving product", "danger");
-    }
-}
-
-async function toggleJewelleryStock(id, newStatus) {
-    try {
-        const res = await api(`/jewellery/products/${id}`, {
-            method: "PUT",
-            body: JSON.stringify({ inStock: newStatus })
-        });
-        if (res.success) {
-            toast(`Product marked as ${newStatus ? 'In Stock' : 'Out of Stock'}`, "success");
-            loadJewellery();
-        }
-    } catch (e) {
-        toast("Failed to toggle stock status", "danger");
     }
 }
 
@@ -382,6 +424,7 @@ async function deleteJewellery(id) {
         if (res.success) {
             toast("Product deleted successfully", "success");
             loadJewellery();
+            if (activeJewelleryTab === "inventory") loadInventory();
         } else {
             toast(res.message || "Failed to delete product", "danger");
         }
@@ -390,7 +433,7 @@ async function deleteJewellery(id) {
     }
 }
 
-// ── 3. Bullion Coins ──────────────────────────────────────────
+// ── 3. Bullion Coins & Bars ───────────────────────────────────
 async function loadCoins() {
     const body = document.getElementById("coins-catalog-body");
     if (!body) return;
@@ -433,6 +476,10 @@ function renderCoinsGrid(coins) {
         const makingPct = c.makingChargePct !== undefined ? c.makingChargePct : 5;
         const makingAmt = c.makingCharge || (baseVal * makingPct / 100);
         const totalCoinVal = Math.round(baseVal + makingAmt);
+        const hasFixedPrice = c.price && Number(c.price) > 0;
+        const displayPrice = hasFixedPrice ? Number(c.price) : totalCoinVal;
+        const sku = c.sku || `VIKA-${(c.metal || 'GOLD').toUpperCase()}-COIN-${c.grams}G-${String(c._id).slice(-4).toUpperCase()}`;
+        const avail = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
 
         html += `
         <div class="product-card">
@@ -447,12 +494,18 @@ function renderCoinsGrid(coins) {
                     <span class="product-badge badge-popular">${c.purity || (isGold ? '999.9 Fine Gold' : '999 Pure Silver')}</span>
                 </div>
 
-                <span class="product-stock-tag ${c.isActive !== false ? 'stock-in' : 'stock-out'}">
-                    ${c.isActive !== false ? '● Active' : '✕ Disabled'}
+                <span class="product-stock-tag ${avail > 0 ? 'stock-in' : 'stock-out'}">
+                    ${avail > 0 ? `● ${avail} In Stock` : '✕ Disabled'}
                 </span>
             </div>
 
             <div class="product-card-body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div class="product-cat-pill">${c.category || 'Coins & Bars'}</div>
+                    <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:10.5px;cursor:pointer" onclick="copySkuToClipboard('${sku}')" title="Click to copy SKU">
+                        <i class="fas fa-barcode"></i> ${sku}
+                    </span>
+                </div>
                 <div class="product-name" style="font-size:15px">${c.name || 'Bullion Mint Coin'}</div>
                 <div class="product-desc-snippet">Tamper-proof assayed physical bullion coin.</div>
 
@@ -462,13 +515,16 @@ function renderCoinsGrid(coins) {
                 </div>
 
                 <div class="product-pricing-box">
-                    <div class="pricing-label">Current Coin Market Valuation</div>
-                    <div class="pricing-total-val">₹ ${totalCoinVal.toLocaleString("en-IN")}</div>
+                    <div class="pricing-label">${hasFixedPrice ? 'Fixed Coin Selling Price' : 'Current Coin Market Valuation'}</div>
+                    <div class="pricing-total-val">₹ ${displayPrice.toLocaleString("en-IN")}</div>
                 </div>
 
                 <div class="product-card-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="openCoinModal('${c._id}')" style="flex:1">
+                    <button class="btn btn-secondary btn-sm" onclick="openCoinModal('${c._id}')">
                         <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openRestockModal('coin', '${c._id}', '${escapeQuotes(c.name)}', '${sku}', ${avail}, ${c.lowStockThreshold || 10}, '${avail > 0 ? 'in_stock' : 'out_of_stock'}')" title="Quick Restock">
+                        <i class="fas fa-boxes"></i> Stock (${avail})
                     </button>
                     <button class="btn-icon-danger" onclick="deleteCoin('${c._id}')" title="Delete Coin">
                         <i class="fas fa-trash"></i>
@@ -490,17 +546,29 @@ function openCoinModal(id = null) {
     if (id) {
         const c = allCoins.find(item => item._id === id);
         if (c) {
-            document.getElementById("coin-modal-title").textContent = "Edit Bullion Coin";
+            document.getElementById("coin-modal-title").textContent = "Edit Bullion Coin / Bar";
             document.getElementById("coin-name").value = c.name || "";
+            document.getElementById("coin-sku").value = c.sku || "";
+            document.getElementById("coin-category").value = c.category || "Coins & Bars";
             document.getElementById("coin-metal").value = c.metal || "gold";
+            document.getElementById("coin-purity").value = c.purity || (c.metal === "gold" ? "24K 999 Purity" : "999 Fine Silver");
             document.getElementById("coin-grams").value = c.grams || c.weightGrams || "";
+            document.getElementById("coin-price").value = c.price || 0;
             document.getElementById("coin-making-pct").value = c.makingChargePct !== undefined ? c.makingChargePct : 5;
             document.getElementById("coin-image-url").value = c.image || "";
+            document.getElementById("coin-available-qty").value = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
+            document.getElementById("coin-low-threshold").value = c.lowStockThreshold || 10;
             document.getElementById("coin-isactive").checked = c.isActive !== false;
         }
     } else {
-        document.getElementById("coin-modal-title").textContent = "Add New Bullion Coin";
+        document.getElementById("coin-modal-title").textContent = "Add New Bullion Coin / Bar";
         document.getElementById("coin-form")?.reset();
+        document.getElementById("coin-sku").value = "";
+        document.getElementById("coin-category").value = "Coins & Bars";
+        document.getElementById("coin-purity").value = "24K 999 Purity";
+        document.getElementById("coin-price").value = 0;
+        document.getElementById("coin-available-qty").value = 50;
+        document.getElementById("coin-low-threshold").value = 10;
         document.getElementById("coin-making-pct").value = 5;
         document.getElementById("coin-isactive").checked = true;
     }
@@ -516,10 +584,16 @@ function closeCoinModal() {
 
 async function saveCoin() {
     const name = document.getElementById("coin-name")?.value.trim();
+    const sku = document.getElementById("coin-sku")?.value.trim();
+    const category = document.getElementById("coin-category")?.value;
     const metal = document.getElementById("coin-metal")?.value;
+    const purity = document.getElementById("coin-purity")?.value.trim();
     const grams = Number(document.getElementById("coin-grams")?.value);
+    const price = Number(document.getElementById("coin-price")?.value || 0);
     const makingChargePct = Number(document.getElementById("coin-making-pct")?.value);
     const image = document.getElementById("coin-image-url")?.value.trim();
+    const availableQty = Number(document.getElementById("coin-available-qty")?.value || 0);
+    const lowStockThreshold = Number(document.getElementById("coin-low-threshold")?.value || 10);
     const isActive = document.getElementById("coin-isactive")?.checked;
 
     if (!name || !grams) {
@@ -527,7 +601,20 @@ async function saveCoin() {
         return;
     }
 
-    const payload = { name, metal, grams, makingChargePct, image, isActive };
+    const payload = {
+        name,
+        sku: sku ? sku.toUpperCase() : undefined,
+        category,
+        metal,
+        purity,
+        grams,
+        price,
+        makingChargePct,
+        image,
+        availableQty,
+        lowStockThreshold,
+        isActive: availableQty > 0 && isActive
+    };
 
     try {
         let res;
@@ -541,6 +628,7 @@ async function saveCoin() {
             toast("Bullion coin saved successfully", "success");
             closeCoinModal();
             loadCoins();
+            if (activeJewelleryTab === "inventory") loadInventory();
         } else {
             toast(res.message || "Failed to save coin", "danger");
         }
@@ -556,6 +644,7 @@ async function deleteCoin(id) {
         if (res.success) {
             toast("Coin deleted successfully", "success");
             loadCoins();
+            if (activeJewelleryTab === "inventory") loadInventory();
         } else {
             toast(res.message || "Failed to delete coin", "danger");
         }
@@ -564,7 +653,318 @@ async function deleteCoin(id) {
     }
 }
 
-// ── 4. Categories Management ──────────────────────────────────
+// ── 4. INVENTORY MANAGEMENT & SKU TRACKING SUITE ──────────────
+async function loadInventory() {
+    const tableBody = document.getElementById("inventory-table-body");
+    if (!tableBody) return;
+
+    tableBody.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading SKU inventory database...</div></div>`;
+
+    const params = new URLSearchParams();
+    if (inventorySearchQuery) params.append("search", inventorySearchQuery);
+    
+    const typeFilter = document.getElementById("inventory-type-filter")?.value || "all";
+    if (typeFilter !== "all") params.append("type", typeFilter);
+
+    const metalFilter = document.getElementById("inventory-metal-filter")?.value || "all";
+    if (metalFilter !== "all") params.append("metal", metalFilter);
+
+    const statusFilter = document.getElementById("inventory-status-filter")?.value || "all";
+    if (statusFilter !== "all") params.append("status", statusFilter);
+
+    try {
+        const res = await api(`/admin/inventory?${params.toString()}`);
+        if (!res.success) {
+            tableBody.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load inventory"}</div></div>`;
+            return;
+        }
+
+        allInventory = res.data || [];
+
+        // Update KPI counter metrics
+        if (res.stats) {
+            setElText("inv-stat-total", res.stats.totalProducts || 0);
+            setElText("inv-stat-instock", res.stats.inStockCount || 0);
+            setElText("inv-stat-lowstock", res.stats.lowStockCount || 0);
+            setElText("inv-stat-outofstock", res.stats.outOfStockCount || 0);
+            setElText("inv-stat-sold", res.stats.totalSoldUnits || 0);
+        }
+
+        renderInventoryTable(allInventory);
+
+        // Sync with standalone inventory page if present
+        syncStandaloneInventoryPage();
+    } catch (e) {
+        tableBody.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading inventory</div></div>`;
+    }
+}
+
+function syncStandaloneInventoryPage() {
+    const mount = document.getElementById("standalone-inventory-mount");
+    const source = document.getElementById("jewellery-inventory-panel");
+    if (mount && source) {
+        mount.innerHTML = source.innerHTML;
+    }
+}
+
+function onInventorySearch(val) {
+    inventorySearchQuery = (val || "").trim();
+    loadInventory();
+}
+
+function onInventoryFilterChange() {
+    loadInventory();
+}
+
+function renderInventoryTable(items) {
+    const tableBody = document.getElementById("inventory-table-body");
+    if (!tableBody) return;
+
+    if (!items || items.length === 0) {
+        tableBody.innerHTML = `
+        <div class="loading-box" style="padding:4rem 2rem">
+            <i class="fas fa-boxes-stacked" style="font-size:36px;color:var(--text-dim);margin-bottom:10px"></i>
+            <div style="font-size:14px;color:#fff;font-weight:600">No inventory products found</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Adjust filters or click "Sync SKUs" / "+ Add Jewellery"</div>
+        </div>`;
+        return;
+    }
+
+    let html = `
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Product & Type</th>
+                    <th>SKU Reference</th>
+                    <th>Category</th>
+                    <th>Metal & Purity</th>
+                    <th>Unit Weight</th>
+                    <th style="text-align:center">Available Qty</th>
+                    <th style="text-align:center">Reserved</th>
+                    <th style="text-align:center">Sold</th>
+                    <th>Stock Status</th>
+                    <th style="text-align:right">Stock Actions</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    items.forEach(item => {
+        const isGold = (item.metal || "gold").toLowerCase() === "gold";
+        const isCoin = item.type === "coin";
+        
+        let statusBadge = `<span class="badge badge-pill-success"><i class="fas fa-check-circle"></i> In Stock</span>`;
+        if (item.stockStatus === "out_of_stock") {
+            statusBadge = `<span class="badge badge-danger"><i class="fas fa-ban"></i> Out of Stock</span>`;
+        } else if (item.stockStatus === "low_stock") {
+            statusBadge = `<span class="badge badge-amber"><i class="fas fa-exclamation-triangle"></i> Low Stock (${item.availableQty})</span>`;
+        }
+
+        const avail = Number(item.availableQty || 0);
+        const reserved = Number(item.reservedQty || 0);
+        const sold = Number(item.soldQty || 0);
+
+        html += `
+        <tr>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:36px;height:36px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                        ${item.imageUrl ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'" />` : `<i class="${isGold ? 'fas fa-coins icon-gold' : 'fas fa-gem icon-silver'}" style="font-size:16px"></i>`}
+                    </div>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13px">${item.name}</div>
+                        <div style="font-size:11px;color:var(--text-dim)">
+                            <span class="badge ${isCoin ? 'badge-blue' : 'badge-purple'}" style="font-size:9.5px;padding:2px 6px">
+                                ${isCoin ? 'Bullion Coin/Bar' : 'Jewellery'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:12px;letter-spacing:0.5px">
+                        ${item.sku}
+                    </span>
+                    <button class="btn-icon-secondary" onclick="copySkuToClipboard('${item.sku}')" title="Copy SKU" style="width:26px;height:26px;padding:0">
+                        <i class="fas fa-copy" style="font-size:11px"></i>
+                    </button>
+                </div>
+            </td>
+            <td>
+                <span style="font-size:12px;color:var(--text-muted)">${item.category || 'Standard'}</span>
+            </td>
+            <td>
+                <div style="font-weight:600;font-size:12px;color:${isGold ? 'var(--gold)' : 'var(--silver)'}">
+                    <i class="fas fa-circle" style="font-size:8px;margin-right:4px"></i>${item.purity || (isGold ? '22K Gold' : '999 Silver')}
+                </div>
+            </td>
+            <td style="font-family:var(--font-mono);font-weight:600;font-size:12.5px;color:#fff">
+                ${Number(item.weightGrams || 0).toFixed(2)} g
+            </td>
+            <td style="text-align:center">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface2);padding:3px 8px;border-radius:6px;border:1px solid var(--border)">
+                    <button class="btn-icon-secondary" onclick="quickAdjustStock('${item.type}', '${item.id}', -1)" title="Deduct 1 unit" style="width:22px;height:22px;padding:0;font-size:11px" ${avail <= 0 ? 'disabled' : ''}>
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <span style="font-family:var(--font-mono);font-weight:800;font-size:13.5px;color:${avail <= (item.lowStockThreshold || 5) ? (avail === 0 ? '#ef4444' : '#f59e0b') : '#10b981'};min-width:28px">
+                        ${avail}
+                    </span>
+                    <button class="btn-icon-secondary" onclick="quickAdjustStock('${item.type}', '${item.id}', 1)" title="Add 1 unit" style="width:22px;height:22px;padding:0;font-size:11px">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </td>
+            <td style="text-align:center">
+                <span class="badge ${reserved > 0 ? 'badge-amber' : 'badge-secondary'}" style="font-family:var(--font-mono)">
+                    ${reserved}
+                </span>
+            </td>
+            <td style="text-align:center">
+                <span class="badge ${sold > 0 ? 'badge-blue' : 'badge-secondary'}" style="font-family:var(--font-mono)">
+                    ${sold}
+                </span>
+            </td>
+            <td>
+                ${statusBadge}
+            </td>
+            <td style="text-align:right">
+                <div style="display:inline-flex;gap:6px">
+                    <button class="btn btn-primary btn-sm" onclick="openRestockModal('${item.type}', '${item.id}', '${escapeQuotes(item.name)}', '${item.sku}', ${avail}, ${item.lowStockThreshold || 5}, '${item.stockStatus}')" title="Quick Restock">
+                        <i class="fas fa-truck-loading"></i> Restock
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="${item.type === 'coin' ? `openCoinModal('${item.id}')` : `openJewelleryModal('${item.id}')`}" title="Edit Full Specifications">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    tableBody.innerHTML = html;
+}
+
+// ── Quick Stock Step +/- ─────────────────────────────────────────
+async function quickAdjustStock(type, id, delta) {
+    try {
+        const action = delta > 0 ? "add" : "deduct";
+        const adjustment = Math.abs(delta);
+        const res = await api(`/admin/inventory/${type}/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({ action, adjustment })
+        });
+
+        if (res.success) {
+            toast(res.message || "Stock quantity adjusted", "success");
+            loadInventory();
+            if (activeJewelleryTab === "products") loadJewellery();
+            if (activeJewelleryTab === "coins") loadCoins();
+        } else {
+            toast(res.message || "Failed to adjust stock", "danger");
+        }
+    } catch (e) {
+        toast("Network error adjusting stock", "danger");
+    }
+}
+
+// ── Quick Restock Modal ─────────────────────────────────────────
+function openRestockModal(type, id, name, sku, availableQty, lowStockThreshold, stockStatus) {
+    activeRestockItem = { type, id, name, sku, availableQty, lowStockThreshold, stockStatus };
+    const modal = document.getElementById("inventory-restock-modal");
+    if (!modal) return;
+
+    setElText("restock-product-name", name);
+    setElText("restock-product-sku", `SKU: ${sku}`);
+    setElText("restock-current-qty", `${availableQty} Units`);
+
+    const statusPill = document.getElementById("restock-stock-status-pill");
+    if (statusPill) {
+        if (stockStatus === "out_of_stock") {
+            statusPill.className = "badge badge-danger";
+            statusPill.textContent = "Out of Stock";
+        } else if (stockStatus === "low_stock") {
+            statusPill.className = "badge badge-amber";
+            statusPill.textContent = "Low Stock";
+        } else {
+            statusPill.className = "badge badge-pill-success";
+            statusPill.textContent = "In Stock";
+        }
+    }
+
+    const newQtyInput = document.getElementById("restock-new-qty");
+    if (newQtyInput) newQtyInput.value = availableQty;
+
+    const lowThreshInput = document.getElementById("restock-low-threshold");
+    if (lowThreshInput) lowThreshInput.value = lowStockThreshold;
+
+    const skuInput = document.getElementById("restock-edit-sku");
+    if (skuInput) skuInput.value = sku;
+
+    modal.style.display = "flex";
+}
+
+function closeRestockModal() {
+    const modal = document.getElementById("inventory-restock-modal");
+    if (modal) modal.style.display = "none";
+    activeRestockItem = null;
+}
+
+function applyQuickStockAdd(amount) {
+    const newQtyInput = document.getElementById("restock-new-qty");
+    if (newQtyInput) {
+        const current = Number(newQtyInput.value || (activeRestockItem ? activeRestockItem.availableQty : 0));
+        newQtyInput.value = current + amount;
+    }
+}
+
+async function saveRestock() {
+    if (!activeRestockItem) return;
+
+    const availableQty = Number(document.getElementById("restock-new-qty")?.value || 0);
+    const lowStockThreshold = Number(document.getElementById("restock-low-threshold")?.value || 5);
+    const sku = document.getElementById("restock-edit-sku")?.value.trim();
+
+    try {
+        const res = await api(`/admin/inventory/${activeRestockItem.type}/${activeRestockItem.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ availableQty, lowStockThreshold, sku: sku ? sku.toUpperCase() : undefined })
+        });
+
+        if (res.success) {
+            toast(res.message || "Inventory stock updated successfully", "success");
+            closeRestockModal();
+            loadInventory();
+            if (activeJewelleryTab === "products") loadJewellery();
+            if (activeJewelleryTab === "coins") loadCoins();
+        } else {
+            toast(res.message || "Failed to update inventory", "danger");
+        }
+    } catch (e) {
+        toast("Network error updating inventory", "danger");
+    }
+}
+
+// ── Auto-Backfill & Sync SKUs ───────────────────────────────────
+async function runBackfillSkus() {
+    toast("Generating unique SKUs and configuring stock tracking...", "info");
+    try {
+        const res = await api("/admin/inventory/backfill-skus", { method: "POST" });
+        if (res.success) {
+            toast(res.message || "SKUs synchronized successfully", "success");
+            loadInventory();
+            loadJewellery();
+            loadCoins();
+            loadJewelleryOrders(ordersPage);
+        } else {
+            toast(res.message || "Failed to backfill SKUs", "danger");
+        }
+    } catch (e) {
+        toast("Network error syncing SKUs", "danger");
+    }
+}
+
+// ── 5. Categories Management ──────────────────────────────────
 async function loadCategories() {
     const body = document.getElementById("categories-catalog-body");
     if (!body) return;
@@ -674,7 +1074,7 @@ async function deleteCategory(id) {
     }
 }
 
-// ── 5. Customer Delivery Orders ───────────────────────────────
+// ── 6. Customer Delivery Orders & Fulfillment ─────────────────
 async function loadJewelleryOrders(page = 1) {
     ordersPage = page;
     const body = document.getElementById("jewellery-orders-body");
@@ -704,12 +1104,12 @@ async function loadJewelleryOrders(page = 1) {
         }
 
         const info = document.getElementById("orders-pagination-info");
-        if (info) info.textContent = `Page ${res.page || page} of ${res.pages || 1} (${res.total || allOrders.length} orders)`;
+        if (info) info.textContent = `Page ${res.pagination?.page || page} of ${res.pagination?.pages || 1} (${res.pagination?.total || allOrders.length} orders)`;
         
         const prevBtn = document.getElementById("btn-prev-orders");
         const nextBtn = document.getElementById("btn-next-orders");
-        if (prevBtn) prevBtn.disabled = (res.page || 1) <= 1;
-        if (nextBtn) nextBtn.disabled = (res.page || 1) >= (res.pages || 1);
+        if (prevBtn) prevBtn.disabled = (res.pagination?.page || 1) <= 1;
+        if (nextBtn) nextBtn.disabled = (res.pagination?.page || 1) >= (res.pagination?.pages || 1);
     } catch (e) {
         body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading delivery orders</div></div>`;
     }
@@ -744,7 +1144,7 @@ function renderJewelleryOrdersTable(orders) {
                 <tr>
                     <th>Order / Tracking</th>
                     <th>Customer</th>
-                    <th>Product & Metal</th>
+                    <th>Product & SKU</th>
                     <th>Weight</th>
                     <th>Total Paid</th>
                     <th>Payment</th>
@@ -760,15 +1160,19 @@ function renderJewelleryOrdersTable(orders) {
         const customerName = o.user?.name || "Customer";
         const customerPhone = o.user?.phone || "—";
         const isGold = (o.metalType || "gold").toLowerCase() === "gold";
+        const sku = o.sku || (o.jewellery && o.jewellery.sku) || "VIKA-PROD";
 
         const statusMap = {
             placed: { label: "Placed", cls: "badge-pill-pending" },
             pending: { label: "Pending", cls: "badge-pill-pending" },
             processing: { label: "Processing", cls: "badge-amber" },
+            out_of_warehouse: { label: "Out of Warehouse", cls: "badge-blue" },
             shipped: { label: "Shipped", cls: "badge-blue" },
             out_for_delivery: { label: "Out for Delivery", cls: "badge-blue" },
             delivered: { label: "Delivered", cls: "badge-pill-success" },
-            cancelled: { label: "Cancelled", cls: "badge-danger" }
+            cancelled: { label: "Cancelled", cls: "badge-danger" },
+            returned: { label: "Returned", cls: "badge-purple" },
+            refunded: { label: "Refunded", cls: "badge-purple" }
         };
 
         const currentStatus = statusMap[o.deliveryStatus] || { label: o.deliveryStatus || 'Pending', cls: 'badge-pill-pending' };
@@ -786,7 +1190,12 @@ function renderJewelleryOrdersTable(orders) {
             </td>
             <td>
                 <div style="font-weight:600;color:#fff">${o.jewelleryName || 'Bullion Product'}</div>
-                <div style="font-size:11px;color:${isGold ? 'var(--gold)' : 'var(--silver)'}"><i class="fas fa-gem"></i> ${(o.metalType || 'Gold').toUpperCase()}</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                    <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:10px;cursor:pointer" onclick="copySkuToClipboard('${sku}')" title="Click to copy SKU">
+                        <i class="fas fa-barcode"></i> ${sku}
+                    </span>
+                    <span style="font-size:11px;color:${isGold ? 'var(--gold)' : 'var(--silver)'}"><i class="fas fa-gem"></i> ${(o.metalType || 'Gold').toUpperCase()}</span>
+                </div>
             </td>
             <td style="font-family:var(--font-mono);font-weight:600">${Number(o.weightGrams || 0).toFixed(2)} g</td>
             <td style="font-family:var(--font-mono);font-weight:700;color:#fff">${formatINR(o.totalPaid)}</td>
@@ -817,10 +1226,20 @@ function openOrderDetailsModal(id) {
     const modal = document.getElementById("order-detail-modal");
     if (!modal) return;
 
+    const sku = o.sku || (o.jewellery && o.jewellery.sku) || "VIKA-PROD";
+
     setElText("order-detail-id", `ORD-${String(o._id).slice(-6).toUpperCase()}`);
     setElText("order-detail-customer", `${o.user?.name || 'Customer'} (${o.user?.phone || 'No phone'})`);
     setElText("order-detail-address", o.shippingAddress || "Customer registered delivery address");
     setElText("order-detail-product-info", `${o.jewelleryName} • ${o.weightGrams}g ${o.metalType?.toUpperCase()} • Paid: ₹${Number(o.totalPaid || 0).toLocaleString("en-IN")}`);
+
+    const skuBadgeEl = document.getElementById("order-detail-sku-badge");
+    if (skuBadgeEl) {
+        skuBadgeEl.innerHTML = `
+        <span class="badge font-mono" style="background:rgba(168,85,247,0.2);color:#c084fc;font-size:12px;padding:5px 10px;cursor:pointer" onclick="copySkuToClipboard('${sku}')" title="Click to copy SKU">
+            <i class="fas fa-barcode"></i> SKU: ${sku} <i class="fas fa-copy" style="margin-left:4px;font-size:10px"></i>
+        </span>`;
+    }
 
     document.getElementById("order-detail-status").value = o.deliveryStatus || "placed";
     document.getElementById("order-detail-courier").value = o.courierName || "Vikaone Express Secure Logistics";
@@ -884,9 +1303,10 @@ async function updateOrderStatus() {
         });
 
         if (res.success) {
-            toast("Order fulfillment details updated successfully", "success");
+            toast("Order fulfillment details updated & inventory synchronized", "success");
             closeOrderDetailsModal();
             loadJewelleryOrders(ordersPage);
+            if (activeJewelleryTab === "inventory") loadInventory();
         } else {
             toast(res.message || "Failed to update order", "danger");
         }

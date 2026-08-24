@@ -1507,14 +1507,82 @@ exports.getAdminCoins = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// Helper: Generate Unique SKU for Bullion Coin
+async function generateUniqueCoinSku(metal, grams) {
+    const Coin = require("../models/Coin");
+    const m = (metal || "gold").toUpperCase();
+    const g = parseFloat(grams || 1);
+    const count = await Coin.countDocuments();
+    let serial = count + 1;
+    let sku = `VIKA-${m}-COIN-${g}G-${String(serial).padStart(3, "0")}`;
+    let exists = await Coin.findOne({ sku });
+    while (exists) {
+        serial++;
+        sku = `VIKA-${m}-COIN-${g}G-${String(serial).padStart(3, "0")}`;
+        exists = await Coin.findOne({ sku });
+    }
+    return sku;
+}
+
+exports.getAdminCoins = async (req, res, next) => {
+    try {
+        const { fetchLiveRates } = require("./goldController");
+        const Coin = require("../models/Coin");
+        
+        const rates = await fetchLiveRates();
+        const coins = await Coin.find().sort({ metal: 1, grams: 1 });
+        
+        const data = coins.map(c => {
+            const rate = c.metal === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
+            const value = parseFloat((c.grams * rate).toFixed(2));
+            const making = parseFloat((value * (c.makingChargePct || 5) / 100).toFixed(2));
+            const calculatedTotal = parseFloat((value + making).toFixed(2));
+            return {
+                ...c.toObject(),
+                ratePerGram: rate,
+                value,
+                makingCharge: making,
+                totalValue: c.price && c.price > 0 ? c.price : calculatedTotal
+            };
+        });
+        res.json({ success: true, data });
+    } catch (err) { next(err); }
+};
+
 exports.createCoin = async (req, res, next) => {
     try {
         const Coin = require("../models/Coin");
-        const { name, metal, grams, makingChargePct, image, isActive } = req.body;
+        let { name, sku, metal, purity, category, grams, price, makingChargePct, image, availableQty, lowStockThreshold, isActive } = req.body;
         if (!name || !metal || !grams || makingChargePct === undefined) {
             return res.status(400).json({ success: false, message: "Name, metal, grams, and making charge percent are required" });
         }
-        const coin = await Coin.create({ name, metal, grams, makingChargePct, image, isActive });
+
+        if (sku && String(sku).trim()) {
+            sku = String(sku).trim().toUpperCase();
+            const existing = await Coin.findOne({ sku });
+            if (existing) {
+                return res.status(400).json({ success: false, message: `SKU "${sku}" is already in use by another coin product.` });
+            }
+        } else {
+            sku = await generateUniqueCoinSku(metal, grams);
+        }
+
+        const coin = await Coin.create({
+            name,
+            sku,
+            metal,
+            purity: purity || (metal === "gold" ? "24K 999 Purity" : "999 Fine Silver"),
+            category: category || "Coins & Bars",
+            grams: Number(grams),
+            price: price !== undefined && Number(price) > 0 ? Number(price) : 0,
+            makingChargePct: Number(makingChargePct),
+            image: image || "",
+            availableQty: availableQty !== undefined ? Number(availableQty) : 50,
+            reservedQty: 0,
+            soldQty: 0,
+            lowStockThreshold: lowStockThreshold !== undefined ? Number(lowStockThreshold) : 10,
+            isActive: isActive !== undefined ? isActive : true
+        });
         res.status(201).json({ success: true, message: "Coin created successfully", data: coin });
     } catch (err) { next(err); }
 };
@@ -1522,15 +1590,31 @@ exports.createCoin = async (req, res, next) => {
 exports.updateCoin = async (req, res, next) => {
     try {
         const Coin = require("../models/Coin");
-        const { name, metal, grams, makingChargePct, image, isActive } = req.body;
+        let { name, sku, metal, purity, category, grams, price, makingChargePct, image, availableQty, reservedQty, soldQty, lowStockThreshold, isActive } = req.body;
         const coin = await Coin.findById(req.params.id);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
 
+        if (sku) {
+            sku = String(sku).trim().toUpperCase();
+            const existing = await Coin.findOne({ sku, _id: { $ne: req.params.id } });
+            if (existing) {
+                return res.status(400).json({ success: false, message: `SKU "${sku}" is already assigned to "${existing.name}".` });
+            }
+            coin.sku = sku;
+        }
+
         if (name !== undefined) coin.name = name;
         if (metal !== undefined) coin.metal = metal;
-        if (grams !== undefined) coin.grams = grams;
-        if (makingChargePct !== undefined) coin.makingChargePct = makingChargePct;
+        if (purity !== undefined) coin.purity = purity;
+        if (category !== undefined) coin.category = category;
+        if (grams !== undefined) coin.grams = Number(grams);
+        if (price !== undefined) coin.price = Math.max(0, Number(price));
+        if (makingChargePct !== undefined) coin.makingChargePct = Number(makingChargePct);
         if (image !== undefined) coin.image = image;
+        if (availableQty !== undefined) coin.availableQty = Math.max(0, Number(availableQty));
+        if (reservedQty !== undefined) coin.reservedQty = Math.max(0, Number(reservedQty));
+        if (soldQty !== undefined) coin.soldQty = Math.max(0, Number(soldQty));
+        if (lowStockThreshold !== undefined) coin.lowStockThreshold = Math.max(0, Number(lowStockThreshold));
         if (isActive !== undefined) coin.isActive = isActive;
 
         await coin.save();
@@ -1544,6 +1628,264 @@ exports.deleteCoin = async (req, res, next) => {
         const coin = await Coin.findByIdAndDelete(req.params.id);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
         res.json({ success: true, message: "Coin deleted successfully" });
+    } catch (err) { next(err); }
+};
+
+// ── INVENTORY MANAGEMENT SUITE ───────────────────────────────────────────────
+exports.getInventory = async (req, res, next) => {
+    try {
+        const Jewellery = require("../models/Jewellery");
+        const Coin = require("../models/Coin");
+        const { fetchLiveRates } = require("./goldController");
+        const rates = await fetchLiveRates();
+
+        const { search, metal, status, type } = req.query;
+
+        const [jewelleryItems, coinItems] = await Promise.all([
+            Jewellery.find().sort({ createdAt: -1 }),
+            Coin.find().sort({ createdAt: -1 })
+        ]);
+
+        let unifiedInventory = [];
+
+        // 1. Process Jewellery Items
+        jewelleryItems.forEach(j => {
+            const avail = j.availableQty !== undefined ? j.availableQty : (j.inStock ? 10 : 0);
+            const lowThreshold = j.lowStockThreshold || 5;
+            let stockStatus = "in_stock";
+            if (avail <= 0) stockStatus = "out_of_stock";
+            else if (avail <= lowThreshold) stockStatus = "low_stock";
+
+            const rate = j.metalType === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
+            const bullionVal = (j.weightGrams || 0) * rate;
+            const estVal = Math.round(bullionVal + (j.makingCharges || 1500));
+
+            unifiedInventory.push({
+                id: j._id,
+                type: "jewellery",
+                sku: j.sku || `VIKA-${(j.metalType || 'gold').toUpperCase()}-JEWEL-${String(j._id).slice(-4).toUpperCase()}`,
+                name: j.name,
+                category: j.category || "Jewellery",
+                metal: j.metalType || "gold",
+                purity: j.purity || (j.metalType === "gold" ? "22K Gold" : "999 Silver"),
+                weightGrams: j.weightGrams || 0,
+                price: j.price || 0,
+                makingCharges: j.makingCharges || 1500,
+                availableQty: avail,
+                reservedQty: j.reservedQty || 0,
+                soldQty: j.soldQty || 0,
+                lowStockThreshold: lowThreshold,
+                stockStatus,
+                inStock: avail > 0,
+                imageUrl: j.imageUrl || (j.images && j.images[0]) || "",
+                currentUnitValue: j.price && j.price > 0 ? j.price : estVal,
+                createdAt: j.createdAt
+            });
+        });
+
+        // 2. Process Coin & Bar Items
+        coinItems.forEach(c => {
+            const avail = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
+            const lowThreshold = c.lowStockThreshold || 10;
+            let stockStatus = "in_stock";
+            if (avail <= 0) stockStatus = "out_of_stock";
+            else if (avail <= lowThreshold) stockStatus = "low_stock";
+
+            const rate = c.metal === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
+            const bullionVal = (c.grams || 0) * rate;
+            const making = (bullionVal * (c.makingChargePct || 5)) / 100;
+            const estVal = Math.round(bullionVal + making);
+
+            unifiedInventory.push({
+                id: c._id,
+                type: "coin",
+                sku: c.sku || `VIKA-${(c.metal || 'gold').toUpperCase()}-COIN-${c.grams}G-${String(c._id).slice(-4).toUpperCase()}`,
+                name: c.name,
+                category: c.category || "Coins & Bars",
+                metal: c.metal || "gold",
+                purity: c.purity || (c.metal === "gold" ? "24K 999 Purity" : "999 Fine Silver"),
+                weightGrams: c.grams || 0,
+                price: c.price || 0,
+                makingCharges: Math.round(making),
+                availableQty: avail,
+                reservedQty: c.reservedQty || 0,
+                soldQty: c.soldQty || 0,
+                lowStockThreshold: lowThreshold,
+                stockStatus,
+                inStock: avail > 0,
+                imageUrl: c.image || "",
+                currentUnitValue: c.price && c.price > 0 ? c.price : estVal,
+                createdAt: c.createdAt
+            });
+        });
+
+        // Calculate Summary Statistics across the full catalog
+        const stats = {
+            totalProducts: unifiedInventory.length,
+            inStockCount: unifiedInventory.filter(item => item.stockStatus === "in_stock").length,
+            lowStockCount: unifiedInventory.filter(item => item.stockStatus === "low_stock").length,
+            outOfStockCount: unifiedInventory.filter(item => item.stockStatus === "out_of_stock").length,
+            totalAvailableUnits: unifiedInventory.reduce((acc, item) => acc + (item.availableQty || 0), 0),
+            totalReservedUnits: unifiedInventory.reduce((acc, item) => acc + (item.reservedQty || 0), 0),
+            totalSoldUnits: unifiedInventory.reduce((acc, item) => acc + (item.soldQty || 0), 0),
+            totalGoldWeightGrams: unifiedInventory.filter(i => i.metal === "gold").reduce((acc, item) => acc + ((item.weightGrams || 0) * (item.availableQty || 0)), 0),
+            totalSilverWeightGrams: unifiedInventory.filter(i => i.metal === "silver").reduce((acc, item) => acc + ((item.weightGrams || 0) * (item.availableQty || 0)), 0),
+        };
+
+        // Apply filters
+        let filtered = unifiedInventory;
+
+        if (type && type !== "all") {
+            filtered = filtered.filter(i => i.type === type);
+        }
+
+        if (metal && metal !== "all") {
+            filtered = filtered.filter(i => i.metal.toLowerCase() === metal.toLowerCase());
+        }
+
+        if (status && status !== "all") {
+            filtered = filtered.filter(i => i.stockStatus === status);
+        }
+
+        if (search) {
+            const q = search.toLowerCase().trim();
+            filtered = filtered.filter(i =>
+                (i.sku || "").toLowerCase().includes(q) ||
+                (i.name || "").toLowerCase().includes(q) ||
+                (i.category || "").toLowerCase().includes(q) ||
+                (i.purity || "").toLowerCase().includes(q) ||
+                (i.metal || "").toLowerCase().includes(q)
+            );
+        }
+
+        res.json({
+            success: true,
+            data: filtered,
+            stats
+        });
+    } catch (err) { next(err); }
+};
+
+exports.updateInventoryStock = async (req, res, next) => {
+    try {
+        const { type, id } = req.params;
+        const { availableQty, lowStockThreshold, sku, action, adjustment } = req.body;
+
+        const Jewellery = require("../models/Jewellery");
+        const Coin = require("../models/Coin");
+
+        let target = type === "coin" ? await Coin.findById(id) : await Jewellery.findById(id);
+        if (!target) return res.status(404).json({ success: false, message: "Product not found in inventory" });
+
+        if (sku) {
+            const cleanSku = String(sku).trim().toUpperCase();
+            const Model = type === "coin" ? Coin : Jewellery;
+            const conflict = await Model.findOne({ sku: cleanSku, _id: { $ne: id } });
+            if (conflict) {
+                return res.status(400).json({ success: false, message: `SKU "${cleanSku}" already belongs to "${conflict.name}"` });
+            }
+            target.sku = cleanSku;
+        }
+
+        if (action === "add" && adjustment) {
+            target.availableQty = (target.availableQty || 0) + Number(adjustment);
+        } else if (action === "deduct" && adjustment) {
+            target.availableQty = Math.max(0, (target.availableQty || 0) - Number(adjustment));
+        } else if (availableQty !== undefined) {
+            target.availableQty = Math.max(0, Number(availableQty));
+        }
+
+        if (lowStockThreshold !== undefined) {
+            target.lowStockThreshold = Math.max(0, Number(lowStockThreshold));
+        }
+
+        if (type === "jewellery") {
+            target.inStock = target.availableQty > 0;
+        } else {
+            target.isActive = target.availableQty > 0;
+        }
+
+        await target.save();
+
+        res.json({
+            success: true,
+            message: `Inventory stock updated for "${target.name}" (SKU: ${target.sku}). Available: ${target.availableQty} units.`,
+            data: target
+        });
+    } catch (err) { next(err); }
+};
+
+exports.backfillInventorySkus = async (req, res, next) => {
+    try {
+        const Jewellery = require("../models/Jewellery");
+        const Coin = require("../models/Coin");
+        const JewelleryRedemption = require("../models/JewelleryRedemption");
+
+        let jCount = 0;
+        let cCount = 0;
+        let oCount = 0;
+
+        // 1. Backfill Jewellery
+        const jewellers = await Jewellery.find();
+        for (let j of jewellers) {
+            let changed = false;
+            if (!j.sku) {
+                j.sku = await generateUniqueJewellerySku(j.metalType, j.category);
+                changed = true;
+            }
+            if (j.availableQty === undefined) {
+                j.availableQty = 10;
+                j.reservedQty = 0;
+                j.soldQty = 0;
+                j.lowStockThreshold = 5;
+                changed = true;
+            }
+            if (changed) {
+                await j.save();
+                jCount++;
+            }
+        }
+
+        // 2. Backfill Coins
+        const coins = await Coin.find();
+        for (let c of coins) {
+            let changed = false;
+            if (!c.sku) {
+                c.sku = await generateUniqueCoinSku(c.metal, c.grams);
+                changed = true;
+            }
+            if (c.availableQty === undefined) {
+                c.availableQty = 50;
+                c.reservedQty = 0;
+                c.soldQty = 0;
+                c.lowStockThreshold = 10;
+                changed = true;
+            }
+            if (!c.purity) {
+                c.purity = c.metal === "gold" ? "24K 999 Purity" : "999 Fine Silver";
+                changed = true;
+            }
+            if (changed) {
+                await c.save();
+                cCount++;
+            }
+        }
+
+        // 3. Backfill Orders with SKU snapshot
+        const orders = await JewelleryRedemption.find({ $or: [{ sku: "" }, { sku: { $exists: false } }] }).populate("jewellery");
+        for (let o of orders) {
+            if (o.jewellery && o.jewellery.sku) {
+                o.sku = o.jewellery.sku;
+                await o.save();
+                oCount++;
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `SKU & Inventory backfill complete! Updated ${jCount} jewellery products, ${cCount} bullion coins, and ${oCount} orders.`,
+            stats: { jewelleryUpdated: jCount, coinsUpdated: cCount, ordersUpdated: oCount }
+        });
     } catch (err) { next(err); }
 };
 
@@ -1598,7 +1940,7 @@ exports.getJewelleryOrders = async (req, res, next) => {
             filter.metalType = req.query.metalType;
         }
 
-        // Search filter (User Name, Email, Phone, or Jewellery Name)
+        // Search filter (User Name, Email, Phone, Jewellery Name, or SKU)
         if (req.query.search) {
             const searchRegex = { $regex: req.query.search, $options: "i" };
             
@@ -1613,7 +1955,8 @@ exports.getJewelleryOrders = async (req, res, next) => {
             const userIds = matchingUsers.map(u => u._id);
             filter.$or = [
                 { user: { $in: userIds } },
-                { jewelleryName: searchRegex }
+                { jewelleryName: searchRegex },
+                { sku: searchRegex }
             ];
         }
 
@@ -1630,7 +1973,7 @@ exports.getJewelleryOrders = async (req, res, next) => {
         const count = await JewelleryRedemption.countDocuments(filter);
         const orders = await JewelleryRedemption.find(filter)
             .populate("user", "name email phone")
-            .populate("jewellery", "name category imageUrl purity weightGrams makingCharges")
+            .populate("jewellery", "name sku category imageUrl purity weightGrams makingCharges")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -1651,25 +1994,53 @@ exports.getJewelleryOrders = async (req, res, next) => {
 
 exports.updateJewelleryOrder = async (req, res, next) => {
     try {
-        const { deliveryStatus, trackingId, trackingUrl, courierName, estimatedDeliveryDate, statusNote, shippingAddress } = req.body;
+        const { deliveryStatus, trackingId, trackingUrl, courierName, estimatedDeliveryDate, statusNote, shippingAddress, refundStatus } = req.body;
+        const Jewellery = require("../models/Jewellery");
         const order = await JewelleryRedemption.findById(req.params.id);
 
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
+        const oldStatus = order.deliveryStatus;
         let statusChanged = false;
-        if (deliveryStatus && deliveryStatus !== order.deliveryStatus) {
+        if (deliveryStatus && deliveryStatus !== oldStatus) {
             order.deliveryStatus = deliveryStatus;
             statusChanged = true;
         }
 
+        if (refundStatus !== undefined) order.refundStatus = refundStatus;
         if (trackingId !== undefined) order.trackingId = trackingId;
         if (trackingUrl !== undefined) order.trackingUrl = trackingUrl;
         if (courierName !== undefined) order.courierName = courierName;
         if (estimatedDeliveryDate !== undefined) order.estimatedDeliveryDate = estimatedDeliveryDate;
         if (statusNote !== undefined) order.statusNote = statusNote;
         if (shippingAddress !== undefined) order.shippingAddress = shippingAddress;
+
+        // Synchronize product inventory on order status change
+        if (statusChanged && order.jewellery) {
+            const product = await Jewellery.findById(order.jewellery);
+            if (product) {
+                const qty = order.quantity || 1;
+
+                if (deliveryStatus === "delivered" && oldStatus !== "delivered") {
+                    // Item successfully delivered -> move from reserved to sold
+                    product.reservedQty = Math.max(0, (product.reservedQty || 0) - qty);
+                    product.soldQty = (product.soldQty || 0) + qty;
+                    await product.save();
+                } else if (["cancelled", "returned", "refunded"].includes(deliveryStatus) && !["cancelled", "returned", "refunded"].includes(oldStatus)) {
+                    // Item cancelled / returned / refunded -> restore stock
+                    if (oldStatus === "delivered") {
+                        product.soldQty = Math.max(0, (product.soldQty || 0) - qty);
+                    } else {
+                        product.reservedQty = Math.max(0, (product.reservedQty || 0) - qty);
+                    }
+                    product.availableQty = (product.availableQty || 0) + qty;
+                    product.inStock = product.availableQty > 0;
+                    await product.save();
+                }
+            }
+        }
 
         if (statusChanged) {
             const statusTitles = {
@@ -1680,7 +2051,9 @@ exports.updateJewelleryOrder = async (req, res, next) => {
                 shipped: "Shipped via Courier",
                 out_for_delivery: "Out for Delivery",
                 delivered: "Delivered Successfully",
-                cancelled: "Order Cancelled"
+                cancelled: "Order Cancelled",
+                returned: "Order Returned to Warehouse",
+                refunded: "Order Refunded"
             };
             const statusDescs = {
                 placed: "Order placed successfully.",
@@ -1690,7 +2063,9 @@ exports.updateJewelleryOrder = async (req, res, next) => {
                 shipped: `Dispatched with ${order.courierName || 'Courier'}. Tracking ID: ${order.trackingId || 'N/A'}`,
                 out_for_delivery: "Courier delivery agent is out to deliver your package today.",
                 delivered: "Item delivered safely to recipient.",
-                cancelled: "Order has been cancelled."
+                cancelled: "Order has been cancelled.",
+                returned: "Item was returned by recipient and received back into inventory.",
+                refunded: "Redemption amount and bullion units have been refunded."
             };
 
             if (!order.statusHistory) order.statusHistory = [];
@@ -1703,6 +2078,6 @@ exports.updateJewelleryOrder = async (req, res, next) => {
         }
 
         await order.save();
-        res.json({ success: true, message: "Order updated successfully", data: order });
+        res.json({ success: true, message: "Order updated successfully and inventory synchronized", data: order });
     } catch (err) { next(err); }
 };
