@@ -1744,6 +1744,18 @@ exports.createCoin = async (req, res, next) => {
             sku = await generateUniqueCoinSku(metal, grams);
         }
 
+        let primaryImg = image || imageUrl || "";
+        let imgList = [];
+        if (Array.isArray(images) && images.length > 0) {
+            imgList = images.map(img => String(img).trim()).filter(Boolean);
+        }
+        if (primaryImg) {
+            primaryImg = String(primaryImg).trim();
+            imgList = [primaryImg, ...imgList.filter(x => x !== primaryImg)];
+        } else if (imgList.length > 0) {
+            primaryImg = imgList[0];
+        }
+
         const coin = await Coin.create({
             name,
             sku,
@@ -1754,7 +1766,9 @@ exports.createCoin = async (req, res, next) => {
             price: price !== undefined && Number(price) > 0 ? Number(price) : 0,
             priceAdjustment: priceAdjustment !== undefined ? Number(priceAdjustment) || 0 : 0,
             makingChargePct: Number(makingChargePct),
-            image: image || "",
+            image: primaryImg,
+            imageUrl: primaryImg,
+            images: imgList,
             availableQty: availableQty !== undefined ? Number(availableQty) : 50,
             reservedQty: 0,
             soldQty: 0,
@@ -1768,7 +1782,7 @@ exports.createCoin = async (req, res, next) => {
 exports.updateCoin = async (req, res, next) => {
     try {
         const Coin = require("../models/Coin");
-        let { name, sku, metal, purity, category, grams, price, priceAdjustment, makingChargePct, image, availableQty, reservedQty, soldQty, lowStockThreshold, isActive } = req.body;
+        let { name, sku, metal, purity, category, grams, price, priceAdjustment, makingChargePct, image, imageUrl, images, availableQty, reservedQty, soldQty, lowStockThreshold, isActive } = req.body;
         const coin = await Coin.findById(req.params.id);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
 
@@ -1789,7 +1803,24 @@ exports.updateCoin = async (req, res, next) => {
         if (price !== undefined) coin.price = Math.max(0, Number(price) || 0);
         if (priceAdjustment !== undefined) coin.priceAdjustment = Number(priceAdjustment) || 0;
         if (makingChargePct !== undefined) coin.makingChargePct = Number(makingChargePct);
-        if (image !== undefined) coin.image = image;
+        
+        let primaryImg = (imageUrl !== undefined ? imageUrl : image);
+        if (primaryImg !== undefined) {
+            primaryImg = String(primaryImg).trim();
+            coin.image = primaryImg;
+            coin.imageUrl = primaryImg;
+            if (Array.isArray(images) && images.length > 0) {
+                const rest = images.map(img => String(img).trim()).filter(x => x && x !== primaryImg);
+                coin.images = [primaryImg, ...rest];
+            } else if (primaryImg) {
+                coin.images = [primaryImg];
+            }
+        } else if (Array.isArray(images) && images.length > 0) {
+            coin.images = images.map(img => String(img).trim()).filter(Boolean);
+            coin.image = coin.images[0] || "";
+            coin.imageUrl = coin.images[0] || "";
+        }
+
         if (availableQty !== undefined) coin.availableQty = Math.max(0, Number(availableQty));
         if (reservedQty !== undefined) coin.reservedQty = Math.max(0, Number(reservedQty));
         if (soldQty !== undefined) coin.soldQty = Math.max(0, Number(soldQty));
@@ -1799,6 +1830,28 @@ exports.updateCoin = async (req, res, next) => {
         await coin.save();
         res.json({ success: true, message: "Coin updated successfully", data: coin });
     } catch (err) { next(err); }
+};
+
+exports.uploadCoinImage = (req, res) => {
+    const { uploadJewelleryImage } = require("../middleware/uploadMiddleware");
+    const Coin = require("../models/Coin");
+    uploadJewelleryImage(req, res, async (err) => {
+        if (err) return res.status(400).json({ success: false, message: err.message || "Upload failed" });
+        try {
+            if (!req.file) return res.status(400).json({ success: false, message: "No image file provided" });
+            const imageUrl = req.file.path;
+            const coin = await Coin.findById(req.params.id);
+            if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
+            coin.image = imageUrl;
+            coin.imageUrl = imageUrl;
+            let currentImages = Array.isArray(coin.images) ? coin.images.filter(x => x && x !== imageUrl) : [];
+            coin.images = [imageUrl, ...currentImages];
+            await coin.save();
+            res.json({ success: true, imageUrl, images: coin.images, message: "Coin image uploaded successfully" });
+        } catch (e) {
+            res.status(500).json({ success: false, message: e.message });
+        }
+    });
 };
 
 exports.deleteCoin = async (req, res, next) => {

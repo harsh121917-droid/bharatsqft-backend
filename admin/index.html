@@ -2451,9 +2451,33 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Image URL</label>
-                        <input class="form-control" id="jewellery-image-url" placeholder="https://..." />
+                    <!-- Product Photos & Main Image Manager -->
+                    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                            <div style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                                <i class="fas fa-images"></i> Product Photos & Main Image Selector
+                            </div>
+                            <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;font-size:11.5px">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Photos
+                                <input type="file" id="jewellery-file-input" multiple accept="image/*" style="display:none" onchange="handleJewelleryModalUpload(this.files)" />
+                            </label>
+                        </div>
+
+                        <!-- URL Input & Add Button -->
+                        <div style="display:flex;gap:8px;margin-bottom:10px">
+                            <input class="form-control" id="jewellery-image-url-input" placeholder="Or enter Image URL (https://...)" style="flex:1" />
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="addJewelleryUrlImage()">
+                                <i class="fas fa-plus"></i> Add Photo
+                            </button>
+                        </div>
+
+                        <!-- Live Gallery Strip with Set as Main -->
+                        <div id="jewellery-modal-gallery" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
+                            <!-- Thumbnails rendered dynamically -->
+                        </div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
+                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★ Main Image</strong> will be the primary image displayed in the mobile app. Tap "Make Main" on any photo to set it as primary.
+                        </div>
                     </div>
 
                     <!-- Inventory & Stock Controls -->
@@ -2552,7 +2576,7 @@
                                 required oninput="updateLiveCoinCalculation()" />
                         </div>
                     </div>
-                    <div class="form-grid-4">
+                    <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Base MRP Override (₹)</label>
                             <input class="form-control" type="number" id="coin-price" placeholder="0 = Auto live rate"
@@ -2577,10 +2601,6 @@
                             <input class="form-control" type="number" step="0.1" id="coin-making-pct" value="5" required
                                 oninput="updateLiveCoinCalculation()" />
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Image URL</label>
-                            <input class="form-control" id="coin-image-url" placeholder="https://..." />
-                        </div>
                     </div>
 
                     <!-- Live Coin Calculation Box -->
@@ -2601,6 +2621,35 @@
                                     style="font-size:1.35rem;font-weight:900;color:#10b981;font-family:var(--font-mono)"
                                     id="coin-calc-final-price-val">₹0</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Photos & Main Image Manager for Coin -->
+                    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-bottom:1.15rem">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                            <div style="font-size:12.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                                <i class="fas fa-images"></i> Coin Photos & Main Image Selector
+                            </div>
+                            <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;font-size:11.5px">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Photos
+                                <input type="file" id="coin-file-input" multiple accept="image/*" style="display:none" onchange="handleCoinModalUpload(this.files)" />
+                            </label>
+                        </div>
+
+                        <!-- URL Input & Add Button -->
+                        <div style="display:flex;gap:8px;margin-bottom:10px">
+                            <input class="form-control" id="coin-image-url-input" placeholder="Or enter Image URL (https://...)" style="flex:1" />
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="addCoinUrlImage()">
+                                <i class="fas fa-plus"></i> Add Photo
+                            </button>
+                        </div>
+
+                        <!-- Live Gallery Strip with Set as Main -->
+                        <div id="coin-modal-gallery" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;min-height:90px;background:var(--surface);padding:10px;border-radius:var(--radius-sm);border:1px dashed var(--border)">
+                            <!-- Thumbnails rendered dynamically -->
+                        </div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
+                            <i class="fas fa-info-circle"></i> The photo tagged with <strong style="color:var(--gold)">★ Main Image</strong> will be the primary coin image in the customer app.
                         </div>
                     </div>
 

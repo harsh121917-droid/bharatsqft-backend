@@ -11,7 +11,9 @@ const CoinSchema = new mongoose.Schema(
         price: { type: Number, default: 0 }, // Optional Direct Selling / Retail Price in ₹
         priceAdjustment: { type: Number, default: 0 }, // Admin Price Adjustment in ₹ (+/- or 0)
         makingChargePct: { type: Number, required: true, default: 5 },
-        image: { type: String }, // Cloudinary URL
+        image: { type: String, default: "" }, // Cloudinary URL
+        imageUrl: { type: String, default: "" }, // Primary image URL compatibility
+        images: { type: [String], default: [] }, // Multi-image gallery
         
         // Inventory & Stock Tracking
         availableQty: { type: Number, default: 50, min: 0 },

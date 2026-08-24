@@ -10,7 +10,7 @@ const {
   getRewardSettings,
   updateRewardSettings,
   getAllRewardHistory,
-  getAdminCoins, createCoin, updateCoin, deleteCoin,
+  getAdminCoins, createCoin, updateCoin, deleteCoin, uploadCoinImage,
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
   getInventory, updateInventoryStock, backfillInventorySkus,
@@ -95,6 +95,7 @@ router.get("/rewards/history", getAllRewardHistory);
 // Coin Catalog Management
 router.get("/coins", getAdminCoins);
 router.post("/coins", createCoin);
+router.post("/coins/:id/upload-image", uploadCoinImage);
 router.put("/coins/:id", updateCoin);
 router.delete("/coins/:id", deleteCoin);
 // App Version Configuration Management

@@ -319,11 +319,14 @@ exports.addProduct = async (req, res, next) => {
         let imageList = [];
         if (Array.isArray(images) && images.length > 0) {
             imageList = images.map(img => String(img).trim()).filter(Boolean);
-        } else if (imageUrl && String(imageUrl).trim()) {
-            imageList = [String(imageUrl).trim()];
         }
 
-        const primaryImage = imageList.length > 0 ? imageList[0] : (imageUrl || "");
+        let primaryImage = imageUrl ? String(imageUrl).trim() : "";
+        if (primaryImage) {
+            imageList = [primaryImage, ...imageList.filter(x => x !== primaryImage)];
+        } else if (imageList.length > 0) {
+            primaryImage = imageList[0];
+        }
 
         const product = await Jewellery.create({
             name,
@@ -378,13 +381,18 @@ exports.updateProduct = async (req, res, next) => {
             updateData.inStock = updateData.availableQty > 0;
         }
 
-        if (updateData.images && Array.isArray(updateData.images)) {
-            updateData.images = updateData.images.map(img => String(img).trim()).filter(Boolean);
-            if (!updateData.imageUrl || !updateData.images.includes(updateData.imageUrl)) {
-                updateData.imageUrl = updateData.images[0] || "";
+        // Image List & Main Image handling
+        if (updateData.imageUrl) {
+            updateData.imageUrl = String(updateData.imageUrl).trim();
+            if (Array.isArray(updateData.images) && updateData.images.length > 0) {
+                const rest = updateData.images.map(img => String(img).trim()).filter(img => img && img !== updateData.imageUrl);
+                updateData.images = [updateData.imageUrl, ...rest];
+            } else {
+                updateData.images = [updateData.imageUrl];
             }
-        } else if (updateData.imageUrl) {
-            updateData.images = [updateData.imageUrl];
+        } else if (updateData.images && Array.isArray(updateData.images) && updateData.images.length > 0) {
+            updateData.images = updateData.images.map(img => String(img).trim()).filter(Boolean);
+            updateData.imageUrl = updateData.images[0] || "";
         }
 
         const updated = await Jewellery.findByIdAndUpdate(req.params.id, updateData, { new: true });
@@ -716,18 +724,18 @@ exports.uploadProductImage = (req, res) => {
 
             const imageUrl = req.file.path; // Cloudinary URL
 
-            // Update the product's imageUrl
-            const product = await Jewellery.findByIdAndUpdate(
-                req.params.id,
-                { imageUrl },
-                { new: true }
-            );
-
+            // Update the product's imageUrl and prepend to images array as main image
+            const product = await Jewellery.findById(req.params.id);
             if (!product) {
                 return res.status(404).json({ success: false, message: "Product not found" });
             }
 
-            res.json({ success: true, imageUrl, message: "Image uploaded successfully" });
+            product.imageUrl = imageUrl;
+            let currentImages = Array.isArray(product.images) ? product.images.filter(x => x && x !== imageUrl) : [];
+            product.images = [imageUrl, ...currentImages];
+            await product.save();
+
+            res.json({ success: true, imageUrl, images: product.images, message: "Main product image uploaded successfully" });
         } catch (e) {
             res.status(500).json({ success: false, message: e.message });
         }

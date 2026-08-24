@@ -394,12 +394,261 @@ function escapeQuotes(str) {
     return String(str).replace(/'/g, "\\'").replace(/"/g, "&quot;");
 }
 
+// ── Photo Gallery State for Modals ──
+let modalJewelleryImages = [];
+let modalMainImage = "";
+let modalCoinImages = [];
+let modalCoinMainImage = "";
+
+function renderJewelleryModalImages() {
+    const gallery = document.getElementById("jewellery-modal-gallery");
+    if (!gallery) return;
+
+    if (!modalJewelleryImages || modalJewelleryImages.length === 0) {
+        gallery.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:1.5rem 1rem;color:var(--text-dim);font-size:12px">
+            <i class="fas fa-images" style="font-size:24px;margin-bottom:6px;display:block"></i>
+            No photos added yet. Click "Upload Photos" or enter an Image URL.
+        </div>`;
+        return;
+    }
+
+    let html = "";
+    modalJewelleryImages.forEach((img, idx) => {
+        const isMain = img === modalMainImage || (idx === 0 && !modalMainImage);
+        if (isMain && !modalMainImage) modalMainImage = img;
+
+        html += `
+        <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;border:2px solid ${isMain ? 'var(--gold)' : 'var(--border)'};background:var(--surface2);aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:4px">
+            <img src="${img}" alt="Photo ${idx+1}" style="width:100%;height:100%;object-fit:contain" onerror="this.src='https://via.placeholder.com/100?text=Error'" />
+            
+            ${isMain ? `
+            <div style="position:absolute;top:4px;left:4px;background:linear-gradient(135deg, #d4a017, #f59e0b);color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.5)">
+                ★ Main Image
+            </div>` : `
+            <button type="button" onclick="setAsMainJewelleryImage(${idx})" style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;border:1px solid rgba(255,255,255,0.2);font-size:9px;padding:2px 5px;border-radius:4px;cursor:pointer">
+                Make Main
+            </button>`}
+
+            <button type="button" onclick="removeJewelleryImage(${idx})" title="Remove photo" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.9);color:#fff;border:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>`;
+    });
+    gallery.innerHTML = html;
+}
+
+function setAsMainJewelleryImage(idx) {
+    if (idx >= 0 && idx < modalJewelleryImages.length) {
+        const selected = modalJewelleryImages[idx];
+        modalMainImage = selected;
+        modalJewelleryImages.splice(idx, 1);
+        modalJewelleryImages.unshift(selected);
+        renderJewelleryModalImages();
+        toast("Primary Main Image set to selected photo", "success");
+    }
+}
+
+function removeJewelleryImage(idx) {
+    if (idx >= 0 && idx < modalJewelleryImages.length) {
+        const removed = modalJewelleryImages.splice(idx, 1)[0];
+        if (modalMainImage === removed) {
+            modalMainImage = modalJewelleryImages.length > 0 ? modalJewelleryImages[0] : "";
+        }
+        renderJewelleryModalImages();
+    }
+}
+
+function addJewelleryUrlImage() {
+    const input = document.getElementById("jewellery-image-url-input");
+    const val = (input?.value || "").trim();
+    if (!val) return toast("Please enter a valid image URL", "warning");
+    if (!modalJewelleryImages.includes(val)) {
+        modalJewelleryImages.push(val);
+        if (!modalMainImage) modalMainImage = val;
+    }
+    input.value = "";
+    renderJewelleryModalImages();
+    toast("Photo added to gallery", "success");
+}
+
+async function handleJewelleryModalUpload(files) {
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
+    }
+
+    toast(`Uploading ${files.length} photo(s)...`, "info");
+    try {
+        const token = localStorage.getItem("token");
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const response = await fetch(`${base}/jewellery/upload-images`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+        const res = await response.json();
+        if (res.success && res.urls) {
+            res.urls.forEach(u => {
+                if (!modalJewelleryImages.includes(u)) {
+                    modalJewelleryImages.push(u);
+                    if (!modalMainImage) modalMainImage = u;
+                }
+            });
+            renderJewelleryModalImages();
+            toast("Photos uploaded and added to gallery!", "success");
+        } else {
+            toast(res.message || "Failed to upload photos", "danger");
+        }
+    } catch (e) {
+        toast("Error uploading photos", "danger");
+    }
+}
+
+// ── Coin Modal Photo Helpers ──
+function renderCoinModalImages() {
+    const gallery = document.getElementById("coin-modal-gallery");
+    if (!gallery) return;
+
+    if (!modalCoinImages || modalCoinImages.length === 0) {
+        gallery.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:1.5rem 1rem;color:var(--text-dim);font-size:12px">
+            <i class="fas fa-coins" style="font-size:24px;margin-bottom:6px;display:block"></i>
+            No coin photos added. Click "Upload Photos" or enter an Image URL.
+        </div>`;
+        return;
+    }
+
+    let html = "";
+    modalCoinImages.forEach((img, idx) => {
+        const isMain = img === modalCoinMainImage || (idx === 0 && !modalCoinMainImage);
+        if (isMain && !modalCoinMainImage) modalCoinMainImage = img;
+
+        html += `
+        <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;border:2px solid ${isMain ? 'var(--gold)' : 'var(--border)'};background:var(--surface2);aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:4px">
+            <img src="${img}" alt="Coin Photo ${idx+1}" style="width:100%;height:100%;object-fit:contain" onerror="this.src='https://via.placeholder.com/100?text=Error'" />
+            
+            ${isMain ? `
+            <div style="position:absolute;top:4px;left:4px;background:linear-gradient(135deg, #d4a017, #f59e0b);color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,0.5)">
+                ★ Main Image
+            </div>` : `
+            <button type="button" onclick="setAsMainCoinImage(${idx})" style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;border:1px solid rgba(255,255,255,0.2);font-size:9px;padding:2px 5px;border-radius:4px;cursor:pointer">
+                Make Main
+            </button>`}
+
+            <button type="button" onclick="removeCoinImage(${idx})" title="Remove photo" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.9);color:#fff;border:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>`;
+    });
+    gallery.innerHTML = html;
+}
+
+function setAsMainCoinImage(idx) {
+    if (idx >= 0 && idx < modalCoinImages.length) {
+        const selected = modalCoinImages[idx];
+        modalCoinMainImage = selected;
+        modalCoinImages.splice(idx, 1);
+        modalCoinImages.unshift(selected);
+        renderCoinModalImages();
+        toast("Primary Main Image updated for coin", "success");
+    }
+}
+
+function removeCoinImage(idx) {
+    if (idx >= 0 && idx < modalCoinImages.length) {
+        const removed = modalCoinImages.splice(idx, 1)[0];
+        if (modalCoinMainImage === removed) {
+            modalCoinMainImage = modalCoinImages.length > 0 ? modalCoinImages[0] : "";
+        }
+        renderCoinModalImages();
+    }
+}
+
+function addCoinUrlImage() {
+    const input = document.getElementById("coin-image-url-input");
+    const val = (input?.value || "").trim();
+    if (!val) return toast("Please enter a valid image URL", "warning");
+    if (!modalCoinImages.includes(val)) {
+        modalCoinImages.push(val);
+        if (!modalCoinMainImage) modalCoinMainImage = val;
+    }
+    input.value = "";
+    renderCoinModalImages();
+    toast("Photo added to coin gallery", "success");
+}
+
+async function handleCoinModalUpload(files) {
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append("images", files[i]);
+    }
+
+    toast(`Uploading ${files.length} coin photo(s)...`, "info");
+    try {
+        const token = localStorage.getItem("token");
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const response = await fetch(`${base}/jewellery/upload-images`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+        const res = await response.json();
+        if (res.success && res.urls) {
+            res.urls.forEach(u => {
+                if (!modalCoinImages.includes(u)) {
+                    modalCoinImages.push(u);
+                    if (!modalCoinMainImage) modalCoinMainImage = u;
+                }
+            });
+            renderCoinModalImages();
+            toast("Coin photos uploaded successfully!", "success");
+        } else {
+            toast(res.message || "Failed to upload photos", "danger");
+        }
+    } catch (e) {
+        toast("Error uploading photos", "danger");
+    }
+}
+
+async function uploadCoinPhoto(id, file) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("image", file);
+
+    toast("Uploading coin image...", "info");
+
+    try {
+        const token = localStorage.getItem("token");
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const response = await fetch(`${base}/admin/coins/${id}/upload-image`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+        });
+        const res = await response.json();
+
+        if (res.success) {
+            toast("Coin main image uploaded successfully", "success");
+            loadCoins();
+        } else {
+            toast(res.message || "Failed to upload image", "danger");
+        }
+    } catch (e) {
+        toast("Error uploading image", "danger");
+    }
+}
+
 function openJewelleryModal(id = null) {
     editingJewelleryId = id;
     const modal = document.getElementById("jewellery-modal");
     if (!modal) return;
 
     populateCategoryDropdown(allCategories);
+    modalJewelleryImages = [];
+    modalMainImage = "";
 
     if (id) {
         const j = allJewellery.find(item => item._id === id);
@@ -415,12 +664,21 @@ function openJewelleryModal(id = null) {
             document.getElementById("jewellery-price-adjustment").value = j.priceAdjustment !== undefined ? j.priceAdjustment : 0;
             document.getElementById("jewellery-making").value = j.makingCharges || "";
             document.getElementById("jewellery-gst").value = j.gstPercentage || 3;
-            document.getElementById("jewellery-image-url").value = j.imageUrl || "";
             document.getElementById("jewellery-available-qty").value = j.availableQty !== undefined ? j.availableQty : (j.inStock ? 10 : 0);
             document.getElementById("jewellery-low-threshold").value = j.lowStockThreshold || 5;
             document.getElementById("jewellery-desc").value = j.description || "";
             document.getElementById("jewellery-instock").checked = j.inStock !== false;
             document.getElementById("jewellery-ispopular").checked = !!j.isPopular;
+
+            modalMainImage = j.imageUrl || "";
+            if (Array.isArray(j.images) && j.images.length > 0) {
+                modalJewelleryImages = [...j.images];
+                if (modalMainImage && !modalJewelleryImages.includes(modalMainImage)) {
+                    modalJewelleryImages.unshift(modalMainImage);
+                }
+            } else if (modalMainImage) {
+                modalJewelleryImages = [modalMainImage];
+            }
         }
     } else {
         document.getElementById("jewellery-modal-title").textContent = "Add New Jewellery Product";
@@ -433,8 +691,11 @@ function openJewelleryModal(id = null) {
         document.getElementById("jewellery-instock").checked = true;
         document.getElementById("jewellery-ispopular").checked = false;
         document.getElementById("jewellery-gst").value = 3;
+        modalJewelleryImages = [];
+        modalMainImage = "";
     }
 
+    renderJewelleryModalImages();
     updateLiveJewelleryCalculation();
     modal.style.display = "flex";
 }
@@ -456,7 +717,6 @@ async function saveJewellery() {
     const priceAdjustment = Number(document.getElementById("jewellery-price-adjustment")?.value || 0);
     const makingCharges = Number(document.getElementById("jewellery-making")?.value);
     const gstPercentage = Number(document.getElementById("jewellery-gst")?.value) || 3;
-    const imageUrl = document.getElementById("jewellery-image-url")?.value.trim();
     const availableQty = Number(document.getElementById("jewellery-available-qty")?.value || 0);
     const lowStockThreshold = Number(document.getElementById("jewellery-low-threshold")?.value || 5);
     const description = document.getElementById("jewellery-desc")?.value.trim();
@@ -467,6 +727,8 @@ async function saveJewellery() {
         toast("Please fill in Product Name, Category and Weight", "warning");
         return;
     }
+
+    const primaryImg = modalMainImage || (modalJewelleryImages.length > 0 ? modalJewelleryImages[0] : "");
 
     const payload = {
         name,
@@ -479,7 +741,8 @@ async function saveJewellery() {
         priceAdjustment,
         makingCharges,
         gstPercentage,
-        imageUrl,
+        imageUrl: primaryImg,
+        images: modalJewelleryImages,
         availableQty,
         lowStockThreshold,
         description,
@@ -513,7 +776,7 @@ async function uploadJewelleryPhoto(id, file) {
     const formData = new FormData();
     formData.append("image", file);
 
-    toast("Uploading product image...", "info");
+    toast("Uploading main product image...", "info");
 
     try {
         const token = localStorage.getItem("token");
@@ -526,7 +789,7 @@ async function uploadJewelleryPhoto(id, file) {
         const res = await response.json();
 
         if (res.success) {
-            toast("Image uploaded successfully", "success");
+            toast("Main image uploaded successfully", "success");
             loadJewellery();
         } else {
             toast(res.message || "Failed to upload image", "danger");
@@ -599,14 +862,15 @@ function renderCoinsGrid(coins) {
         const marketRate = hasFixedPrice ? Number(c.price) : formulaMarketRate;
         const adj = Number(c.priceAdjustment || 0);
         const displayPrice = Math.max(0, marketRate + adj);
+        const imgUrl = c.imageUrl || c.image || (c.images && c.images[0]) || "";
         const sku = c.sku || `VIKA-${(c.metal || 'GOLD').toUpperCase()}-COIN-${c.grams}G-${String(c._id).slice(-4).toUpperCase()}`;
         const avail = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
 
         html += `
         <div class="product-card">
             <div class="product-card-media" style="background: radial-gradient(circle, ${isGold ? 'rgba(245,158,11,0.15)' : 'rgba(148,163,184,0.15)'} 0%, rgba(14,18,26,0.9) 100%)">
-                ${c.image ? `<img src="${c.image}" alt="${c.name}" class="product-img" onerror="this.style.display='none'" />` : ''}
-                <div class="product-img-fallback">
+                ${imgUrl ? `<img src="${imgUrl}" alt="${c.name}" class="product-img" onerror="this.style.display='none'" />` : ''}
+                <div class="product-img-fallback" style="${imgUrl ? 'display:none' : 'display:flex'}">
                     <i class="${isGold ? 'fas fa-coins icon-gold' : 'fas fa-coins icon-silver'}" style="font-size:42px"></i>
                 </div>
 
@@ -628,7 +892,7 @@ function renderCoinsGrid(coins) {
                     </span>
                 </div>
                 <div class="product-name" style="font-size:15px">${c.name || 'Bullion Mint Coin'}</div>
-                <div class="product-desc-snippet">Tamper-proof assayed physical bullion coin.</div>
+                <div class="product-desc-snippet">Assayed physical bullion coin.</div>
 
                 <div class="product-weight-row">
                     <span class="product-weight-badge"><i class="fas fa-circle-dot"></i> ${Number(c.grams || c.weightGrams || 0).toFixed(2)} g</span>
@@ -660,6 +924,10 @@ function renderCoinsGrid(coins) {
                     <button class="btn btn-secondary btn-sm" onclick="openRestockModal('coin', '${c._id}', '${escapeQuotes(c.name)}', '${sku}', ${avail}, ${c.lowStockThreshold || 10}, '${avail > 0 ? 'in_stock' : 'out_of_stock'}')" title="Quick Restock">
                         <i class="fas fa-boxes"></i> Stock (${avail})
                     </button>
+                    <label class="btn btn-secondary btn-sm" title="Upload Photo" style="cursor:pointer;margin:0">
+                        <i class="fas fa-camera"></i>
+                        <input type="file" accept="image/*" style="display:none" onchange="uploadCoinPhoto('${c._id}', this.files[0])" />
+                    </label>
                     <button class="btn-icon-danger" onclick="deleteCoin('${c._id}')" title="Delete Coin">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -677,6 +945,9 @@ function openCoinModal(id = null) {
     const modal = document.getElementById("coin-modal");
     if (!modal) return;
 
+    modalCoinImages = [];
+    modalCoinMainImage = "";
+
     if (id) {
         const c = allCoins.find(item => item._id === id);
         if (c) {
@@ -690,10 +961,19 @@ function openCoinModal(id = null) {
             document.getElementById("coin-price").value = c.price || 0;
             document.getElementById("coin-price-adjustment").value = c.priceAdjustment !== undefined ? c.priceAdjustment : 0;
             document.getElementById("coin-making-pct").value = c.makingChargePct !== undefined ? c.makingChargePct : 5;
-            document.getElementById("coin-image-url").value = c.image || "";
             document.getElementById("coin-available-qty").value = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
             document.getElementById("coin-low-threshold").value = c.lowStockThreshold || 10;
             document.getElementById("coin-isactive").checked = c.isActive !== false;
+
+            modalCoinMainImage = c.imageUrl || c.image || "";
+            if (Array.isArray(c.images) && c.images.length > 0) {
+                modalCoinImages = [...c.images];
+                if (modalCoinMainImage && !modalCoinImages.includes(modalCoinMainImage)) {
+                    modalCoinImages.unshift(modalCoinMainImage);
+                }
+            } else if (modalCoinMainImage) {
+                modalCoinImages = [modalCoinMainImage];
+            }
         }
     } else {
         document.getElementById("coin-modal-title").textContent = "Add New Bullion Coin / Bar";
@@ -707,8 +987,11 @@ function openCoinModal(id = null) {
         document.getElementById("coin-low-threshold").value = 10;
         document.getElementById("coin-making-pct").value = 5;
         document.getElementById("coin-isactive").checked = true;
+        modalCoinImages = [];
+        modalCoinMainImage = "";
     }
 
+    renderCoinModalImages();
     updateLiveCoinCalculation();
     modal.style.display = "flex";
 }
@@ -729,7 +1012,6 @@ async function saveCoin() {
     const price = Number(document.getElementById("coin-price")?.value || 0);
     const priceAdjustment = Number(document.getElementById("coin-price-adjustment")?.value || 0);
     const makingChargePct = Number(document.getElementById("coin-making-pct")?.value);
-    const image = document.getElementById("coin-image-url")?.value.trim();
     const availableQty = Number(document.getElementById("coin-available-qty")?.value || 0);
     const lowStockThreshold = Number(document.getElementById("coin-low-threshold")?.value || 10);
     const isActive = document.getElementById("coin-isactive")?.checked;
@@ -738,6 +1020,8 @@ async function saveCoin() {
         toast("Please provide Coin Name and Weight in grams", "warning");
         return;
     }
+
+    const primaryImg = modalCoinMainImage || (modalCoinImages.length > 0 ? modalCoinImages[0] : "");
 
     const payload = {
         name,
@@ -749,7 +1033,9 @@ async function saveCoin() {
         price,
         priceAdjustment,
         makingChargePct,
-        image,
+        image: primaryImg,
+        imageUrl: primaryImg,
+        images: modalCoinImages,
         availableQty,
         lowStockThreshold,
         isActive: availableQty > 0 && isActive
