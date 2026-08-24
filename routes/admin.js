@@ -16,6 +16,8 @@ const {
   getInventory, updateInventoryStock, backfillInventorySkus,
   addWalletMoney,
   deductWalletMoney,
+  getWalletLedger,
+  getUserWalletLedger,
   recalculateVaultBalance,
   resetUserVault,
   resetUserWallet,
@@ -39,6 +41,7 @@ router.get("/dashboard", getDashboard);
 // Users
 router.get("/users", getAllUsers);
 router.get("/users/:id", getUserById);
+router.get("/users/:id/wallet-ledger", getUserWalletLedger);
 router.post("/users/:id/add-money", addWalletMoney);
 router.post("/users/:id/deduct-money", deductWalletMoney);
 router.post("/users/:id/recalculate-vault", recalculateVaultBalance);
@@ -48,6 +51,9 @@ router.post("/users/:id/reset-rewards", resetUserRewards);
 router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
+
+// Wallet Transaction Ledger & Audit Trail
+router.get("/wallet-ledger", getWalletLedger);
 
 // Enquiries
 router.get("/enquiries", getAllEnquiries);

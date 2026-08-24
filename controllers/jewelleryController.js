@@ -295,7 +295,7 @@ async function generateUniqueJewellerySku(metalType, category) {
 // ADD Product (Admin)
 exports.addProduct = async (req, res, next) => {
     try {
-        let { name, sku, category, metalType, purity, weightGrams, price, makingCharges, gstPercentage, description, imageUrl, images, availableQty, lowStockThreshold, inStock, isPopular } = req.body;
+        let { name, sku, category, metalType, purity, weightGrams, price, priceAdjustment, makingCharges, gstPercentage, description, imageUrl, images, availableQty, lowStockThreshold, inStock, isPopular } = req.body;
         if (!name || !category || !weightGrams) {
             return res.status(400).json({ success: false, message: "Name, category, and weight are required" });
         }
@@ -314,6 +314,7 @@ exports.addProduct = async (req, res, next) => {
         const qty = availableQty !== undefined ? Number(availableQty) : 10;
         const lowThreshold = lowStockThreshold !== undefined ? Number(lowStockThreshold) : 5;
         const sellingPrice = price !== undefined && Number(price) > 0 ? Number(price) : 0;
+        const adjustment = priceAdjustment !== undefined ? Number(priceAdjustment) || 0 : 0;
 
         let imageList = [];
         if (Array.isArray(images) && images.length > 0) {
@@ -332,6 +333,7 @@ exports.addProduct = async (req, res, next) => {
             purity: purity || "22K Gold",
             weightGrams: Number(weightGrams),
             price: sellingPrice,
+            priceAdjustment: adjustment,
             makingCharges: Number(makingCharges || 1500),
             gstPercentage: Number(gstPercentage || 3),
             description: description || "",
@@ -364,7 +366,11 @@ exports.updateProduct = async (req, res, next) => {
         }
 
         if (updateData.price !== undefined) {
-            updateData.price = Math.max(0, Number(updateData.price));
+            updateData.price = Math.max(0, Number(updateData.price) || 0);
+        }
+
+        if (updateData.priceAdjustment !== undefined) {
+            updateData.priceAdjustment = Number(updateData.priceAdjustment) || 0;
         }
 
         if (updateData.availableQty !== undefined) {

@@ -183,6 +183,105 @@ function filterAndRenderJewellery() {
     renderJewelleryGrid(filtered);
 }
 
+// ── Helper: Live Rate per Purity ────────────────────────────────
+function getLiveRateForPurity(metal, purity) {
+    const isGold = (metal || "gold").toLowerCase() === "gold";
+    if (isGold) {
+        const p = (purity || "").toLowerCase();
+        if (p.includes("24k") || p.includes("999") || p.includes("99.9")) {
+            return { rate: liveGoldRate, label: "24K Gold (99.9%)" };
+        } else if (p.includes("18k") || p.includes("750")) {
+            return { rate: Math.round(liveGoldRate * 18 / 24), label: "18K Gold (75.0%)" };
+        } else if (p.includes("14k") || p.includes("585")) {
+            return { rate: Math.round(liveGoldRate * 14 / 24), label: "14K Gold (58.5%)" };
+        } else {
+            // Default 22K (916)
+            return { rate: Math.round(liveGoldRate * 22 / 24), label: "22K Gold (91.6%)" };
+        }
+    } else {
+        const p = (purity || "").toLowerCase();
+        if (p.includes("925")) {
+            return { rate: Math.round(liveSilverRate * 0.925), label: "925 Sterling Silver" };
+        } else {
+            return { rate: liveSilverRate, label: "999 Fine Silver" };
+        }
+    }
+}
+
+function updateLiveJewelleryCalculation() {
+    const metal = document.getElementById("jewellery-metal")?.value || "gold";
+    const purity = document.getElementById("jewellery-purity")?.value || "22K Gold";
+    const weight = parseFloat(document.getElementById("jewellery-weight")?.value) || 0;
+    const basePriceOverride = parseFloat(document.getElementById("jewellery-price")?.value) || 0;
+    const priceAdjustment = parseFloat(document.getElementById("jewellery-price-adjustment")?.value) || 0;
+    const making = parseFloat(document.getElementById("jewellery-making")?.value) || 0;
+    const gst = parseFloat(document.getElementById("jewellery-gst")?.value) || 3;
+
+    // Update Live Benchmark Ticker in Modal
+    setElText("modal-live-gold-24k", `₹${liveGoldRate.toLocaleString("en-IN")}/g`);
+    setElText("modal-live-gold-22k", `₹${Math.round(liveGoldRate * 22 / 24).toLocaleString("en-IN")}/g`);
+    setElText("modal-live-gold-18k", `₹${Math.round(liveGoldRate * 18 / 24).toLocaleString("en-IN")}/g`);
+    setElText("modal-live-silver-999", `₹${liveSilverRate.toLocaleString("en-IN")}/g`);
+
+    const { rate, label } = getLiveRateForPurity(metal, purity);
+    const baseMetalVal = Math.round(weight * rate);
+    const subtotal = baseMetalVal + making;
+    const gstAmt = Math.round(subtotal * (gst / 100));
+    const formulaMarketRate = baseMetalVal + making + gstAmt;
+
+    const marketRate = basePriceOverride > 0 ? basePriceOverride : formulaMarketRate;
+    const finalPrice = Math.max(0, Math.round(marketRate + priceAdjustment));
+
+    // Update calculation preview box
+    setElText("calc-purity-rate-tag", `${label} Rate: ₹${rate.toLocaleString("en-IN")}/g`);
+    setElText("calc-base-metal-val", `₹${baseMetalVal.toLocaleString("en-IN")}`);
+    setElText("calc-making-gst-val", `₹${(making + gstAmt).toLocaleString("en-IN")}`);
+    setElText("calc-market-rate-val", `₹${marketRate.toLocaleString("en-IN")}`);
+    setElText("calc-formula-market", `₹${marketRate.toLocaleString("en-IN")} (Market)`);
+
+    const adjEl = document.getElementById("calc-formula-adj");
+    if (adjEl) {
+        if (priceAdjustment > 0) {
+            adjEl.innerHTML = ` <span style="color:#10b981;font-weight:700">+ ₹${priceAdjustment.toLocaleString("en-IN")} (Admin Adj.)</span>`;
+        } else if (priceAdjustment < 0) {
+            adjEl.innerHTML = ` <span style="color:#ef4444;font-weight:700">- ₹${Math.abs(priceAdjustment).toLocaleString("en-IN")} (Admin Adj.)</span>`;
+        } else {
+            adjEl.innerHTML = ` <span style="color:var(--text-dim)">+ ₹0 (No Adj.)</span>`;
+        }
+    }
+
+    setElText("calc-final-price-val", `₹${finalPrice.toLocaleString("en-IN")}`);
+}
+
+function updateLiveCoinCalculation() {
+    const metal = document.getElementById("coin-metal")?.value || "gold";
+    const grams = parseFloat(document.getElementById("coin-grams")?.value) || 0;
+    const basePriceOverride = parseFloat(document.getElementById("coin-price")?.value) || 0;
+    const priceAdjustment = parseFloat(document.getElementById("coin-price-adjustment")?.value) || 0;
+    const makingPct = parseFloat(document.getElementById("coin-making-pct")?.value) || 5;
+
+    const rate = metal === "gold" ? liveGoldRate : liveSilverRate;
+    const baseVal = Math.round(grams * rate);
+    const makingAmt = Math.round(baseVal * (makingPct / 100));
+    const formulaMarketRate = baseVal + makingAmt;
+
+    const marketRate = basePriceOverride > 0 ? basePriceOverride : formulaMarketRate;
+    const finalPrice = Math.max(0, Math.round(marketRate + priceAdjustment));
+
+    setElText("coin-calc-formula-market", `₹${marketRate.toLocaleString("en-IN")} (Market)`);
+    const adjEl = document.getElementById("coin-calc-formula-adj");
+    if (adjEl) {
+        if (priceAdjustment > 0) {
+            adjEl.innerHTML = ` <span style="color:#10b981;font-weight:700">+ ₹${priceAdjustment.toLocaleString("en-IN")} (Admin Adj.)</span>`;
+        } else if (priceAdjustment < 0) {
+            adjEl.innerHTML = ` <span style="color:#ef4444;font-weight:700">- ₹${Math.abs(priceAdjustment).toLocaleString("en-IN")} (Admin Adj.)</span>`;
+        } else {
+            adjEl.innerHTML = ` <span style="color:var(--text-dim)">+ ₹0 (No Adj.)</span>`;
+        }
+    }
+    setElText("coin-calc-final-price-val", `₹${finalPrice.toLocaleString("en-IN")}`);
+}
+
 function renderJewelleryGrid(items) {
     const body = document.getElementById("jewellery-catalog-body");
     if (!body) return;
@@ -201,14 +300,16 @@ function renderJewelleryGrid(items) {
 
     items.forEach(j => {
         const isGold = (j.metalType || "gold").toLowerCase() === "gold";
-        const rate = isGold ? liveGoldRate : liveSilverRate;
+        const { rate, label } = getLiveRateForPurity(j.metalType, j.purity);
         const metalBaseVal = (j.weightGrams || 0) * rate;
         const making = Number(j.makingCharges || 0);
         const gst = Number(j.gstPercentage || 3);
         const subtotal = metalBaseVal + making;
-        const totalEstValue = Math.round(subtotal * (1 + gst / 100));
+        const formulaMarketRate = Math.round(subtotal * (1 + gst / 100));
         const hasFixedPrice = j.price && Number(j.price) > 0;
-        const displayPrice = hasFixedPrice ? Number(j.price) : totalEstValue;
+        const marketRate = hasFixedPrice ? Number(j.price) : formulaMarketRate;
+        const adj = Number(j.priceAdjustment || 0);
+        const finalSellingPrice = Math.max(0, marketRate + adj);
 
         const imgUrl = j.imageUrl || (j.images && j.images[0]) || "";
         const sku = j.sku || `VIKA-${(j.metalType || 'GOLD').toUpperCase()}-JEWEL-${String(j._id).slice(-4).toUpperCase()}`;
@@ -248,8 +349,21 @@ function renderJewelleryGrid(items) {
                 </div>
 
                 <div class="product-pricing-box">
-                    <div class="pricing-label">${hasFixedPrice ? 'Fixed Retail Selling Price' : `Estimated Retail Value (Inc. ${gst}% GST)`}</div>
-                    <div class="pricing-total-val">₹ ${displayPrice.toLocaleString("en-IN")}</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;margin-bottom:3px">
+                        <span style="color:var(--text-dim)">Market Rate:</span>
+                        <strong style="color:var(--gold);font-family:var(--font-mono)">₹${marketRate.toLocaleString("en-IN")}</strong>
+                    </div>
+                    ${adj !== 0 ? `
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px">
+                        <span style="color:var(--text-dim)">Admin Adjustment:</span>
+                        <span class="badge ${adj > 0 ? 'badge-pill-success' : 'badge-danger'}" style="font-size:10px;padding:2px 6px">
+                            ${adj > 0 ? `+₹${adj.toLocaleString("en-IN")}` : `-₹${Math.abs(adj).toLocaleString("en-IN")}`}
+                        </span>
+                    </div>` : ''}
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,0.08)">
+                        <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase">Final Selling Price:</span>
+                        <span class="pricing-total-val" style="color:#10b981;font-size:1.15rem">₹ ${finalSellingPrice.toLocaleString("en-IN")}</span>
+                    </div>
                 </div>
 
                 <div class="product-card-actions">
@@ -298,6 +412,7 @@ function openJewelleryModal(id = null) {
             document.getElementById("jewellery-purity").value = j.purity || "22K Gold";
             document.getElementById("jewellery-weight").value = j.weightGrams || "";
             document.getElementById("jewellery-price").value = j.price || 0;
+            document.getElementById("jewellery-price-adjustment").value = j.priceAdjustment !== undefined ? j.priceAdjustment : 0;
             document.getElementById("jewellery-making").value = j.makingCharges || "";
             document.getElementById("jewellery-gst").value = j.gstPercentage || 3;
             document.getElementById("jewellery-image-url").value = j.imageUrl || "";
@@ -312,6 +427,7 @@ function openJewelleryModal(id = null) {
         document.getElementById("jewellery-form")?.reset();
         document.getElementById("jewellery-sku").value = "";
         document.getElementById("jewellery-price").value = 0;
+        document.getElementById("jewellery-price-adjustment").value = 0;
         document.getElementById("jewellery-available-qty").value = 10;
         document.getElementById("jewellery-low-threshold").value = 5;
         document.getElementById("jewellery-instock").checked = true;
@@ -319,6 +435,7 @@ function openJewelleryModal(id = null) {
         document.getElementById("jewellery-gst").value = 3;
     }
 
+    updateLiveJewelleryCalculation();
     modal.style.display = "flex";
 }
 
@@ -336,6 +453,7 @@ async function saveJewellery() {
     const purity = document.getElementById("jewellery-purity")?.value.trim();
     const weightGrams = Number(document.getElementById("jewellery-weight")?.value);
     const price = Number(document.getElementById("jewellery-price")?.value || 0);
+    const priceAdjustment = Number(document.getElementById("jewellery-price-adjustment")?.value || 0);
     const makingCharges = Number(document.getElementById("jewellery-making")?.value);
     const gstPercentage = Number(document.getElementById("jewellery-gst")?.value) || 3;
     const imageUrl = document.getElementById("jewellery-image-url")?.value.trim();
@@ -358,6 +476,7 @@ async function saveJewellery() {
         purity,
         weightGrams,
         price,
+        priceAdjustment,
         makingCharges,
         gstPercentage,
         imageUrl,
@@ -475,9 +594,11 @@ function renderCoinsGrid(coins) {
         const baseVal = (c.grams || c.weightGrams || 0) * rate;
         const makingPct = c.makingChargePct !== undefined ? c.makingChargePct : 5;
         const makingAmt = c.makingCharge || (baseVal * makingPct / 100);
-        const totalCoinVal = Math.round(baseVal + makingAmt);
+        const formulaMarketRate = Math.round(baseVal + makingAmt);
         const hasFixedPrice = c.price && Number(c.price) > 0;
-        const displayPrice = hasFixedPrice ? Number(c.price) : totalCoinVal;
+        const marketRate = hasFixedPrice ? Number(c.price) : formulaMarketRate;
+        const adj = Number(c.priceAdjustment || 0);
+        const displayPrice = Math.max(0, marketRate + adj);
         const sku = c.sku || `VIKA-${(c.metal || 'GOLD').toUpperCase()}-COIN-${c.grams}G-${String(c._id).slice(-4).toUpperCase()}`;
         const avail = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
 
@@ -515,8 +636,21 @@ function renderCoinsGrid(coins) {
                 </div>
 
                 <div class="product-pricing-box">
-                    <div class="pricing-label">${hasFixedPrice ? 'Fixed Coin Selling Price' : 'Current Coin Market Valuation'}</div>
-                    <div class="pricing-total-val">₹ ${displayPrice.toLocaleString("en-IN")}</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;margin-bottom:3px">
+                        <span style="color:var(--text-dim)">Market Rate:</span>
+                        <strong style="color:var(--gold);font-family:var(--font-mono)">₹${marketRate.toLocaleString("en-IN")}</strong>
+                    </div>
+                    ${adj !== 0 ? `
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px">
+                        <span style="color:var(--text-dim)">Admin Adjustment:</span>
+                        <span class="badge ${adj > 0 ? 'badge-pill-success' : 'badge-danger'}" style="font-size:10px;padding:2px 6px">
+                            ${adj > 0 ? `+₹${adj.toLocaleString("en-IN")}` : `-₹${Math.abs(adj).toLocaleString("en-IN")}`}
+                        </span>
+                    </div>` : ''}
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,0.08)">
+                        <span style="font-size:11px;font-weight:700;color:#fff;text-transform:uppercase">Final Selling Price:</span>
+                        <span class="pricing-total-val" style="color:#10b981;font-size:1.15rem">₹ ${displayPrice.toLocaleString("en-IN")}</span>
+                    </div>
                 </div>
 
                 <div class="product-card-actions">
@@ -554,6 +688,7 @@ function openCoinModal(id = null) {
             document.getElementById("coin-purity").value = c.purity || (c.metal === "gold" ? "24K 999 Purity" : "999 Fine Silver");
             document.getElementById("coin-grams").value = c.grams || c.weightGrams || "";
             document.getElementById("coin-price").value = c.price || 0;
+            document.getElementById("coin-price-adjustment").value = c.priceAdjustment !== undefined ? c.priceAdjustment : 0;
             document.getElementById("coin-making-pct").value = c.makingChargePct !== undefined ? c.makingChargePct : 5;
             document.getElementById("coin-image-url").value = c.image || "";
             document.getElementById("coin-available-qty").value = c.availableQty !== undefined ? c.availableQty : (c.isActive ? 50 : 0);
@@ -567,12 +702,14 @@ function openCoinModal(id = null) {
         document.getElementById("coin-category").value = "Coins & Bars";
         document.getElementById("coin-purity").value = "24K 999 Purity";
         document.getElementById("coin-price").value = 0;
+        document.getElementById("coin-price-adjustment").value = 0;
         document.getElementById("coin-available-qty").value = 50;
         document.getElementById("coin-low-threshold").value = 10;
         document.getElementById("coin-making-pct").value = 5;
         document.getElementById("coin-isactive").checked = true;
     }
 
+    updateLiveCoinCalculation();
     modal.style.display = "flex";
 }
 
@@ -590,6 +727,7 @@ async function saveCoin() {
     const purity = document.getElementById("coin-purity")?.value.trim();
     const grams = Number(document.getElementById("coin-grams")?.value);
     const price = Number(document.getElementById("coin-price")?.value || 0);
+    const priceAdjustment = Number(document.getElementById("coin-price-adjustment")?.value || 0);
     const makingChargePct = Number(document.getElementById("coin-making-pct")?.value);
     const image = document.getElementById("coin-image-url")?.value.trim();
     const availableQty = Number(document.getElementById("coin-available-qty")?.value || 0);
@@ -609,6 +747,7 @@ async function saveCoin() {
         purity,
         grams,
         price,
+        priceAdjustment,
         makingChargePct,
         image,
         availableQty,

@@ -498,3 +498,278 @@ async function approveSellPayout(id, metal, amt) {
         toast("Network error", "danger");
     }
 }
+
+// ── 5. WALLET TRANSACTION LEDGER & AUDIT TRAIL ────────────────
+let allWalletLedger = [];
+let ledgerPage = 1;
+let ledgerSearchQuery = "";
+
+async function loadWalletLedger(page = 1) {
+    ledgerPage = page;
+    const body = document.getElementById("wallet-ledger-table-body");
+    if (!body) return;
+
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading wallet transaction ledger...</div></div>`;
+
+    const params = new URLSearchParams({ page, limit: 25 });
+    if (ledgerSearchQuery) params.append("search", ledgerSearchQuery);
+
+    const entryFilter = document.getElementById("ledger-entry-filter")?.value || "all";
+    if (entryFilter !== "all") params.append("entryType", entryFilter);
+
+    const typeFilter = document.getElementById("ledger-type-filter")?.value || "all";
+    if (typeFilter !== "all") params.append("type", typeFilter);
+
+    try {
+        const res = await api(`/admin/wallet-ledger?${params.toString()}`);
+        if (!res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load wallet ledger"}</div></div>`;
+            return;
+        }
+
+        allWalletLedger = res.data || [];
+
+        // Update Summary KPI Cards
+        if (res.stats) {
+            setElText("ledger-stat-total", res.stats.totalTxns || 0);
+            setElText("ledger-stat-credits", `+${formatINR(res.stats.totalCredits || 0)}`);
+            setElText("ledger-stat-credit-count", `<i class="fas fa-plus-circle"></i> ${res.stats.creditCount || 0} credit entries`);
+            setElText("ledger-stat-debits", `-${formatINR(res.stats.totalDebits || 0)}`);
+            setElText("ledger-stat-debit-count", `<i class="fas fa-minus-circle"></i> ${res.stats.debitCount || 0} debit entries`);
+            setElText("ledger-stat-net", formatINR(res.stats.netVolume || 0));
+        }
+
+        renderWalletLedgerTable(allWalletLedger);
+
+        const info = document.getElementById("ledger-pagination-info");
+        if (info) info.textContent = `Showing page ${res.pagination?.page || page} of ${res.pagination?.pages || 1} (${res.pagination?.total || allWalletLedger.length} total entries)`;
+
+        const prevBtn = document.getElementById("btn-prev-ledger");
+        const nextBtn = document.getElementById("btn-next-ledger");
+        if (prevBtn) prevBtn.disabled = (res.pagination?.page || 1) <= 1;
+        if (nextBtn) nextBtn.disabled = (res.pagination?.page || 1) >= (res.pagination?.pages || 1);
+    } catch (e) {
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading wallet ledger</div></div>`;
+    }
+}
+
+function onLedgerSearch(val) {
+    ledgerSearchQuery = (val || "").trim();
+    loadWalletLedger(1);
+}
+
+function onLedgerFilterChange() {
+    loadWalletLedger(1);
+}
+
+function prevLedgerPage() {
+    if (ledgerPage > 1) loadWalletLedger(ledgerPage - 1);
+}
+
+function nextLedgerPage() {
+    loadWalletLedger(ledgerPage + 1);
+}
+
+function renderWalletLedgerTable(items) {
+    const body = document.getElementById("wallet-ledger-table-body");
+    if (!body) return;
+
+    if (!items || items.length === 0) {
+        body.innerHTML = `
+        <div class="loading-box" style="padding:4rem 2rem">
+            <i class="fas fa-receipt" style="font-size:36px;color:var(--text-dim);margin-bottom:10px"></i>
+            <div style="font-size:14px;color:#fff;font-weight:600">No ledger transactions found</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Adjust search or filters to locate specific ledger entries.</div>
+        </div>`;
+        return;
+    }
+
+    let html = `
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Transaction ID</th>
+                    <th>Customer</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Previous Balance</th>
+                    <th>New Balance</th>
+                    <th>Reason / Remarks</th>
+                    <th>Performed By</th>
+                    <th>Date & Time</th>
+                    <th style="text-align:right">Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    const typeNames = {
+        add: "Deposit / Credit",
+        deduct: "Manual Deduction",
+        gold_buy: "Gold Buy",
+        gold_sell: "Gold Sell Payout",
+        silver_buy: "Silver Buy",
+        silver_sell: "Silver Sell Payout",
+        copper_buy: "Copper Buy",
+        copper_sell: "Copper Sell Payout",
+        withdraw: "Bank Withdrawal",
+        refund: "Refund / Reversal",
+        coin_redeem: "Coin Redemption",
+        manual_credit: "Manual Credit",
+        manual_debit: "Manual Debit"
+    };
+
+    items.forEach(t => {
+        const u = t.user || {};
+        const isCredit = t.entryType === "credit";
+        const amtStr = isCredit ? `+${formatINR(t.amount)}` : `-${formatINR(t.amount)}`;
+        const amtColor = isCredit ? "#10b981" : "#ef4444";
+        const typeLabel = typeNames[t.type] || t.type;
+        const txnId = t.txnId || `TXN-WAL-${String(t._id).slice(-8).toUpperCase()}`;
+
+        html += `
+        <tr>
+            <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:11.5px;letter-spacing:0.5px">
+                        ${txnId}
+                    </span>
+                    <button class="btn-icon-secondary" onclick="copyTxnIdToClipboard('${txnId}')" title="Copy Txn ID" style="width:24px;height:24px;padding:0">
+                        <i class="fas fa-copy" style="font-size:10px"></i>
+                    </button>
+                </div>
+            </td>
+            <td>
+                <div style="font-weight:700;color:#fff;font-size:13px">${u.name || 'Anonymous Customer'}</div>
+                <div style="font-size:11px;color:var(--text-dim)">${u.phone || u.email || '—'}</div>
+            </td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:3px">
+                    <span class="badge ${isCredit ? 'badge-pill-success' : 'badge-danger'}" style="font-size:10px;font-weight:700;width:max-content">
+                        ${isCredit ? '● Credit (+)' : '▼ Debit (-)'}
+                    </span>
+                    <span style="font-size:11px;color:var(--text-muted)">${typeLabel}</span>
+                </div>
+            </td>
+            <td>
+                <span style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:${amtColor}">
+                    ${amtStr}
+                </span>
+            </td>
+            <td>
+                <span style="font-family:var(--font-mono);font-size:12.5px;color:var(--text-muted)">
+                    ${formatINR(t.balanceBefore || 0)}
+                </span>
+            </td>
+            <td>
+                <span style="font-family:var(--font-mono);font-size:13.5px;font-weight:800;color:#fff">
+                    ${formatINR(t.balanceAfter || 0)}
+                </span>
+            </td>
+            <td>
+                <div style="font-weight:600;color:#e2e8f0;font-size:12.5px">${t.reason || t.note || '—'}</div>
+            </td>
+            <td>
+                <div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim)">
+                    <i class="fas fa-user-shield" style="font-size:11px;color:var(--gold)"></i>
+                    <span>${t.adminName || 'System'}</span>
+                </div>
+            </td>
+            <td>
+                <div style="font-size:12px;color:#fff;font-weight:600">${t.formattedDate || 'Today'}</div>
+                <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">${t.formattedTime || ''}</div>
+            </td>
+            <td style="text-align:right">
+                <span class="badge ${t.status === 'success' ? 'badge-pill-success' : (t.status === 'pending' ? 'badge-amber' : 'badge-danger')}">
+                    ${(t.status || 'success').toUpperCase()}
+                </span>
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    body.innerHTML = html;
+}
+
+function copyTxnIdToClipboard(txnId) {
+    if (!txnId) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txnId).then(() => {
+            toast(`Transaction ID "${txnId}" copied to clipboard!`, "success");
+        }).catch(() => {
+            prompt("Copy Transaction ID:", txnId);
+        });
+    } else {
+        prompt("Copy Transaction ID:", txnId);
+    }
+}
+
+// ── 6. User Modal Embedded Live Ledger ─────────────────────────
+async function loadUserWalletLedger(userId) {
+    const mount = document.getElementById("user-modal-ledger-mount");
+    if (!mount || !userId) return;
+
+    mount.innerHTML = `<div style="padding:15px;text-align:center;color:var(--text-dim);font-size:12px"><i class="fas fa-spinner fa-spin"></i> Loading user wallet ledger...</div>`;
+
+    try {
+        const res = await api(`/admin/users/${userId}/wallet-ledger`);
+        if (!res.success || !res.data || res.data.length === 0) {
+            mount.innerHTML = `<div style="padding:14px;text-align:center;color:var(--text-dim);font-size:12px"><i class="fas fa-receipt" style="opacity:0.5"></i> No wallet transactions recorded yet for this customer.</div>`;
+            return;
+        }
+
+        let html = `
+        <table style="width:100%;font-size:11.5px;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);color:var(--text-dim);text-align:left">
+                    <th style="padding:6px 8px">Type</th>
+                    <th style="padding:6px 8px">Amount</th>
+                    <th style="padding:6px 8px">Previous</th>
+                    <th style="padding:6px 8px">New Balance</th>
+                    <th style="padding:6px 8px">Reason</th>
+                    <th style="padding:6px 8px">Admin</th>
+                    <th style="padding:6px 8px;text-align:right">Date & Time</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        res.data.forEach(t => {
+            const isCredit = t.entryType === "credit";
+            const amtStr = isCredit ? `+${formatINR(t.amount)}` : `-${formatINR(t.amount)}`;
+            const amtColor = isCredit ? "#10b981" : "#ef4444";
+
+            html += `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+                <td style="padding:6px 8px">
+                    <span class="badge ${isCredit ? 'badge-pill-success' : 'badge-danger'}" style="font-size:9.5px;padding:2px 6px">
+                        ${isCredit ? 'Credit' : 'Debit'}
+                    </span>
+                </td>
+                <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:${amtColor}">
+                    ${amtStr}
+                </td>
+                <td style="padding:6px 8px;font-family:var(--font-mono);color:var(--text-muted)">
+                    ${formatINR(t.balanceBefore || 0)}
+                </td>
+                <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:#fff">
+                    ${formatINR(t.balanceAfter || 0)}
+                </td>
+                <td style="padding:6px 8px;color:#e2e8f0" title="${t.reason || t.note || ''}">
+                    ${t.reason || t.note || 'Adjustment'}
+                </td>
+                <td style="padding:6px 8px;color:var(--text-dim)">
+                    ${t.adminName || 'System'}
+                </td>
+                <td style="padding:6px 8px;text-align:right;color:var(--text-dim)">
+                    ${t.formattedDate || ''} ${t.formattedTime || ''}
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        mount.innerHTML = html;
+    } catch (e) {
+        mount.innerHTML = `<div style="padding:10px;color:var(--danger);font-size:12px">Failed to load user ledger</div>`;
+    }
+}
+

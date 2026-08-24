@@ -108,6 +108,10 @@
                 <div class="nav-item-icon"><i class="fas fa-coins"></i></div>
                 <span class="nav-item-label">User Investments</span>
             </div>
+            <div class="nav-item" onclick="showPage('walletledger')" id="nav-walletledger">
+                <div class="nav-item-icon"><i class="fas fa-receipt"></i></div>
+                <span class="nav-item-label">Wallet Ledger</span>
+            </div>
             <div class="nav-item" onclick="showPage('schemes')" id="nav-schemes">
                 <div class="nav-item-icon"><i class="fas fa-award"></i></div>
                 <span class="nav-item-label">Scheme Management</span>
@@ -929,6 +933,126 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════
+                 DIGI GOLD: WALLET TRANSACTION LEDGER & AUDIT TRAIL
+                 ══════════════════════════════════════════════════ -->
+            <div class="page" id="page-walletledger">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">
+                            <i class="fas fa-receipt" style="color:var(--gold)"></i> Customer & Admin Wallet Audit
+                            Ledger
+                        </div>
+                        <div class="section-subtitle">Comprehensive ledger audit trail tracking every Credit (+), Debit
+                            (-), Previous Balance, and Balance Transition</div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center">
+                        <button class="btn btn-secondary" onclick="loadWalletLedger()"><i class="fas fa-sync-alt"></i>
+                            Refresh Ledger</button>
+                    </div>
+                </div>
+
+                <!-- Ledger KPI Summary Cards -->
+                <div class="fulfillment-kpi-grid" style="grid-template-columns:repeat(4, 1fr);margin-bottom:1.5rem">
+                    <div class="fulfillment-kpi-card card-purple">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-receipt"></i></div>
+                            <span class="fulfillment-tag tag-purple">Ledger Logs</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Total Transactions</div>
+                            <div class="fulfillment-val val-purple" id="ledger-stat-total">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-list"></i> Lifetime ledger records</div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-green">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-arrow-down"></i></div>
+                            <span class="fulfillment-tag tag-green">Credit (+)</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Total Money In</div>
+                            <div class="fulfillment-val val-green" id="ledger-stat-credits">₹0</div>
+                            <div class="fulfillment-subtext" id="ledger-stat-credit-count"><i
+                                    class="fas fa-plus-circle"></i> 0 credit entries</div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-amber">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-amber-glow"><i class="fas fa-arrow-up"></i></div>
+                            <span class="fulfillment-tag tag-amber">Debit (-)</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Total Money Out</div>
+                            <div class="fulfillment-val val-amber" id="ledger-stat-debits">₹0</div>
+                            <div class="fulfillment-subtext" id="ledger-stat-debit-count"><i
+                                    class="fas fa-minus-circle"></i> 0 debit entries</div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-blue">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-blue-glow"><i class="fas fa-balance-scale"></i></div>
+                            <span class="fulfillment-tag tag-blue">Net Volume</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Net Wallet Volume</div>
+                            <div class="fulfillment-val val-blue" id="ledger-stat-net">₹0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-shield-alt"></i> Balanced ledger</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search & Filters Container -->
+                <div
+                    style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem;background:var(--surface2);padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border)">
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1">
+                        <input class="search-bar" id="ledger-search-input"
+                            placeholder="🔍 Search Txn ID, Customer Name, Phone, Reason, Admin..."
+                            oninput="onLedgerSearch(this.value)" style="min-width:300px;flex:1" />
+                        <select class="form-control" id="ledger-entry-filter" onchange="onLedgerFilterChange()"
+                            style="width:140px">
+                            <option value="all">All Flow</option>
+                            <option value="credit">🟢 Credit (+)</option>
+                            <option value="debit">🔴 Debit (-)</option>
+                        </select>
+                        <select class="form-control" id="ledger-type-filter" onchange="onLedgerFilterChange()"
+                            style="width:170px">
+                            <option value="all">All Txn Types</option>
+                            <option value="add">Admin Add / Deposit</option>
+                            <option value="deduct">Admin Deduction</option>
+                            <option value="gold_buy">Gold Purchase</option>
+                            <option value="gold_sell">Gold Sale Payout</option>
+                            <option value="silver_buy">Silver Purchase</option>
+                            <option value="silver_sell">Silver Sale Payout</option>
+                            <option value="copper_buy">Copper Purchase</option>
+                            <option value="copper_sell">Copper Sale Payout</option>
+                            <option value="withdraw">Bank Withdrawal</option>
+                            <option value="refund">Refund / Reversal</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadWalletLedger()"><i class="fas fa-filter"></i>
+                        Filter</button>
+                </div>
+
+                <!-- Ledger Table Body -->
+                <div id="wallet-ledger-table-body"></div>
+
+                <!-- Pagination Controls -->
+                <div
+                    style="display:flex;justify-content:space-between;align-items:center;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+                    <div style="font-size:13px;color:var(--text-dim)" id="ledger-pagination-info">Showing page 1</div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-secondary btn-sm" id="btn-prev-ledger" onclick="prevLedgerPage()"><i
+                                class="fas fa-chevron-left"></i> Previous</button>
+                        <button class="btn btn-secondary btn-sm" id="btn-next-ledger" onclick="nextLedgerPage()">Next <i
+                                class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════
                  DIGI GOLD: 2. GOLD SCHEMES
                  ══════════════════════════════════════════════════ -->
             <div class="page" id="page-schemes">
@@ -1225,7 +1349,8 @@
                             style="border:1px solid rgba(239,68,68,0.3);background:linear-gradient(145deg, rgba(239,68,68,0.06), var(--surface))">
                             <div class="fulfillment-card-top">
                                 <div class="fulfillment-icon-box" style="background:rgba(239,68,68,0.15);color:#ef4444">
-                                    <i class="fas fa-times-circle"></i></div>
+                                    <i class="fas fa-times-circle"></i>
+                                </div>
                                 <span class="fulfillment-tag"
                                     style="background:rgba(239,68,68,0.15);color:#ef4444">Depleted</span>
                             </div>
@@ -1844,6 +1969,23 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Live User Wallet Audit Ledger Box -->
+                    <div
+                        style="margin-top:1.15rem;background:var(--surface2);border-radius:var(--radius-md);border:1px solid var(--border);padding:12px 14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <div
+                                style="font-size:12px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.5px">
+                                <i class="fas fa-receipt" style="color:var(--gold)"></i> User Wallet Audit Ledger
+                                (Previous & New Balance)
+                            </div>
+                            <span class="badge badge-purple" style="font-size:10px"><i class="fas fa-history"></i> Audit
+                                Trail</span>
+                        </div>
+                        <div id="user-modal-ledger-mount" style="max-height:220px;overflow-y:auto">
+                            <!-- Populated dynamically by loadUserWalletLedger -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 3. Vault Balances Section -->
@@ -2160,6 +2302,24 @@
                 <button class="modal-close" onclick="closeJewelleryModal()">×</button>
             </div>
             <div class="modal-body">
+                <!-- Live Bullion Market Rate Ticker Bar -->
+                <div
+                    style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:1.15rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    <div
+                        style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--gold)">
+                        <i class="fas fa-chart-line"></i> Live Bullion Benchmark Rates:
+                    </div>
+                    <div
+                        style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;font-family:var(--font-mono)">
+                        <span style="color:var(--gold)">Gold 24K: <strong
+                                id="modal-live-gold-24k">₹7,500/g</strong></span>
+                        <span style="color:#fbbf24">Gold 22K: <strong id="modal-live-gold-22k">₹6,875/g</strong></span>
+                        <span style="color:#fde68a">Gold 18K: <strong id="modal-live-gold-18k">₹5,625/g</strong></span>
+                        <span style="color:var(--silver)">Silver 999: <strong
+                                id="modal-live-silver-999">₹90/g</strong></span>
+                    </div>
+                </div>
+
                 <form id="jewellery-form" onsubmit="event.preventDefault()">
                     <div class="form-grid-3">
                         <div class="form-group">
@@ -2184,44 +2344,116 @@
                     <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Metal Type</label>
-                            <select class="form-control" id="jewellery-metal">
+                            <select class="form-control" id="jewellery-metal"
+                                onchange="updateLiveJewelleryCalculation()">
                                 <option value="gold">Gold</option>
                                 <option value="silver">Silver</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Purity</label>
-                            <input class="form-control" id="jewellery-purity" value="22K Gold"
-                                placeholder="24K (99.9%) / 22K Gold / 999 Silver" />
+                            <select class="form-control" id="jewellery-purity"
+                                onchange="updateLiveJewelleryCalculation()">
+                                <option value="22K Gold">22K Gold (91.6% Pure)</option>
+                                <option value="24K Gold">24K Gold (99.9% Pure)</option>
+                                <option value="18K Gold">18K Gold (75.0% Pure)</option>
+                                <option value="14K Gold">14K Gold (58.5% Pure)</option>
+                                <option value="999 Silver">999 Fine Silver</option>
+                                <option value="925 Silver">925 Sterling Silver</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Weight (Grams)</label>
                             <input class="form-control" type="number" step="0.01" id="jewellery-weight"
-                                placeholder="12.50" required />
+                                placeholder="12.50" required oninput="updateLiveJewelleryCalculation()" />
                         </div>
                     </div>
 
                     <div class="form-grid-4">
                         <div class="form-group">
-                            <label class="form-label">Selling Price / MRP (₹)</label>
+                            <label class="form-label">Base MRP Override (₹)</label>
                             <input class="form-control" type="number" id="jewellery-price"
-                                placeholder="e.g. 45000 (0 = auto-calc)" value="0" />
-                            <div style="font-size:11px;color:var(--text-dim);margin-top:3px">Direct price or 0 for live
-                                rate</div>
+                                placeholder="0 = Auto live rate" value="0" oninput="updateLiveJewelleryCalculation()" />
+                            <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">0 for live formula rate
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"
+                                style="display:flex;justify-content:space-between;align-items:center">
+                                <span>Admin Price Adj. (₹)</span>
+                                <span class="badge badge-purple" style="font-size:9.5px;padding:2px 5px">+ / - /
+                                    0</span>
+                            </label>
+                            <input class="form-control" type="number" id="jewellery-price-adjustment"
+                                placeholder="e.g. +500 or -300" value="0" step="any"
+                                oninput="updateLiveJewelleryCalculation()" />
+                            <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">Increase (+), Decrease
+                                (-), or 0</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Making Charges (₹)</label>
-                            <input class="form-control" type="number" id="jewellery-making" placeholder="2500"
-                                required />
+                            <input class="form-control" type="number" id="jewellery-making" placeholder="2500" required
+                                oninput="updateLiveJewelleryCalculation()" />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">GST Percentage (%)</label>
-                            <input class="form-control" type="number" step="0.1" id="jewellery-gst" value="3" />
+                            <label class="form-label">GST (%)</label>
+                            <input class="form-control" type="number" step="0.1" id="jewellery-gst" value="3"
+                                oninput="updateLiveJewelleryCalculation()" />
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Image URL</label>
-                            <input class="form-control" id="jewellery-image-url" placeholder="https://..." />
+                    </div>
+
+                    <!-- Live Real-Time Price Calculation & Adjustment Box -->
+                    <div id="jewellery-calc-preview-box"
+                        style="background:linear-gradient(135deg, rgba(212,160,23,0.08), rgba(168,85,247,0.06));border:1px solid rgba(212,160,23,0.3);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:1.15rem">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <div
+                                style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                                <i class="fas fa-calculator"></i> Real-time Price Calculation & Adjustment
+                            </div>
+                            <span class="badge badge-gold" id="calc-purity-rate-tag" style="font-size:10.5px">Rate:
+                                ₹6,875/g</span>
                         </div>
+
+                        <div
+                            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:12px;margin-bottom:8px;background:var(--surface);padding:8px 12px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <div>
+                                <div style="color:var(--text-dim);font-size:10.5px">Bullion Base Metal</div>
+                                <div style="font-weight:700;color:#fff;font-family:var(--font-mono);font-size:13px"
+                                    id="calc-base-metal-val">₹0</div>
+                            </div>
+                            <div>
+                                <div style="color:var(--text-dim);font-size:10.5px">Making + GST</div>
+                                <div style="font-weight:700;color:#fff;font-family:var(--font-mono);font-size:13px"
+                                    id="calc-making-gst-val">₹0</div>
+                            </div>
+                            <div>
+                                <div style="color:var(--text-dim);font-size:10.5px">Market Rate</div>
+                                <div style="font-weight:700;color:var(--gold);font-family:var(--font-mono);font-size:13.5px"
+                                    id="calc-market-rate-val">₹0</div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1)">
+                            <div style="font-size:12px;color:var(--text-muted)">
+                                <span>Formula: </span>
+                                <strong style="color:var(--gold)" id="calc-formula-market">₹0 (Market)</strong>
+                                <span id="calc-formula-adj" style="color:#c084fc"> + ₹0 (Adjustment)</span>
+                            </div>
+                            <div style="text-align:right">
+                                <span
+                                    style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Final
+                                    Customer Selling Price: </span>
+                                <span
+                                    style="font-size:1.35rem;font-weight:900;color:#10b981;font-family:var(--font-mono)"
+                                    id="calc-final-price-val">₹0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Image URL</label>
+                        <input class="form-control" id="jewellery-image-url" placeholder="https://..." />
                     </div>
 
                     <!-- Inventory & Stock Controls -->
@@ -2304,7 +2536,7 @@
                     <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Metal</label>
-                            <select class="form-control" id="coin-metal">
+                            <select class="form-control" id="coin-metal" onchange="updateLiveCoinCalculation()">
                                 <option value="gold">Gold (24K Pure)</option>
                                 <option value="silver">Silver (999 Pure)</option>
                             </select>
@@ -2317,25 +2549,58 @@
                         <div class="form-group">
                             <label class="form-label">Weight (Grams)</label>
                             <input class="form-control" type="number" step="0.01" id="coin-grams" placeholder="10"
-                                required />
+                                required oninput="updateLiveCoinCalculation()" />
                         </div>
                     </div>
-                    <div class="form-grid-3">
+                    <div class="form-grid-4">
                         <div class="form-group">
-                            <label class="form-label">Selling Price / MRP (₹)</label>
-                            <input class="form-control" type="number" id="coin-price"
-                                placeholder="e.g. 8500 (0 = auto-calc)" value="0" />
-                            <div style="font-size:11px;color:var(--text-dim);margin-top:3px">Direct price or 0 for live
-                                rate</div>
+                            <label class="form-label">Base MRP Override (₹)</label>
+                            <input class="form-control" type="number" id="coin-price" placeholder="0 = Auto live rate"
+                                value="0" oninput="updateLiveCoinCalculation()" />
+                            <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">0 for live rate</div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Making / Minting Charge (%)</label>
-                            <input class="form-control" type="number" step="0.1" id="coin-making-pct" value="5"
-                                required />
+                            <label class="form-label"
+                                style="display:flex;justify-content:space-between;align-items:center">
+                                <span>Admin Price Adj. (₹)</span>
+                                <span class="badge badge-purple" style="font-size:9.5px;padding:2px 5px">+ / - /
+                                    0</span>
+                            </label>
+                            <input class="form-control" type="number" id="coin-price-adjustment"
+                                placeholder="e.g. +500 or -300" value="0" step="any"
+                                oninput="updateLiveCoinCalculation()" />
+                            <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">Increase (+), Decrease
+                                (-), or 0</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Minting Charge (%)</label>
+                            <input class="form-control" type="number" step="0.1" id="coin-making-pct" value="5" required
+                                oninput="updateLiveCoinCalculation()" />
                         </div>
                         <div class="form-group">
                             <label class="form-label">Image URL</label>
                             <input class="form-control" id="coin-image-url" placeholder="https://..." />
+                        </div>
+                    </div>
+
+                    <!-- Live Coin Calculation Box -->
+                    <div id="coin-calc-preview-box"
+                        style="background:linear-gradient(135deg, rgba(212,160,23,0.08), rgba(168,85,247,0.06));border:1px solid rgba(212,160,23,0.3);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:1.15rem">
+                        <div
+                            style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                            <div style="font-size:12px;color:var(--text-muted)">
+                                <span>Formula: </span>
+                                <strong style="color:var(--gold)" id="coin-calc-formula-market">₹0 (Market)</strong>
+                                <span id="coin-calc-formula-adj" style="color:#c084fc"> + ₹0 (Adjustment)</span>
+                            </div>
+                            <div style="text-align:right">
+                                <span
+                                    style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Final
+                                    Coin Selling Price: </span>
+                                <span
+                                    style="font-size:1.35rem;font-weight:900;color:#10b981;font-family:var(--font-mono)"
+                                    id="coin-calc-final-price-val">₹0</span>
+                            </div>
                         </div>
                     </div>
 

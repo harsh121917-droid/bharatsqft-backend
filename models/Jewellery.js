@@ -7,7 +7,8 @@ const jewellerySchema = new mongoose.Schema({
     metalType: { type: String, enum: ["gold", "silver"], default: "gold" },
     purity: { type: String, default: "22K Gold" }, // 24K Gold, 22K Gold, 18K Gold, 999 Silver
     weightGrams: { type: Number, required: true }, // Weight in grams
-    price: { type: Number, default: 0 }, // Optional Direct Selling / Retail Price in ₹ (0 = auto-calculate from live rate)
+    price: { type: Number, default: 0 }, // Optional Direct Base Price in ₹ (0 = auto-calculate from live rate)
+    priceAdjustment: { type: Number, default: 0 }, // Admin Price Adjustment in ₹ (+/- or 0)
     makingCharges: { type: Number, default: 1500 }, // Making charges in ₹
     gstPercentage: { type: Number, default: 3 }, // 3% GST
     description: { type: String, default: "" },

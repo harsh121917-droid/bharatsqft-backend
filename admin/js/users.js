@@ -324,6 +324,11 @@ async function openUserModal(id) {
         breakdownEl.innerHTML = breakHtml;
     }
 
+    // Load customer's wallet audit ledger in modal
+    if (typeof loadUserWalletLedger === "function") {
+        loadUserWalletLedger(u._id);
+    }
+
     modal.style.display = "flex";
 }
 
@@ -344,7 +349,6 @@ async function adjustUserWallet(action = "add") {
     const amtInput = document.getElementById("user-wallet-amt") || document.getElementById("user-wallet-add-amt");
     const amount = parseFloat(amtInput?.value);
     const note = document.getElementById("user-wallet-note")?.value?.trim() || "";
-    const showTransaction = document.getElementById("user-wallet-show-tx")?.checked === true;
 
     if (isNaN(amount) || amount <= 0) {
         toast("Please enter a valid amount greater than ₹0", "warning");
@@ -358,7 +362,7 @@ async function adjustUserWallet(action = "add") {
 
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isAdd ? "Adding..." : "Deducting..."}`;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isAdd ? "Crediting..." : "Debiting..."}`;
     }
     if (otherBtn) otherBtn.disabled = true;
 
@@ -367,11 +371,11 @@ async function adjustUserWallet(action = "add") {
     try {
         const data = await api(endpoint, {
             method: "POST",
-            body: JSON.stringify({ amount, showTransaction, note })
+            body: JSON.stringify({ amount, reason: note, note })
         });
 
         if (data.success) {
-            toast(data.message || (isAdd ? "Money added successfully ✓" : "Money deducted successfully ✓"), "success");
+            toast(data.message || (isAdd ? "Money credited successfully ✓" : "Money debited successfully ✓"), "success");
             
             const balEl = document.getElementById("user-wallet-balance");
             if (balEl) balEl.textContent = formatINR(data.balance);
@@ -388,6 +392,9 @@ async function adjustUserWallet(action = "add") {
                 if (ui) ui.walletBalance = data.balance;
             }
 
+            // Real-time refresh of embedded modal audit ledger and global ledger
+            if (typeof loadUserWalletLedger === "function") loadUserWalletLedger(id);
+            if (typeof loadWalletLedger === "function") loadWalletLedger(ledgerPage || 1);
             if (typeof loadUsers === "function") loadUsers(usersPage);
             if (typeof loadUserInvestments === "function") loadUserInvestments();
         } else {

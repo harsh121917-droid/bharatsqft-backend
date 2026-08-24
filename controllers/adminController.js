@@ -291,7 +291,7 @@ exports.deleteUser = async (req, res, next) => {
 
 exports.addWalletMoney = async (req, res, next) => {
     try {
-        const { amount, showTransaction, note } = req.body;
+        const { amount, note, reason } = req.body;
         const userId = req.params.id;
 
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
@@ -304,34 +304,46 @@ exports.addWalletMoney = async (req, res, next) => {
             wallet = new Wallet({ user: userId, balance: 0 });
         }
 
-        const balanceBefore = wallet.balance || 0;
+        const balanceBefore = parseFloat((wallet.balance || 0).toFixed(2));
         wallet.balance = parseFloat((balanceBefore + addAmt).toFixed(2));
         wallet.totalAdded = parseFloat(((wallet.totalAdded || 0) + addAmt).toFixed(2));
         await wallet.save();
 
-        if (showTransaction) {
-            await WalletTxn.create({
-                user: userId,
-                type: "add",
-                amount: addAmt,
-                balanceBefore,
-                balanceAfter: wallet.balance,
-                status: "success",
-                note: note || "Admin wallet credit"
-            });
-        }
+        const remarks = (reason || note || "Admin Wallet Credit").trim();
+        const adminName = req.user?.name || req.user?.email || "Admin Console";
+        const adminId = req.user?._id;
+
+        const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const txnId = `TXN-WAL-${Date.now().toString().slice(-8)}-${rand}`;
+
+        // Audit Trail Transaction Record
+        const txn = await WalletTxn.create({
+            user: userId,
+            txnId,
+            entryType: "credit",
+            type: "add",
+            amount: addAmt,
+            balanceBefore,
+            balanceAfter: wallet.balance,
+            reason: remarks,
+            note: remarks,
+            adminId,
+            adminName,
+            status: "success"
+        });
 
         res.json({
             success: true,
-            message: `₹${addAmt.toLocaleString("en-IN")} added to wallet successfully`,
-            balance: wallet.balance
+            message: `₹${addAmt.toLocaleString("en-IN")} credited to wallet successfully (Txn ID: ${txn.txnId})`,
+            balance: wallet.balance,
+            transaction: txn
         });
     } catch (err) { next(err); }
 };
 
 exports.deductWalletMoney = async (req, res, next) => {
     try {
-        const { amount, showTransaction, note } = req.body;
+        const { amount, note, reason } = req.body;
         const userId = req.params.id;
 
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
@@ -340,7 +352,7 @@ exports.deductWalletMoney = async (req, res, next) => {
 
         const deductAmt = parseFloat(parseFloat(amount).toFixed(2));
         let wallet = await Wallet.findOne({ user: userId });
-        const currentBal = wallet ? (wallet.balance || 0) : 0;
+        const currentBal = wallet ? parseFloat((wallet.balance || 0).toFixed(2)) : 0;
 
         if (!wallet || currentBal < deductAmt) {
             return res.status(400).json({
@@ -353,23 +365,188 @@ exports.deductWalletMoney = async (req, res, next) => {
         wallet.balance = parseFloat((currentBal - deductAmt).toFixed(2));
         await wallet.save();
 
-        if (showTransaction) {
-            await WalletTxn.create({
-                user: userId,
-                type: "deduct",
-                amount: deductAmt,
-                balanceBefore,
-                balanceAfter: wallet.balance,
-                status: "success",
-                note: note || "Admin wallet deduction"
-            });
-        }
+        const remarks = (reason || note || "Admin Wallet Deduction").trim();
+        const adminName = req.user?.name || req.user?.email || "Admin Console";
+        const adminId = req.user?._id;
+
+        const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const txnId = `TXN-WAL-${Date.now().toString().slice(-8)}-${rand}`;
+
+        // Audit Trail Transaction Record
+        const txn = await WalletTxn.create({
+            user: userId,
+            txnId,
+            entryType: "debit",
+            type: "deduct",
+            amount: deductAmt,
+            balanceBefore,
+            balanceAfter: wallet.balance,
+            reason: remarks,
+            note: remarks,
+            adminId,
+            adminName,
+            status: "success"
+        });
 
         res.json({
             success: true,
-            message: `₹${deductAmt.toLocaleString("en-IN")} deducted from wallet successfully`,
-            balance: wallet.balance
+            message: `₹${deductAmt.toLocaleString("en-IN")} debited from wallet successfully (Txn ID: ${txn.txnId})`,
+            balance: wallet.balance,
+            transaction: txn
         });
+    } catch (err) { next(err); }
+};
+
+// ── GET FULL WALLET AUDIT LEDGER (Admin) ───────────────────────
+exports.getWalletLedger = async (req, res, next) => {
+    try {
+        const { page = 1, limit = 25, search, entryType, type, userId, startDate, endDate } = req.query;
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.max(1, parseInt(limit) || 25);
+        const skip = (pageNum - 1) * limitNum;
+
+        let filter = {};
+
+        if (userId) {
+            filter.user = userId;
+        }
+
+        if (entryType && ["credit", "debit"].includes(entryType)) {
+            filter.entryType = entryType;
+        }
+
+        if (type && type !== "all") {
+            filter.type = type;
+        }
+
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) filter.createdAt.$gte = new Date(startDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                filter.createdAt.$lte = end;
+            }
+        }
+
+        if (search && search.trim()) {
+            const searchRegex = new RegExp(search.trim(), "i");
+            const User = require("../models/User");
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex }
+                ]
+            }).select("_id");
+            const userIds = matchingUsers.map(u => u._id);
+
+            filter.$or = [
+                { txnId: searchRegex },
+                { reason: searchRegex },
+                { note: searchRegex },
+                { adminName: searchRegex },
+                { user: { $in: userIds } }
+            ];
+        }
+
+        // Aggregate statistics
+        const [totalCount, statsAggregation] = await Promise.all([
+            WalletTxn.countDocuments(filter),
+            WalletTxn.aggregate([
+                { $match: filter },
+                {
+                    $group: {
+                        _id: "$entryType",
+                        totalAmt: { $sum: "$amount" },
+                        count: { $sum: 1 }
+                    }
+                }
+            ])
+        ]);
+
+        let totalCredits = 0;
+        let totalDebits = 0;
+        let creditCount = 0;
+        let debitCount = 0;
+
+        statsAggregation.forEach(s => {
+            if (s._id === "credit") {
+                totalCredits = s.totalAmt;
+                creditCount = s.count;
+            } else if (s._id === "debit") {
+                totalDebits = s.totalAmt;
+                debitCount = s.count;
+            }
+        });
+
+        const txns = await WalletTxn.find(filter)
+            .populate("user", "name email phone")
+            .populate("adminId", "name email")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .lean();
+
+        // Format transactions for clean presentation
+        const formattedTxns = txns.map(t => {
+            const created = new Date(t.createdAt);
+            return {
+                ...t,
+                txnId: t.txnId || `TXN-WAL-${String(t._id).slice(-8).toUpperCase()}`,
+                entryType: t.entryType || (["add", "gold_sell", "silver_sell", "copper_sell", "refund", "manual_credit"].includes(t.type) ? "credit" : "debit"),
+                reason: t.reason || t.note || (t.type === "add" ? "Wallet Deposit" : (t.type === "deduct" ? "Wallet Deduction" : t.type)),
+                adminName: t.adminName || (t.adminId?.name || t.adminId?.email) || "System",
+                formattedDate: created.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+                formattedTime: created.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+            };
+        });
+
+        res.json({
+            success: true,
+            data: formattedTxns,
+            stats: {
+                totalTxns: totalCount,
+                totalCredits: Math.round(totalCredits * 100) / 100,
+                totalDebits: Math.round(totalDebits * 100) / 100,
+                netVolume: Math.round((totalCredits - totalDebits) * 100) / 100,
+                creditCount,
+                debitCount
+            },
+            pagination: {
+                total: totalCount,
+                page: pageNum,
+                limit: limitNum,
+                pages: Math.ceil(totalCount / limitNum) || 1
+            }
+        });
+    } catch (err) { next(err); }
+};
+
+// ── GET USER SPECIFIC WALLET LEDGER (Admin) ─────────────────────
+exports.getUserWalletLedger = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const txns = await WalletTxn.find({ user: userId })
+            .populate("adminId", "name email")
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean();
+
+        const formatted = txns.map(t => {
+            const created = new Date(t.createdAt);
+            return {
+                ...t,
+                txnId: t.txnId || `TXN-WAL-${String(t._id).slice(-8).toUpperCase()}`,
+                entryType: t.entryType || (["add", "gold_sell", "silver_sell", "copper_sell", "refund", "manual_credit"].includes(t.type) ? "credit" : "debit"),
+                reason: t.reason || t.note || (t.type === "add" ? "Wallet Deposit" : (t.type === "deduct" ? "Wallet Deduction" : t.type)),
+                adminName: t.adminName || (t.adminId?.name || t.adminId?.email) || "System",
+                formattedDate: created.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+                formattedTime: created.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+            };
+        });
+
+        res.json({ success: true, data: formatted });
     } catch (err) { next(err); }
 };
 
@@ -1552,7 +1729,7 @@ exports.getAdminCoins = async (req, res, next) => {
 exports.createCoin = async (req, res, next) => {
     try {
         const Coin = require("../models/Coin");
-        let { name, sku, metal, purity, category, grams, price, makingChargePct, image, availableQty, lowStockThreshold, isActive } = req.body;
+        let { name, sku, metal, purity, category, grams, price, priceAdjustment, makingChargePct, image, availableQty, lowStockThreshold, isActive } = req.body;
         if (!name || !metal || !grams || makingChargePct === undefined) {
             return res.status(400).json({ success: false, message: "Name, metal, grams, and making charge percent are required" });
         }
@@ -1575,6 +1752,7 @@ exports.createCoin = async (req, res, next) => {
             category: category || "Coins & Bars",
             grams: Number(grams),
             price: price !== undefined && Number(price) > 0 ? Number(price) : 0,
+            priceAdjustment: priceAdjustment !== undefined ? Number(priceAdjustment) || 0 : 0,
             makingChargePct: Number(makingChargePct),
             image: image || "",
             availableQty: availableQty !== undefined ? Number(availableQty) : 50,
@@ -1590,7 +1768,7 @@ exports.createCoin = async (req, res, next) => {
 exports.updateCoin = async (req, res, next) => {
     try {
         const Coin = require("../models/Coin");
-        let { name, sku, metal, purity, category, grams, price, makingChargePct, image, availableQty, reservedQty, soldQty, lowStockThreshold, isActive } = req.body;
+        let { name, sku, metal, purity, category, grams, price, priceAdjustment, makingChargePct, image, availableQty, reservedQty, soldQty, lowStockThreshold, isActive } = req.body;
         const coin = await Coin.findById(req.params.id);
         if (!coin) return res.status(404).json({ success: false, message: "Coin not found" });
 
@@ -1608,7 +1786,8 @@ exports.updateCoin = async (req, res, next) => {
         if (purity !== undefined) coin.purity = purity;
         if (category !== undefined) coin.category = category;
         if (grams !== undefined) coin.grams = Number(grams);
-        if (price !== undefined) coin.price = Math.max(0, Number(price));
+        if (price !== undefined) coin.price = Math.max(0, Number(price) || 0);
+        if (priceAdjustment !== undefined) coin.priceAdjustment = Number(priceAdjustment) || 0;
         if (makingChargePct !== undefined) coin.makingChargePct = Number(makingChargePct);
         if (image !== undefined) coin.image = image;
         if (availableQty !== undefined) coin.availableQty = Math.max(0, Number(availableQty));

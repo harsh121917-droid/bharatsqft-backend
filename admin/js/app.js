@@ -143,6 +143,7 @@ const pageTitles = {
 
     // 2. Digi Gold
     userinvestments: "Digi Gold User Investments",
+    walletledger: "Wallet Transaction Ledger & Audit Trail",
     schemes: "Gold & Silver Savings Schemes",
     withdrawals: "Bank Withdrawal Requests",
     sellapprovals: "Sell Payout Approvals",
@@ -196,6 +197,9 @@ function showPage(pageId) {
             break;
         case "userinvestments":
             loadUserInvestments();
+            break;
+        case "walletledger":
+            loadWalletLedger(1);
             break;
         case "schemes":
             loadSchemes();
