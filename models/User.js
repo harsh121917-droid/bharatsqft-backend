@@ -70,6 +70,17 @@ const UserSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    location: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      country: { type: String, default: "India" },
+      address: { type: String, default: "" },
+      pincode: { type: String, default: "" },
+      capturedAt: { type: Date },
+      ip: { type: String, default: "" },
+    },
   },
   { timestamps: true }
 );

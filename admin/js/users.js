@@ -87,6 +87,7 @@ function renderUsersTable(users) {
                     <th>User</th>
                     <th>Role</th>
                     <th>KYC</th>
+                    <th>Location</th>
                     <th>Wallet Balance</th>
                     <th>Gold (24K)</th>
                     <th>Silver (999)</th>
@@ -117,6 +118,29 @@ function renderUsersTable(users) {
         const silverGrams = u.silverInvestments?.grams || 0;
         const walletBal = u.walletBalance !== undefined ? u.walletBalance : (u.wallet?.balance || 0);
 
+        // Location formatting
+        const loc = u.location;
+        let locationCell = "";
+        if (loc && loc.latitude !== undefined && loc.longitude !== undefined && loc.latitude !== null && loc.longitude !== null) {
+            const placeName = loc.city ? `${loc.city}${loc.state ? ', ' + loc.state : ''}` : `${Number(loc.latitude).toFixed(3)}, ${Number(loc.longitude).toFixed(3)}`;
+            const mapUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+            locationCell = `
+            <div>
+                <div style="font-weight:600;color:#fff;font-size:12px;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-map-marker-alt" style="color:#ef4444;font-size:11px"></i>
+                    <span>${placeName}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+                    <span style="font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono)">${Number(loc.latitude).toFixed(2)}, ${Number(loc.longitude).toFixed(2)}</span>
+                    <a href="${mapUrl}" target="_blank" class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:9.5px;text-decoration:none;padding:1px 5px;border-radius:4px" title="Open in Google Maps">
+                        <i class="fas fa-external-link-alt"></i> Map
+                    </a>
+                </div>
+            </div>`;
+        } else {
+            locationCell = `<span class="badge" style="background:rgba(239,68,68,0.12);color:#f87171;font-size:10px;padding:3px 7px;border:1px solid rgba(239,68,68,0.25)"><i class="fas fa-map-marker-slash"></i> Not Captured</span>`;
+        }
+
         html += `
         <tr>
             <td>
@@ -125,6 +149,7 @@ function renderUsersTable(users) {
             </td>
             <td><span class="badge ${u.role === 'admin' ? 'badge-gold' : 'badge-info'}">${u.role || 'user'}</span></td>
             <td>${kycBadge}</td>
+            <td>${locationCell}</td>
             <td style="font-family:var(--font-mono);font-weight:700;color:var(--gold)">${formatINR(walletBal)}</td>
             <td style="font-family:var(--font-mono);font-size:12.5px;color:var(--gold)">${formatGrams(goldGrams)}</td>
             <td style="font-family:var(--font-mono);font-size:12.5px;color:var(--silver)">${formatGrams(silverGrams)}</td>
@@ -186,6 +211,50 @@ async function openUserModal(id) {
     const kycSelect = document.getElementById("user-kyc-status");
     if (kycSelect) {
         kycSelect.value = u.kycStatus || (u.kycVerified ? "approved" : "not_submitted");
+    }
+
+    // 📍 1b. Customer Live Location Details
+    const locContainer = document.getElementById("user-location-info-card");
+    if (locContainer) {
+        const loc = u.location;
+        if (loc && loc.latitude !== undefined && loc.longitude !== undefined && loc.latitude !== null && loc.longitude !== null) {
+            const mapUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+            locContainer.innerHTML = `
+            <div style="background:linear-gradient(135deg, rgba(59,130,246,0.08), rgba(15,23,42,0.6));border:1px solid rgba(59,130,246,0.3);border-radius:var(--radius-md);padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);display:flex;align-items:center;justify-content:center;color:#60a5fa;font-size:18px;flex-shrink:0">
+                        <i class="fas fa-location-arrow"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:13px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            <span>${loc.city || 'Verified GPS Location'}${loc.state ? ', ' + loc.state : ''}${loc.country ? ' (' + loc.country + ')' : ''}</span>
+                            <span class="badge badge-success" style="font-size:10px"><i class="fas fa-check-circle"></i> Captured</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">
+                            GPS Coordinates: <strong style="font-family:var(--font-mono);color:#fff">${Number(loc.latitude).toFixed(5)}, ${Number(loc.longitude).toFixed(5)}</strong>
+                            ${loc.pincode ? ` · PIN: <strong style="color:#fff">${loc.pincode}</strong>` : ''}
+                            ${loc.ip ? ` · IP: <span style="font-family:var(--font-mono);color:var(--text-dim)">${loc.ip}</span>` : ''}
+                        </div>
+                        ${loc.address ? `<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;max-width:520px">${loc.address}</div>` : ''}
+                        ${loc.capturedAt ? `<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px"><i class="far fa-clock"></i> Captured: ${formatDateTime(loc.capturedAt)}</div>` : ''}
+                    </div>
+                </div>
+                <a href="${mapUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                    <i class="fas fa-map-marked-alt" style="color:#60a5fa"></i> Open Google Maps
+                </a>
+            </div>`;
+        } else {
+            locContainer.innerHTML = `
+            <div style="background:rgba(239,68,68,0.06);border:1px dashed rgba(239,68,68,0.3);border-radius:var(--radius-md);padding:12px 16px;display:flex;align-items:center;gap:12px">
+                <div style="width:36px;height:36px;border-radius:8px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;color:var(--danger);font-size:16px;flex-shrink:0">
+                    <i class="fas fa-map-marker-slash"></i>
+                </div>
+                <div>
+                    <div style="font-size:12.5px;font-weight:700;color:#f87171">Location Not Captured Yet</div>
+                    <div style="font-size:11.5px;color:var(--text-dim)">The customer has not yet granted GPS location permission in the app. The app will repeatedly prompt them until captured.</div>
+                </div>
+            </div>`;
+        }
     }
 
     // 2. User Wallet

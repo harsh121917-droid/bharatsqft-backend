@@ -98,6 +98,7 @@ const sendToken = (user, statusCode, res) => {
       role: user.role,
       referralCode: user.referralCode,
       referralBalance: user.referralBalance || 0,
+      location: user.location || null,
     },
   });
 };
