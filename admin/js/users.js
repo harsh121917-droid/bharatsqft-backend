@@ -135,6 +135,9 @@ function renderUsersTable(users) {
                     <a href="${mapUrl}" target="_blank" class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:9.5px;text-decoration:none;padding:1px 5px;border-radius:4px" title="Open in Google Maps">
                         <i class="fas fa-external-link-alt"></i> Map
                     </a>
+                    <button class="btn-icon" style="padding:1px 5px;font-size:10px;color:#f87171;cursor:pointer;background:rgba(239,68,68,0.12);border-radius:3px;border:1px solid rgba(239,68,68,0.25)" title="Delete / Reset Location" onclick="clearUserLocation('${u._id}', event)">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>
             </div>`;
         } else {
@@ -174,6 +177,36 @@ function renderUsersTable(users) {
 
 // ── User Management Modal ──────────────────────────────────────
 let activeUserId = null;
+
+async function clearUserLocation(userId, event) {
+    if (event) event.stopPropagation();
+    if (!confirm("Are you sure you want to delete this user's captured location? The user will be required to re-verify their GPS location next time they open the mobile app.")) {
+        return;
+    }
+
+    try {
+        const res = await api(`/admin/users/${userId}/location`, { method: "DELETE" });
+        if (res.success) {
+            toast("User location deleted successfully", "success");
+            if (activeUserId === userId) {
+                // Fetch fresh user details to update modal
+                try {
+                    const freshRes = await api(`/admin/users/${userId}`);
+                    if (freshRes.success && freshRes.data) {
+                        const idx = allUsers.findIndex(x => x._id === userId);
+                        if (idx !== -1) allUsers[idx] = freshRes.data;
+                        openUserModal(userId);
+                    }
+                } catch (_) {}
+            }
+            loadUsers(usersPage);
+        } else {
+            toast(res.message || "Failed to delete location", "danger");
+        }
+    } catch (e) {
+        toast("Network error deleting location", "danger");
+    }
+}
 
 async function openUserModal(id) {
     activeUserId = id;
@@ -239,9 +272,14 @@ async function openUserModal(id) {
                         ${loc.capturedAt ? `<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px"><i class="far fa-clock"></i> Captured: ${formatDateTime(loc.capturedAt)}</div>` : ''}
                     </div>
                 </div>
-                <a href="${mapUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:6px">
-                    <i class="fas fa-map-marked-alt" style="color:#60a5fa"></i> Open Google Maps
-                </a>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <a href="${mapUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-map-marked-alt" style="color:#60a5fa"></i> Open Google Maps
+                    </a>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearUserLocation('${u._id}')" style="font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-trash-alt"></i> Delete Location
+                    </button>
+                </div>
             </div>`;
         } else {
             locContainer.innerHTML = `

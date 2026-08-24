@@ -263,6 +263,18 @@ exports.updateUser = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+exports.clearUserLocation = async (req, res, next) => {
+    try {
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { $unset: { location: 1 } },
+            { new: true }
+        );
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        res.json({ success: true, message: "User location deleted successfully", data: user });
+    } catch (err) { next(err); }
+};
+
 exports.deleteUser = async (req, res, next) => {
     try {
         const userId = req.params.id;

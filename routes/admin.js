@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
-  getAllUsers, getUserById, updateUser, deleteUser,
+  getAllUsers, getUserById, updateUser, deleteUser, clearUserLocation,
   getAllEnquiries, updateEnquiry, deleteEnquiry,
   getDashboard,
   getWithdrawals, completeWithdrawal,
@@ -51,6 +51,7 @@ router.post("/users/:id/reset-wallet", resetUserWallet);
 router.post("/users/:id/reset-rewards", resetUserRewards);
 router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
+router.delete("/users/:id/location", clearUserLocation);
 router.delete("/users/:id", deleteUser);
 
 // Wallet Transaction Ledger & Audit Trail
