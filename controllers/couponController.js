@@ -75,6 +75,33 @@ exports.getCouponsAdmin = async (req, res, next) => {
             success: true,
             count: coupons.length,
             coupons,
+            data: coupons,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Toggle coupon active status
+// @route   PATCH /api/coupons/:id/toggle-active
+// @access  Private (Admin)
+exports.toggleCouponActive = async (req, res, next) => {
+    try {
+        const coupon = await Coupon.findById(req.params.id);
+        if (!coupon) {
+            return res.status(404).json({ success: false, message: "Coupon not found" });
+        }
+        if (req.body.isActive !== undefined) {
+            coupon.isActive = req.body.isActive;
+        } else {
+            coupon.isActive = !coupon.isActive;
+        }
+        await coupon.save();
+        res.json({
+            success: true,
+            message: `Coupon is now ${coupon.isActive ? 'Active' : 'Inactive'}`,
+            coupon,
+            data: coupon,
         });
     } catch (err) {
         next(err);

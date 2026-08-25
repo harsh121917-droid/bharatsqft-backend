@@ -7,17 +7,23 @@ const {
     deleteCoupon,
     getCouponsUser,
     validateCoupon,
+    toggleCouponActive,
 } = require("../controllers/couponController");
-const { protect, authorize, optionalProtect } = require("../middleware/authMiddleware");
+const { protect, adminOnly, optionalProtect } = require("../middleware/authMiddleware");
 
 // User routes (app users)
 router.get("/", optionalProtect, getCouponsUser);
 router.post("/validate", optionalProtect, validateCoupon);
 
 // Admin-only routes
-router.post("/create", protect, authorize("admin"), createCoupon);
-router.get("/admin-list", protect, authorize("admin"), getCouponsAdmin);
-router.put("/:id", protect, authorize("admin"), updateCoupon);
-router.delete("/:id", protect, authorize("admin"), deleteCoupon);
+router.get("/admin-list", protect, adminOnly, getCouponsAdmin);
+router.get("/admin", protect, adminOnly, getCouponsAdmin);
+router.post("/create", protect, adminOnly, createCoupon);
+router.post("/", protect, adminOnly, createCoupon);
+router.put("/:id", protect, adminOnly, updateCoupon);
+router.patch("/:id", protect, adminOnly, updateCoupon);
+router.patch("/:id/toggle-active", protect, adminOnly, toggleCouponActive);
+router.put("/:id/toggle-active", protect, adminOnly, toggleCouponActive);
+router.delete("/:id", protect, adminOnly, deleteCoupon);
 
 module.exports = router;

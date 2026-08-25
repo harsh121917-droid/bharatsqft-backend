@@ -3152,6 +3152,76 @@
             </div>
         </div>
 
+        <!-- Coupon Offer Modal -->
+        <div class="modal-overlay" id="coupon-modal" style="display:none">
+            <div class="modal modal-md">
+                <div class="modal-header">
+                    <div class="modal-title" id="coupon-modal-title">Create New Coupon</div>
+                    <button class="modal-close" onclick="closeCouponModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="coupon-form" onsubmit="event.preventDefault(); saveCoupon();">
+                        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div class="form-group">
+                                <label class="form-label">Coupon Code</label>
+                                <input class="form-control font-mono" id="coupon-code" placeholder="e.g. WELCOME50" style="text-transform:uppercase;font-weight:700;letter-spacing:1px" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Applies To Metal</label>
+                                <select class="form-control" id="coupon-metal">
+                                    <option value="both">All Metals (Gold & Silver)</option>
+                                    <option value="gold">24K Gold Only</option>
+                                    <option value="silver">999 Silver Only</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Description / Offer Tagline</label>
+                            <input class="form-control" id="coupon-desc" placeholder="e.g. Get ₹50 Free Extra 24K Gold" required />
+                        </div>
+                        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div class="form-group">
+                                <label class="form-label">Benefit Type</label>
+                                <select class="form-control" id="coupon-type">
+                                    <option value="extra_gold">Free Extra Metal Bonus (Credited to Vault)</option>
+                                    <option value="discount">Price Discount (Direct ₹ Off)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Value Calculation</label>
+                                <select class="form-control" id="coupon-val-type">
+                                    <option value="percentage">Percentage (%)</option>
+                                    <option value="flat">Flat Amount (₹)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-grid-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                            <div class="form-group">
+                                <label class="form-label">Benefit Value</label>
+                                <input class="form-control" type="number" step="any" id="coupon-val" placeholder="e.g. 50 or 5" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Min Purchase (₹)</label>
+                                <input class="form-control" type="number" id="coupon-min-amt" placeholder="0 = No Min" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Benefit Cap (₹)</label>
+                                <input class="form-control" type="number" id="coupon-max-disc" placeholder="0 = No Cap" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Expiry Date (Leave empty for lifetime)</label>
+                            <input class="form-control" type="date" id="coupon-expiry" />
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveCoupon()"><i class="fas fa-save"></i> Save Coupon</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Payment Gateway Modal -->
         <div class="modal-overlay" id="gateway-modal" style="display:none">
             <div class="modal">

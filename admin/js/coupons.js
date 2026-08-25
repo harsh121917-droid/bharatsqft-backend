@@ -12,13 +12,13 @@ async function loadCoupons() {
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading coupon offers...</div></div>`;
 
     try {
-        const res = await api("/coupons");
+        const res = await api("/coupons/admin-list");
         if (!res.success) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Failed to load coupons</div></div>`;
             return;
         }
 
-        allCoupons = res.data || [];
+        allCoupons = res.coupons || res.data || [];
         renderCouponsTable(allCoupons);
     } catch (e) {
         body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error</div></div>`;
