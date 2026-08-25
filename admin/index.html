@@ -1219,99 +1219,137 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════
-                 DIGI GOLD: 5. REWARDS
-                 ══════════════════════════════════════════════════ -->
-            <!-- ══════════════════════════════════════════════════
                  DIGI GOLD: 5. REWARDS & REFERRALS TRACKING
                  ══════════════════════════════════════════════════ -->
             <div class="page" id="page-rewards">
-                <div class="section-header">
+                <div class="section-header" style="margin-bottom:1.5rem">
                     <div>
-                        <div class="section-title"><i class="fas fa-gift" style="color:var(--purple)"></i> Rewards & Referral Tracking</div>
-                        <div class="section-subtitle">Comprehensive referral relationships, user reward analytics, and distribution ledger</div>
+                        <div class="section-title" style="display:flex;align-items:center;gap:10px">
+                            <span
+                                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(168,85,247,0.18);color:#c084fc;border:1px solid rgba(168,85,247,0.3)">
+                                <i class="fas fa-gift"></i>
+                            </span>
+                            <span>Rewards & Referral Network</span>
+                        </div>
+                        <div class="section-subtitle">Real-time referral graph, dynamic customer rewards, and tokenized
+                            point distributions</div>
                     </div>
                     <div style="display:flex;gap:10px">
-                        <button class="btn btn-secondary" onclick="loadRewardsPage()"><i class="fas fa-sync-alt"></i> Refresh</button>
-                        <button class="btn btn-primary" onclick="saveRewardSettings()"><i class="fas fa-save"></i> Save Settings</button>
+                        <button class="btn btn-secondary" onclick="loadRewardsPage()"
+                            style="display:inline-flex;align-items:center;gap:6px">
+                            <i class="fas fa-sync-alt"></i> Sync Data
+                        </button>
+                        <button class="btn btn-primary" onclick="saveRewardSettings()"
+                            style="display:inline-flex;align-items:center;gap:6px">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
                     </div>
                 </div>
 
-                <!-- ── Summary KPI Cards ────────────────────────────────────── -->
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:1rem;margin-bottom:1.5rem">
-                    <div class="metric-card" style="border-left:4px solid var(--purple)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <div>
-                                <div style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Rewards Distributed</div>
-                                <div id="summary-total-rewards-amt" style="font-size:24px;font-weight:800;color:#fff;margin-top:6px">₹0</div>
-                                <div id="summary-total-rewards-pts" style="font-size:12px;color:var(--purple);margin-top:2px">0 total points given</div>
-                            </div>
-                            <div style="width:40px;height:40px;border-radius:10px;background:rgba(168,85,247,0.15);display:flex;align-items:center;justify-content:center;color:var(--purple);font-size:18px">
+                <!-- ── Ultra-Modern Executive KPI Cards Grid ────────────────── -->
+                <div class="reward-kpi-grid">
+                    <!-- 1. Total Rewards Distributed -->
+                    <div class="reward-kpi-card reward-card-purple">
+                        <div class="reward-kpi-top">
+                            <span class="reward-kpi-label">
+                                <span class="pulse-dot pulse-dot-purple"></span> Total Rewards Distributed
+                            </span>
+                            <div class="reward-kpi-icon-wrap reward-icon-purple">
                                 <i class="fas fa-award"></i>
                             </div>
                         </div>
+                        <div>
+                            <div class="reward-kpi-val" id="summary-total-rewards-amt">₹0</div>
+                            <div class="reward-kpi-subpill subpill-purple" id="summary-total-rewards-pts">
+                                <i class="fas fa-sparkles"></i> 0 total points given
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="metric-card" style="border-left:4px solid var(--gold)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <div>
-                                <div style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Referrals Generated</div>
-                                <div id="summary-total-referrals-count" style="font-size:24px;font-weight:800;color:var(--gold);margin-top:6px">0</div>
-                                <div id="summary-active-referrers-count" style="font-size:12px;color:var(--text-dim);margin-top:2px">0 active referrers</div>
-                            </div>
-                            <div style="width:40px;height:40px;border-radius:10px;background:rgba(212,160,23,0.15);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:18px">
+                    <!-- 2. Total Referrals Generated -->
+                    <div class="reward-kpi-card reward-card-gold">
+                        <div class="reward-kpi-top">
+                            <span class="reward-kpi-label">
+                                <span class="pulse-dot pulse-dot-gold"></span> Total Referrals Generated
+                            </span>
+                            <div class="reward-kpi-icon-wrap reward-icon-gold">
                                 <i class="fas fa-user-friends"></i>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="metric-card" style="border-left:4px solid var(--success)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <div>
-                                <div style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Referral Cash Bonuses</div>
-                                <div id="summary-referral-cash-distributed" style="font-size:24px;font-weight:800;color:var(--success);margin-top:6px">₹0</div>
-                                <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Credited to user balances</div>
+                        <div>
+                            <div class="reward-kpi-val" id="summary-total-referrals-count" style="color:var(--gold)">0
                             </div>
-                            <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;color:var(--success);font-size:18px">
-                                <i class="fas fa-hand-holding-usd"></i>
+                            <div class="reward-kpi-subpill subpill-gold" id="summary-active-referrers-count">
+                                <i class="fas fa-users"></i> 0 active referrers
                             </div>
                         </div>
                     </div>
 
-                    <div class="metric-card" style="border-left:4px solid var(--info)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <div>
-                                <div style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Points Redeemed</div>
-                                <div id="summary-points-redeemed-count" style="font-size:24px;font-weight:800;color:#60a5fa;margin-top:6px">0 pts</div>
-                                <div id="summary-active-points-count" style="font-size:12px;color:var(--text-dim);margin-top:2px">0 net points active</div>
+                    <!-- 3. Referral Cash Bonuses -->
+                    <div class="reward-kpi-card reward-card-green">
+                        <div class="reward-kpi-top">
+                            <span class="reward-kpi-label">
+                                <span class="pulse-dot pulse-dot-green"></span> Referral Cash Bonuses
+                            </span>
+                            <div class="reward-kpi-icon-wrap reward-icon-green">
+                                <i class="fas fa-hand-holding-usd"></i>
                             </div>
-                            <div style="width:40px;height:40px;border-radius:10px;background:rgba(96,165,250,0.15);display:flex;align-items:center;justify-content:center;color:#60a5fa;font-size:18px">
+                        </div>
+                        <div>
+                            <div class="reward-kpi-val" id="summary-referral-cash-distributed" style="color:#10b981">₹0
+                            </div>
+                            <div class="reward-kpi-subpill subpill-green">
+                                <i class="fas fa-check-circle"></i> Credited to user balances
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Points Redeemed & Active -->
+                    <div class="reward-kpi-card reward-card-blue">
+                        <div class="reward-kpi-top">
+                            <span class="reward-kpi-label">
+                                <span class="pulse-dot pulse-dot-blue"></span> Points Redeemed
+                            </span>
+                            <div class="reward-kpi-icon-wrap reward-icon-blue">
                                 <i class="fas fa-coins"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="reward-kpi-val" id="summary-points-redeemed-count" style="color:#38bdf8">0 pts
+                            </div>
+                            <div class="reward-kpi-subpill subpill-blue" id="summary-active-points-count">
+                                <i class="fas fa-layer-group"></i> 0 net points active
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ── Navigation Sub-tabs ────────────────────────────────────── -->
-                <div style="display:flex;gap:8px;margin-bottom:1.25rem;border-bottom:1px solid var(--border);padding-bottom:10px">
-                    <button class="btn btn-secondary active" id="tab-btn-referrals" onclick="switchRewardTab('referrals')" style="font-weight:700">
+                <!-- ── Executive Segmented Sub-tabs ───────────────────────────── -->
+                <div class="reward-segmented-nav">
+                    <button class="reward-segmented-btn active" id="tab-btn-referrals"
+                        onclick="switchRewardTab('referrals')">
                         <i class="fas fa-users-cog"></i> Referral Tracking (Who Referred Whom)
                     </button>
-                    <button class="btn btn-secondary" id="tab-btn-points" onclick="switchRewardTab('points')" style="font-weight:700">
+                    <button class="reward-segmented-btn" id="tab-btn-points" onclick="switchRewardTab('points')">
                         <i class="fas fa-history"></i> Point Distribution Ledger
                     </button>
-                    <button class="btn btn-secondary" id="tab-btn-rules" onclick="switchRewardTab('rules')" style="font-weight:700">
+                    <button class="reward-segmented-btn" id="tab-btn-rules" onclick="switchRewardTab('rules')">
                         <i class="fas fa-sliders-h"></i> Reward Rules & Rates
                     </button>
                 </div>
 
                 <!-- ── TAB 1: REFERRAL TRACKING ─────────────────────────────────── -->
                 <div id="panel-reward-referrals">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
                         <div class="search-box" style="flex:1;max-width:380px">
                             <i class="fas fa-search"></i>
-                            <input type="text" class="form-control" id="referrals-search" placeholder="Search by referrer, referee or code..." oninput="debounceReferralsSearch(this.value)" />
+                            <input type="text" class="form-control" id="referrals-search"
+                                placeholder="Search by referrer, referee or code..."
+                                oninput="debounceReferralsSearch(this.value)" />
                         </div>
-                        <span class="badge badge-gold" id="referrals-count-badge" style="font-size:13px;padding:6px 14px">Loading referrals...</span>
+                        <span class="badge badge-gold" id="referrals-count-badge"
+                            style="font-size:13px;padding:6px 14px">Loading referrals...</span>
                     </div>
 
                     <div class="table-wrap">
@@ -1324,8 +1362,10 @@
                         <div class="pagination" id="referrals-pagination">
                             <span id="referrals-pagination-info">Showing referrals...</span>
                             <div class="pagination-controls">
-                                <button class="btn btn-secondary btn-sm" id="btn-prev-referrals" onclick="prevReferralsPage()"><i class="fas fa-chevron-left"></i> Prev</button>
-                                <button class="btn btn-secondary btn-sm" id="btn-next-referrals" onclick="nextReferralsPage()">Next <i class="fas fa-chevron-right"></i></button>
+                                <button class="btn btn-secondary btn-sm" id="btn-prev-referrals"
+                                    onclick="prevReferralsPage()"><i class="fas fa-chevron-left"></i> Prev</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-next-referrals"
+                                    onclick="nextReferralsPage()">Next <i class="fas fa-chevron-right"></i></button>
                             </div>
                         </div>
                     </div>
@@ -1333,13 +1373,17 @@
 
                 <!-- ── TAB 2: POINT DISTRIBUTION LEDGER ───────────────────────── -->
                 <div id="panel-reward-points" style="display:none">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
                         <div class="search-box" style="flex:1;max-width:380px">
                             <i class="fas fa-search"></i>
-                            <input type="text" class="form-control" id="points-search" placeholder="Search customer name, phone or event..." oninput="debouncePointsSearch(this.value)" />
+                            <input type="text" class="form-control" id="points-search"
+                                placeholder="Search customer name, phone or event..."
+                                oninput="debouncePointsSearch(this.value)" />
                         </div>
                         <div style="display:flex;gap:8px">
-                            <select class="form-control" id="points-type-filter" style="width:160px" onchange="onPointsFilterChange()">
+                            <select class="form-control" id="points-type-filter" style="width:160px"
+                                onchange="onPointsFilterChange()">
                                 <option value="">All Event Types</option>
                                 <option value="referral">Referral Bonus</option>
                                 <option value="registration">Registration Bonus</option>
@@ -1359,8 +1403,10 @@
                         <div class="pagination">
                             <span id="rewards-pagination-info">Showing logs...</span>
                             <div class="pagination-controls">
-                                <button class="btn btn-secondary btn-sm" id="btn-prev-rewards" onclick="prevRewardsPage()"><i class="fas fa-chevron-left"></i> Prev</button>
-                                <button class="btn btn-secondary btn-sm" id="btn-next-rewards" onclick="nextRewardsPage()">Next <i class="fas fa-chevron-right"></i></button>
+                                <button class="btn btn-secondary btn-sm" id="btn-prev-rewards"
+                                    onclick="prevRewardsPage()"><i class="fas fa-chevron-left"></i> Prev</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-next-rewards"
+                                    onclick="nextRewardsPage()">Next <i class="fas fa-chevron-right"></i></button>
                             </div>
                         </div>
                     </div>
@@ -1368,28 +1414,70 @@
 
                 <!-- ── TAB 3: REWARD RULES & SETTINGS ───────────────────────────── -->
                 <div id="panel-reward-rules" style="display:none">
-                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
-                        <div style="font-weight:700;font-size:16px;color:#fff;margin-bottom:1.25rem">Reward Points Configuration Rules</div>
-                        <div class="form-grid-4" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:1.25rem">
-                            <div>
-                                <label class="form-label">Points per ₹100 Spent</label>
-                                <input class="form-control" type="number" id="reward-buy-points" value="1" />
-                                <span style="font-size:11px;color:var(--text-dim)">Points awarded for bullion purchases</span>
+                    <div
+                        style="background:linear-gradient(135deg, rgba(22, 28, 42, 0.85) 0%, rgba(14, 18, 28, 0.95) 100%);border:1px solid rgba(255, 255, 255, 0.08);border-radius:var(--radius-xl);padding:1.75rem;box-shadow:0 8px 28px rgba(0,0,0,0.3);backdrop-filter:blur(16px)">
+                        <div
+                            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div
+                                    style="width:38px;height:38px;border-radius:10px;background:rgba(245,158,11,0.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid rgba(245,158,11,0.3)">
+                                    <i class="fas fa-sliders-h"></i>
+                                </div>
+                                <div>
+                                    <div
+                                        style="font-weight:800;font-size:16px;color:#fff;font-family:var(--font-heading)">
+                                        Reward Points Configuration Rules</div>
+                                    <div style="font-size:12px;color:var(--text-dim)">Adjust conversion multipliers,
+                                        welcome incentives, and platform point valuations</div>
+                                </div>
                             </div>
-                            <div>
-                                <label class="form-label">Referral Bonus (Points)</label>
-                                <input class="form-control" type="number" id="reward-referral-points" value="200" />
-                                <span style="font-size:11px;color:var(--text-dim)">Points given to referrer (+ ₹50 cash)</span>
+                            <button class="btn btn-primary" onclick="saveRewardSettings()"
+                                style="display:inline-flex;align-items:center;gap:6px">
+                                <i class="fas fa-save"></i> Save Rules
+                            </button>
+                        </div>
+                        <div class="form-grid-4"
+                            style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:1.5rem">
+                            <div
+                                style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:14px">
+                                <label class="form-label"
+                                    style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Points
+                                    per ₹100 Spent</label>
+                                <input class="form-control" type="number" id="reward-buy-points" value="1"
+                                    style="font-family:var(--font-mono);font-size:15px;font-weight:700" />
+                                <span style="font-size:11px;color:var(--text-dim);margin-top:6px;display:block">Points
+                                    awarded for bullion purchases</span>
                             </div>
-                            <div>
-                                <label class="form-label">Registration Welcome Points</label>
-                                <input class="form-control" type="number" id="reward-kyc-points" value="100" />
-                                <span style="font-size:11px;color:var(--text-dim)">Welcome bonus for new signed up users</span>
+                            <div
+                                style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:14px">
+                                <label class="form-label"
+                                    style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Referral
+                                    Bonus (Points)</label>
+                                <input class="form-control" type="number" id="reward-referral-points" value="200"
+                                    style="font-family:var(--font-mono);font-size:15px;font-weight:700" />
+                                <span style="font-size:11px;color:var(--text-dim);margin-top:6px;display:block">Points
+                                    given to referrer (+ ₹50 cash)</span>
                             </div>
-                            <div>
-                                <label class="form-label">Value per Point (₹)</label>
-                                <input class="form-control" type="number" step="0.01" id="reward-point-value" value="0.05" />
-                                <span style="font-size:11px;color:var(--text-dim)">Conversion rate for wallet redemption</span>
+                            <div
+                                style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:14px">
+                                <label class="form-label"
+                                    style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Registration
+                                    Welcome Points</label>
+                                <input class="form-control" type="number" id="reward-kyc-points" value="100"
+                                    style="font-family:var(--font-mono);font-size:15px;font-weight:700" />
+                                <span style="font-size:11px;color:var(--text-dim);margin-top:6px;display:block">Welcome
+                                    bonus for new signed up users</span>
+                            </div>
+                            <div
+                                style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:14px">
+                                <label class="form-label"
+                                    style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Value
+                                    per Point (₹)</label>
+                                <input class="form-control" type="number" step="0.01" id="reward-point-value"
+                                    value="0.05" style="font-family:var(--font-mono);font-size:15px;font-weight:700" />
+                                <span
+                                    style="font-size:11px;color:var(--text-dim);margin-top:6px;display:block">Conversion
+                                    rate for wallet redemption</span>
                             </div>
                         </div>
                     </div>

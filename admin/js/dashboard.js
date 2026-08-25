@@ -115,6 +115,11 @@ function setElText(id, text) {
     if (el) el.textContent = text;
 }
 
+function setElHtml(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+}
+
 function updateBadge(id, count) {
     const badge = document.getElementById(id);
     if (!badge) return;

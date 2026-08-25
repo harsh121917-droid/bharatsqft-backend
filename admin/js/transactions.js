@@ -631,11 +631,11 @@ async function loadWalletLedger(page = 1) {
 
         // Update Summary KPI Cards
         if (res.stats) {
-            setElText("ledger-stat-total", res.stats.totalTxns || 0);
+            setElText("ledger-stat-total", (res.stats.totalTxns || 0).toLocaleString("en-IN"));
             setElText("ledger-stat-credits", `+${formatINR(res.stats.totalCredits || 0)}`);
-            setElText("ledger-stat-credit-count", `<i class="fas fa-plus-circle"></i> ${res.stats.creditCount || 0} credit entries`);
+            setElHtml("ledger-stat-credit-count", `<i class="fas fa-plus-circle"></i> ${(res.stats.creditCount || 0).toLocaleString("en-IN")} credit entries`);
             setElText("ledger-stat-debits", `-${formatINR(res.stats.totalDebits || 0)}`);
-            setElText("ledger-stat-debit-count", `<i class="fas fa-minus-circle"></i> ${res.stats.debitCount || 0} debit entries`);
+            setElHtml("ledger-stat-debit-count", `<i class="fas fa-minus-circle"></i> ${(res.stats.debitCount || 0).toLocaleString("en-IN")} debit entries`);
             setElText("ledger-stat-net", formatINR(res.stats.netVolume || 0));
         }
 

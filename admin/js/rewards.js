@@ -45,12 +45,20 @@ async function loadRewardsSummary() {
             const ref = d.referralStats || {};
 
             setElText("summary-total-rewards-amt", formatINR(dist.overallTotalRupeesEquivalent || 0));
-            setElText("summary-total-rewards-pts", `${(dist.totalPointsGiven || 0).toLocaleString("en-IN")} total points given`);
-            setElText("summary-total-referrals-count", ref.totalReferralsCount || 0);
-            setElText("summary-active-referrers-count", `${ref.uniqueActiveReferrers || 0} active referrers`);
+            
+            const ptsGivenEl = document.getElementById("summary-total-rewards-pts");
+            if (ptsGivenEl) ptsGivenEl.innerHTML = `<i class="fas fa-sparkles"></i> ${(dist.totalPointsGiven || 0).toLocaleString("en-IN")} total points given`;
+
+            setElText("summary-total-referrals-count", (ref.totalReferralsCount || 0).toLocaleString("en-IN"));
+            
+            const activeRefEl = document.getElementById("summary-active-referrers-count");
+            if (activeRefEl) activeRefEl.innerHTML = `<i class="fas fa-users"></i> ${ref.uniqueActiveReferrers || 0} active referrers`;
+
             setElText("summary-referral-cash-distributed", formatINR(ref.totalCashDistributed || 0));
             setElText("summary-points-redeemed-count", `${(dist.totalPointsRedeemed || 0).toLocaleString("en-IN")} pts`);
-            setElText("summary-active-points-count", `${(dist.netActivePoints || 0).toLocaleString("en-IN")} net points active`);
+            
+            const activePtsEl = document.getElementById("summary-active-points-count");
+            if (activePtsEl) activePtsEl.innerHTML = `<i class="fas fa-layer-group"></i> ${(dist.netActivePoints || 0).toLocaleString("en-IN")} net points active`;
         }
     } catch (e) {
         console.error("Error loading rewards summary:", e);
@@ -146,34 +154,47 @@ function renderReferralsTable(referrals) {
         const ptsReward = r.rewardPoints !== undefined ? r.rewardPoints : 200;
         const refereePts = r.refereeBonusPoints !== undefined ? r.refereeBonusPoints : 100;
 
+        const refInitials = (referrer.name || 'R').slice(0, 2).toUpperCase();
+        const userInitials = (referee.name || 'U').slice(0, 2).toUpperCase();
+
         html += `
         <tr>
             <td>
-                <div style="font-weight:700;color:#fff;font-size:13.5px">${referrer.name || 'Unknown Referrer'}</div>
-                <div style="font-size:11.5px;color:var(--text-dim)">${referrer.phone ? referrer.phone + ' • ' : ''}${referrer.email || ''}</div>
-                ${referrer.referralBalance !== undefined ? `<div style="font-size:10.5px;color:var(--gold);margin-top:2px"><i class="fas fa-wallet"></i> Total Ref Bal: ${formatINR(referrer.referralBalance)}</div>` : ''}
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div class="reward-user-avatar avatar-gold">${refInitials}</div>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13.5px">${referrer.name || 'Unknown Referrer'}</div>
+                        <div style="font-size:11.5px;color:var(--text-dim)">${referrer.phone ? referrer.phone + ' • ' : ''}${referrer.email || ''}</div>
+                        ${referrer.referralBalance !== undefined ? `<div style="font-size:10.5px;color:var(--gold);margin-top:2px"><i class="fas fa-wallet"></i> Total Ref Bal: ${formatINR(referrer.referralBalance)}</div>` : ''}
+                    </div>
+                </div>
             </td>
             <td>
                 <div style="display:flex;align-items:center;gap:6px">
-                    <span class="badge font-mono" style="background:rgba(212,160,23,0.15);color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px">
+                    <span class="badge font-mono" style="background:rgba(212,160,23,0.15);color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0.5px;border:1px solid rgba(212,160,23,0.3)">
                         ${code}
                     </span>
-                    <button class="btn-icon-secondary" onclick="copyReferralCode('${code}')" title="Copy Referral Code" style="width:22px;height:22px;padding:0">
-                        <i class="fas fa-copy" style="font-size:10px"></i>
+                    <button class="btn-icon-secondary" onclick="copyReferralCode('${code}')" title="Copy Referral Code" style="width:24px;height:24px;padding:0;border-radius:6px">
+                        <i class="fas fa-copy" style="font-size:10.5px"></i>
                     </button>
                 </div>
             </td>
             <td>
-                <div style="font-weight:700;color:#fff;font-size:13.5px">${referee.name || 'New Customer'}</div>
-                <div style="font-size:11.5px;color:var(--text-dim)">${referee.phone ? referee.phone + ' • ' : ''}${referee.email || ''}</div>
-                <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">Joined: ${formatDate(referee.createdAt || r.createdAt)}</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div class="reward-user-avatar avatar-purple">${userInitials}</div>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13.5px">${referee.name || 'New Customer'}</div>
+                        <div style="font-size:11.5px;color:var(--text-dim)">${referee.phone ? referee.phone + ' • ' : ''}${referee.email || ''}</div>
+                        <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px">Joined: ${formatDate(referee.createdAt || r.createdAt)}</div>
+                    </div>
+                </div>
             </td>
             <td>
                 <div style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:var(--success)">+${formatINR(cashReward)}</div>
                 <div style="font-size:11px;color:var(--purple);font-weight:600">+${ptsReward} Points</div>
             </td>
             <td>
-                <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:11px">
+                <span class="badge font-mono" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:11px;border:1px solid rgba(168,85,247,0.25)">
                     +${refereePts} Welcome Pts
                 </span>
             </td>
@@ -289,19 +310,25 @@ function renderRewardHistoryTable(logs) {
     logs.forEach(l => {
         const u = l.user || {};
         const isCredit = (l.points || 0) >= 0;
-        const ptsStr = `${isCredit ? '+' : ''}${l.points} pts`;
+        const ptsStr = `${isCredit ? '+' : ''}${Number(l.points || 0).toLocaleString("en-IN")} pts`;
+        const initials = (u.name || 'U').slice(0, 2).toUpperCase();
 
         let typeBadge = `<span class="badge badge-secondary">${l.type || 'activity'}</span>`;
-        if (l.type === "referral") typeBadge = `<span class="badge badge-gold"><i class="fas fa-user-plus"></i> Referral</span>`;
-        else if (l.type === "registration") typeBadge = `<span class="badge badge-info"><i class="fas fa-sparkles"></i> Welcome Bonus</span>`;
-        else if (l.type === "spin_win") typeBadge = `<span class="badge badge-purple"><i class="fas fa-dice"></i> Spin & Win</span>`;
-        else if (l.type === "redeem") typeBadge = `<span class="badge badge-danger"><i class="fas fa-arrow-down"></i> Redeemed</span>`;
+        if (l.type === "referral") typeBadge = `<span class="badge badge-gold" style="border:1px solid rgba(245,158,11,0.3)"><i class="fas fa-user-plus"></i> Referral</span>`;
+        else if (l.type === "registration") typeBadge = `<span class="badge badge-info" style="border:1px solid rgba(59,130,246,0.3)"><i class="fas fa-sparkles"></i> Welcome Bonus</span>`;
+        else if (l.type === "spin_win") typeBadge = `<span class="badge badge-purple" style="border:1px solid rgba(168,85,247,0.3)"><i class="fas fa-dice"></i> Spin & Win</span>`;
+        else if (l.type === "redeem") typeBadge = `<span class="badge badge-danger" style="border:1px solid rgba(239,68,68,0.3)"><i class="fas fa-arrow-down"></i> Redeemed</span>`;
 
         html += `
         <tr>
             <td>
-                <div style="font-weight:600;color:#fff">${u.name || '—'}</div>
-                <div style="font-size:12px;color:var(--text-dim)">${u.phone || u.email || ''} ${u.referralCode ? `• Code: <b>${u.referralCode}</b>` : ''}</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div class="reward-user-avatar avatar-purple">${initials}</div>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13.5px">${u.name || '—'}</div>
+                        <div style="font-size:11.5px;color:var(--text-dim)">${u.phone || u.email || ''} ${u.referralCode ? `• Code: <b>${u.referralCode}</b>` : ''}</div>
+                    </div>
+                </div>
             </td>
             <td style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:${isCredit ? '#10b981' : '#ef4444'}">
                 ${ptsStr}
