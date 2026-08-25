@@ -338,6 +338,7 @@ exports.deleteUser = async (req, res, next) => {
 
         // Clean up all related data to prevent orphaned documents
         const RewardTxn = require("../models/RewardTxn");
+        const Sip = require("../models/Sip");
         await Promise.all([
             GoldBalance.deleteMany({ user: userId }),
             GoldTransaction.deleteMany({ user: userId }),
@@ -350,6 +351,7 @@ exports.deleteUser = async (req, res, next) => {
             RewardTxn.deleteMany({ user: userId }),
             Saving.deleteMany({ user: userId }),
             SchemeEnrollment.deleteMany({ user: userId }),
+            Sip.deleteMany({ user: userId }),
         ]);
 
         res.json({ success: true, message: "User and all associated data deleted successfully" });
@@ -720,6 +722,7 @@ exports.recalculateVaultBalance = async (req, res, next) => {
 exports.resetUserVault = async (req, res, next) => {
     try {
         const userId = req.params.id;
+        const Sip = require("../models/Sip");
 
         // Reset Gold
         await GoldBalance.findOneAndUpdate(
@@ -745,13 +748,14 @@ exports.resetUserVault = async (req, res, next) => {
         );
         await CopperTransaction.deleteMany({ user: userId });
 
-        // Reset Schemes & Savings
+        // Reset Schemes, Savings & SIPs
         await Saving.deleteMany({ user: userId });
         await SchemeEnrollment.deleteMany({ user: userId });
+        await Sip.deleteMany({ user: userId });
 
         res.json({
             success: true,
-            message: "User bullion holdings (Gold, Silver, Copper) and all trading transactions have been reset to 0.",
+            message: "User bullion holdings (Gold, Silver, Copper), SIP subscriptions, and all trading transactions have been reset to 0.",
             data: { goldGrams: 0, silverGrams: 0, copperGrams: 0 }
         });
     } catch (err) { next(err); }
@@ -802,6 +806,7 @@ exports.resetAllUserData = async (req, res, next) => {
     try {
         const userId = req.params.id;
         const RewardTxn = require("../models/RewardTxn");
+        const Sip = require("../models/Sip");
 
         // Reset Gold
         await GoldBalance.findOneAndUpdate(
@@ -827,9 +832,10 @@ exports.resetAllUserData = async (req, res, next) => {
         );
         await CopperTransaction.deleteMany({ user: userId });
 
-        // Reset Schemes & Savings
+        // Reset Schemes, Savings & SIP subscriptions
         await Saving.deleteMany({ user: userId });
         await SchemeEnrollment.deleteMany({ user: userId });
+        await Sip.deleteMany({ user: userId });
 
         // Reset Wallet & Wallet Transactions
         await Wallet.findOneAndUpdate(
@@ -845,7 +851,7 @@ exports.resetAllUserData = async (req, res, next) => {
 
         res.json({
             success: true,
-            message: "All testing data (Bullion Vault, Wallet Balance, Reward Points, Spin Count & all Transaction history) for this user has been wiped clean to 0.",
+            message: "All testing data (Gold, Silver, Copper Vault, SIPs, Wallet Balance, Reward Points, Spin Count & all Transaction history) for this user has been wiped clean to 0.",
             data: { goldGrams: 0, silverGrams: 0, copperGrams: 0, balance: 0, rewardPoints: 0, spinsLeft: 3 }
         });
     } catch (err) { next(err); }

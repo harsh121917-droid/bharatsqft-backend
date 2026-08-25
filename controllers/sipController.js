@@ -26,10 +26,9 @@ async function creditGramsToVault(userId, metal, grams, amount, buyRate, install
 
     if (metal === "gold") {
         let bal = await GoldBalance.findOne({ user: userId });
-        if (!bal) bal = new GoldBalance({ user: userId, grams: 0 });
-        bal.grams = parseFloat(((bal.grams || 0) + netGrams).toFixed(6));
-        bal.totalPurchasedGrams = parseFloat(((bal.totalPurchasedGrams || 0) + netGrams).toFixed(6));
-        bal.totalInvestedRupees = parseFloat(((bal.totalInvestedRupees || 0) + netAmt).toFixed(2));
+        if (!bal) bal = new GoldBalance({ user: userId, totalGrams: 0, investedAmt: 0 });
+        bal.totalGrams = parseFloat(((bal.totalGrams || 0) + netGrams).toFixed(6));
+        bal.investedAmt = parseFloat(((bal.investedAmt || 0) + netAmt).toFixed(2));
         await bal.save();
 
         const GST_PCT = 3;
@@ -41,20 +40,18 @@ async function creditGramsToVault(userId, metal, grams, amount, buyRate, install
             type: "sip_buy",
             grams: netGrams,
             ratePerGram: buyRate,
-            amount: netAmt,
-            netAmount: netExGst,
-            gstAmount: gstAmount,
-            status: "completed",
-            paymentMethod: "wallet",
-            reference: `Gold SIP Installment #${installmentNo}`
+            goldValue: netExGst,
+            gstAmt: gstAmount,
+            totalAmt: netAmt,
+            status: "success",
+            note: `Gold SIP Installment #${installmentNo}`,
         });
         return txn._id.toString();
     } else if (metal === "silver") {
         let bal = await SilverBalance.findOne({ user: userId });
-        if (!bal) bal = new SilverBalance({ user: userId, grams: 0 });
-        bal.grams = parseFloat(((bal.grams || 0) + netGrams).toFixed(6));
-        bal.totalPurchasedGrams = parseFloat(((bal.totalPurchasedGrams || 0) + netGrams).toFixed(6));
-        bal.totalInvestedRupees = parseFloat(((bal.totalInvestedRupees || 0) + netAmt).toFixed(2));
+        if (!bal) bal = new SilverBalance({ user: userId, totalGrams: 0, investedAmt: 0 });
+        bal.totalGrams = parseFloat(((bal.totalGrams || 0) + netGrams).toFixed(6));
+        bal.investedAmt = parseFloat(((bal.investedAmt || 0) + netAmt).toFixed(2));
         await bal.save();
 
         const GST_PCT = 3;
@@ -66,12 +63,11 @@ async function creditGramsToVault(userId, metal, grams, amount, buyRate, install
             type: "sip_buy",
             grams: netGrams,
             ratePerGram: buyRate,
-            amount: netAmt,
-            netAmount: netExGst,
-            gstAmount: gstAmount,
-            status: "completed",
-            paymentMethod: "wallet",
-            reference: `Silver SIP Installment #${installmentNo}`
+            silverValue: netExGst,
+            gstAmt: gstAmount,
+            totalAmt: netAmt,
+            status: "success",
+            note: `Silver SIP Installment #${installmentNo}`,
         });
         return txn._id.toString();
     } else if (metal === "copper") {
@@ -90,12 +86,11 @@ async function creditGramsToVault(userId, metal, grams, amount, buyRate, install
             type: "sip_buy",
             grams: netGrams,
             ratePerGram: buyRate,
-            amount: netAmt,
-            netAmount: netExGst,
-            gstAmount: gstAmount,
-            status: "completed",
-            paymentMethod: "wallet",
-            reference: `Copper SIP Installment #${installmentNo}`
+            copperValue: netExGst,
+            gstAmt: gstAmount,
+            totalAmt: netAmt,
+            status: "success",
+            note: `Copper SIP Installment #${installmentNo}`,
         });
         return txn._id.toString();
     }

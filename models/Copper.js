@@ -17,7 +17,7 @@ const CopperTransactionSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         invoiceNo: { type: String, unique: true, sparse: true }, // e.g. CPR-2026-000123
-        type: { type: String, enum: ["buy", "sell", "gift", "redeem"], required: true },
+        type: { type: String, enum: ["buy", "sell", "sip_buy", "gift", "redeem"], required: true },
         grams: { type: Number, required: true },
         ratePerGram: { type: Number, required: true },
         copperValue: { type: Number, required: true },          // grams × rate
