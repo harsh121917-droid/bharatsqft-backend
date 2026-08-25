@@ -97,7 +97,7 @@ exports.generateInvoicePDF = async (txn, user, type, res, isSample = false) => {
     const totalAmt = txn.totalAmt;
 
     // GST calculations (always CGST + SGST, no IGST)
-    const cgstSgstRateStr = isBuy && gstAmt > 0 ? "1.50% + 1.50%" : "0.00%";
+    const cgstSgstRateStr = isBuy && gstAmt > 0 ? (type === "copper" ? "9.00% + 9.00%" : "1.50% + 1.50%") : "0.00%";
     const cgstSgstAmtStr = isBuy && gstAmt > 0 ? gstAmt.toFixed(2) : "0.00";
 
     // 3. Initialize PDF document

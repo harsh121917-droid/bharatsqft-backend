@@ -17,6 +17,7 @@ const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.get("/rate", getRate);   // live rate — no auth needed (show on landing page too)
+router.get("/rates", getRate);  // alias for backward compatibility / frontend callers
 router.get("/history", getHistory);
 
 // ── User (auth required) ──────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ const {
   getRewardSettings,
   updateRewardSettings,
   getAllRewardHistory,
+  getAdminReferrals,
+  getAdminRewardsSummary,
   getAdminCoins, createCoin, updateCoin, deleteCoin, uploadCoinImage,
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
@@ -91,10 +93,13 @@ router.post("/sell-settings", updateSellSettings);
 // Gold Scheme Enrollments
 router.get("/schemes/enrollments", getSchemeEnrollments);
 
-// Reward Points System
+// Reward Points & Referral System
 router.get("/rewards/settings", getRewardSettings);
 router.post("/rewards/settings", updateRewardSettings);
 router.get("/rewards/history", getAllRewardHistory);
+router.get("/rewards/summary", getAdminRewardsSummary);
+router.get("/rewards/referrals", getAdminReferrals);
+router.get("/referrals", getAdminReferrals);
 
 // Coin Catalog Management
 router.get("/coins", getAdminCoins);

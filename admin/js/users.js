@@ -147,8 +147,13 @@ function renderUsersTable(users) {
         html += `
         <tr>
             <td>
-                <div style="font-weight:600;color:#fff">${u.name || '—'}</div>
-                <div style="font-size:12px;color:var(--text-dim)">${u.email || ''} ${u.phone ? `• ${u.phone}` : ''}</div>
+                <div style="font-weight:700;color:#fff;font-size:13.5px">${u.name || '—'}</div>
+                <div style="font-size:11.5px;color:var(--text-dim)">${u.email || ''} ${u.phone ? `• ${u.phone}` : ''}</div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:wrap">
+                    ${u.referralCode ? `<span class="badge font-mono" style="background:rgba(212,160,23,0.12);color:var(--gold);font-size:10px" title="User Referral Code"><i class="fas fa-ticket-alt"></i> ${u.referralCode}</span>` : ''}
+                    ${u.referredByInfo ? `<span class="badge" style="background:rgba(168,85,247,0.12);color:#c084fc;font-size:10px" title="Invited by this user"><i class="fas fa-user-check"></i> Ref by: ${u.referredByInfo.name || u.referredByInfo.phone || 'User'}</span>` : ''}
+                    <span class="badge" style="background:rgba(16,185,129,0.12);color:#34d399;font-size:10px" title="Referral Earnings & Points"><i class="fas fa-gift"></i> +${formatINR(u.referralRewardsEarned || 0)} (${u.referralsCount || 0} refs · ${u.totalRewardPointsEarned || u.rewardPoints || 0} pts)</span>
+                </div>
             </td>
             <td><span class="badge ${u.role === 'admin' ? 'badge-gold' : 'badge-info'}">${u.role || 'user'}</span></td>
             <td>${kycBadge}</td>

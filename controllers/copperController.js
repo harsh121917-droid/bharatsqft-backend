@@ -114,12 +114,12 @@ exports.getTransactionInvoice = async (req, res, next) => {
                 invoiceNo: "SMPL-CPPR-2026-0001",
                 createdAt: new Date(),
                 type: "buy",
-                grams: 735.29,
+                grams: 623.13,
                 ratePerGram: 1.36,
-                goldValue: 970.87,
-                silverValue: 970.87,
-                copperValue: 970.87,
-                gstAmt: 29.13,
+                goldValue: 847.46,
+                silverValue: 847.46,
+                copperValue: 847.46,
+                gstAmt: 152.54, // 18% GST on ₹847.46 taxable value = ₹152.54
                 totalAmt: 1000.00
             };
         } else {

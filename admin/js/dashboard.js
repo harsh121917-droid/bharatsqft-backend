@@ -317,8 +317,8 @@ function formatShortInvoice(inv) {
     if (str.startsWith("WLT-")) {
         return `WLT-…${str.slice(-4)}`;
     }
-    if (str.startsWith("SLV-") || str.startsWith("GLD-")) {
-        return `${str.slice(0, 3)}-…${str.slice(-4)}`;
+    if (str.startsWith("SLV-") || str.startsWith("GLD-") || str.startsWith("CPPR-")) {
+        return `${str.slice(0, 4)}-…${str.slice(-4)}`;
     }
     if (str.length > 10) {
         return `…${str.slice(-6).toUpperCase()}`;
@@ -374,6 +374,8 @@ function renderRealTimeTransactionsTable(txns) {
             metalBadge = `<span style="color:#f59e0b;font-weight:600"><i class="fas fa-coins" style="font-size:10px;margin-right:4px"></i>Gold</span>`;
         } else if (m === "silver") {
             metalBadge = `<span style="color:#cbd5e1;font-weight:600"><i class="fas fa-cubes" style="font-size:10px;margin-right:4px"></i>Silver</span>`;
+        } else if (m === "copper") {
+            metalBadge = `<span style="color:#c084fc;font-weight:600"><i class="fas fa-layer-group" style="font-size:10px;margin-right:4px"></i>Copper</span>`;
         } else {
             metalBadge = `<span style="color:var(--text-dim);font-weight:500"><i class="fas fa-wallet" style="font-size:10px;margin-right:4px"></i>Wallet</span>`;
         }

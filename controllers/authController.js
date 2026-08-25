@@ -5,6 +5,7 @@ const Otp = require("../models/Otp");
 const { sendSms } = require("../services/smsService");
 const RewardSettings = require("../models/RewardSettings");
 const RewardTxn = require("../models/RewardTxn");
+const Referral = require("../models/Referral");
 
 // Helper to generate a unique referral code based on email prefix or phone suffix
 async function generateUniqueReferralCode(email, phone) {
@@ -44,23 +45,46 @@ async function processReferralAndRewards(user, enteredReferralCode) {
 
     // 3. Process referral if code was provided
     if (enteredReferralCode) {
-        const referrer = await User.findOne({ referralCode: enteredReferralCode.trim().toUpperCase() });
-        if (referrer) {
+        const cleanCode = enteredReferralCode.trim().toUpperCase();
+        const referrer = await User.findOne({ referralCode: cleanCode });
+        if (referrer && referrer._id.toString() !== user._id.toString()) {
             user.referredBy = referrer._id;
             
             // Credit referrer with 50 rupees
-            referrer.referralBalance = (referrer.referralBalance || 0) + 50;
+            const cashBonus = 50;
+            referrer.referralBalance = (referrer.referralBalance || 0) + cashBonus;
             // Also credit points if configured
             if (refPoints > 0) {
                 referrer.rewardPoints = (referrer.rewardPoints || 0) + refPoints;
             }
             await referrer.save();
             
+            // Create dedicated Referral record
+            await Referral.findOneAndUpdate(
+                { referredUser: user._id },
+                {
+                    referrer: referrer._id,
+                    referredUser: user._id,
+                    referralCode: cleanCode,
+                    rewardPoints: refPoints > 0 ? refPoints : 50,
+                    rewardAmount: cashBonus,
+                    refereeBonusPoints: regPoints,
+                    status: "completed",
+                    extra: {
+                        referrerName: referrer.name,
+                        referrerPhone: referrer.phone,
+                        referredUserName: user.name,
+                        referredUserPhone: user.phone,
+                    }
+                },
+                { upsert: true, new: true }
+            );
+
             await RewardTxn.create({
                 user: referrer._id,
                 type: "referral",
                 points: refPoints > 0 ? refPoints : 50,
-                description: `Referral bonus of ₹50 for inviting ${user.name || user.phone || user.email}`,
+                description: `Referral bonus of ₹${cashBonus} for inviting ${user.name || user.phone || user.email}`,
                 extra: { referredUserId: user._id }
             });
         }
@@ -68,7 +92,7 @@ async function processReferralAndRewards(user, enteredReferralCode) {
 
     // 4. Credit registration bonus to the new user
     if (regPoints > 0) {
-        user.rewardPoints = regPoints;
+        user.rewardPoints = (user.rewardPoints || 0) + regPoints;
         await RewardTxn.create({
             user: user._id,
             type: "registration",

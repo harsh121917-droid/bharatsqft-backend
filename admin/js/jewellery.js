@@ -81,10 +81,10 @@ async function loadJewellery() {
     try {
         // Fetch Live Rates for Value Calculation
         try {
-            const ratesRes = await api("/gold/rates");
+            const ratesRes = await api("/gold/rate");
             if (ratesRes.success && ratesRes.data) {
                 liveGoldRate = ratesRes.data.gold?.buyRate || 7500;
-                liveSilverRate = ratesRes.data.silver?.buyRate || 90;
+                liveSilverRate = ratesRes.data.silver?.buyRate || 240;
             }
         } catch (e) {}
 
@@ -822,6 +822,14 @@ async function loadCoins() {
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading bullion mint coins...</div></div>`;
 
     try {
+        try {
+            const ratesRes = await api("/gold/rate");
+            if (ratesRes.success && ratesRes.data) {
+                liveGoldRate = ratesRes.data.gold?.buyRate || 7500;
+                liveSilverRate = ratesRes.data.silver?.buyRate || 240;
+            }
+        } catch (e) {}
+
         const res = await api("/admin/coins");
         if (!res.success) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load coins"}</div></div>`;

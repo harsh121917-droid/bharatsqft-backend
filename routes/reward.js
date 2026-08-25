@@ -5,6 +5,7 @@ const {
     spinWheel,
     redeemPoints,
     getRewardHistory,
+    getUserReferrals,
 } = require("../controllers/rewardController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -14,5 +15,6 @@ router.get("/balance", getRewardBalance);
 router.post("/spin", spinWheel);
 router.post("/redeem", redeemPoints);
 router.get("/history", getRewardHistory);
+router.get("/referrals", getUserReferrals);
 
 module.exports = router;

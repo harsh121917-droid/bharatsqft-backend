@@ -699,7 +699,7 @@ exports.buyCopperFromWallet = async (req, res, next) => {
         if (!buyRate || buyRate <= 0) {
             return res.status(503).json({ success: false, message: "Copper rate unavailable right now" });
         }
-        const GST_PCT = 3;
+        const GST_PCT = 18; // 18% GST on Copper (9% CGST + 9% SGST)
 
         let { amountInRupees, grams, pointsRedeemed } = req.body;
         if (grams && !amountInRupees) amountInRupees = parseFloat((grams * buyRate).toFixed(2));

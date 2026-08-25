@@ -183,7 +183,54 @@ exports.getAllUsers = async (req, res, next) => {
             walletMap[w.user.toString()] = w.balance;
         });
 
+        // ── Referral & Reward Data Aggregations ────────────────────────
+        const Referral = require("../models/Referral");
+        const RewardTxn = require("../models/RewardTxn");
+
+        const [referralAggs, rewardEarnedAggs, referrerUsers] = await Promise.all([
+            Referral.aggregate([
+                { $match: { referrer: { $in: userIds } } },
+                {
+                    $group: {
+                        _id: "$referrer",
+                        count: { $sum: 1 },
+                        totalBonus: { $sum: "$rewardAmount" },
+                        totalPoints: { $sum: "$rewardPoints" }
+                    }
+                }
+            ]),
+            RewardTxn.aggregate([
+                { $match: { user: { $in: userIds }, points: { $gt: 0 } } },
+                {
+                    $group: {
+                        _id: "$user",
+                        totalPointsEarned: { $sum: "$points" },
+                        rewardTxnCount: { $sum: 1 }
+                    }
+                }
+            ]),
+            User.find({ _id: { $in: users.map(u => u.referredBy).filter(Boolean) } })
+                .select("name email phone referralCode")
+                .lean()
+        ]);
+
+        const refStatsMap = {};
+        referralAggs.forEach(r => {
+            refStatsMap[r._id.toString()] = r;
+        });
+
+        const rewardStatsMap = {};
+        rewardEarnedAggs.forEach(r => {
+            rewardStatsMap[r._id.toString()] = r;
+        });
+
+        const referrerMap = {};
+        referrerUsers.forEach(ru => {
+            referrerMap[ru._id.toString()] = ru;
+        });
+
         const usersWithHoldings = users.map(user => {
+            const uidStr = user._id.toString();
             const goldGrams = user.goldInvestments?.grams || 0;
             const goldSpent = user.goldInvestments?.totalInvested || 0;
             const goldAvgPrice = goldGrams > 0 ? parseFloat((goldSpent / goldGrams).toFixed(2)) : 0;
@@ -202,9 +249,17 @@ exports.getAllUsers = async (req, res, next) => {
             const copperCurrentValue = parseFloat((copperGrams * copperSellRate).toFixed(2));
             const copperProfitLoss = parseFloat((copperCurrentValue - copperSpent).toFixed(2));
 
+            const refStat = refStatsMap[uidStr] || { count: 0, totalBonus: 0, totalPoints: 0 };
+            const rewStat = rewardStatsMap[uidStr] || { totalPointsEarned: user.rewardPoints || 0, rewardTxnCount: 0 };
+            const referrerInfo = user.referredBy ? (referrerMap[user.referredBy.toString()] || null) : null;
+
             return {
                 ...user,
-                walletBalance: walletMap[user._id.toString()] || 0,
+                walletBalance: walletMap[uidStr] || 0,
+                referralsCount: refStat.count || 0,
+                referralRewardsEarned: refStat.totalBonus || (user.referralBalance || 0),
+                totalRewardPointsEarned: rewStat.totalPointsEarned || (user.rewardPoints || 0),
+                referredByInfo: referrerInfo,
                 goldInvestments: {
                     ...user.goldInvestments,
                     avgBuyPrice: goldAvgPrice,
@@ -927,6 +982,7 @@ exports.getDashboard = async (req, res, next) => {
             // Recent Transactions
             recentGoldTxns,
             recentSilverTxns,
+            recentCopperTxns,
             recentWalletTxns,
 
             // Chart data aggregations (last 30 days)
@@ -1039,6 +1095,7 @@ exports.getDashboard = async (req, res, next) => {
             // Recent Transactions
             GoldTransaction.find().populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
             SilverTransaction.find().populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
+            CopperTransaction.find().populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
             WalletTxn.find({ type: { $in: ["add", "withdraw"] } }).populate("user", "name email phone").sort({ createdAt: -1 }).limit(10).lean(),
 
             // Daily chart trend (Gold 30d)
@@ -1165,6 +1222,22 @@ exports.getDashboard = async (req, res, next) => {
                 grams: t.grams || 0,
                 rate: t.ratePerGram || 0,
                 amount: t.totalAmt || t.silverValue || 0,
+                status: t.status,
+                createdAt: t.createdAt
+            });
+        });
+
+        (recentCopperTxns || []).forEach(t => {
+            unifiedTxns.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `CPPR-${String(t._id).slice(-6).toUpperCase()}`,
+                asset: "Copper",
+                metal: "copper",
+                type: t.type,
+                user: t.user ? { name: t.user.name, email: t.user.email, phone: t.user.phone } : null,
+                grams: t.grams || 0,
+                rate: t.ratePerGram || 0,
+                amount: t.totalAmt || t.copperValue || 0,
                 status: t.status,
                 createdAt: t.createdAt
             });
@@ -1722,7 +1795,7 @@ exports.getAllRewardHistory = async (req, res, next) => {
 
         const [history, total] = await Promise.all([
             RewardTxn.find(filter)
-                .populate("user", "name email phone")
+                .populate("user", "name email phone referralCode")
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
@@ -1741,28 +1814,142 @@ exports.getAllRewardHistory = async (req, res, next) => {
     }
 };
 
-exports.getAdminCoins = async (req, res, next) => {
+// ── GET /api/admin/referrals ─────────────────────────────────────────────────
+exports.getAdminReferrals = async (req, res, next) => {
     try {
-        const { fetchLiveRates } = require("./goldController");
-        const Coin = require("../models/Coin");
-        
-        const rates = await fetchLiveRates();
-        const coins = await Coin.find().sort({ metal: 1, grams: 1 });
-        
-        const data = coins.map(c => {
-            const rate = c.metal === "gold" ? rates.gold.buyRate : rates.silver.buyRate;
-            const value = parseFloat((c.grams * rate).toFixed(2));
-            const making = parseFloat((value * c.makingChargePct / 100).toFixed(2));
-            return {
-                ...c.toObject(),
-                ratePerGram: rate,
-                value,
-                makingCharge: making,
-                totalValue: parseFloat((value + making).toFixed(2))
-            };
+        const Referral = require("../models/Referral");
+        const User = require("../models/User");
+
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 25;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.status && req.query.status !== "all") {
+            filter.status = req.query.status;
+        }
+
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search.trim(), "i");
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex },
+                    { referralCode: searchRegex }
+                ],
+            }).select("_id");
+            const userIds = matchingUsers.map(u => u._id);
+
+            filter.$or = [
+                { referrer: { $in: userIds } },
+                { referredUser: { $in: userIds } },
+                { referralCode: searchRegex }
+            ];
+        }
+
+        const [referrals, total] = await Promise.all([
+            Referral.find(filter)
+                .populate("referrer", "name email phone referralCode referralBalance")
+                .populate("referredUser", "name email phone createdAt")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Referral.countDocuments(filter),
+        ]);
+
+        res.json({
+            success: true,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            data: referrals,
         });
-        res.json({ success: true, data });
-    } catch (err) { next(err); }
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── GET /api/admin/rewards/summary ───────────────────────────────────────────
+exports.getAdminRewardsSummary = async (req, res, next) => {
+    try {
+        const RewardTxn = require("../models/RewardTxn");
+        const Referral = require("../models/Referral");
+        const User = require("../models/User");
+
+        const [
+            totalRewardTxns,
+            rewardTypeStats,
+            totalReferralsCount,
+            totalReferralCashDistributed,
+            uniqueReferrersCount,
+            totalUsersWithPoints
+        ] = await Promise.all([
+            RewardTxn.countDocuments(),
+            RewardTxn.aggregate([
+                {
+                    $group: {
+                        _id: "$type",
+                        totalPoints: { $sum: "$points" },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+            Referral.countDocuments(),
+            Referral.aggregate([
+                { $group: { _id: null, totalCash: { $sum: "$rewardAmount" }, totalPoints: { $sum: "$rewardPoints" } } }
+            ]),
+            Referral.distinct("referrer"),
+            User.countDocuments({ rewardPoints: { $gt: 0 } })
+        ]);
+
+        let totalPointsGiven = 0;
+        let totalPointsRedeemed = 0;
+        let registrationPointsGiven = 0;
+        let referralPointsGiven = 0;
+        let spinPointsGiven = 0;
+
+        rewardTypeStats.forEach(stat => {
+            if (stat._id === "redeem") {
+                totalPointsRedeemed += Math.abs(stat.totalPoints);
+            } else {
+                totalPointsGiven += stat.totalPoints;
+                if (stat._id === "registration") registrationPointsGiven += stat.totalPoints;
+                if (stat._id === "referral") referralPointsGiven += stat.totalPoints;
+                if (stat._id === "spin_win") spinPointsGiven += stat.totalPoints;
+            }
+        });
+
+        const cashDistributed = totalReferralCashDistributed[0]?.totalCash || 0;
+
+        res.json({
+            success: true,
+            data: {
+                totalRewardsDistributed: {
+                    totalPointsGiven,
+                    totalPointsRedeemed,
+                    netActivePoints: Math.max(0, totalPointsGiven - totalPointsRedeemed),
+                    totalReferralCashBonus: cashDistributed,
+                    overallTotalRupeesEquivalent: parseFloat((cashDistributed + (totalPointsGiven * 0.05)).toFixed(2))
+                },
+                breakdown: {
+                    registrationPointsGiven,
+                    referralPointsGiven,
+                    spinPointsGiven,
+                    totalPointsRedeemed
+                },
+                referralStats: {
+                    totalReferralsCount,
+                    uniqueActiveReferrers: uniqueReferrersCount.length,
+                    totalCashDistributed: cashDistributed,
+                },
+                usersWithRewardsCount: totalUsersWithPoints,
+                totalTransactions: totalRewardTxns
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
 };
 
 // Helper: Generate Unique SKU for Bullion Coin

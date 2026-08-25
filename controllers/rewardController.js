@@ -220,3 +220,29 @@ exports.getRewardHistory = async (req, res, next) => {
         next(err);
     }
 };
+
+// ── GET /api/rewards/referrals ───────────────────────────────────────────────
+exports.getUserReferrals = async (req, res, next) => {
+    try {
+        const Referral = require("../models/Referral");
+        const referrals = await Referral.find({ referrer: req.user._id })
+            .populate("referredUser", "name email phone createdAt")
+            .sort({ createdAt: -1 });
+
+        const totalEarnedAmount = referrals.reduce((sum, r) => sum + (r.rewardAmount || 50), 0);
+        const totalEarnedPoints = referrals.reduce((sum, r) => sum + (r.rewardPoints || 0), 0);
+
+        res.json({
+            success: true,
+            referralCode: req.user.referralCode || "",
+            referralBalance: req.user.referralBalance || 0,
+            totalReferrals: referrals.length,
+            totalEarnedAmount,
+            totalEarnedPoints,
+            data: referrals,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
