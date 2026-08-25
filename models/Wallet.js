@@ -30,6 +30,8 @@ const WalletTxnSchema = new mongoose.Schema(
                 "silver_sell",   // credited from silver sale
                 "copper_buy",    // deducted for copper purchase
                 "copper_sell",   // credited from copper sale
+                "sip_buy",       // deducted for SIP installment purchase
+                "spent",         // general bullion or scheme spending
                 "withdraw",      // withdrawn to bank
                 "refund",        // refund on failed purchase / cancelled order
                 "coin_redeem",   // coin delivery payment

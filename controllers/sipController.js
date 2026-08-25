@@ -173,15 +173,17 @@ exports.createSip = async (req, res, next) => {
         await wallet.save();
 
         // Record Wallet Txn
+        const walletTxnType = metalKey === "silver" ? "silver_buy" : metalKey === "copper" ? "copper_buy" : "gold_buy";
         await WalletTxn.create({
             user: userId,
-            type: "spent",
+            entryType: "debit",
+            type: walletTxnType,
             amount,
             balanceBefore: balBefore,
             balanceAfter: wallet.balance,
             status: "success",
+            reason: `${metal.toUpperCase()} SIP Installment #1`,
             note: `Started ${metal.toUpperCase()} SIP #${1} (${frequency})`,
-            category: "bullion_purchase",
         });
 
         // Credit bullion to vault
@@ -428,15 +430,17 @@ exports.payInstallment = async (req, res, next) => {
         const nextCycleNo = sip.cyclesCompleted + 1;
 
         // Record Wallet Txn
+        const walletTxnType = metal === "silver" ? "silver_buy" : metal === "copper" ? "copper_buy" : "gold_buy";
         await WalletTxn.create({
             user: userId,
-            type: "spent",
+            entryType: "debit",
+            type: walletTxnType,
             amount,
             balanceBefore: balBefore,
             balanceAfter: wallet.balance,
             status: "success",
+            reason: `${metal.toUpperCase()} SIP Installment #${nextCycleNo}`,
             note: `Paid ${metal.toUpperCase()} SIP Installment #${nextCycleNo}`,
-            category: "bullion_purchase",
         });
 
         // Credit to vault
