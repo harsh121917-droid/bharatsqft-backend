@@ -1820,6 +1820,36 @@ exports.getAdminReferrals = async (req, res, next) => {
         const Referral = require("../models/Referral");
         const User = require("../models/User");
 
+        // Auto-sync any existing User.referredBy relations that haven't been inserted into Referral yet
+        const usersWithRef = await User.find({ referredBy: { $exists: true, $ne: null } })
+            .populate("referredBy", "referralCode name")
+            .lean();
+
+        if (usersWithRef && usersWithRef.length > 0) {
+            const existingRefUserIds = await Referral.distinct("referredUser");
+            const existingSet = new Set(existingRefUserIds.map(id => String(id)));
+            const toInsert = [];
+
+            for (const u of usersWithRef) {
+                if (u.referredBy && !existingSet.has(String(u._id))) {
+                    toInsert.push({
+                        referrer: u.referredBy._id || u.referredBy,
+                        referredUser: u._id,
+                        referralCode: u.referredBy.referralCode || "REFERRAL",
+                        rewardPoints: 200,
+                        rewardAmount: 50,
+                        refereeBonusPoints: 100,
+                        status: "completed",
+                        createdAt: u.createdAt || new Date()
+                    });
+                }
+            }
+
+            if (toInsert.length > 0) {
+                await Referral.insertMany(toInsert);
+            }
+        }
+
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 25;
         const skip = (page - 1) * limit;
@@ -1876,6 +1906,36 @@ exports.getAdminRewardsSummary = async (req, res, next) => {
         const RewardTxn = require("../models/RewardTxn");
         const Referral = require("../models/Referral");
         const User = require("../models/User");
+
+        // Auto-sync any existing User.referredBy relations
+        const usersWithRef = await User.find({ referredBy: { $exists: true, $ne: null } })
+            .populate("referredBy", "referralCode name")
+            .lean();
+
+        if (usersWithRef && usersWithRef.length > 0) {
+            const existingRefUserIds = await Referral.distinct("referredUser");
+            const existingSet = new Set(existingRefUserIds.map(id => String(id)));
+            const toInsert = [];
+
+            for (const u of usersWithRef) {
+                if (u.referredBy && !existingSet.has(String(u._id))) {
+                    toInsert.push({
+                        referrer: u.referredBy._id || u.referredBy,
+                        referredUser: u._id,
+                        referralCode: u.referredBy.referralCode || "REFERRAL",
+                        rewardPoints: 200,
+                        rewardAmount: 50,
+                        refereeBonusPoints: 100,
+                        status: "completed",
+                        createdAt: u.createdAt || new Date()
+                    });
+                }
+            }
+
+            if (toInsert.length > 0) {
+                await Referral.insertMany(toInsert);
+            }
+        }
 
         const [
             totalRewardTxns,
