@@ -8,7 +8,13 @@
     gap: 16px;
 }
 
-/* ── 1. KPI Cards Grid (5 Columns × 3 Rows) ──────────────────── */
+/* ── 1. KPI Cards Grid (6 Columns / 5 Columns) ──────────────── */
+.kpi-row-6 {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+}
+
 .kpi-row-5 {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -47,6 +53,7 @@
 .icon-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
 .icon-gold { background: rgba(234, 179, 8, 0.15); color: #eab308; }
 .icon-silver { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+.icon-copper { background: rgba(234, 88, 12, 0.15); color: #ea580c; }
 .icon-purple { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
 .icon-green { background: rgba(16, 185, 129, 0.15); color: #10b981; }
 .icon-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
@@ -314,10 +321,11 @@
     letter-spacing: 0.4px;
 }
 
-/* ── 4. Live Rate Cards (Dual Split Box) ──────────────────────── */
-.live-rates-dual-grid {
+/* ── 4. Live Rate Cards (Triple Split Box) ──────────────────────── */
+.live-rates-dual-grid,
+.live-rates-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     height: 100%;
 }
@@ -372,6 +380,7 @@
 
 .rate-gold-color { color: #f59e0b; }
 .rate-silver-color { color: #cbd5e1; }
+.rate-copper-color { color: #ea580c; }
 
 .rate-badge-trend {
     background: rgba(16, 185, 129, 0.15);

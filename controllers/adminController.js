@@ -911,7 +911,8 @@ exports.getDashboard = async (req, res, next) => {
         // Fetch live rates
         let liveRates = {
             gold: { buyRate: 7500, sellRate: 7450, change24h: 0, changePct: 0, purity: "24K 99.9%" },
-            silver: { buyRate: 90, sellRate: 88, change24h: 0, changePct: 0, purity: "999 Pure" }
+            silver: { buyRate: 90, sellRate: 88, change24h: 0, changePct: 0, purity: "999 Pure" },
+            copper: { buyRate: 1.36, sellRate: 1.35, change24h: 0, changePct: 0, purity: "999 Pure" }
         };
 
         try {
@@ -921,6 +922,7 @@ exports.getDashboard = async (req, res, next) => {
                 if (fetched) {
                     if (fetched.gold) liveRates.gold = { ...liveRates.gold, ...fetched.gold, purity: "24K 99.9%" };
                     if (fetched.silver) liveRates.silver = { ...liveRates.silver, ...fetched.silver, purity: "999 Pure" };
+                    if (fetched.copper) liveRates.copper = { ...liveRates.copper, ...fetched.copper, purity: "999 Pure" };
                 }
             }
         } catch (e) {
@@ -929,8 +931,10 @@ exports.getDashboard = async (req, res, next) => {
 
         const goldSellRate = liveRates.gold.sellRate || 7450;
         const silverSellRate = liveRates.silver.sellRate || 88;
+        const copperSellRate = liveRates.copper.sellRate || 1.35;
         const goldBuyRate = liveRates.gold.buyRate || 7500;
         const silverBuyRate = liveRates.silver.buyRate || 90;
+        const copperBuyRate = liveRates.copper.buyRate || 1.36;
 
         const [
             // User stats
@@ -940,9 +944,10 @@ exports.getDashboard = async (req, res, next) => {
             kycPendingCount,
             kycRejectedCount,
 
-            // Gold & Silver balance aggregations
+            // Gold, Silver & Copper balance aggregations
             goldHoldingAgg,
             silverHoldingAgg,
+            copperHoldingAgg,
 
             // Gold lifetime buy/sell transactions
             goldBuyAgg,
@@ -955,6 +960,12 @@ exports.getDashboard = async (req, res, next) => {
             silverSellAgg,
             todaySilverBuyAgg,
             todaySilverSellAgg,
+
+            // Copper lifetime buy/sell transactions
+            copperBuyAgg,
+            copperSellAgg,
+            todayCopperBuyAgg,
+            todayCopperSellAgg,
 
             // Properties / Investments
             propertyInvestmentsAgg,
@@ -972,8 +983,10 @@ exports.getDashboard = async (req, res, next) => {
             pendingWithdrawalsAgg,
             pendingSellGoldCount,
             pendingSellSilverCount,
+            pendingSellCopperCount,
             pendingGoldPayments,
             pendingSilverPayments,
+            pendingCopperPayments,
             pendingWalletPayments,
             pendingRedemptionsCount,
             newEnquiriesCount,
@@ -984,6 +997,7 @@ exports.getDashboard = async (req, res, next) => {
             totalCouponsCount,
             goldCouponAgg,
             silverCouponAgg,
+            copperCouponAgg,
 
             // Recent Transactions
             recentGoldTxns,
@@ -993,7 +1007,8 @@ exports.getDashboard = async (req, res, next) => {
 
             // Chart data aggregations (last 30 days)
             chartGoldDaily,
-            chartSilverDaily
+            chartSilverDaily,
+            chartCopperDaily
         ] = await Promise.all([
             // Users
             User.countDocuments({ role: "user" }),
@@ -1008,6 +1023,10 @@ exports.getDashboard = async (req, res, next) => {
             ]),
             // Silver Holdings
             SilverBalance.aggregate([
+                { $group: { _id: null, totalGrams: { $sum: "$totalGrams" }, totalInvested: { $sum: "$investedAmt" } } }
+            ]),
+            // Copper Holdings
+            CopperBalance.aggregate([
                 { $group: { _id: null, totalGrams: { $sum: "$totalGrams" }, totalInvested: { $sum: "$investedAmt" } } }
             ]),
 
@@ -1034,7 +1053,7 @@ exports.getDashboard = async (req, res, next) => {
 
             // Silver Lifetime Buy
             SilverTransaction.aggregate([
-                { $match: { type: "buy", status: "success" } },
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success" } },
                 { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" }, count: { $sum: 1 }, gst: { $sum: "$gstAmt" } } }
             ]),
             // Silver Lifetime Sell
@@ -1044,13 +1063,34 @@ exports.getDashboard = async (req, res, next) => {
             ]),
             // Today Silver Buy
             SilverTransaction.aggregate([
-                { $match: { type: "buy", status: "success", createdAt: { $gte: startOfToday } } },
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success", createdAt: { $gte: startOfToday } } },
                 { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" } } }
             ]),
             // Today Silver Sell
             SilverTransaction.aggregate([
                 { $match: { type: "sell", status: { $in: ["success", "processing"] }, createdAt: { $gte: startOfToday } } },
                 { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$silverValue" } } }
+            ]),
+
+            // Copper Lifetime Buy
+            CopperTransaction.aggregate([
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success" } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" }, count: { $sum: 1 }, gst: { $sum: "$gstAmt" } } }
+            ]),
+            // Copper Lifetime Sell
+            CopperTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$copperValue" }, count: { $sum: 1 } } }
+            ]),
+            // Today Copper Buy
+            CopperTransaction.aggregate([
+                { $match: { type: { $in: ["buy", "sip_buy"] }, status: "success", createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$totalAmt" } } }
+            ]),
+            // Today Copper Sell
+            CopperTransaction.aggregate([
+                { $match: { type: "sell", status: { $in: ["success", "processing"] }, createdAt: { $gte: startOfToday } } },
+                { $group: { _id: null, totalGrams: { $sum: "$grams" }, totalAmt: { $sum: "$copperValue" } } }
             ]),
 
             // Properties / Investments
@@ -1079,8 +1119,10 @@ exports.getDashboard = async (req, res, next) => {
             ]),
             GoldTransaction.countDocuments({ type: "sell", status: "processing" }),
             SilverTransaction.countDocuments({ type: "sell", status: "processing" }),
+            CopperTransaction.countDocuments({ type: "sell", status: "processing" }),
             GoldTransaction.countDocuments({ status: "pending" }),
             SilverTransaction.countDocuments({ status: "pending" }),
+            CopperTransaction.countDocuments({ status: "pending" }),
             WalletTxn.countDocuments({ status: "pending" }),
             JewelleryRedemption.countDocuments({ status: "pending" }),
             Enquiry.countDocuments({ status: "new" }),
@@ -1094,6 +1136,10 @@ exports.getDashboard = async (req, res, next) => {
                 { $group: { _id: null, count: { $sum: 1 }, discount: { $sum: "$couponDiscount" }, bonus: { $sum: "$couponBonus" } } }
             ]),
             SilverTransaction.aggregate([
+                { $match: { isCouponApplied: true } },
+                { $group: { _id: null, count: { $sum: 1 }, discount: { $sum: "$couponDiscount" }, bonus: { $sum: "$couponBonus" } } }
+            ]),
+            CopperTransaction.aggregate([
                 { $match: { isCouponApplied: true } },
                 { $group: { _id: null, count: { $sum: 1 }, discount: { $sum: "$couponDiscount" }, bonus: { $sum: "$couponBonus" } } }
             ]),
@@ -1131,6 +1177,20 @@ exports.getDashboard = async (req, res, next) => {
                         grams: { $sum: "$grams" }
                     }
                 }
+            ]),
+            // Daily chart trend (Copper 30d)
+            CopperTransaction.aggregate([
+                { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $in: ["success", "processing"] } } },
+                {
+                    $group: {
+                        _id: {
+                            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                            type: "$type"
+                        },
+                        totalAmt: { $sum: "$totalAmt" },
+                        grams: { $sum: "$grams" }
+                    }
+                }
             ])
         ]);
 
@@ -1144,11 +1204,16 @@ exports.getDashboard = async (req, res, next) => {
         const totalSilverInvestedAmt = parseFloat((silverHoldingAgg[0]?.totalInvested || 0).toFixed(2));
         const totalSilverCurrentVal = parseFloat((totalSilverGramsHeld * silverSellRate).toFixed(2));
 
+        // Process Copper Holdings
+        const totalCopperGramsHeld = parseFloat((copperHoldingAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalCopperInvestedAmt = parseFloat((copperHoldingAgg[0]?.totalInvested || 0).toFixed(2));
+        const totalCopperCurrentVal = parseFloat((totalCopperGramsHeld * copperSellRate).toFixed(2));
+
         // Process Property Investments
         const totalPropertyInvested = parseFloat((propertyInvestmentsAgg[0]?.totalAmount || 0).toFixed(2));
 
         // Total Investment Value
-        const totalInvestmentValue = parseFloat((totalGoldCurrentVal + totalSilverCurrentVal + totalPropertyInvested).toFixed(2));
+        const totalInvestmentValue = parseFloat((totalGoldCurrentVal + totalSilverCurrentVal + totalCopperCurrentVal + totalPropertyInvested).toFixed(2));
 
         // Lifetime Gold Purchases & Sales
         const totalGoldPurchasedGrams = parseFloat((goldBuyAgg[0]?.totalGrams || 0).toFixed(4));
@@ -1162,6 +1227,12 @@ exports.getDashboard = async (req, res, next) => {
         const totalSilverSoldGrams = parseFloat((silverSellAgg[0]?.totalGrams || 0).toFixed(4));
         const totalSilverSoldAmt = parseFloat((silverSellAgg[0]?.totalAmt || 0).toFixed(2));
 
+        // Lifetime Copper Purchases & Sales
+        const totalCopperPurchasedGrams = parseFloat((copperBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalCopperPurchasedAmt = parseFloat((copperBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const totalCopperSoldGrams = parseFloat((copperSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const totalCopperSoldAmt = parseFloat((copperSellAgg[0]?.totalAmt || 0).toFixed(2));
+
         // Today's Buy & Sell Volumes
         const todayGoldBuyGrams = parseFloat((todayGoldBuyAgg[0]?.totalGrams || 0).toFixed(4));
         const todayGoldBuyAmt = parseFloat((todayGoldBuyAgg[0]?.totalAmt || 0).toFixed(2));
@@ -1173,8 +1244,13 @@ exports.getDashboard = async (req, res, next) => {
         const todaySilverSellGrams = parseFloat((todaySilverSellAgg[0]?.totalGrams || 0).toFixed(4));
         const todaySilverSellAmt = parseFloat((todaySilverSellAgg[0]?.totalAmt || 0).toFixed(2));
 
-        const todayBuyVolumeAmt = parseFloat((todayGoldBuyAmt + todaySilverBuyAmt).toFixed(2));
-        const todaySellVolumeAmt = parseFloat((todayGoldSellAmt + todaySilverSellAmt).toFixed(2));
+        const todayCopperBuyGrams = parseFloat((todayCopperBuyAgg[0]?.totalGrams || 0).toFixed(4));
+        const todayCopperBuyAmt = parseFloat((todayCopperBuyAgg[0]?.totalAmt || 0).toFixed(2));
+        const todayCopperSellGrams = parseFloat((todayCopperSellAgg[0]?.totalGrams || 0).toFixed(4));
+        const todayCopperSellAmt = parseFloat((todayCopperSellAgg[0]?.totalAmt || 0).toFixed(2));
+
+        const todayBuyVolumeAmt = parseFloat((todayGoldBuyAmt + todaySilverBuyAmt + todayCopperBuyAmt).toFixed(2));
+        const todaySellVolumeAmt = parseFloat((todayGoldSellAmt + todaySilverSellAmt + todayCopperSellAmt).toFixed(2));
 
         // SIPs & Schemes
         const totalSipSaved = parseFloat((sipSavedAgg[0]?.totalSaved || 0).toFixed(2));
@@ -1183,19 +1259,20 @@ exports.getDashboard = async (req, res, next) => {
         // Action Items & Pendings
         const pendingWithdrawalsCount = pendingWithdrawalsAgg[0]?.count || 0;
         const pendingWithdrawalsAmt = parseFloat((pendingWithdrawalsAgg[0]?.totalAmt || 0).toFixed(2));
-        const pendingSellApprovalsCount = (pendingSellGoldCount || 0) + (pendingSellSilverCount || 0);
-        const pendingPaymentsCount = (pendingGoldPayments || 0) + (pendingSilverPayments || 0) + (pendingWalletPayments || 0);
+        const pendingSellApprovalsCount = (pendingSellGoldCount || 0) + (pendingSellSilverCount || 0) + (pendingSellCopperCount || 0);
+        const pendingPaymentsCount = (pendingGoldPayments || 0) + (pendingSilverPayments || 0) + (pendingCopperPayments || 0) + (pendingWalletPayments || 0);
 
         // Coupons & Revenue
-        const couponUsageCount = (goldCouponAgg[0]?.count || 0) + (silverCouponAgg[0]?.count || 0);
+        const couponUsageCount = (goldCouponAgg[0]?.count || 0) + (silverCouponAgg[0]?.count || 0) + (copperCouponAgg[0]?.count || 0);
         const totalCouponDiscounts = parseFloat(
             ((goldCouponAgg[0]?.discount || 0) + (goldCouponAgg[0]?.bonus || 0) +
-             (silverCouponAgg[0]?.discount || 0) + (silverCouponAgg[0]?.bonus || 0)).toFixed(2)
+             (silverCouponAgg[0]?.discount || 0) + (silverCouponAgg[0]?.bonus || 0) +
+             (copperCouponAgg[0]?.discount || 0) + (copperCouponAgg[0]?.bonus || 0)).toFixed(2)
         );
 
         // GST & Platform Revenue Estimation
-        const totalGstCollected = parseFloat(((goldBuyAgg[0]?.gst || 0) + (silverBuyAgg[0]?.gst || 0)).toFixed(2));
-        const totalTurnover = totalGoldPurchasedAmt + totalSilverPurchasedAmt + totalGoldSoldAmt + totalSilverSoldAmt;
+        const totalGstCollected = parseFloat(((goldBuyAgg[0]?.gst || 0) + (silverBuyAgg[0]?.gst || 0) + (copperBuyAgg[0]?.gst || 0)).toFixed(2));
+        const totalTurnover = totalGoldPurchasedAmt + totalSilverPurchasedAmt + totalCopperPurchasedAmt + totalGoldSoldAmt + totalSilverSoldAmt + totalCopperSoldAmt;
         const estimatedRevenue = parseFloat((totalGstCollected + (totalTurnover * 0.005)).toFixed(2)); // estimated platform margin + fees
 
         // Combine and sort recent transactions
@@ -1275,6 +1352,8 @@ exports.getDashboard = async (req, res, next) => {
         const goldSellSeries = [];
         const silverBuySeries = [];
         const silverSellSeries = [];
+        const copperBuySeries = [];
+        const copperSellSeries = [];
         const totalBuySeries = [];
         const totalSellSeries = [];
 
@@ -1290,6 +1369,12 @@ exports.getDashboard = async (req, res, next) => {
             silverMap[key] = (silverMap[key] || 0) + (item.totalAmt || 0);
         });
 
+        const copperMap = {};
+        chartCopperDaily.forEach(item => {
+            const key = `${item._id.date}_${item._id.type}`;
+            copperMap[key] = (copperMap[key] || 0) + (item.totalAmt || 0);
+        });
+
         for (let i = chartDays - 1; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
@@ -1299,16 +1384,20 @@ exports.getDashboard = async (req, res, next) => {
 
             const gBuy = (goldMap[`${dateStr}_buy`] || 0) + (goldMap[`${dateStr}_sip_buy`] || 0);
             const gSell = goldMap[`${dateStr}_sell`] || 0;
-            const sBuy = silverMap[`${dateStr}_buy`] || 0;
+            const sBuy = (silverMap[`${dateStr}_buy`] || 0) + (silverMap[`${dateStr}_sip_buy`] || 0);
             const sSell = silverMap[`${dateStr}_sell`] || 0;
+            const cBuy = (copperMap[`${dateStr}_buy`] || 0) + (copperMap[`${dateStr}_sip_buy`] || 0);
+            const cSell = copperMap[`${dateStr}_sell`] || 0;
 
             goldBuySeries.push(parseFloat(gBuy.toFixed(2)));
             goldSellSeries.push(parseFloat(gSell.toFixed(2)));
             silverBuySeries.push(parseFloat(sBuy.toFixed(2)));
             silverSellSeries.push(parseFloat(sSell.toFixed(2)));
+            copperBuySeries.push(parseFloat(cBuy.toFixed(2)));
+            copperSellSeries.push(parseFloat(cSell.toFixed(2)));
 
-            totalBuySeries.push(parseFloat((gBuy + sBuy).toFixed(2)));
-            totalSellSeries.push(parseFloat((gSell + sSell).toFixed(2)));
+            totalBuySeries.push(parseFloat((gBuy + sBuy + cBuy).toFixed(2)));
+            totalSellSeries.push(parseFloat((gSell + sSell + cSell).toFixed(2)));
         }
 
         res.json({
@@ -1350,25 +1439,42 @@ exports.getDashboard = async (req, res, next) => {
                     todaySellGrams: todaySilverSellGrams,
                     todaySellAmt: todaySilverSellAmt
                 },
-                // 4. Combined Volume & Portfolio Value
+                // 4. Copper Stats
+                copper: {
+                    totalGramsHeld: totalCopperGramsHeld,
+                    totalInvestedAmt: totalCopperInvestedAmt,
+                    currentValue: totalCopperCurrentVal,
+                    totalPurchasedGrams: totalCopperPurchasedGrams,
+                    totalPurchasedAmt: totalCopperPurchasedAmt,
+                    totalSoldGrams: totalCopperSoldGrams,
+                    totalSoldAmt: totalCopperSoldAmt,
+                    todayBuyGrams: todayCopperBuyGrams,
+                    todayBuyAmt: todayCopperBuyAmt,
+                    todaySellGrams: todayCopperSellGrams,
+                    todaySellAmt: todayCopperSellAmt
+                },
+                // 5. Combined Volume & Portfolio Value
                 investments: {
                     totalInvestmentValue,
                     totalPropertyInvested,
                     totalGoldCurrentVal,
                     totalSilverCurrentVal,
+                    totalCopperCurrentVal,
                     totalProperties,
                     publishedProperties
                 },
-                // 5. Today's Volumes
+                // 6. Today's Volumes
                 today: {
                     totalBuyAmt: todayBuyVolumeAmt,
                     totalBuyGoldGrams: todayGoldBuyGrams,
                     totalBuySilverGrams: todaySilverBuyGrams,
+                    totalBuyCopperGrams: todayCopperBuyGrams,
                     totalSellAmt: todaySellVolumeAmt,
                     totalSellGoldGrams: todayGoldSellGrams,
-                    totalSellSilverGrams: todaySilverSellGrams
+                    totalSellSilverGrams: todaySilverSellGrams,
+                    totalSellCopperGrams: todayCopperSellGrams
                 },
-                // 6. SIPs & Schemes
+                // 7. SIPs & Schemes
                 schemesAndSips: {
                     activeSips: activeSipsCount,
                     totalSipSaved,
@@ -1376,7 +1482,7 @@ exports.getDashboard = async (req, res, next) => {
                     totalEnrollments: totalEnrollmentsCount,
                     totalSchemeInvested
                 },
-                // 7. Pendings & Action Items
+                // 8. Pendings & Action Items
                 actionItems: {
                     pendingWithdrawals: pendingWithdrawalsCount,
                     pendingWithdrawalsAmt,
@@ -1387,7 +1493,7 @@ exports.getDashboard = async (req, res, next) => {
                     newEnquiries: newEnquiriesCount,
                     totalEnquiries: totalEnquiriesCount
                 },
-                // 8. Coupons & Revenue
+                // 9. Coupons & Revenue
                 commercials: {
                     totalCoupons: totalCouponsCount,
                     activeCoupons: activeCouponsCount,
@@ -1396,7 +1502,7 @@ exports.getDashboard = async (req, res, next) => {
                     revenue: estimatedRevenue,
                     gstCollected: totalGstCollected
                 },
-                // 9. Live Rate Cards
+                // 10. Live Rate Cards
                 rates: {
                     gold: {
                         buyRate: goldBuyRate,
@@ -1412,17 +1518,26 @@ exports.getDashboard = async (req, res, next) => {
                         changePct: liveRates.silver.changePct || 0,
                         purity: "999 Pure"
                     },
+                    copper: {
+                        buyRate: copperBuyRate,
+                        sellRate: copperSellRate,
+                        change24h: liveRates.copper.change24h || 0,
+                        changePct: liveRates.copper.changePct || 0,
+                        purity: "999 Pure"
+                    },
                     updatedAt: new Date()
                 },
-                // 10. Recent Transactions Feed
+                // 11. Recent Transactions Feed
                 recentTransactions,
-                // 11. Interactive Chart Data
+                // 12. Interactive Chart Data
                 charts: {
                     labels: chartLabels,
                     goldBuy: goldBuySeries,
                     goldSell: goldSellSeries,
                     silverBuy: silverBuySeries,
                     silverSell: silverSellSeries,
+                    copperBuy: copperBuySeries,
+                    copperSell: copperSellSeries,
                     totalBuy: totalBuySeries,
                     totalSell: totalSellSeries
                 }

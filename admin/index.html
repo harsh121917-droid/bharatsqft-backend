@@ -257,8 +257,8 @@
             <div class="page active" id="page-dashboard">
                 <div class="dashboard-container">
 
-                    <!-- ── ROW 1 OF KPI CARDS (5 Cards) ────────────── -->
-                    <div class="kpi-row-5">
+                    <!-- ── ROW 1 OF KPI CARDS (6 Cards) ────────────── -->
+                    <div class="kpi-row-6">
                         <!-- Total Users -->
                         <div class="kpi-stat-card" style="cursor:pointer" onclick="showPage('users')">
                             <div class="kpi-stat-icon icon-amber"><i class="fas fa-users"></i></div>
@@ -287,7 +287,7 @@
                         <div class="kpi-stat-card" style="cursor:pointer" onclick="showPage('userinvestments')">
                             <div class="kpi-stat-icon icon-gold"><i class="fas fa-coins"></i></div>
                             <div class="kpi-stat-content">
-                                <div class="kpi-stat-label">Total Gold Held</div>
+                                <div class="kpi-stat-label">Gold Held (24K)</div>
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-total-gold-held">0 g</span>
                                 </div>
@@ -299,9 +299,21 @@
                         <div class="kpi-stat-card" style="cursor:pointer" onclick="showPage('userinvestments')">
                             <div class="kpi-stat-icon icon-silver"><i class="fas fa-cubes"></i></div>
                             <div class="kpi-stat-content">
-                                <div class="kpi-stat-label">Total Silver Held</div>
+                                <div class="kpi-stat-label">Silver Held (999)</div>
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-total-silver-held">0 g</span>
+                                </div>
+                                <div class="kpi-stat-subtext">Customer vault balance</div>
+                            </div>
+                        </div>
+
+                        <!-- Total Copper Held -->
+                        <div class="kpi-stat-card" style="cursor:pointer" onclick="showPage('userinvestments')">
+                            <div class="kpi-stat-icon icon-copper"><i class="fas fa-layer-group"></i></div>
+                            <div class="kpi-stat-content">
+                                <div class="kpi-stat-label">Copper Held (999)</div>
+                                <div class="kpi-stat-value-row">
+                                    <span class="kpi-stat-value" id="kpi-total-copper-held">0 g</span>
                                 </div>
                                 <div class="kpi-stat-subtext">Customer vault balance</div>
                             </div>
@@ -311,26 +323,26 @@
                         <div class="kpi-stat-card">
                             <div class="kpi-stat-icon icon-purple"><i class="fas fa-wallet"></i></div>
                             <div class="kpi-stat-content">
-                                <div class="kpi-stat-label">Total Investment Value</div>
+                                <div class="kpi-stat-label">Portfolio Value</div>
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-total-investment-val">₹0</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Bullion & Real Estate</div>
+                                <div class="kpi-stat-subtext">All Bullion & Assets</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- ── ROW 2 OF KPI CARDS (5 Cards) ────────────── -->
-                    <div class="kpi-row-5">
+                    <!-- ── ROW 2 OF KPI CARDS (6 Cards - Lifetime Buy & Sell) ────── -->
+                    <div class="kpi-row-6">
                         <!-- Gold Purchased -->
                         <div class="kpi-stat-card">
-                            <div class="kpi-stat-icon icon-amber"><i class="fas fa-shopping-cart"></i></div>
+                            <div class="kpi-stat-icon icon-gold"><i class="fas fa-shopping-cart"></i></div>
                             <div class="kpi-stat-content">
-                                <div class="kpi-stat-label">Gold Purchased</div>
+                                <div class="kpi-stat-label">Gold Bought</div>
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-gold-purchased">0 g</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Lifetime bought</div>
+                                <div class="kpi-stat-subtext">Lifetime 24K bought</div>
                             </div>
                         </div>
 
@@ -342,19 +354,19 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-gold-sold">0 g</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Lifetime sold</div>
+                                <div class="kpi-stat-subtext">Lifetime 24K sold</div>
                             </div>
                         </div>
 
                         <!-- Silver Purchased -->
                         <div class="kpi-stat-card">
-                            <div class="kpi-stat-icon icon-blue"><i class="fas fa-shopping-cart"></i></div>
+                            <div class="kpi-stat-icon icon-silver"><i class="fas fa-shopping-cart"></i></div>
                             <div class="kpi-stat-content">
-                                <div class="kpi-stat-label">Silver Purchased</div>
+                                <div class="kpi-stat-label">Silver Bought</div>
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-silver-purchased">0 g</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Lifetime bought</div>
+                                <div class="kpi-stat-subtext">Lifetime 999 bought</div>
                             </div>
                         </div>
 
@@ -366,10 +378,37 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-silver-sold">0 g</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Lifetime sold</div>
+                                <div class="kpi-stat-subtext">Lifetime 999 sold</div>
                             </div>
                         </div>
 
+                        <!-- Copper Purchased -->
+                        <div class="kpi-stat-card">
+                            <div class="kpi-stat-icon icon-copper"><i class="fas fa-shopping-cart"></i></div>
+                            <div class="kpi-stat-content">
+                                <div class="kpi-stat-label">Copper Bought</div>
+                                <div class="kpi-stat-value-row">
+                                    <span class="kpi-stat-value" id="kpi-copper-purchased">0 g</span>
+                                </div>
+                                <div class="kpi-stat-subtext">Lifetime 999 bought</div>
+                            </div>
+                        </div>
+
+                        <!-- Copper Sold -->
+                        <div class="kpi-stat-card">
+                            <div class="kpi-stat-icon icon-red"><i class="fas fa-shopping-bag"></i></div>
+                            <div class="kpi-stat-content">
+                                <div class="kpi-stat-label">Copper Sold</div>
+                                <div class="kpi-stat-value-row">
+                                    <span class="kpi-stat-value" id="kpi-copper-sold">0 g</span>
+                                </div>
+                                <div class="kpi-stat-subtext">Lifetime 999 sold</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── ROW 3 OF KPI CARDS (6 Cards) ────────────── -->
+                    <div class="kpi-row-6">
                         <!-- Active SIPs -->
                         <div class="kpi-stat-card">
                             <div class="kpi-stat-icon icon-purple"><i class="fas fa-calendar-alt"></i></div>
@@ -378,13 +417,10 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-active-sips">0</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Recurring daily/weekly/monthly</div>
+                                <div class="kpi-stat-subtext">Recurring investment plans</div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- ── ROW 3 OF KPI CARDS (5 Cards) ────────────── -->
-                    <div class="kpi-row-5">
                         <!-- Active Schemes -->
                         <div class="kpi-stat-card" style="cursor:pointer" onclick="showPage('schemes')">
                             <div class="kpi-stat-icon icon-teal"><i class="fas fa-gift"></i></div>
@@ -405,7 +441,7 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-pending-kyc">0</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Requires admin review</div>
+                                <div class="kpi-stat-subtext">Requires review</div>
                             </div>
                         </div>
 
@@ -417,7 +453,7 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-pending-payouts">0</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Bank withdrawal requests</div>
+                                <div class="kpi-stat-subtext">Bank withdrawals</div>
                             </div>
                         </div>
 
@@ -441,7 +477,7 @@
                                 <div class="kpi-stat-value-row">
                                     <span class="kpi-stat-value" id="kpi-coupons-used">0</span>
                                 </div>
-                                <div class="kpi-stat-subtext">Redeemed by customers</div>
+                                <div class="kpi-stat-subtext">Redeemed by users</div>
                             </div>
                         </div>
                     </div>
@@ -451,14 +487,14 @@
                         <!-- Chart 1: Buy & Sell Overview (Bar Chart) -->
                         <div class="dashboard-card">
                             <div class="dashboard-card-header">
-                                <div class="dashboard-card-title">Buy & Sell Overview</div>
+                                <div class="dashboard-card-title">Bullion Buy & Sell Overview</div>
                                 <select class="select-pill" onchange="loadDashboard(parseInt(this.value))">
                                     <option value="7">7 Days</option>
                                     <option value="30">30 Days</option>
                                 </select>
                             </div>
 
-                            <div class="chart-custom-legend">
+                            <div class="chart-custom-legend" style="flex-wrap:wrap">
                                 <div class="legend-item">
                                     <span class="legend-dot" style="background:#eab308"></span>
                                     <span>Gold Buy</span>
@@ -474,6 +510,14 @@
                                 <div class="legend-item">
                                     <span class="legend-dot" style="background:#8b5cf6"></span>
                                     <span>Silver Sell</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-dot" style="background:#ea580c"></span>
+                                    <span>Copper Buy</span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-dot" style="background:#fb923c"></span>
+                                    <span>Copper Sell</span>
                                 </div>
                             </div>
 
@@ -493,7 +537,7 @@
                             </div>
 
                             <div class="investment-trend-header">
-                                <div class="investment-trend-label">Total Portfolio Valuation</div>
+                                <div class="investment-trend-label">Total Portfolio Valuation (Gold + Silver + Copper)</div>
                                 <div class="investment-trend-val-wrap">
                                     <span class="investment-trend-main-val" id="trend-total-val-display">₹0</span>
                                 </div>
@@ -522,14 +566,14 @@
                             </div>
                         </div>
 
-                        <!-- Right Box: Gold & Silver Live Rate Cards -->
+                        <!-- Right Box: Gold, Silver & Copper Live Rate Cards -->
                         <div class="dashboard-card">
                             <div class="dashboard-card-header">
-                                <div class="dashboard-card-title">Gold & Silver Live Rate</div>
-                                <span class="dashboard-card-action" onclick="loadDashboard()">View All</span>
+                                <div class="dashboard-card-title">Bullion Live Rates (24K Gold, Silver & Copper)</div>
+                                <span class="dashboard-card-action" onclick="loadDashboard()">Refresh</span>
                             </div>
 
-                            <div class="live-rates-dual-grid">
+                            <div class="live-rates-grid">
                                 <!-- Gold 24K Card -->
                                 <div class="rate-mini-card">
                                     <div class="rate-mini-header">
@@ -585,6 +629,34 @@
                                     <div class="rate-mini-footer">
                                         <span id="rate-silver-time">Updated today</span>
                                         <span style="cursor:pointer;color:var(--silver)" onclick="loadDashboard()"><i
+                                                class="fas fa-sync-alt"></i></span>
+                                    </div>
+                                </div>
+
+                                <!-- Copper 999 Card -->
+                                <div class="rate-mini-card">
+                                    <div class="rate-mini-header">
+                                        <div class="rate-mini-icon icon-copper"><i class="fas fa-layer-group"></i></div>
+                                        <div class="rate-mini-title">Copper (999)</div>
+                                    </div>
+                                    <div class="rate-mini-price-row">
+                                        <span class="rate-mini-main-price rate-copper-color"
+                                            id="rate-copper-price-main">₹ 1.36 /gm</span>
+                                        <span class="rate-badge-trend"><i class="fas fa-arrow-up"></i> 0.15%</span>
+                                    </div>
+                                    <div class="rate-mini-split-row">
+                                        <div class="rate-mini-split-item">
+                                            <span class="rate-mini-split-label">Buy Rate</span>
+                                            <span class="rate-mini-split-val" id="rate-copper-buy-price">₹ 1.36</span>
+                                        </div>
+                                        <div class="rate-mini-split-item" style="text-align:right">
+                                            <span class="rate-mini-split-label">Sell Rate</span>
+                                            <span class="rate-mini-split-val" id="rate-copper-sell-price">₹ 1.35</span>
+                                        </div>
+                                    </div>
+                                    <div class="rate-mini-footer">
+                                        <span id="rate-copper-time">Updated today</span>
+                                        <span style="cursor:pointer;color:var(--copper, #ea580c)" onclick="loadDashboard()"><i
                                                 class="fas fa-sync-alt"></i></span>
                                     </div>
                                 </div>

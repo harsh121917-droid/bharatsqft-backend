@@ -60,6 +60,14 @@ const UserSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected", "not_submitted"],
       default: "not_submitted",
     },
+    avatar: {
+      type: String,
+      default: "",
+    },
+    profilePicture: {
+      type: String,
+      default: "",
+    },
     plainPassword: {
       type: String,
       default: "",

@@ -35,6 +35,7 @@ function populateRealTimeDashboard(data, days = 7) {
     const users = data.users || {};
     const gold = data.gold || {};
     const silver = data.silver || {};
+    const copper = data.copper || {};
     const inv = data.investments || {};
     const recurring = data.schemesAndSips || {};
     const actions = data.actionItems || {};
@@ -43,24 +44,27 @@ function populateRealTimeDashboard(data, days = 7) {
     const charts = data.charts || {};
     const recentTxns = data.recentTransactions || [];
 
-    // ── Row 1: Users, KYC, Vault Holdings & Real Investment Value ───
+    // ── Row 1: Users, KYC, Vault Holdings (Gold, Silver, Copper) & Valuation ───
     setElText("kpi-total-users", (users.total || 0).toLocaleString("en-IN"));
     setElText("kpi-kyc-verified", (users.kycVerified || 0).toLocaleString("en-IN"));
     setElText("kpi-total-gold-held", formatKgOrGrams(gold.totalGramsHeld || 0));
     setElText("kpi-total-silver-held", formatKgOrGrams(silver.totalGramsHeld || 0));
+    setElText("kpi-total-copper-held", formatKgOrGrams(copper.totalGramsHeld || 0));
     
     const realTotalInvVal = Number(inv.totalInvestmentValue || 0);
     setElText("kpi-total-investment-val", formatINR(realTotalInvVal));
     setElText("trend-total-val-display", formatINR(realTotalInvVal));
 
-    // ── Row 2: Purchases, Sales & Recurring SIPs ───────────────────
+    // ── Row 2: Lifetime Purchases & Sales (Gold, Silver, Copper) ───
     setElText("kpi-gold-purchased", formatKgOrGrams(gold.totalPurchasedGrams || 0));
     setElText("kpi-gold-sold", formatKgOrGrams(gold.totalSoldGrams || 0));
     setElText("kpi-silver-purchased", formatKgOrGrams(silver.totalPurchasedGrams || 0));
     setElText("kpi-silver-sold", formatKgOrGrams(silver.totalSoldGrams || 0));
-    setElText("kpi-active-sips", (recurring.activeSips || 0).toLocaleString("en-IN"));
+    setElText("kpi-copper-purchased", formatKgOrGrams(copper.totalPurchasedGrams || 0));
+    setElText("kpi-copper-sold", formatKgOrGrams(copper.totalSoldGrams || 0));
 
-    // ── Row 3: Schemes, Pending Actions & Coupon Usage ─────────────
+    // ── Row 3: Recurring SIPs, Schemes, Pending Actions & Coupons ───
+    setElText("kpi-active-sips", (recurring.activeSips || 0).toLocaleString("en-IN"));
     setElText("kpi-active-schemes", (recurring.activeSchemes || 0).toLocaleString("en-IN"));
     setElText("kpi-pending-kyc", (actions.pendingKyc || 0).toLocaleString("en-IN"));
     setElText("kpi-pending-payouts", (actions.pendingWithdrawals || 0).toLocaleString("en-IN"));
@@ -72,14 +76,17 @@ function populateRealTimeDashboard(data, days = 7) {
     updateBadge("withdrawals-pending-badge", actions.pendingWithdrawals);
     updateBadge("sellapprovals-pending-badge", actions.pendingSellApprovals);
 
-    // ── Live Rate Cards from API ───────────────────────────────────
+    // ── Live Rate Cards from API (Gold, Silver, Copper) ────────────
     const goldRate = rates.gold || {};
     const silverRate = rates.silver || {};
+    const copperRate = rates.copper || {};
 
     const gBuy = Number(goldRate.buyRate || 0);
     const gSell = Number(goldRate.sellRate || 0);
     const sBuy = Number(silverRate.buyRate || 0);
     const sSell = Number(silverRate.sellRate || 0);
+    const cBuy = Number(copperRate.buyRate || 0);
+    const cSell = Number(copperRate.sellRate || 0);
 
     setElText("rate-gold-price-main", `₹ ${gBuy.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /gm`);
     setElText("rate-gold-buy-price", `₹ ${gBuy.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
@@ -89,14 +96,19 @@ function populateRealTimeDashboard(data, days = 7) {
     setElText("rate-silver-buy-price", `₹ ${sBuy.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     setElText("rate-silver-sell-price", `₹ ${sSell.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
+    setElText("rate-copper-price-main", `₹ ${cBuy.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /gm`);
+    setElText("rate-copper-buy-price", `₹ ${cBuy.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    setElText("rate-copper-sell-price", `₹ ${cSell.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
     const updatedTime = rates.updatedAt ? new Date(rates.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
     setElText("rate-gold-time", `Updated today, ${updatedTime}`);
     setElText("rate-silver-time", `Updated today, ${updatedTime}`);
+    setElText("rate-copper-time", `Updated today, ${updatedTime}`);
 
     // ── Bottom Financial Metrics from Actual Ledger ────────────────
     const rev = Number(commercials.revenue || 0);
     const gst = Number(commercials.gstCollected || 0);
-    const payouts = Number(gold.totalSoldAmt || 0) + Number(silver.totalSoldAmt || 0);
+    const payouts = Number(gold.totalSoldAmt || 0) + Number(silver.totalSoldAmt || 0) + Number(copper.totalSoldAmt || 0);
     const discounts = Number(commercials.totalDiscountDistributed || 0);
 
     setElText("fin-total-revenue", formatINR(rev));
@@ -149,6 +161,8 @@ function renderRealTimeBuySellChart(charts, days = 7) {
     const goldSell = (charts.goldSell || []).slice(sliceIdx);
     const silverBuy = (charts.silverBuy || []).slice(sliceIdx);
     const silverSell = (charts.silverSell || []).slice(sliceIdx);
+    const copperBuy = (charts.copperBuy || []).slice(sliceIdx);
+    const copperSell = (charts.copperSell || []).slice(sliceIdx);
 
     buySellChartInstance = new Chart(ctx, {
         type: "bar",
@@ -160,32 +174,48 @@ function renderRealTimeBuySellChart(charts, days = 7) {
                     data: goldBuy,
                     backgroundColor: "#eab308",
                     borderRadius: 4,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
                 },
                 {
                     label: "Gold Sell (₹)",
                     data: goldSell,
                     backgroundColor: "#ef4444",
                     borderRadius: 4,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
                 },
                 {
                     label: "Silver Buy (₹)",
                     data: silverBuy,
                     backgroundColor: "#3b82f6",
                     borderRadius: 4,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
                 },
                 {
                     label: "Silver Sell (₹)",
                     data: silverSell,
                     backgroundColor: "#8b5cf6",
                     borderRadius: 4,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
+                },
+                {
+                    label: "Copper Buy (₹)",
+                    data: copperBuy,
+                    backgroundColor: "#ea580c",
+                    borderRadius: 4,
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
+                },
+                {
+                    label: "Copper Sell (₹)",
+                    data: copperSell,
+                    backgroundColor: "#fb923c",
+                    borderRadius: 4,
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.85
                 }
             ]
         },

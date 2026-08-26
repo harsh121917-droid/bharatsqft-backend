@@ -39,13 +39,126 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
+const { uploadSingleImage } = require("../middleware/uploadMiddleware");
+
 router.patch("/profile", protect, async (req, res, next) => {
   try {
-    const allowed = ["name", "phone"];
+    const allowed = ["name", "phone", "avatar", "profilePicture"];
     const updates = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    if (updates.avatar && !updates.profilePicture) updates.profilePicture = updates.avatar;
+    if (updates.profilePicture && !updates.avatar) updates.avatar = updates.profilePicture;
     const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true });
-    res.json({ success: true, data: user });
+    res.json({ success: true, data: user, user });
+  } catch (err) { next(err); }
+});
+
+// POST /api/users/profile-picture — upload image file or save image URL
+router.post("/profile-picture", protect, (req, res, next) => {
+  uploadSingleImage(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message || "Failed to upload image" });
+    }
+    try {
+      let imageUrl = "";
+      if (req.file && req.file.path) {
+        imageUrl = req.file.path;
+      } else if (req.body.image || req.body.avatar || req.body.profilePicture) {
+        imageUrl = req.body.image || req.body.avatar || req.body.profilePicture;
+      }
+
+      if (!imageUrl) {
+        return res.status(400).json({ success: false, message: "No image file or URL provided" });
+      }
+
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { avatar: imageUrl, profilePicture: imageUrl },
+        { new: true, runValidators: false }
+      );
+
+      res.json({
+        success: true,
+        message: "Profile picture updated successfully",
+        avatar: imageUrl,
+        profilePicture: imageUrl,
+        user,
+        data: user
+      });
+    } catch (dbErr) {
+      next(dbErr);
+    }
+  });
+});
+
+// Alias: POST /api/users/avatar
+router.post("/avatar", protect, (req, res, next) => {
+  uploadSingleImage(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message || "Failed to upload image" });
+    }
+    try {
+      let imageUrl = "";
+      if (req.file && req.file.path) {
+        imageUrl = req.file.path;
+      } else if (req.body.image || req.body.avatar || req.body.profilePicture) {
+        imageUrl = req.body.image || req.body.avatar || req.body.profilePicture;
+      }
+
+      if (!imageUrl) {
+        return res.status(400).json({ success: false, message: "No image file or URL provided" });
+      }
+
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { avatar: imageUrl, profilePicture: imageUrl },
+        { new: true, runValidators: false }
+      );
+
+      res.json({
+        success: true,
+        message: "Profile picture updated successfully",
+        avatar: imageUrl,
+        profilePicture: imageUrl,
+        user,
+        data: user
+      });
+    } catch (dbErr) {
+      next(dbErr);
+    }
+  });
+});
+
+// DELETE /api/users/profile-picture — remove avatar
+router.delete("/profile-picture", protect, async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { avatar: "", profilePicture: "" },
+      { new: true, runValidators: false }
+    );
+    res.json({
+      success: true,
+      message: "Profile picture removed successfully",
+      user,
+      data: user
+    });
+  } catch (err) { next(err); }
+});
+
+router.delete("/avatar", protect, async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { avatar: "", profilePicture: "" },
+      { new: true, runValidators: false }
+    );
+    res.json({
+      success: true,
+      message: "Profile picture removed successfully",
+      user,
+      data: user
+    });
   } catch (err) { next(err); }
 });
 

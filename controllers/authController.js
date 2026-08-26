@@ -120,6 +120,8 @@ const sendToken = (user, statusCode, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      avatar: user.avatar || user.profilePicture || "",
+      profilePicture: user.profilePicture || user.avatar || "",
       referralCode: user.referralCode,
       referralBalance: user.referralBalance || 0,
       location: user.location || null,
