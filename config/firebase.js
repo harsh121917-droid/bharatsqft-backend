@@ -64,24 +64,23 @@ module.exports = {
       notification: {
         title,
         body,
-        ...(imageUrl && { image: imageUrl }),
+        ...(imageUrl && { imageUrl }),
       },
       data: {
-        title,
-        body,
+        title: title || "",
+        body: body || "",
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         deepLink: deepLink || "home",
-        ...(imageUrl && { imageUrl }),
-        ...(imageUrl && { image: imageUrl }),
+        ...(imageUrl && { imageUrl: imageUrl, image: imageUrl }),
       },
       android: {
         priority: "high",
         notification: {
           title,
           body,
-          ...(imageUrl && { imageUrl }),
           sound: "default",
           channelId: "high_importance_channel",
+          ...(imageUrl && { imageUrl }),
         },
       },
       apns: {
@@ -94,7 +93,6 @@ module.exports = {
         },
         fcmOptions: {
           ...(imageUrl && { imageUrl }),
-          ...(imageUrl && { image: imageUrl }),
         },
       },
     };
