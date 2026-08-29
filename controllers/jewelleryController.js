@@ -413,9 +413,11 @@ exports.deleteProduct = async (req, res, next) => {
 };
 
 // INITIATE REDEEM (Create Razorpay Order for Making Charges + GST)
+// INITIATE PURCHASE / REDEEM (Supports Direct Buy and Vault Redeem)
 exports.initiateRedeemOrder = async (req, res, next) => {
     try {
-        const { jewelleryId, paymentMethod } = req.body;
+        const { jewelleryId, paymentMethod, purchaseType } = req.body;
+        const mode = (purchaseType === "vault_redeem") ? "vault_redeem" : "direct_buy";
         const jewellery = await Jewellery.findById(jewelleryId);
 
         if (!jewellery) return res.status(404).json({ success: false, message: "Product not found" });
@@ -427,27 +429,47 @@ exports.initiateRedeemOrder = async (req, res, next) => {
 
         const weightGrams = jewellery.weightGrams;
         const metalType = jewellery.metalType;
+        const { fetchLiveRates } = require("./goldController");
+        const rates = await fetchLiveRates();
+        const rate = (metalType === "gold") ? rates.gold.buyRate : rates.silver.buyRate;
 
-        // Perform balance check
-        if (metalType === "gold") {
-            const { GoldBalance } = require("../models/Gold");
-            const balance = await GoldBalance.findOne({ user: req.user._id });
-            const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
-            if (available < weightGrams) {
-                return res.status(400).json({ success: false, message: `Insufficient gold balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
-            }
-        } else {
-            const { SilverBalance } = require("../models/Silver");
-            const balance = await SilverBalance.findOne({ user: req.user._id });
-            const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
-            if (available < weightGrams) {
-                return res.status(400).json({ success: false, message: `Insufficient silver balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
-            }
-        }
-
+        const metalValue = Math.round(weightGrams * rate);
         const making = jewellery.makingCharges || 1500;
-        const gst = Math.round((making * (jewellery.gstPercentage || 3)) / 100);
-        const totalAmount = making + gst; // Total payable now via Razorpay
+
+        let totalAmount = 0;
+        let gst = 0;
+
+        if (mode === "vault_redeem") {
+            // Perform balance check
+            if (metalType === "gold") {
+                const { GoldBalance } = require("../models/Gold");
+                const balance = await GoldBalance.findOne({ user: req.user._id });
+                const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
+                if (available < weightGrams) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient gold in your vault. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g. Please select 'Direct Buy' instead.`
+                    });
+                }
+            } else {
+                const { SilverBalance } = require("../models/Silver");
+                const balance = await SilverBalance.findOne({ user: req.user._id });
+                const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
+                if (available < weightGrams) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient silver in your vault. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g. Please select 'Direct Buy' instead.`
+                    });
+                }
+            }
+
+            gst = Math.round((making * (jewellery.gstPercentage || 3)) / 100);
+            totalAmount = making + gst; // User only pays making charges + GST
+        } else {
+            // Direct Buy (Fresh Order) — user pays for entire metal + making + 3% GST
+            gst = Math.round(((metalValue + making) * 3) / 100);
+            totalAmount = metalValue + making + gst;
+        }
 
         if (paymentMethod === "wallet") {
             const user = await User.findById(req.user._id);
@@ -455,51 +477,43 @@ exports.initiateRedeemOrder = async (req, res, next) => {
                 return res.status(400).json({ success: false, message: `Insufficient wallet balance. Required: ₹${totalAmount}` });
             }
 
-            // Deduct metal balance
-            if (metalType === "gold") {
-                const { GoldBalance, GoldTransaction } = require("../models/Gold");
-                const { fetchLiveRates } = require("./goldController");
-                const rates = await fetchLiveRates();
-                const rate = rates.gold.buyRate;
-
-                await GoldBalance.findOneAndUpdate(
-                    { user: req.user._id },
-                    { $inc: { totalGrams: -weightGrams } }
-                );
-                // Create a gold transaction for tracking
-                await GoldTransaction.create({
-                    user: req.user._id,
-                    type: "redeem",
-                    grams: weightGrams,
-                    ratePerGram: rate,
-                    goldValue: weightGrams * rate,
-                    gstAmt: 0,
-                    totalAmt: weightGrams * rate,
-                    status: "success",
-                    note: `Redeemed ${jewellery.name}`
-                });
-            } else {
-                const { SilverBalance, SilverTransaction } = require("../models/Silver");
-                const { fetchLiveRates } = require("./goldController");
-                const rates = await fetchLiveRates();
-                const rate = rates.silver.buyRate;
-
-                await SilverBalance.findOneAndUpdate(
-                    { user: req.user._id },
-                    { $inc: { totalGrams: -weightGrams } }
-                );
-                // Create a silver transaction for tracking
-                await SilverTransaction.create({
-                    user: req.user._id,
-                    type: "redeem",
-                    grams: weightGrams,
-                    ratePerGram: rate,
-                    silverValue: weightGrams * rate,
-                    gstAmt: 0,
-                    totalAmt: weightGrams * rate,
-                    status: "success",
-                    note: `Redeemed ${jewellery.name}`
-                });
+            // Deduct metal balance ONLY if vault_redeem
+            if (mode === "vault_redeem") {
+                if (metalType === "gold") {
+                    const { GoldBalance, GoldTransaction } = require("../models/Gold");
+                    await GoldBalance.findOneAndUpdate(
+                        { user: req.user._id },
+                        { $inc: { totalGrams: -weightGrams } }
+                    );
+                    await GoldTransaction.create({
+                        user: req.user._id,
+                        type: "redeem",
+                        grams: weightGrams,
+                        ratePerGram: rate,
+                        goldValue: weightGrams * rate,
+                        gstAmt: 0,
+                        totalAmt: weightGrams * rate,
+                        status: "success",
+                        note: `Redeemed ${jewellery.name}`
+                    });
+                } else {
+                    const { SilverBalance, SilverTransaction } = require("../models/Silver");
+                    await SilverBalance.findOneAndUpdate(
+                        { user: req.user._id },
+                        { $inc: { totalGrams: -weightGrams } }
+                    );
+                    await SilverTransaction.create({
+                        user: req.user._id,
+                        type: "redeem",
+                        grams: weightGrams,
+                        ratePerGram: rate,
+                        silverValue: weightGrams * rate,
+                        gstAmt: 0,
+                        totalAmt: weightGrams * rate,
+                        status: "success",
+                        note: `Redeemed ${jewellery.name}`
+                    });
+                }
             }
 
             // Deduct wallet balance
@@ -524,6 +538,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
                 makingCharges: making,
                 gstAmount: gst,
                 totalPaid: totalAmount,
+                purchaseType: mode,
                 paymentMethod: "wallet",
                 status: "completed",
                 deliveryStatus: "placed"
@@ -532,7 +547,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
             return res.json({
                 success: true,
                 paidViaWallet: true,
-                message: "Redemption order placed successfully using wallet!",
+                message: mode === "vault_redeem" ? "Redemption order placed successfully using vault & wallet!" : "Jewellery order placed successfully using wallet!",
                 redemption
             });
         }
@@ -546,7 +561,8 @@ exports.initiateRedeemOrder = async (req, res, next) => {
                 userId: req.user._id.toString(),
                 jewelleryId: jewellery._id.toString(),
                 weightGrams: jewellery.weightGrams.toString(),
-                metalType: jewellery.metalType
+                metalType: jewellery.metalType,
+                purchaseType: mode
             }
         };
 
@@ -558,7 +574,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
         jewellery.inStock = jewellery.availableQty > 0;
         await jewellery.save();
 
-        // Save pending redemption with SKU
+        // Save pending redemption with SKU & purchaseType
         const redemption = await JewelleryRedemption.create({
             user: req.user._id,
             jewellery: jewellery._id,
@@ -570,6 +586,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
             makingCharges: making,
             gstAmount: gst,
             totalPaid: totalAmount,
+            purchaseType: mode,
             paymentMethod: "razorpay",
             razorpayOrderId: order.id,
             status: "pending",
@@ -580,16 +597,17 @@ exports.initiateRedeemOrder = async (req, res, next) => {
             success: true,
             orderId: order.id,
             amount: totalAmount,
+            purchaseType: mode,
             keyId: process.env.RAZORPAY_KEY_ID || "rzp_test_dummy",
             redemptionId: redemption._id,
-            message: "Razorpay order created for redemption"
+            message: "Razorpay payment initiated"
         });
     } catch (err) {
         next(err);
     }
 };
 
-// VERIFY REDEEM ORDER (Verify Razorpay signature & complete redemption)
+// VERIFY REDEEM / PURCHASE ORDER (Verify Razorpay signature & complete order)
 exports.verifyRedeemOrder = async (req, res, next) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, redemptionId } = req.body;
@@ -614,68 +632,71 @@ exports.verifyRedeemOrder = async (req, res, next) => {
 
         const weightGrams = jewellery.weightGrams;
         const metalType = jewellery.metalType;
+        const mode = redemption.purchaseType || "direct_buy";
 
-        // Perform balance check & deduction
-        if (metalType === "gold") {
-            const { GoldBalance, GoldTransaction } = require("../models/Gold");
-            const balance = await GoldBalance.findOne({ user: redemption.user });
-            const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
-            if (available < weightGrams) {
-                return res.status(400).json({ success: false, message: `Insufficient gold balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
+        // Perform balance check & deduction ONLY IF mode is vault_redeem
+        if (mode === "vault_redeem") {
+            if (metalType === "gold") {
+                const { GoldBalance, GoldTransaction } = require("../models/Gold");
+                const balance = await GoldBalance.findOne({ user: redemption.user });
+                const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
+                if (available < weightGrams) {
+                    return res.status(400).json({ success: false, message: `Insufficient gold balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
+                }
+
+                const { fetchLiveRates } = require("./goldController");
+                const rates = await fetchLiveRates();
+                const rate = rates.gold.buyRate;
+
+                const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
+                const costBasisOfRedeemedGrams = weightGrams * avgRate;
+                
+                balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
+                balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
+                await balance.save();
+
+                await GoldTransaction.create({
+                    user: redemption.user,
+                    type: "redeem",
+                    grams: weightGrams,
+                    ratePerGram: rate,
+                    goldValue: weightGrams * rate,
+                    gstAmt: 0,
+                    totalAmt: weightGrams * rate,
+                    status: "success",
+                    note: `Redeemed ${jewellery.name}`
+                });
+            } else {
+                const { SilverBalance, SilverTransaction } = require("../models/Silver");
+                const balance = await SilverBalance.findOne({ user: redemption.user });
+                const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
+                if (available < weightGrams) {
+                    return res.status(400).json({ success: false, message: `Insufficient silver balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
+                }
+
+                const { fetchLiveRates } = require("./goldController");
+                const rates = await fetchLiveRates();
+                const rate = rates.silver.buyRate;
+
+                const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
+                const costBasisOfRedeemedGrams = weightGrams * avgRate;
+
+                balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
+                balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
+                await balance.save();
+
+                await SilverTransaction.create({
+                    user: redemption.user,
+                    type: "redeem",
+                    grams: weightGrams,
+                    ratePerGram: rate,
+                    silverValue: weightGrams * rate,
+                    gstAmt: 0,
+                    totalAmt: weightGrams * rate,
+                    status: "success",
+                    note: `Redeemed ${jewellery.name}`
+                });
             }
-
-            const { fetchLiveRates } = require("./goldController");
-            const rates = await fetchLiveRates();
-            const rate = rates.gold.buyRate;
-
-            const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
-            const costBasisOfRedeemedGrams = weightGrams * avgRate;
-            
-            balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
-            balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
-            await balance.save();
-            // Create a gold transaction for tracking
-            await GoldTransaction.create({
-                user: redemption.user,
-                type: "redeem",
-                grams: weightGrams,
-                ratePerGram: rate,
-                goldValue: weightGrams * rate,
-                gstAmt: 0,
-                totalAmt: weightGrams * rate,
-                status: "success",
-                note: `Redeemed ${jewellery.name}`
-            });
-        } else {
-            const { SilverBalance, SilverTransaction } = require("../models/Silver");
-            const balance = await SilverBalance.findOne({ user: redemption.user });
-            const available = balance ? (balance.totalGrams - balance.lockedGrams) : 0;
-            if (available < weightGrams) {
-                return res.status(400).json({ success: false, message: `Insufficient silver balance. Required: ${weightGrams}g, Available: ${available.toFixed(4)}g` });
-            }
-
-            const { fetchLiveRates } = require("./goldController");
-            const rates = await fetchLiveRates();
-            const rate = rates.silver.buyRate;
-
-            const avgRate = balance.totalGrams > 0 ? (balance.investedAmt / balance.totalGrams) : 0;
-            const costBasisOfRedeemedGrams = weightGrams * avgRate;
-
-            balance.totalGrams = parseFloat((balance.totalGrams - weightGrams).toFixed(6));
-            balance.investedAmt = parseFloat(Math.max(0, balance.investedAmt - costBasisOfRedeemedGrams).toFixed(2));
-            await balance.save();
-            // Create a silver transaction for tracking
-            await SilverTransaction.create({
-                user: redemption.user,
-                type: "redeem",
-                grams: weightGrams,
-                ratePerGram: rate,
-                silverValue: weightGrams * rate,
-                gstAmt: 0,
-                totalAmt: weightGrams * rate,
-                status: "success",
-                note: `Redeemed ${jewellery.name}`
-            });
         }
 
         redemption.status = "completed";
