@@ -132,7 +132,7 @@ function renderKycTable(kycList) {
                         </button>
                     ` : ''}
                     ${k.status === 'approved' ? `
-                        <button class="btn btn-danger btn-sm" onclick="quickReviewKyc('${k._id}', 'revoked')" title="Revoke KYC">
+                        <button class="btn btn-revoke btn-sm" onclick="quickReviewKyc('${k._id}', 'revoked')" title="Revoke KYC" style="color:#ffffff !important">
                             <i class="fas fa-ban"></i> Revoke
                         </button>
                     ` : ''}
@@ -240,7 +240,7 @@ async function openKycModal(id) {
                 `;
             } else if (k.status === 'approved') {
                 actionButtons = `
-                    <button class="btn btn-danger" onclick="reviewKyc('revoked')" style="background:#ea580c;border-color:#ea580c">
+                    <button class="btn btn-revoke" onclick="reviewKyc('revoked')" style="color:#ffffff !important">
                         <i class="fas fa-ban"></i> Revoke KYC
                     </button>
                     <button class="btn btn-danger" onclick="reviewKyc('rejected')"><i class="fas fa-times"></i> Reject</button>

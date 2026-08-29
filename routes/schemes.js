@@ -11,13 +11,15 @@ router.use(protect);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 router.get("/admin/all", adminOnly, listAllSchemes);
+router.get("/admin/enrollments/:id", adminOnly, enrollmentDetail);
 router.post("/", adminOnly, createScheme);
 router.put("/:id", adminOnly, updateScheme);
 router.delete("/:id", adminOnly, deleteScheme);
 
-// ── Customer ──────────────────────────────────────────────────────────────────
+// ── Customer & Common ──────────────────────────────────────────────────────────
 router.get("/my", myEnrollments);
 router.get("/my/:id", enrollmentDetail);
+router.get("/enrollments/:id", enrollmentDetail);
 router.post("/my/:id/cancel", cancelEnrollment);
 router.post("/enrollments/:id/pay", payNextInstallment);
 router.get("/", listSchemes);

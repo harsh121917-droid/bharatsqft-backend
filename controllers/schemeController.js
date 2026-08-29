@@ -257,10 +257,18 @@ exports.myEnrollments = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// GET /api/schemes/my/:id  — single enrollment detail (with full payment history)
+// GET /api/schemes/enrollments/:id or /api/schemes/my/:id  — single enrollment detail
 exports.enrollmentDetail = async (req, res, next) => {
     try {
-        const enrollment = await SchemeEnrollment.findOne({ _id: req.params.id, user: req.user._id });
+        const query = { _id: req.params.id };
+        if (req.user.role !== "admin") {
+            query.user = req.user._id;
+        }
+
+        const enrollment = await SchemeEnrollment.findOne(query)
+            .populate("user", "name email phone")
+            .populate("scheme", "name minAmount maxAmount durationMonths bonusMonths benefits");
+
         if (!enrollment) return res.status(404).json({ success: false, message: "Enrollment not found" });
         res.json({ success: true, data: enrollment });
     } catch (err) { next(err); }

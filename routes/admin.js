@@ -35,6 +35,7 @@ const {
 } = require("../controllers/propertyController");
 const { getAllInvestments } = require("../controllers/paymentController");
 const { getAllKyc, getKycById, reviewKyc } = require("../controllers/kycController");
+const { enrollmentDetail } = require("../controllers/schemeController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect, authorize("admin"));
@@ -93,6 +94,7 @@ router.post("/sell-settings", updateSellSettings);
 
 // Gold Scheme Enrollments
 router.get("/schemes/enrollments", getSchemeEnrollments);
+router.get("/schemes/enrollments/:id", enrollmentDetail);
 
 // Reward Points & Referral System
 router.get("/rewards/settings", getRewardSettings);

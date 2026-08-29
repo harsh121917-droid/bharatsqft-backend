@@ -303,55 +303,182 @@ async function viewEnrollmentDetails(id) {
     const body = document.getElementById("enrollment-modal-body");
     if (!modal || !body) return;
 
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading payment milestones...</div></div>`;
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading subscriber milestones...</div></div>`;
     modal.style.display = "flex";
 
     try {
-        const res = await api(`/schemes/enrollments/${id}`);
+        let res = await api(`/schemes/enrollments/${id}`);
         if (!res.success || !res.data) {
-            body.innerHTML = `<div style="color:var(--danger)">Failed to load details</div>`;
+            res = await api(`/admin/schemes/enrollments/${id}`);
+        }
+
+        if (!res.success || !res.data) {
+            body.innerHTML = `<div style="color:var(--danger);padding:2rem;text-align:center"><i class="fas fa-exclamation-triangle" style="font-size:2rem;margin-bottom:8px"></i><div>${res.message || "Failed to load enrollment details"}</div></div>`;
             return;
         }
 
         const e = res.data;
         activeEnrollment = e;
 
-        let paymentsHtml = `
-        <div style="margin-bottom:1rem;background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
-            <div style="font-size:15px;font-weight:700;color:#fff">${e.schemeName}</div>
-            <div style="font-size:13px;color:var(--text-muted);margin-top:3px">Customer: ${userNameEsc(e.user)} • Monthly: ${formatINR(e.monthlyAmount)}</div>
-            <div style="font-size:13px;color:var(--gold);margin-top:3px">Total Credited: ${formatGrams(e.totalGoldGrams)} • Total Paid: ${formatINR(e.totalInvested)}</div>
-        </div>
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Amount</th>
-                        <th>Rate Locked</th>
-                        <th>Grams Credited</th>
-                        <th>Type</th>
-                        <th>Paid Date</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+        const u = e.user || {};
+        const custName = u.name || "Customer";
+        const custPhone = u.phone || "—";
+        const custEmail = u.email || "—";
+        const isGold = (e.metal || "gold").toLowerCase() === "gold";
+        const metalLabel = isGold ? "24K Gold (999)" : "Fine Silver (999)";
 
+        const totalInstallments = e.durationMonths || 11;
+        const paidCount = e.installmentsPaid || 0;
+        const bonusCount = e.bonusMonths || 1;
+        const progressPct = Math.min(Math.round((paidCount / totalInstallments) * 100), 100);
+
+        let statusBadge = `<span class="badge badge-success">● Active Subscription</span>`;
+        if (e.status === "completed") statusBadge = `<span class="badge badge-gold">★ Matured & Completed</span>`;
+        else if (e.status === "cancelled") statusBadge = `<span class="badge badge-danger">✕ Cancelled</span>`;
+
+        // Map payments by installment number
+        const paymentsMap = {};
+        let bonusPayment = null;
         (e.payments || []).forEach(p => {
-            paymentsHtml += `
-            <tr>
-                <td style="font-family:var(--font-mono);font-weight:600">${p.installmentNo}</td>
-                <td style="font-weight:700;color:#fff">${formatINR(p.amount)}</td>
-                <td style="font-family:var(--font-mono)">${formatINR(p.ratePerGram)}/g</td>
-                <td style="font-family:var(--font-mono);color:var(--gold)">${formatGrams(p.grams)}</td>
-                <td><span class="badge ${p.isBonus ? 'badge-gold' : 'badge-success'}">${p.isBonus ? '★ Bonus Month' : 'Paid'}</span></td>
-                <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(p.paidAt)}</td>
-            </tr>`;
+            if (p.isBonus) {
+                bonusPayment = p;
+            } else if (p.installmentNo) {
+                paymentsMap[p.installmentNo] = p;
+            }
         });
 
-        paymentsHtml += `</tbody></table></div>`;
-        body.innerHTML = paymentsHtml;
+        let html = `
+        <div style="display:flex;flex-direction:column;gap:1.25rem">
+            <!-- Header Summary Card -->
+            <div style="background:var(--surface2);padding:1.25rem;border-radius:var(--radius-md);border:1px solid var(--border)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span class="badge ${isGold ? 'badge-gold' : 'badge-silver'}">
+                                <i class="${isGold ? 'fas fa-coins' : 'fas fa-cubes'}"></i> ${metalLabel}
+                            </span>
+                            ${statusBadge}
+                        </div>
+                        <div style="font-size:18px;font-weight:800;color:#fff;margin-top:6px">${e.schemeName || 'Savings Scheme'}</div>
+                        <div style="font-size:13px;color:var(--text-muted);margin-top:2px">
+                            <strong style="color:#fff">${custName}</strong> • ${custPhone} • ${custEmail}
+                        </div>
+                    </div>
+
+                    <div style="text-align:right">
+                        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Monthly Installment</div>
+                        <div style="font-size:1.4rem;font-weight:800;color:var(--gold);font-family:var(--font-mono)">${formatINR(e.monthlyAmount)}</div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="margin-top:1.25rem;background:var(--surface3);padding:12px 14px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12.5px">
+                        <span style="font-weight:700;color:#fff"><i class="fas fa-tasks" style="color:var(--gold)"></i> Milestone Progress</span>
+                        <span style="font-weight:700;color:var(--gold)">${paidCount} of ${totalInstallments} Months Paid (${progressPct}%)</span>
+                    </div>
+                    <div style="width:100%;height:8px;background:var(--surface);border-radius:4px;overflow:hidden">
+                        <div style="width:${progressPct}%;height:100%;background:linear-gradient(90deg, #f59e0b, #eab308);border-radius:4px;transition:width 0.3s ease"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--text-dim)">
+                        <span>Started: <strong>${formatDate(e.startedAt || e.createdAt)}</strong></span>
+                        <span>Total Paid: <strong style="color:#fff">${formatINR(e.totalInvested || 0)}</strong></span>
+                        <span>Total Credited: <strong style="color:var(--gold);font-family:var(--font-mono)">${formatGrams(e.totalGoldGrams || 0)}</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Milestone Schedule Breakdown -->
+            <div>
+                <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:0.75rem;display:flex;align-items:center;gap:6px">
+                    <i class="fas fa-calendar-check" style="color:var(--gold)"></i> Customer Monthly Milestone Schedule (${totalInstallments} + ${bonusCount} Free)
+                </div>
+
+                <div class="table-responsive" style="max-height:380px;overflow-y:auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:70px">Month</th>
+                                <th>Status</th>
+                                <th>Amount</th>
+                                <th>Rate Locked</th>
+                                <th>Metal Credited</th>
+                                <th>Payment Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+        for (let m = 1; m <= totalInstallments; m++) {
+            const p = paymentsMap[m];
+            if (p) {
+                // Paid Milestone
+                html += `
+                <tr style="background:rgba(46, 204, 113, 0.04)">
+                    <td style="font-family:var(--font-mono);font-weight:700;color:#fff">M-${m}</td>
+                    <td><span class="badge badge-success"><i class="fas fa-check-circle"></i> Paid</span></td>
+                    <td style="font-weight:700;color:#fff">${formatINR(p.amount || e.monthlyAmount)}</td>
+                    <td style="font-family:var(--font-mono);color:var(--text-dim)">${p.ratePerGram ? formatINR(p.ratePerGram) + '/g' : '—'}</td>
+                    <td style="font-family:var(--font-mono);font-weight:700;color:var(--gold)">${formatGrams(p.grams || 0)}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(p.paidAt)}</td>
+                </tr>`;
+            } else if (m === paidCount + 1 && e.status === "active") {
+                // Next Due Milestone
+                html += `
+                <tr style="background:rgba(245, 158, 11, 0.08);border-left:3px solid var(--gold)">
+                    <td style="font-family:var(--font-mono);font-weight:700;color:var(--gold)">M-${m}</td>
+                    <td><span class="badge badge-warning"><i class="fas fa-clock"></i> Next Due</span></td>
+                    <td style="font-weight:700;color:#fff">${formatINR(e.monthlyAmount)}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">Locked on pay</td>
+                    <td style="font-size:12px;color:var(--text-dim)">Calculated live</td>
+                    <td style="font-size:12px;color:var(--gold);font-weight:600">Awaiting customer payment</td>
+                </tr>`;
+            } else {
+                // Future Upcoming Milestone
+                html += `
+                <tr style="opacity:0.65">
+                    <td style="font-family:var(--font-mono);font-weight:600">M-${m}</td>
+                    <td><span class="badge badge-secondary">○ Upcoming</span></td>
+                    <td>${formatINR(e.monthlyAmount)}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">—</td>
+                    <td style="font-size:12px;color:var(--text-dim)">—</td>
+                    <td style="font-size:12px;color:var(--text-dim)">Pending milestone</td>
+                </tr>`;
+            }
+        }
+
+        // Bonus Month (Maturity Reward)
+        if (bonusPayment) {
+            html += `
+            <tr style="background:rgba(245, 166, 35, 0.12);border-top:2px solid var(--gold)">
+                <td style="font-family:var(--font-mono);font-weight:800;color:var(--gold)">M-${totalInstallments + 1}</td>
+                <td><span class="badge badge-gold"><i class="fas fa-gift"></i> Bonus Credited</span></td>
+                <td style="font-weight:700;color:var(--success)">FREE (₹0)</td>
+                <td style="font-family:var(--font-mono);color:var(--text-dim)">${bonusPayment.ratePerGram ? formatINR(bonusPayment.ratePerGram) + '/g' : '—'}</td>
+                <td style="font-family:var(--font-mono);font-weight:800;color:var(--gold)">+${formatGrams(bonusPayment.grams || 0)}</td>
+                <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(bonusPayment.paidAt)}</td>
+            </tr>`;
+        } else {
+            html += `
+            <tr style="background:rgba(168, 85, 247, 0.08);border-top:1px dashed rgba(168, 85, 247, 0.35)">
+                <td style="font-family:var(--font-mono);font-weight:800;color:#c084fc">M-${totalInstallments + 1}</td>
+                <td><span class="badge badge-purple" style="background:rgba(168,85,247,0.18);color:#c084fc;border:1px solid rgba(168,85,247,0.3)"><i class="fas fa-gift"></i> 1 Month Free Gold</span></td>
+                <td style="font-weight:700;color:var(--success)">FREE (₹0)</td>
+                <td style="font-size:12px;color:var(--text-dim)">Maturity rate</td>
+                <td style="font-size:12px;color:#c084fc;font-weight:600">Worth ${formatINR(e.monthlyAmount)} Gold</td>
+                <td style="font-size:12px;color:var(--text-dim)">Unlocks on Month ${totalInstallments} completion</td>
+            </tr>`;
+        }
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+        body.innerHTML = html;
     } catch (err) {
-        body.innerHTML = `<div style="color:var(--danger)">Error: ${err.message}</div>`;
+        body.innerHTML = `<div style="color:var(--danger);padding:2rem;text-align:center"><i class="fas fa-exclamation-triangle" style="font-size:2rem;margin-bottom:8px"></i><div>Error loading subscriber details: ${err.message}</div></div>`;
     }
 }
 
