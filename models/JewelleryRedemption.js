@@ -8,10 +8,12 @@ const jewelleryRedemptionSchema = new mongoose.Schema({
     metalType: { type: String, enum: ["gold", "silver"], required: true },
     quantity: { type: Number, default: 1, min: 1 },
     weightGrams: { type: Number, required: true },
+    vaultGramsDeducted: { type: Number, default: 0 },
+    vaultDiscountAmt: { type: Number, default: 0 },
     makingCharges: { type: Number, required: true },
     gstAmount: { type: Number, required: true },
     totalPaid: { type: Number, required: true }, // Paid via Razorpay or Wallet
-    purchaseType: { type: String, enum: ["vault_redeem", "direct_buy"], default: "direct_buy" },
+    purchaseType: { type: String, enum: ["vault_redeem", "direct_buy", "hybrid"], default: "direct_buy" },
     paymentMethod: { type: String, enum: ["razorpay", "wallet"], default: "razorpay" },
     razorpayOrderId: { type: String, default: "" },
     razorpayPaymentId: { type: String, default: "" },
