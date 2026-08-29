@@ -5,36 +5,102 @@
 let notifHistory = [];
 let notifPage = 1;
 let uploadedNotifImageUrl = "";
+let cachedNotifUsers = [];
 
 function selectNotificationTarget(target) {
     document.querySelectorAll('.notif-target-pill').forEach(p => p.classList.remove('active'));
     document.getElementById(`notif-target-${target}`)?.classList.add('active');
 
     const userSelectBox = document.getElementById("notif-user-select-box");
+    const sendBtn = document.getElementById("btn-send-notif");
+    
     if (userSelectBox) {
         userSelectBox.style.display = target === "single" ? "block" : "none";
         if (target === "single") populateNotifUserDropdown();
+    }
+
+    if (sendBtn) {
+        if (target === "single") {
+            sendBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Send Direct Push to Customer`;
+        } else if (target === "kyc") {
+            sendBtn.innerHTML = `<i class="fas fa-shield-alt"></i> Send to KYC-Verified Users`;
+        } else {
+            sendBtn.innerHTML = `<i class="fas fa-bullhorn"></i> Send Push Broadcast (All Users)`;
+        }
     }
 }
 
 async function populateNotifUserDropdown() {
     const select = document.getElementById("notif-user-dropdown");
-    if (!select || select.children.length > 1) return;
+    if (!select) return;
 
-    try {
-        const res = await api("/admin/users?limit=100");
-        const usersList = res.data || res.users || [];
-        if (usersList.length > 0) {
-            select.innerHTML = '<option value="">Select a customer...</option>';
-            usersList.forEach(u => {
-                const opt = document.createElement("option");
-                opt.value = u._id;
-                opt.textContent = `${u.name || 'Customer'} (${u.phone || u.email || 'No Phone'})`;
-                select.appendChild(opt);
-            });
+    if (cachedNotifUsers.length === 0) {
+        select.innerHTML = '<option value="">Loading customer list...</option>';
+        try {
+            const res = await api("/admin/users?limit=300");
+            cachedNotifUsers = res.data || res.users || [];
+        } catch (e) {
+            console.error("Error populating users:", e);
         }
-    } catch (e) {
-        console.error("Error populating users:", e);
+    }
+
+    renderNotifUserDropdown(cachedNotifUsers);
+}
+
+function filterNotifUsers(query) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) {
+        renderNotifUserDropdown(cachedNotifUsers);
+        return;
+    }
+
+    const filtered = cachedNotifUsers.filter(u => 
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.phone || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q)
+    );
+
+    renderNotifUserDropdown(filtered);
+}
+
+function renderNotifUserDropdown(usersList) {
+    const select = document.getElementById("notif-user-dropdown");
+    if (!select) return;
+
+    if (!usersList || usersList.length === 0) {
+        select.innerHTML = '<option value="">No matching customers found</option>';
+        onNotifUserSelected();
+        return;
+    }
+
+    let html = '<option value="">-- Choose a target customer (' + usersList.length + ' available) --</option>';
+    usersList.forEach(u => {
+        const deviceCount = (u.fcmTokens && u.fcmTokens.length > 0) ? `📱 ${u.fcmTokens.length} active device(s)` : '⚠️ No FCM Token';
+        html += `<option value="${u._id}" data-tokens="${(u.fcmTokens || []).length}">
+            ${u.name || 'Customer'} (${u.phone || u.email || 'No Phone'}) — ${deviceCount}
+        </option>`;
+    });
+
+    select.innerHTML = html;
+    onNotifUserSelected();
+}
+
+function onNotifUserSelected() {
+    const select = document.getElementById("notif-user-dropdown");
+    const infoEl = document.getElementById("notif-user-fcm-info");
+    if (!select || !infoEl) return;
+
+    const selectedOpt = select.options[select.selectedIndex];
+    if (!selectedOpt || !selectedOpt.value) {
+        infoEl.textContent = "";
+        return;
+    }
+
+    const tokenCount = parseInt(selectedOpt.dataset.tokens || "0", 10);
+    if (tokenCount > 0) {
+        infoEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> User is registered on ${tokenCount} device(s). Notification will pop up on their screen immediately.</span>`;
+    } else {
+        infoEl.innerHTML = `<span style="color:var(--warning)"><i class="fas fa-info-circle"></i> User hasn't registered device tokens yet. Notification will be stored in their In-App Inbox.</span>`;
     }
 }
 
@@ -66,18 +132,54 @@ async function uploadNotificationImage(e) {
     formData.append("image", file);
 
     try {
-        toast("Uploading notification image...", "info");
+        toast("Uploading notification banner image...", "info");
         const res = await api("/upload/image", { method: "POST", body: formData });
         if (res.success && res.url) {
             uploadedNotifImageUrl = res.url;
+            showImageStatus(res.url);
             updateNotificationPreview();
-            toast("Image uploaded successfully", "success");
+            toast("Image attached successfully", "success");
         } else {
             toast(res.message || "Failed to upload image", "danger");
         }
     } catch (err) {
-        toast("Failed to upload image", "danger");
+        toast("Failed to upload image. Please verify connection.", "danger");
     }
+}
+
+function setNotifImageUrl(url) {
+    uploadedNotifImageUrl = (url || "").trim();
+    if (uploadedNotifImageUrl) {
+        showImageStatus(uploadedNotifImageUrl);
+    } else {
+        hideImageStatus();
+    }
+    updateNotificationPreview();
+}
+
+function clearNotifImage() {
+    uploadedNotifImageUrl = "";
+    const fileInput = document.getElementById("notif-file-input");
+    const urlInput = document.getElementById("notif-img-url");
+    if (fileInput) fileInput.value = "";
+    if (urlInput) urlInput.value = "";
+    hideImageStatus();
+    updateNotificationPreview();
+    toast("Image removed", "info");
+}
+
+function showImageStatus(url) {
+    const statusBox = document.getElementById("notif-img-status");
+    const textEl = document.getElementById("notif-img-status-text");
+    if (statusBox) {
+        statusBox.style.display = "flex";
+        if (textEl) textEl.textContent = `Image Attached: ${url.substring(0, 45)}...`;
+    }
+}
+
+function hideImageStatus() {
+    const statusBox = document.getElementById("notif-img-status");
+    if (statusBox) statusBox.style.display = "none";
 }
 
 async function sendPushNotification() {
@@ -86,6 +188,7 @@ async function sendPushNotification() {
     const targetPill = document.querySelector('.notif-target-pill.active');
     const targetKey = targetPill?.dataset.target || "all";
     const userId = document.getElementById("notif-user-dropdown")?.value;
+    const sendBtn = document.getElementById("btn-send-notif");
 
     if (!title || !body) {
         toast("Please enter notification title and message body", "warning");
@@ -102,29 +205,38 @@ async function sendPushNotification() {
         body,
         imageUrl: uploadedNotifImageUrl || "",
         deepLink: targetKey === "kyc_verified" ? "kyc" : "home",
-        targetType: targetKey === "single" ? "user" : "all",
+        targetType: targetKey === "single" ? "user" : (targetKey === "kyc_verified" ? "kyc_verified" : "all"),
         targetUserId: targetKey === "single" ? userId : null
     };
 
     try {
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatched to FCM...`;
+        }
         toast("Dispatching push notification...", "info");
+
         const res = await api("/notifications/send", {
             method: "POST",
             body: JSON.stringify(payload)
         });
 
         if (res.success) {
-            toast("Push notification dispatched successfully!", "success");
+            toast(res.message || "Push notification dispatched successfully!", "success");
             document.getElementById("notif-title").value = "";
             document.getElementById("notif-body").value = "";
-            uploadedNotifImageUrl = "";
-            updateNotificationPreview();
+            clearNotifImage();
             loadNotificationHistory(1);
         } else {
             toast(res.message || "Failed to send notification", "danger");
         }
     } catch (e) {
         toast("Network error sending notification", "danger");
+    } finally {
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            selectNotificationTarget(targetKey);
+        }
     }
 }
 

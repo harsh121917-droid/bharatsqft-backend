@@ -770,18 +770,32 @@
             <div class="page" id="page-kyc">
                 <div class="section-header">
                     <div>
-                        <div class="section-title"><i class="fas fa-id-card" style="color:var(--warning)"></i> KYC
-                            Management</div>
-                        <div class="section-subtitle">Review government identity proofs, PAN, Aadhaar, and bank accounts
-                        </div>
+                        <div class="section-title"><i class="fas fa-id-card" style="color:var(--warning)"></i> KYC Verification Suite</div>
+                        <div class="section-subtitle">Review government identity proofs, PAN, Aadhaar, and approve / reject / revoke verifications</div>
                     </div>
-                    <div style="display:flex;gap:10px">
-                        <select class="form-control" onchange="loadKyc(this.value)" style="width:160px">
-                            <option value="pending">Pending Only</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="all">All Submissions</option>
-                        </select>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <input class="search-bar" id="kyc-search" placeholder="🔍 Search name, phone, PAN..."
+                            oninput="debouncedSearchKyc(this.value)" style="max-width:260px" />
+                        <div class="chart-pill-group">
+                            <button class="chart-pill-btn kyc-filter-pill active" id="kyc-pill-pending" onclick="setKycFilter('pending')">
+                                Pending <span class="badge badge-warning" id="kyc-badge-pending" style="font-size:10px;margin-left:4px">0</span>
+                            </button>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-approved" onclick="setKycFilter('approved')">
+                                Approved <span class="badge badge-success" id="kyc-badge-approved" style="font-size:10px;margin-left:4px">0</span>
+                            </button>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-rejected" onclick="setKycFilter('rejected')">
+                                Rejected <span class="badge badge-danger" id="kyc-badge-rejected" style="font-size:10px;margin-left:4px">0</span>
+                            </button>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-revoked" onclick="setKycFilter('revoked')">
+                                Revoked <span class="badge badge-amber" id="kyc-badge-revoked" style="font-size:10px;margin-left:4px">0</span>
+                            </button>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-all" onclick="setKycFilter('all')">
+                                All Submissions
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="loadKyc()" title="Refresh KYC List">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
                     </div>
                 </div>
                 <div class="table-wrap">
@@ -1552,6 +1566,57 @@
                                     rate for wallet redemption</span>
                             </div>
                         </div>
+
+                        <!-- ── REWARD POINTS EXPIRY CONTROLS ── -->
+                        <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08)">
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem">
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(239,68,68,0.15);color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid rgba(239,68,68,0.3)">
+                                        <i class="fas fa-hourglass-half"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:800;font-size:15px;color:#fff">Reward Points Expiry Management</div>
+                                        <div style="font-size:12px;color:var(--text-dim)">Set point expiration validity periods (weekly, monthly, custom) to protect platform liability</div>
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center">
+                                    <button class="btn btn-secondary btn-sm" id="btn-run-expiry-sweep" onclick="runRewardExpirySweep()" style="border-color:rgba(239,68,68,0.4);color:#fca5a5">
+                                        <i class="fas fa-bolt"></i> Run Expiry Check Now
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1.25rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:1.25rem">
+                                <div>
+                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">Points Expiration Status</label>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+                                        <label class="switch">
+                                            <input type="checkbox" id="reward-expiry-enabled" onchange="toggleRewardExpiryControls()" />
+                                            <span class="slider"></span>
+                                        </label>
+                                        <span id="reward-expiry-status-text" style="font-size:13px;font-weight:600;color:#fff">Enabled</span>
+                                    </div>
+                                </div>
+
+                                <div id="reward-expiry-preset-wrap">
+                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Expiry Validity Period</label>
+                                    <select class="form-control" id="reward-expiry-type" onchange="onRewardExpiryTypeChange()">
+                                        <option value="weekly">Weekly (7 Days)</option>
+                                        <option value="monthly">Monthly (30 Days)</option>
+                                        <option value="quarterly">Quarterly (90 Days)</option>
+                                        <option value="yearly">Yearly (365 Days)</option>
+                                        <option value="custom_days">Custom Duration (in Days)</option>
+                                        <option value="never">No Expiry (Points Never Expire)</option>
+                                    </select>
+                                </div>
+
+                                <div id="reward-expiry-custom-days-wrap" style="display:none">
+                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Custom Expiry Days</label>
+                                    <input class="form-control" type="number" min="1" id="reward-expiry-days" placeholder="e.g. 45" value="30" />
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -1966,8 +2031,10 @@
                         </div>
 
                         <div class="form-group" id="notif-user-select-box" style="display:none">
-                            <label class="form-label">Select Customer</label>
-                            <select class="form-control" id="notif-user-dropdown"></select>
+                            <label class="form-label">Target Customer</label>
+                            <input class="form-control" id="notif-user-search" placeholder="🔍 Type customer name, phone, or email to search..." oninput="filterNotifUsers(this.value)" style="margin-bottom:6px" />
+                            <select class="form-control" id="notif-user-dropdown" onchange="onNotifUserSelected()"></select>
+                            <div id="notif-user-fcm-info" style="font-size:11.5px;color:var(--text-dim);margin-top:4px"></div>
                         </div>
 
                         <div class="form-group">
@@ -1984,12 +2051,22 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Optional Banner Image</label>
-                            <input type="file" class="form-control" accept="image/*"
-                                onchange="uploadNotificationImage(event)" />
+                            <label class="form-label">Banner Image (File Upload or Image URL)</label>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                <input type="file" id="notif-file-input" class="form-control" accept="image/*"
+                                    onchange="uploadNotificationImage(event)" style="flex:1;min-width:200px" />
+                                <input type="text" id="notif-img-url" class="form-control" placeholder="Or paste image URL (https://...)"
+                                    oninput="setNotifImageUrl(this.value)" style="flex:1;min-width:200px" />
+                            </div>
+                            <div id="notif-img-status" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:12px;color:var(--success);align-items:center;gap:6px">
+                                <i class="fas fa-check-circle"></i> <span id="notif-img-status-text">Image Attached</span>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearNotifImage()" style="margin-left:auto;padding:2px 8px;font-size:11px;color:var(--danger)">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </div>
                         </div>
 
-                        <button class="btn btn-primary" onclick="sendPushNotification()"
+                        <button class="btn btn-primary" id="btn-send-notif" onclick="sendPushNotification()"
                             style="width:100%;height:44px;margin-top:0.5rem">
                             <i class="fas fa-paper-plane"></i> Send Push Broadcast
                         </button>
@@ -2235,6 +2312,7 @@
                             <option value="pending">Pending Review</option>
                             <option value="approved">Approved (Verified)</option>
                             <option value="rejected">Rejected</option>
+                            <option value="revoked">Revoked</option>
                         </select>
                     </div>
                     <div class="form-group" style="display:flex;flex-direction:column;justify-content:center">

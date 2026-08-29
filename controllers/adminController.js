@@ -1855,6 +1855,9 @@ exports.getRewardSettings = async (req, res, next) => {
                 referralPoints: 200,
                 pointToWalletRate: 0.10,
                 spinPoints: [10, 20, 50, 100, 150, 200],
+                expiryEnabled: true,
+                expiryType: "monthly",
+                expiryDays: 30,
                 isActive: true,
             });
         }
@@ -1867,7 +1870,16 @@ exports.getRewardSettings = async (req, res, next) => {
 exports.updateRewardSettings = async (req, res, next) => {
     try {
         const RewardSettings = require("../models/RewardSettings");
-        const { registrationPoints, referralPoints, pointToWalletRate, spinPoints, isActive } = req.body;
+        const {
+            registrationPoints,
+            referralPoints,
+            pointToWalletRate,
+            spinPoints,
+            expiryEnabled,
+            expiryType,
+            expiryDays,
+            isActive,
+        } = req.body;
 
         let settings = await RewardSettings.findOne();
         if (!settings) {
@@ -1878,10 +1890,28 @@ exports.updateRewardSettings = async (req, res, next) => {
         if (referralPoints !== undefined) settings.referralPoints = referralPoints;
         if (pointToWalletRate !== undefined) settings.pointToWalletRate = pointToWalletRate;
         if (spinPoints !== undefined) settings.spinPoints = spinPoints;
+        if (expiryEnabled !== undefined) settings.expiryEnabled = expiryEnabled;
+        if (expiryType !== undefined) settings.expiryType = expiryType;
+        if (expiryDays !== undefined) settings.expiryDays = expiryDays;
         if (isActive !== undefined) settings.isActive = isActive;
 
         await settings.save();
         res.json({ success: true, message: "Reward settings updated successfully", data: settings });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── POST /api/admin/rewards/run-expiry-check ───────────────────────────────────
+exports.runRewardExpiryCheck = async (req, res, next) => {
+    try {
+        const { runGlobalExpirySweep } = require("./rewardController");
+        const result = await runGlobalExpirySweep();
+        res.json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
     } catch (err) {
         next(err);
     }

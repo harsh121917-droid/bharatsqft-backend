@@ -50,13 +50,24 @@ exports.sendNotification = async (req, res, next) => {
       }
 
       const tokens = targetUserDoc.fcmTokens || [];
-      fcmResult = await sendFcmMessage({
-        tokens,
-        title,
-        body,
-        imageUrl,
-        deepLink: deepLink || "home",
-      });
+      if (tokens.length > 0) {
+        fcmResult = await sendFcmMessage({
+          tokens,
+          title,
+          body,
+          imageUrl,
+          deepLink: deepLink || "home",
+        });
+      } else {
+        fcmResult = {
+          success: true,
+          simulated: false,
+          sentCount: 0,
+          successCount: 0,
+          failureCount: 0,
+          note: "User has not registered device FCM token yet. Notification recorded for in-app inbox.",
+        };
+      }
     } else {
       // Broadcast to topic 'all_users'
       fcmResult = await sendFcmMessage({
@@ -83,11 +94,16 @@ exports.sendNotification = async (req, res, next) => {
       status: fcmResult.simulated ? "simulated" : fcmResult.success ? "sent" : "failed",
     });
 
+    let message = "Push notification dispatched successfully!";
+    if (fcmResult.simulated) {
+      message = "Push notification processed (Simulation Mode — credentials not set)";
+    } else if (fcmResult.note) {
+      message = fcmResult.note;
+    }
+
     res.json({
       success: true,
-      message: fcmResult.simulated
-        ? "Push notification processed (Simulation Mode — credentials not set)"
-        : "Push notification dispatched successfully!",
+      message,
       log,
       fcmResult,
     });

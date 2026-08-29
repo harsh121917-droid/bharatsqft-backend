@@ -86,28 +86,57 @@ exports.getMyKyc = async (req, res, next) => {
 ───────────────────────────────────────── */
 exports.getAllKyc = async (req, res, next) => {
     try {
+        const User = require("../models/User");
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
 
         const filter = {};
-        if (req.query.status) filter.status = req.query.status;
+        if (req.query.status && req.query.status !== "all") {
+            filter.status = req.query.status;
+        }
 
-        const [items, total] = await Promise.all([
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search.trim(), "i");
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex },
+                ]
+            }).select("_id");
+
+            const userIds = matchingUsers.map(u => u._id);
+
+            filter.$or = [
+                { fullName: searchRegex },
+                { panNumber: searchRegex },
+                { user: { $in: userIds } }
+            ];
+        }
+
+        const [items, total, pendingCount, approvedCount, rejectedCount, revokedCount] = await Promise.all([
             Kyc.find(filter)
                 .populate("user", "name email phone")
                 .select("+aadhaarNumber")
                 .sort("-submittedAt")
                 .skip(skip).limit(limit),
             Kyc.countDocuments(filter),
+            Kyc.countDocuments({ status: "pending" }),
+            Kyc.countDocuments({ status: "approved" }),
+            Kyc.countDocuments({ status: "rejected" }),
+            Kyc.countDocuments({ status: "revoked" }),
         ]);
 
-        const pendingCount = await Kyc.countDocuments({ status: "pending" });
-
         res.json({
-            success: true, total, page,
+            success: true,
+            total,
+            page,
             pages: Math.ceil(total / limit),
             pendingCount,
+            approvedCount,
+            rejectedCount,
+            revokedCount,
             data: items,
         });
     } catch (err) { next(err); }
@@ -120,6 +149,7 @@ exports.getKycById = async (req, res, next) => {
     try {
         const kyc = await Kyc.findById(req.params.id)
             .populate("user", "name email phone")
+            .populate("reviewedBy", "name email")
             .select("+aadhaarNumber");
         if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
         res.json({ success: true, data: kyc });
@@ -128,25 +158,36 @@ exports.getKycById = async (req, res, next) => {
 
 /* ─────────────────────────────────────────
    PATCH /api/admin/kyc/:id
-   Body: { status: "approved" | "rejected", rejectionReason? }
+   Body: { status: "approved" | "rejected" | "revoked" | "pending", rejectionReason? }
 ───────────────────────────────────────── */
 exports.reviewKyc = async (req, res, next) => {
     try {
         const { status, rejectionReason } = req.body;
 
-        if (!["approved", "rejected", "pending"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Status must be 'approved', 'rejected', or 'pending'" });
+        if (!["approved", "rejected", "revoked", "pending"].includes(status)) {
+            return res.status(400).json({ success: false, message: "Status must be 'approved', 'rejected', 'revoked', or 'pending'" });
         }
-        const reason = status === "rejected" ? (rejectionReason || "Rejected by Administrator") : undefined;
+
+        const updateData = {
+            status,
+            reviewedBy: req.user._id,
+            reviewedAt: new Date(),
+        };
+
+        if (status === "rejected") {
+            updateData.rejectionReason = rejectionReason || "Rejected by Administrator";
+        } else if (status === "revoked") {
+            updateData.revokedReason = rejectionReason || "KYC verification revoked by Administrator";
+            updateData.rejectionReason = rejectionReason || "KYC verification revoked by Administrator";
+            updateData.revokedAt = new Date();
+        } else if (status === "approved" || status === "pending") {
+            updateData.rejectionReason = undefined;
+            updateData.revokedReason = undefined;
+        }
 
         const kyc = await Kyc.findByIdAndUpdate(
             req.params.id,
-            {
-                status,
-                rejectionReason: reason,
-                reviewedBy: req.user._id,
-                reviewedAt: new Date(),
-            },
+            updateData,
             { new: true }
         ).populate("user", "name email phone");
 
@@ -157,7 +198,13 @@ exports.reviewKyc = async (req, res, next) => {
             await User.findByIdAndUpdate(kyc.user._id, { kycStatus: status });
         }
 
-        res.json({ success: true, message: `KYC ${status}`, data: kyc });
+        let actionMsg = "KYC status updated";
+        if (status === "approved") actionMsg = "KYC Approved successfully";
+        else if (status === "rejected") actionMsg = "KYC Rejected";
+        else if (status === "revoked") actionMsg = "KYC Verification Revoked";
+        else if (status === "pending") actionMsg = "KYC Reset to Pending Review";
+
+        res.json({ success: true, message: actionMsg, data: kyc });
     } catch (err) { next(err); }
 };
 

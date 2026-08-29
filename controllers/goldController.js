@@ -792,18 +792,28 @@ exports.giftAsset = async (req, res, next) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 10. GET /api/gold/history  — get historical rates for charts
+// 10. GET /api/gold/history  — get historical rates for charts (all metals)
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getHistory = async (req, res, next) => {
     try {
-        const { symbol, period } = req.query; // XAU / XAG, period: 1d, 1w, 1m, 1y
+        const { symbol, period } = req.query; // XAU, XAG, HG/COPPER, XPT, XPD, period: 1d, 1w, 1m, 1y, 3y, 5y
         if (!symbol) {
             return res.status(400).json({ success: false, message: "Symbol is required" });
         }
 
-        const isGold = symbol.toUpperCase() === "XAU";
+        const sym = symbol.toUpperCase();
         const rates = await fetchLiveRates();
-        const currentRate = isGold ? rates.gold.buyRate : rates.silver.buyRate;
+        
+        let currentRate = rates.gold.buyRate;
+        if (["XAG", "SILVER"].includes(sym)) {
+            currentRate = rates.silver.buyRate;
+        } else if (["HG", "COPPER", "XCU"].includes(sym)) {
+            currentRate = rates.copper.buyRate;
+        } else if (["XPT", "PLATINUM"].includes(sym)) {
+            currentRate = rates.platinum.buyRate;
+        } else if (["XPD", "PALLADIUM"].includes(sym)) {
+            currentRate = rates.palladium.buyRate;
+        }
 
         let pointsCount = 30;
         let volatility = 0.005;

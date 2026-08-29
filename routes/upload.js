@@ -19,6 +19,12 @@ router.post("/single", uploadSingleImage, (req, res) => {
     res.json({ success: true, url: req.file.path });
 });
 
+// Alias for single image upload
+router.post("/image", uploadSingleImage, (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+    res.json({ success: true, url: req.file.path });
+});
+
 // Property Images
 router.post("/:id/images", uploadPropertyImages);
 router.delete("/:id/images/:imageId", deletePropertyImage);

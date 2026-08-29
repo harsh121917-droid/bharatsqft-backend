@@ -10,6 +10,7 @@ const {
   getSchemeEnrollments,
   getRewardSettings,
   updateRewardSettings,
+  runRewardExpiryCheck,
   getAllRewardHistory,
   getAdminReferrals,
   getAdminRewardsSummary,
@@ -96,6 +97,7 @@ router.get("/schemes/enrollments", getSchemeEnrollments);
 // Reward Points & Referral System
 router.get("/rewards/settings", getRewardSettings);
 router.post("/rewards/settings", updateRewardSettings);
+router.post("/rewards/run-expiry-check", runRewardExpiryCheck);
 router.get("/rewards/history", getAllRewardHistory);
 router.get("/rewards/summary", getAdminRewardsSummary);
 router.get("/rewards/referrals", getAdminReferrals);

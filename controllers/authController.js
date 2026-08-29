@@ -238,19 +238,27 @@ exports.registerWithOtp = async (req, res, next) => {
 
 exports.loginWithOtp = async (req, res, next) => {
   try {
-    const { phone, otpRecordId, email } = req.body;
+    let { phone, otpRecordId, email } = req.body;
     if (!phone || !otpRecordId) {
       return res.status(400).json({ success: false, message: "phone and otpRecordId are required" });
     }
+
+    phone = phone.trim();
 
     const ok = await consumeVerifiedOtp(phone, "login", otpRecordId);
     if (!ok) {
       return res.status(400).json({ success: false, message: "OTP not verified or expired — verify again" });
     }
 
-    const query = email ? { phone, email: email.toLowerCase().trim() } : { phone };
-    const user = await User.findOne(query);
-    if (!user) return res.status(404).json({ success: false, message: "No account found with these details" });
+    // Try finding by exact phone, or with/without +91
+    let user = await User.findOne({ phone });
+    if (!user && phone.startsWith("+91")) {
+      user = await User.findOne({ phone: phone.replace("+91", "").trim() });
+    } else if (!user && phone.length === 10) {
+      user = await User.findOne({ phone: "+91" + phone });
+    }
+
+    if (!user) return res.status(404).json({ success: false, message: "No account found with this mobile number" });
     if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
 
     user.lastLogin = Date.now();

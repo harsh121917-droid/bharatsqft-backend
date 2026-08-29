@@ -60,12 +60,14 @@ const KycSchema = new mongoose.Schema(
         // Verification status
         status: {
             type: String,
-            enum: ["pending", "approved", "rejected"],
+            enum: ["pending", "approved", "rejected", "revoked"],
             default: "pending",
         },
         rejectionReason: { type: String, trim: true },
+        revokedReason: { type: String, trim: true },
         reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         reviewedAt: { type: Date },
+        revokedAt: { type: Date },
 
         submittedAt: { type: Date, default: Date.now },
     },

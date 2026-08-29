@@ -350,6 +350,12 @@ tbody td {
     border: 1px solid var(--danger-border);
 }
 
+.badge-revoked, .badge-amber {
+    background: rgba(234, 88, 12, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(234, 88, 12, 0.35);
+}
+
 .badge-gold {
     background: rgba(245, 166, 35, 0.12);
     color: var(--gold);

@@ -3,10 +3,156 @@ const { Wallet, WalletTxn } = require("../models/Wallet");
 const RewardSettings = require("../models/RewardSettings");
 const RewardTxn = require("../models/RewardTxn");
 
+// Helper to compute expiresAt based on current settings
+function calculateExpiresAt(settings) {
+    if (!settings || !settings.expiryEnabled || settings.expiryType === "never") {
+        return null;
+    }
+    let days = settings.expiryDays || 30;
+    if (settings.expiryType === "daily") days = 1;
+    else if (settings.expiryType === "weekly") days = 7;
+    else if (settings.expiryType === "monthly") days = 30;
+    else if (settings.expiryType === "quarterly") days = 90;
+    else if (settings.expiryType === "yearly") days = 365;
+
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
+// Helper to process and deduct expired points for a single user
+async function processExpiredPoints(userId) {
+    try {
+        const settings = await RewardSettings.findOne({ isActive: true });
+        if (!settings || !settings.expiryEnabled || settings.expiryType === "never") {
+            return { expiredPoints: 0, count: 0 };
+        }
+
+        const now = new Date();
+        const expiredTxns = await RewardTxn.find({
+            user: userId,
+            points: { $gt: 0 },
+            isExpired: { $ne: true },
+            expiresAt: { $exists: true, $ne: null, $lte: now },
+        });
+
+        if (!expiredTxns || expiredTxns.length === 0) {
+            return { expiredPoints: 0, count: 0 };
+        }
+
+        let totalExpired = 0;
+        for (const tx of expiredTxns) {
+            totalExpired += tx.points;
+            tx.isExpired = true;
+            tx.expiredAt = now;
+            await tx.save();
+        }
+
+        if (totalExpired > 0) {
+            const user = await User.findById(userId);
+            if (user) {
+                user.rewardPoints = Math.max(0, (user.rewardPoints || 0) - totalExpired);
+                await user.save();
+
+                await RewardTxn.create({
+                    user: userId,
+                    type: "expired",
+                    points: -totalExpired,
+                    description: `Expired ${totalExpired} reward points past validity date`,
+                    extra: {
+                        expiredTxnIds: expiredTxns.map((t) => t._id),
+                        expiredAt: now,
+                    },
+                });
+            }
+        }
+
+        return { expiredPoints: totalExpired, count: expiredTxns.length };
+    } catch (err) {
+        console.error("Error processing expired points for user:", userId, err);
+        return { expiredPoints: 0, count: 0 };
+    }
+}
+
+// Global expiry sweep across all users (used by admin or cron)
+exports.runGlobalExpirySweep = async () => {
+    const settings = await RewardSettings.findOne({ isActive: true });
+    if (!settings || !settings.expiryEnabled || settings.expiryType === "never") {
+        return { sweptUsers: 0, totalPointsExpired: 0, message: "Rewards expiry is currently disabled." };
+    }
+
+    const now = new Date();
+    const expiredTxns = await RewardTxn.find({
+        points: { $gt: 0 },
+        isExpired: { $ne: true },
+        expiresAt: { $exists: true, $ne: null, $lte: now },
+    });
+
+    if (!expiredTxns || expiredTxns.length === 0) {
+        return { sweptUsers: 0, totalPointsExpired: 0, message: "No expired points found." };
+    }
+
+    // Group by user
+    const userMap = {};
+    for (const tx of expiredTxns) {
+        const uId = tx.user.toString();
+        if (!userMap[uId]) userMap[uId] = [];
+        userMap[uId].push(tx);
+    }
+
+    let totalPoints = 0;
+    let userCount = 0;
+
+    for (const [uId, txns] of Object.entries(userMap)) {
+        let userExpired = 0;
+        for (const tx of txns) {
+            userExpired += tx.points;
+            tx.isExpired = true;
+            tx.expiredAt = now;
+            await tx.save();
+        }
+
+        if (userExpired > 0) {
+            const user = await User.findById(uId);
+            if (user) {
+                user.rewardPoints = Math.max(0, (user.rewardPoints || 0) - userExpired);
+                await user.save();
+
+                await RewardTxn.create({
+                    user: uId,
+                    type: "expired",
+                    points: -userExpired,
+                    description: `Expired ${userExpired} reward points past validity period`,
+                    extra: {
+                        expiredTxnIds: txns.map((t) => t._id),
+                        expiredAt: now,
+                    },
+                });
+
+                totalPoints += userExpired;
+                userCount++;
+            }
+        }
+    }
+
+    return {
+        sweptUsers: userCount,
+        totalPointsExpired: totalPoints,
+        message: `Successfully expired ${totalPoints} points across ${userCount} users.`,
+    };
+};
+
+exports.calculateExpiresAt = calculateExpiresAt;
+exports.processExpiredPoints = processExpiredPoints;
+
 // ── GET /api/rewards/balance ─────────────────────────────────────────────────
 exports.getRewardBalance = async (req, res, next) => {
     try {
-        const user = req.user;
+        const userId = req.user._id;
+
+        // Process any expired points for this user first
+        await processExpiredPoints(userId);
+
+        const user = await User.findById(userId);
+        const settings = await RewardSettings.findOne({ isActive: true });
 
         // Fetch spin transactions since start of today (IST midnight reset) to verify daily spin count (max 3)
         const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -30,6 +176,18 @@ exports.getRewardBalance = async (req, res, next) => {
             timeRemaining = Math.ceil((nextSpinTime.getTime() - Date.now()) / 1000);
         }
 
+        // Check points expiring soon (within next 7 days)
+        const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const expiringTxns = await RewardTxn.find({
+            user: user._id,
+            points: { $gt: 0 },
+            isExpired: { $ne: true },
+            expiresAt: { $exists: true, $ne: null, $gte: new Date(), $lte: in7Days }
+        }).sort({ expiresAt: 1 });
+
+        const expiringSoonPoints = expiringTxns.reduce((sum, t) => sum + t.points, 0);
+        const nextExpiryDate = expiringTxns.length > 0 ? expiringTxns[0].expiresAt : null;
+
         res.json({
             success: true,
             data: {
@@ -40,6 +198,13 @@ exports.getRewardBalance = async (req, res, next) => {
                 spinsLeft,
                 timeRemaining,
                 nextSpinTime,
+                expirySettings: {
+                    expiryEnabled: settings ? settings.expiryEnabled : true,
+                    expiryType: settings ? settings.expiryType : "monthly",
+                    expiryDays: settings ? settings.expiryDays : 30,
+                },
+                expiringSoonPoints,
+                nextExpiryDate,
             },
         });
     } catch (err) {
@@ -90,12 +255,14 @@ exports.spinWheel = async (req, res, next) => {
         user.rewardPoints = (user.rewardPoints || 0) + pointsWon;
         await user.save();
 
-        // Log points transaction
+        // Log points transaction with expiration
+        const expiresAt = calculateExpiresAt(settings);
         await RewardTxn.create({
             user: user._id,
             type: "spin_win",
             points: pointsWon,
             description: `Won ${pointsWon} points on Daily Spin to Win`,
+            expiresAt,
         });
 
         res.json({

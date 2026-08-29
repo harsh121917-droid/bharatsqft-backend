@@ -343,7 +343,7 @@ function renderRewardHistoryTable(logs) {
     body.innerHTML = html;
 }
 
-// ── 4. Reward Settings ─────────────────────────────────────────
+// ── 4. Reward Settings & Expiry Control ─────────────────────────
 async function loadRewardSettings() {
     try {
         const res = await api("/admin/rewards/settings");
@@ -353,9 +353,73 @@ async function loadRewardSettings() {
             document.getElementById("reward-referral-points").value = s.referralPoints || 200;
             document.getElementById("reward-kyc-points").value = s.registrationPoints || s.kycCompletionPoints || 100;
             document.getElementById("reward-point-value").value = s.pointToWalletRate || s.rupeesPerPoint || 0.05;
+
+            // Expiry fields
+            const expiryEnabled = s.expiryEnabled !== false;
+            const expiryEnabledEl = document.getElementById("reward-expiry-enabled");
+            if (expiryEnabledEl) expiryEnabledEl.checked = expiryEnabled;
+
+            const expiryTypeEl = document.getElementById("reward-expiry-type");
+            if (expiryTypeEl) expiryTypeEl.value = s.expiryType || "monthly";
+
+            const expiryDaysEl = document.getElementById("reward-expiry-days");
+            if (expiryDaysEl) expiryDaysEl.value = s.expiryDays || 30;
+
+            toggleRewardExpiryControls();
+            onRewardExpiryTypeChange();
         }
     } catch (e) {
         console.error("Error loading reward settings:", e);
+    }
+}
+
+function toggleRewardExpiryControls() {
+    const isEnabled = document.getElementById("reward-expiry-enabled")?.checked;
+    const statusText = document.getElementById("reward-expiry-status-text");
+    const presetWrap = document.getElementById("reward-expiry-preset-wrap");
+    const customWrap = document.getElementById("reward-expiry-custom-days-wrap");
+
+    if (statusText) {
+        statusText.textContent = isEnabled ? "Active (Expiring)" : "Disabled (Never Expire)";
+        statusText.style.color = isEnabled ? "#10b981" : "#94a3b8";
+    }
+
+    if (presetWrap) presetWrap.style.opacity = isEnabled ? "1" : "0.4";
+    if (customWrap) customWrap.style.opacity = isEnabled ? "1" : "0.4";
+}
+
+function onRewardExpiryTypeChange() {
+    const type = document.getElementById("reward-expiry-type")?.value;
+    const customWrap = document.getElementById("reward-expiry-custom-days-wrap");
+    if (customWrap) {
+        customWrap.style.display = type === "custom_days" ? "block" : "none";
+    }
+}
+
+async function runRewardExpirySweep() {
+    const btn = document.getElementById("btn-run-expiry-sweep");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing Sweep...`;
+    }
+
+    try {
+        toast("Running reward points expiry check sweep...", "info");
+        const res = await api("/admin/rewards/run-expiry-check", { method: "POST" });
+        if (res.success) {
+            toast(res.message || "Expiry sweep completed successfully", "success");
+            loadRewardsSummary();
+            if (activeRewardTab === "points") loadRewardHistory(1);
+        } else {
+            toast(res.message || "Failed to execute expiry sweep", "danger");
+        }
+    } catch (err) {
+        toast("Network error while running expiry sweep", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-bolt"></i> Run Expiry Check Now`;
+        }
     }
 }
 
@@ -365,19 +429,31 @@ async function saveRewardSettings() {
     const registrationPoints = Number(document.getElementById("reward-kyc-points")?.value);
     const pointToWalletRate = Number(document.getElementById("reward-point-value")?.value);
 
+    const expiryEnabled = document.getElementById("reward-expiry-enabled")?.checked ?? true;
+    const expiryType = document.getElementById("reward-expiry-type")?.value || "monthly";
+    const expiryDays = Number(document.getElementById("reward-expiry-days")?.value || 30);
+
     try {
         const res = await api("/admin/rewards/settings", {
             method: "POST",
-            body: JSON.stringify({ pointsPer100Rupees, referralPoints, registrationPoints, pointToWalletRate })
+            body: JSON.stringify({
+                pointsPer100Rupees,
+                referralPoints,
+                registrationPoints,
+                pointToWalletRate,
+                expiryEnabled,
+                expiryType,
+                expiryDays,
+            })
         });
 
         if (res.success) {
-            toast("Reward settings updated successfully", "success");
+            toast("Reward rules & expiry settings updated successfully", "success");
         } else {
             toast(res.message || "Failed to save reward settings", "danger");
         }
     } catch (e) {
-        toast("Network error", "danger");
+        toast("Network error saving settings", "danger");
     }
 }
 

@@ -57,7 +57,7 @@ const UserSchema = new mongoose.Schema(
     },
     kycStatus: {
       type: String,
-      enum: ["pending", "approved", "rejected", "not_submitted"],
+      enum: ["pending", "approved", "rejected", "revoked", "not_submitted"],
       default: "not_submitted",
     },
     avatar: {

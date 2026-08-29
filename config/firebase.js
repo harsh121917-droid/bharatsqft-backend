@@ -74,6 +74,29 @@ module.exports = {
         ...(imageUrl && { imageUrl }),
         ...(imageUrl && { image: imageUrl }),
       },
+      android: {
+        priority: "high",
+        notification: {
+          title,
+          body,
+          ...(imageUrl && { imageUrl }),
+          sound: "default",
+          channelId: "high_importance_channel",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: { title, body },
+            sound: "default",
+            "mutable-content": 1,
+          },
+        },
+        fcmOptions: {
+          ...(imageUrl && { imageUrl }),
+          ...(imageUrl && { image: imageUrl }),
+        },
+      },
     };
 
     if (!isInitialized || !messagingInstance) {

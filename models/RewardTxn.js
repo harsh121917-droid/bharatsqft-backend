@@ -9,7 +9,7 @@ const RewardTxnSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["spin_win", "registration", "referral", "redeem"],
+            enum: ["spin_win", "registration", "referral", "redeem", "expired", "admin_adjustment"],
             required: true,
         },
         points: {
@@ -19,6 +19,16 @@ const RewardTxnSchema = new mongoose.Schema(
         description: {
             type: String,
             required: true,
+        },
+        expiresAt: {
+            type: Date,
+        },
+        isExpired: {
+            type: Boolean,
+            default: false,
+        },
+        expiredAt: {
+            type: Date,
         },
         extra: {
             type: mongoose.Schema.Types.Mixed,

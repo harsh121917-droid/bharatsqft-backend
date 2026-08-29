@@ -3,17 +3,57 @@
    ══════════════════════════════════════════════════════════════ */
 
 let currentKycId = null;
+let currentKycFilter = "pending";
+let kycSearchQuery = "";
+let kycSearchDebounce = null;
 
-async function loadKyc(status = "pending") {
+function setKycFilter(status) {
+    currentKycFilter = status;
+    document.querySelectorAll('.kyc-filter-pill').forEach(p => p.classList.remove('active'));
+    document.getElementById(`kyc-pill-${status}`)?.classList.add('active');
+    loadKyc(status);
+}
+
+function debouncedSearchKyc(query) {
+    kycSearchQuery = (query || "").trim();
+    clearTimeout(kycSearchDebounce);
+    kycSearchDebounce = setTimeout(() => {
+        loadKyc(currentKycFilter);
+    }, 300);
+}
+
+async function loadKyc(status = currentKycFilter) {
+    currentKycFilter = status;
     const body = document.getElementById("kyc-body");
     if (!body) return;
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading KYC requests...</div></div>`;
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading KYC queue...</div></div>`;
 
     try {
-        const res = await api(`/admin/kyc?status=${status}`);
+        let url = `/admin/kyc?status=${status}`;
+        if (kycSearchQuery) url += `&search=${encodeURIComponent(kycSearchQuery)}`;
+
+        const res = await api(url);
         if (!res.success) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load KYC"}</div></div>`;
             return;
+        }
+
+        // Update badge counters
+        if (res.pendingCount !== undefined) {
+            const elP = document.getElementById("kyc-badge-pending");
+            if (elP) elP.textContent = res.pendingCount;
+        }
+        if (res.approvedCount !== undefined) {
+            const elA = document.getElementById("kyc-badge-approved");
+            if (elA) elA.textContent = res.approvedCount;
+        }
+        if (res.rejectedCount !== undefined) {
+            const elR = document.getElementById("kyc-badge-rejected");
+            if (elR) elR.textContent = res.rejectedCount;
+        }
+        if (res.revokedCount !== undefined) {
+            const elRev = document.getElementById("kyc-badge-revoked");
+            if (elRev) elRev.textContent = res.revokedCount;
         }
 
         renderKycTable(res.data || []);
@@ -27,7 +67,7 @@ function renderKycTable(kycList) {
     if (!body) return;
 
     if (!kycList || kycList.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-id-card" style="font-size:32px;color:var(--text-dim)"></i><div>No KYC requests in this filter</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-id-card" style="font-size:32px;color:var(--text-dim)"></i><div>No KYC requests in this category</div></div>`;
         return;
     }
 
@@ -42,15 +82,24 @@ function renderKycTable(kycList) {
                     <th>Bank Details</th>
                     <th>Submitted</th>
                     <th>Status</th>
-                    <th style="text-align:right">Action</th>
+                    <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
             <tbody>`;
 
     kycList.forEach(k => {
         let badgeClass = "badge-pending";
-        if (k.status === "approved") badgeClass = "badge-success";
-        if (k.status === "rejected") badgeClass = "badge-danger";
+        let statusLabel = "Pending";
+        if (k.status === "approved") {
+            badgeClass = "badge-success";
+            statusLabel = "Approved";
+        } else if (k.status === "rejected") {
+            badgeClass = "badge-danger";
+            statusLabel = "Rejected";
+        } else if (k.status === "revoked") {
+            badgeClass = "badge-amber";
+            statusLabel = "Revoked";
+        }
 
         const u = k.user || {};
         const bank = k.bankDetails || {};
@@ -68,11 +117,31 @@ function renderKycTable(kycList) {
                 <div style="font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono)">${bank.accountNumber ? 'A/C: ' + bank.accountNumber : '—'}</div>
             </td>
             <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(k.submittedAt || k.createdAt)}</td>
-            <td><span class="badge ${badgeClass}">${k.status}</span></td>
+            <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
             <td style="text-align:right">
-                <button class="btn btn-primary btn-sm" onclick="openKycModal('${k._id}')">
-                    <i class="fas fa-eye"></i> Review
-                </button>
+                <div style="display:inline-flex;gap:6px;align-items:center">
+                    <button class="btn btn-secondary btn-sm" onclick="openKycModal('${k._id}')" title="Inspect Documents & Info">
+                        <i class="fas fa-eye"></i> Review
+                    </button>
+                    ${k.status === 'pending' ? `
+                        <button class="btn btn-success btn-sm" onclick="quickReviewKyc('${k._id}', 'approved')" title="Approve KYC">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="quickReviewKyc('${k._id}', 'rejected')" title="Reject KYC">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                    ${k.status === 'approved' ? `
+                        <button class="btn btn-danger btn-sm" onclick="quickReviewKyc('${k._id}', 'revoked')" title="Revoke KYC">
+                            <i class="fas fa-ban"></i> Revoke
+                        </button>
+                    ` : ''}
+                    ${k.status === 'rejected' || k.status === 'revoked' ? `
+                        <button class="btn btn-success btn-sm" onclick="quickReviewKyc('${k._id}', 'approved')" title="Re-Approve KYC">
+                            <i class="fas fa-check"></i> Approve
+                        </button>
+                    ` : ''}
+                </div>
             </td>
         </tr>`;
     });
@@ -103,12 +172,20 @@ async function openKycModal(id) {
         const bank = k.bankDetails || {};
         const addr = k.address || {};
 
+        let statusBadge = `<span class="badge badge-warning">Pending Review</span>`;
+        if (k.status === 'approved') statusBadge = `<span class="badge badge-success">Approved & Verified</span>`;
+        else if (k.status === 'rejected') statusBadge = `<span class="badge badge-danger">Rejected</span>`;
+        else if (k.status === 'revoked') statusBadge = `<span class="badge badge-amber">Revoked</span>`;
+
         body.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:1.25rem">
             <!-- User Basic Info -->
             <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
-                <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Customer Information</div>
-                <div style="font-size:15px;font-weight:700;color:#fff;margin-top:4px">${k.fullName || u.name}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Customer Profile</div>
+                    <div>${statusBadge}</div>
+                </div>
+                <div style="font-size:16px;font-weight:700;color:#fff">${k.fullName || u.name}</div>
                 <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${u.email || 'No email'} • ${u.phone || 'No phone'}</div>
                 <div style="font-size:13px;color:var(--text-dim);margin-top:4px"><strong>DOB:</strong> ${formatDate(k.dob)}</div>
                 <div style="font-size:13px;color:var(--text-dim);margin-top:2px"><strong>Address:</strong> ${addr.line1 || ''}, ${addr.city || ''}, ${addr.state || ''} - ${addr.pincode || ''}</div>
@@ -119,19 +196,19 @@ async function openKycModal(id) {
                 <!-- PAN Card -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
                     <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:6px">PAN: ${k.panNumber || '—'}</div>
-                    ${k.panImage?.url ? `<a href="${k.panImage.url}" target="_blank"><img src="${k.panImage.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No PAN image</div>'}
+                    ${k.panImage?.url ? `<a href="${k.panImage.url}" target="_blank" title="Click to view full image"><img src="${k.panImage.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No PAN image uploaded</div>'}
                 </div>
 
                 <!-- Aadhaar Front -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
                     <div style="font-size:12px;font-weight:700;color:var(--info);margin-bottom:6px">Aadhaar Front</div>
-                    ${k.aadhaarFront?.url ? `<a href="${k.aadhaarFront.url}" target="_blank"><img src="${k.aadhaarFront.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No front image</div>'}
+                    ${k.aadhaarFront?.url ? `<a href="${k.aadhaarFront.url}" target="_blank" title="Click to view full image"><img src="${k.aadhaarFront.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No front image uploaded</div>'}
                 </div>
 
                 <!-- Aadhaar Back -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
                     <div style="font-size:12px;font-weight:700;color:var(--info);margin-bottom:6px">Aadhaar Back</div>
-                    ${k.aadhaarBack?.url ? `<a href="${k.aadhaarBack.url}" target="_blank"><img src="${k.aadhaarBack.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No back image</div>'}
+                    ${k.aadhaarBack?.url ? `<a href="${k.aadhaarBack.url}" target="_blank" title="Click to view full image"><img src="${k.aadhaarBack.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No back image uploaded</div>'}
                 </div>
             </div>
 
@@ -146,14 +223,38 @@ async function openKycModal(id) {
                 </div>
             </div>
 
-            ${k.rejectionReason ? `<div style="background:var(--danger-bg);border:1px solid var(--danger-border);padding:0.75rem 1rem;border-radius:var(--radius-sm);color:var(--danger);font-size:13px"><strong>Rejection Reason:</strong> ${k.rejectionReason}</div>` : ''}
+            ${k.rejectionReason || k.revokedReason ? `
+                <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:0.75rem 1rem;border-radius:var(--radius-sm);color:#fca5a5;font-size:13px">
+                    <strong><i class="fas fa-info-circle"></i> Reason / Note:</strong> ${k.rejectionReason || k.revokedReason}
+                </div>
+            ` : ''}
         </div>`;
 
         if (footer) {
+            let actionButtons = '';
+            
+            if (k.status === 'pending') {
+                actionButtons = `
+                    <button class="btn btn-danger" onclick="reviewKyc('rejected')"><i class="fas fa-times"></i> Reject KYC</button>
+                    <button class="btn btn-success" onclick="reviewKyc('approved')"><i class="fas fa-check"></i> Approve KYC</button>
+                `;
+            } else if (k.status === 'approved') {
+                actionButtons = `
+                    <button class="btn btn-danger" onclick="reviewKyc('revoked')" style="background:#ea580c;border-color:#ea580c">
+                        <i class="fas fa-ban"></i> Revoke KYC
+                    </button>
+                    <button class="btn btn-danger" onclick="reviewKyc('rejected')"><i class="fas fa-times"></i> Reject</button>
+                `;
+            } else if (k.status === 'rejected' || k.status === 'revoked') {
+                actionButtons = `
+                    <button class="btn btn-secondary" onclick="reviewKyc('pending')"><i class="fas fa-undo"></i> Reset to Pending</button>
+                    <button class="btn btn-success" onclick="reviewKyc('approved')"><i class="fas fa-check"></i> Re-Approve KYC</button>
+                `;
+            }
+
             footer.innerHTML = `
                 <button class="btn btn-secondary" onclick="closeKycModal()">Close</button>
-                ${k.status !== 'approved' ? `<button class="btn btn-danger" onclick="reviewKyc('rejected')"><i class="fas fa-times"></i> Reject</button>` : ''}
-                ${k.status !== 'approved' ? `<button class="btn btn-success" onclick="reviewKyc('approved')"><i class="fas fa-check"></i> Approve KYC</button>` : ''}
+                ${actionButtons}
             `;
         }
     } catch (e) {
@@ -167,6 +268,11 @@ function closeKycModal() {
     currentKycId = null;
 }
 
+async function quickReviewKyc(id, decision) {
+    currentKycId = id;
+    await reviewKyc(decision);
+}
+
 async function reviewKyc(decision) {
     if (!currentKycId) return;
 
@@ -178,6 +284,13 @@ async function reviewKyc(decision) {
             toast("Rejection reason is required", "warning");
             return;
         }
+    } else if (decision === "revoked") {
+        reason = prompt("Please provide a reason for REVOKING this verified KYC:");
+        if (reason === null) return;
+        if (!reason.trim()) {
+            toast("Revocation reason is required", "warning");
+            return;
+        }
     }
 
     try {
@@ -187,7 +300,13 @@ async function reviewKyc(decision) {
         });
 
         if (res.success) {
-            toast(`KYC ${decision === 'approved' ? 'Approved' : 'Rejected'} successfully`, "success");
+            let msg = "KYC status updated";
+            if (decision === "approved") msg = "KYC Approved successfully!";
+            else if (decision === "rejected") msg = "KYC Rejected successfully";
+            else if (decision === "revoked") msg = "KYC Verification Revoked successfully";
+            else if (decision === "pending") msg = "KYC Reset to Pending Review";
+
+            toast(msg, "success");
             closeKycModal();
             loadKyc();
             if (typeof loadDashboard === "function") loadDashboard();
