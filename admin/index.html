@@ -3376,37 +3376,61 @@
         <div class="modal-overlay" id="gateway-modal" style="display:none">
             <div class="modal">
                 <div class="modal-header">
-                    <div class="modal-title" id="gateway-modal-title">Payment Gateway</div>
+                    <div class="modal-title" id="gateway-modal-title"><i class="fas fa-credit-card" style="color:var(--gold);margin-right:8px"></i> Payment Gateway</div>
                     <button class="modal-close" onclick="closeGatewayModal()">×</button>
                 </div>
                 <div class="modal-body">
-                    <form id="gateway-form" onsubmit="event.preventDefault()">
+                    <form id="gateway-form" onsubmit="event.preventDefault(); saveGateway();">
                         <div class="form-group">
-                            <label class="form-label">Gateway Name</label>
-                            <input class="form-control" id="gateway-name" placeholder="Razorpay Primary" required />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Provider Type</label>
-                            <select class="form-control" id="gateway-type">
-                                <option value="razorpay">Razorpay</option>
-                                <option value="cashfree">Cashfree</option>
-                                <option value="phonepe">PhonePe</option>
+                            <label class="form-label">Gateway Provider</label>
+                            <select class="form-control" id="gateway-name">
+                                <option value="razorpay">Razorpay (UPI, AutoPay, Cards, NetBanking)</option>
+                                <option value="cashfree">Cashfree Payments</option>
+                                <option value="cashfree_payout">Cashfree Payouts (Bank Transfers)</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">API Key / Merchant ID</label>
-                            <input class="form-control" id="gateway-key" placeholder="rzp_live_..." required />
+                            <label class="form-label">Environment Mode</label>
+                            <select class="form-control" id="gateway-mode">
+                                <option value="live">Live (Production)</option>
+                                <option value="demo">Demo / Test (Sandbox)</option>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">API Secret (Leave blank to keep unchanged)</label>
-                            <input class="form-control" type="password" id="gateway-secret"
-                                placeholder="••••••••••••" />
+                            <label class="form-label">Key ID / Client ID</label>
+                            <input class="form-control" id="gateway-key" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx" required style="font-family:monospace;" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Secret Key (Leave blank to keep existing)</label>
+                            <input class="form-control" type="password" id="gateway-secret" placeholder="••••••••••••" style="font-family:monospace;" />
+                        </div>
+                        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:12px">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                                <div>
+                                    <div style="color:#fff;font-weight:700;font-size:13px">Set as Active Default Gateway</div>
+                                    <div style="color:var(--text-dim);font-size:11px">Mobile app & backend will use this gateway for all transactions.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="gateway-is-default" />
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between">
+                                <div>
+                                    <div style="color:#fff;font-weight:700;font-size:13px">Enable Gateway</div>
+                                    <div style="color:var(--text-dim);font-size:11px">Allow transactions through this provider.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="gateway-is-active" checked />
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveGateway()">Save Gateway</button>
+                    <button class="btn btn-primary" onclick="saveGateway()"><i class="fas fa-save"></i> Save Gateway</button>
                 </div>
             </div>
         </div>
@@ -3438,70 +3462,6 @@
         </div>
 
         
-        <!-- ══════════════════════════════════════════════════════════
-             PAYMENT GATEWAY CONFIGURATION MODAL
-             ══════════════════════════════════════════════════════════ -->
-        <div id="gateway-modal" class="modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
-            <div class="modal-content" style="background:#131d18;border:1px solid #2a4736;border-radius:18px;width:92%;max-width:540px;padding:24px;box-shadow:0 20px 40px rgba(0,0,0,0.6);max-height:90vh;overflow-y:auto;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid #2a4736;padding-bottom:14px;">
-                    <h3 id="gateway-modal-title" style="margin:0;color:#fff;font-size:18px;font-weight:800;"><i class="fas fa-credit-card" style="color:#d4a017;margin-right:8px;"></i> Payment Gateway Config</h3>
-                    <button type="button" onclick="closeGatewayModal()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;"><i class="fas fa-times"></i></button>
-                </div>
-                
-                <form id="gateway-form" onsubmit="event.preventDefault(); saveGateway();">
-                    <div class="form-group" style="margin-bottom:14px;">
-                        <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#cbd5e1;">Gateway Provider</label>
-                        <select id="gateway-name" class="form-control" style="width:100%;padding:10px 14px;background:#0d1410;border:1px solid #2a4736;border-radius:10px;color:#fff;font-size:13px;">
-                            <option value="razorpay">Razorpay (UPI, AutoPay, Cards, NetBanking)</option>
-                            <option value="cashfree">Cashfree Payments</option>
-                            <option value="cashfree_payout">Cashfree Payouts (Bank Transfers)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom:14px;">
-                        <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#cbd5e1;">Environment Mode</label>
-                        <select id="gateway-mode" class="form-control" style="width:100%;padding:10px 14px;background:#0d1410;border:1px solid #2a4736;border-radius:10px;color:#fff;font-size:13px;">
-                            <option value="live">Live (Production Environment)</option>
-                            <option value="demo">Demo / Test (Sandbox Environment)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom:14px;">
-                        <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#cbd5e1;">Key ID / Client ID</label>
-                        <input type="text" id="gateway-key" class="form-control" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx" required style="width:100%;padding:10px 14px;background:#0d1410;border:1px solid #2a4736;border-radius:10px;color:#fff;font-size:13px;font-family:monospace;" />
-                    </div>
-
-                    <div class="form-group" style="margin-bottom:18px;">
-                        <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#cbd5e1;">Secret Key / Client Secret</label>
-                        <input type="password" id="gateway-secret" class="form-control" placeholder="Enter API Secret Key" style="width:100%;padding:10px 14px;background:#0d1410;border:1px solid #2a4736;border-radius:10px;color:#fff;font-size:13px;font-family:monospace;" />
-                        <small style="color:#94a3b8;font-size:11px;margin-top:4px;display:block;">Leave blank when editing to keep existing secret unchanged.</small>
-                    </div>
-
-                    <div style="background:#0d1410;border:1px solid #2a4736;border-radius:12px;padding:14px;margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                            <div>
-                                <div style="color:#fff;font-weight:700;font-size:13px;">Set as Active Default Gateway</div>
-                                <div style="color:#94a3b8;font-size:11px;">Mobile app & backend will use this gateway for all transactions.</div>
-                            </div>
-                            <input type="checkbox" id="gateway-is-default" style="transform:scale(1.3);cursor:pointer;" />
-                        </div>
-                        <div style="display:flex;align-items:center;justify-content:space-between;">
-                            <div>
-                                <div style="color:#fff;font-weight:700;font-size:13px;">Enable Gateway</div>
-                                <div style="color:#94a3b8;font-size:11px;">Allow transactions through this gateway provider.</div>
-                            </div>
-                            <input type="checkbox" id="gateway-is-active" checked style="transform:scale(1.3);cursor:pointer;" />
-                        </div>
-                    </div>
-
-                    <div style="display:flex;justify-content:flex-end;gap:10px;">
-                        <button type="button" class="btn btn-outline" onclick="closeGatewayModal()" style="padding:10px 18px;border-radius:10px;cursor:pointer;">Cancel</button>
-                        <button type="submit" class="btn btn-primary" style="padding:10px 22px;background:#d4a017;color:#000;font-weight:800;border:none;border-radius:10px;cursor:pointer;"><i class="fas fa-save"></i> Save Gateway</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- ══════════════════════════════════════════════════════════
          5. MODULAR JAVASCRIPT BUNDLE
          ══════════════════════════════════════════════════════════ -->
