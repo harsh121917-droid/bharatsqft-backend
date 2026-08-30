@@ -53,7 +53,6 @@ function verifyRazorpaySignature({ orderId, paymentId, signature, keySecret }) {
     return expected === signature;
 }
 
-
 async function createRazorpaySubscription({ amount, frequency, totalCycles, notes, mode }) {
     const config = await resolveGateway({ gateway: "razorpay", mode });
     const razorpay = new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
@@ -175,7 +174,9 @@ async function getCashfreePayoutToken(mode) {
 module.exports = {
     resolveGateway,
     createRazorpayOrder,
+    createRazorpaySubscription,
     verifyRazorpaySignature,
+    verifyRazorpaySubscriptionSignature,
     getRazorpayKeySecret,
     createCashfreeOrder,
     verifyCashfreeOrder,
