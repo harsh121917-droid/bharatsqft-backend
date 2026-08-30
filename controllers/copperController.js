@@ -137,3 +137,164 @@ exports.getTransactionInvoice = async (req, res, next) => {
         await generateInvoicePDF(txn, req.user, "copper", res, isSample);
     } catch (err) { next(err); }
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/copper/buy (or /api/copper/buy/initiate) — Direct Razorpay Buy Order
+// ══════════════════════════════════════════════════════════════════════════════
+exports.initiateBuy = async (req, res, next) => {
+    try {
+        const { fetchLiveRates } = require("./goldController");
+        const paymentGatewayService = require("../services/paymentGatewayService");
+        const User = require("../models/User");
+        const Coupon = require("../models/Coupon");
+
+        if (req.user.kycStatus !== "approved") {
+            return res.status(400).json({ success: false, message: "Please complete your KYC to buy copper." });
+        }
+
+        const rates = await fetchLiveRates();
+        const buyRate = rates.copper?.buyRate || 1.36;
+        let { amountInRupees, grams, redeemReferral, couponCode, pointsRedeemed } = req.body;
+
+        if (!amountInRupees && !grams) {
+            return res.status(400).json({ success: false, message: "Provide amountInRupees or grams" });
+        }
+        if (grams && !amountInRupees) {
+            amountInRupees = parseFloat((grams * buyRate).toFixed(2));
+        }
+
+        let isRedeemed = false;
+        let purchaseValue = amountInRupees;
+        if (redeemReferral) {
+            const user = await User.findById(req.user._id);
+            if (user.referralBalance && user.referralBalance >= 50 && amountInRupees >= 1000) {
+                isRedeemed = true;
+                purchaseValue = amountInRupees + 50;
+            }
+        }
+
+        let couponBonus = 0;
+        let couponDiscount = 0;
+        let appliedCoupon = null;
+        if (couponCode) {
+            const cp = await Coupon.findOne({ code: couponCode.toUpperCase().trim(), isActive: true });
+            if (cp && (!cp.minPurchase || amountInRupees >= cp.minPurchase) && (cp.metal === "both" || cp.metal === "copper")) {
+                appliedCoupon = cp;
+                if (cp.type === "discount") {
+                    couponDiscount = cp.calcType === "percentage" ? (amountInRupees * cp.value) / 100 : cp.value;
+                    if (cp.maxDiscount && couponDiscount > cp.maxDiscount) couponDiscount = cp.maxDiscount;
+                } else if (cp.type === "extra_gold") {
+                    couponBonus = cp.calcType === "percentage" ? (amountInRupees * cp.value) / 100 : cp.value;
+                }
+            }
+        }
+
+        const effectivePayAmount = Math.max(1, amountInRupees - couponDiscount);
+        const gstAmt = parseFloat(((effectivePayAmount * 18.0) / 100).toFixed(2));
+        const totalAmt = parseFloat((effectivePayAmount + gstAmt).toFixed(2));
+        const gramsToAdd = parseFloat(((purchaseValue + couponBonus) / buyRate).toFixed(6));
+
+        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+            amount: totalAmt,
+            notes: {
+                userId: req.user._id.toString(),
+                type: "copper_buy",
+                grams: gramsToAdd,
+                couponCode: appliedCoupon ? appliedCoupon.code : "",
+            },
+        });
+
+        const txn = await CopperTransaction.create({
+            user: req.user._id,
+            type: "buy",
+            grams: gramsToAdd,
+            ratePerGram: buyRate,
+            copperValue: purchaseValue + couponBonus,
+            gstAmt,
+            totalAmt,
+            status: "pending",
+            razorpayOrderId: order.id,
+            isReferralRedeemed: isRedeemed,
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            couponBonus,
+            couponDiscount,
+            isCouponApplied: !!appliedCoupon,
+        });
+
+        res.json({
+            success: true,
+            data: {
+                order,
+                key: keyId,
+                transaction: { id: txn._id },
+                breakdown: { grams: gramsToAdd, copperValue: purchaseValue, gstAmt, totalAmt, ratePerGram: buyRate },
+            },
+        });
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/copper/buy/verify — Verify Razorpay Payment and Credit Copper
+// ══════════════════════════════════════════════════════════════════════════════
+exports.verifyBuy = async (req, res, next) => {
+    try {
+        const paymentGatewayService = require("../services/paymentGatewayService");
+        const User = require("../models/User");
+        const {
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            transactionId,
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+        } = req.body;
+
+        const orderId = razorpayOrderId || razorpay_order_id;
+        const paymentId = razorpayPaymentId || razorpay_payment_id;
+        const signature = razorpaySignature || razorpay_signature;
+
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret();
+        const isValid = paymentGatewayService.verifyRazorpaySignature({
+            orderId,
+            paymentId,
+            signature,
+            keySecret,
+        });
+
+        if (!isValid) {
+            if (transactionId) await CopperTransaction.findByIdAndUpdate(transactionId, { status: "failed" });
+            return res.status(400).json({ success: false, message: "Payment signature verification failed" });
+        }
+
+        const txn = await CopperTransaction.findOne({
+            $or: [{ _id: transactionId }, { razorpayOrderId: orderId }],
+            user: req.user._id,
+        });
+        if (!txn) return res.status(404).json({ success: false, message: "Copper transaction not found" });
+
+        if (txn.status !== "success") {
+            const bal = await getOrCreateBalance(req.user._id);
+            bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
+            bal.investedAmt = parseFloat((bal.investedAmt + txn.totalAmt).toFixed(2));
+            await bal.save();
+
+            if (txn.isReferralRedeemed) {
+                const user = await User.findById(req.user._id);
+                user.referralBalance = Math.max(0, (user.referralBalance || 0) - 50);
+                await user.save();
+            }
+
+            txn.status = "success";
+            txn.razorpayPaymentId = paymentId;
+            txn.razorpaySignature = signature;
+            await txn.save();
+        }
+
+        res.json({
+            success: true,
+            message: `${txn.grams}g copper successfully credited to your vault`,
+            data: { grams: txn.grams, transaction: txn },
+        });
+    } catch (err) { next(err); }
+};

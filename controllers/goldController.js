@@ -342,13 +342,16 @@ exports.getBalance = async (req, res, next) => {
 
 exports.initiateBuy = async (req, res, next) => {
     try {
+        const Coupon = require("../models/Coupon");
+        const User = require("../models/User");
+
         if (req.user.kycStatus !== "approved") {
             return res.status(400).json({ success: false, message: "Please complete your KYC to buy gold/silver." });
         }
 
         const rates = await fetchLiveRates();
         const buyRate = rates.gold.buyRate;
-        let { amountInRupees, grams, redeemReferral } = req.body;
+        let { amountInRupees, grams, redeemReferral, couponCode, pointsRedeemed } = req.body;
 
         if (!amountInRupees && !grams) {
             return res.status(400).json({ success: false, message: "Provide amountInRupees or grams" });
@@ -357,57 +360,69 @@ exports.initiateBuy = async (req, res, next) => {
             amountInRupees = parseFloat((grams * buyRate).toFixed(2));
         }
 
-        // If redeeming referral, validate conditions
         let isRedeemed = false;
         let purchaseValue = amountInRupees;
         if (redeemReferral) {
             const user = await User.findById(req.user._id);
-            if (!user.referralBalance || user.referralBalance < 50) {
-                return res.status(400).json({ success: false, message: "Insufficient referral balance (minimum ₹50 required)." });
+            if (user.referralBalance && user.referralBalance >= 50 && amountInRupees >= 1000) {
+                isRedeemed = true;
+                purchaseValue = amountInRupees + 50;
             }
-            if (amountInRupees < 1000) {
-                return res.status(400).json({ success: false, message: "Minimum metal purchase of ₹1000 is required to redeem referral bonus." });
+        }
+
+        let couponBonus = 0;
+        let couponDiscount = 0;
+        let appliedCoupon = null;
+        if (couponCode) {
+            const cp = await Coupon.findOne({ code: couponCode.toUpperCase().trim(), isActive: true });
+            if (cp && (!cp.minPurchase || amountInRupees >= cp.minPurchase) && (cp.metal === "both" || cp.metal === "gold")) {
+                appliedCoupon = cp;
+                if (cp.type === "discount") {
+                    couponDiscount = cp.calcType === "percentage" ? (amountInRupees * cp.value) / 100 : cp.value;
+                    if (cp.maxDiscount && couponDiscount > cp.maxDiscount) couponDiscount = cp.maxDiscount;
+                } else if (cp.type === "extra_gold") {
+                    couponBonus = cp.calcType === "percentage" ? (amountInRupees * cp.value) / 100 : cp.value;
+                }
             }
-            isRedeemed = true;
-            // The user pays for amountInRupees (e.g. ₹1000) but gets amountInRupees + ₹50 (e.g. ₹1050) worth of gold
-            purchaseValue = amountInRupees + 50;
         }
 
-        if (amountInRupees < MIN_BUY) {
-            return res.status(400).json({ success: false, message: `Minimum purchase is ₹${MIN_BUY}` });
-        }
-
-        const gramsToAdd = parseFloat((purchaseValue / buyRate).toFixed(6));
-        // GST is calculated on the actual amount paid by the user (amountInRupees)
-        const gstAmt = parseFloat(((amountInRupees * GST_PCT) / 100).toFixed(2));
-        const totalAmt = parseFloat((amountInRupees + gstAmt).toFixed(2));
-
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({
-                success: false,
-                message: `Active default payment gateway is '${config.name}', but direct gold purchases only support Razorpay. Please set Razorpay as the default gateway in Admin.`,
-            });
-        }
+        const effectivePayAmount = Math.max(1, amountInRupees - couponDiscount);
+        const gstAmt = parseFloat(((effectivePayAmount * GST_PCT) / 100).toFixed(2));
+        const totalAmt = parseFloat((effectivePayAmount + gstAmt).toFixed(2));
+        const gramsToAdd = parseFloat(((purchaseValue + couponBonus) / buyRate).toFixed(6));
 
         const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
             amount: totalAmt,
-            notes: { userId: req.user._id.toString(), type: "gold_buy", grams: gramsToAdd },
-            mode: config.mode,
+            notes: {
+                userId: req.user._id.toString(),
+                type: "gold_buy",
+                grams: gramsToAdd,
+                couponCode: appliedCoupon ? appliedCoupon.code : "",
+            },
         });
 
         const txn = await GoldTransaction.create({
-            user: req.user._id, type: "buy", grams: gramsToAdd,
-            ratePerGram: buyRate, goldValue: purchaseValue,
-            gstAmt, totalAmt, status: "pending",
+            user: req.user._id,
+            type: "buy",
+            grams: gramsToAdd,
+            ratePerGram: buyRate,
+            goldValue: purchaseValue + couponBonus,
+            gstAmt,
+            totalAmt,
+            status: "pending",
             razorpayOrderId: order.id,
             isReferralRedeemed: isRedeemed,
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            couponBonus,
+            couponDiscount,
+            isCouponApplied: !!appliedCoupon,
         });
 
         res.json({
             success: true,
             data: {
-                order, key: keyId,
+                order,
+                key: keyId,
                 transaction: { id: txn._id },
                 breakdown: { grams: gramsToAdd, goldValue: purchaseValue, gstAmt, totalAmt, ratePerGram: buyRate, isReferralRedeemed: isRedeemed },
             },
@@ -420,50 +435,62 @@ exports.initiateBuy = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.verifyBuy = async (req, res, next) => {
     try {
-        const { razorpayOrderId, razorpayPaymentId, razorpaySignature, transactionId } = req.body;
+        const User = require("../models/User");
+        const {
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            transactionId,
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+        } = req.body;
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
-        }
+        const orderId = razorpayOrderId || razorpay_order_id;
+        const paymentId = razorpayPaymentId || razorpay_payment_id;
+        const signature = razorpaySignature || razorpay_signature;
 
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret();
         const isValid = paymentGatewayService.verifyRazorpaySignature({
-            orderId: razorpayOrderId,
-            paymentId: razorpayPaymentId,
-            signature: razorpaySignature,
-            keySecret: config.keySecret,
+            orderId,
+            paymentId,
+            signature,
+            keySecret,
         });
 
         if (!isValid) {
-            await GoldTransaction.findByIdAndUpdate(transactionId, { status: "failed" });
+            if (transactionId) await GoldTransaction.findByIdAndUpdate(transactionId, { status: "failed" });
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
         const txn = await GoldTransaction.findOne({
-            _id: transactionId, user: req.user._id, status: "pending"
+            $or: [{ _id: transactionId }, { razorpayOrderId: orderId }],
+            user: req.user._id,
         });
         if (!txn) return res.status(404).json({ success: false, message: "Transaction not found" });
 
-        const bal = await getOrCreateBalance(req.user._id);
-        bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
-        bal.investedAmt = parseFloat((bal.investedAmt + (txn.totalAmt || txn.goldValue)).toFixed(2));
-        await bal.save();
+        if (txn.status !== "success") {
+            const bal = await getOrCreateBalance(req.user._id);
+            bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
+            bal.investedAmt = parseFloat((bal.investedAmt + (txn.totalAmt || txn.goldValue)).toFixed(2));
+            await bal.save();
 
-        if (txn.isReferralRedeemed) {
-            const user = await User.findById(req.user._id);
-            user.referralBalance = Math.max(0, (user.referralBalance || 0) - 50);
-            await user.save();
+            if (txn.isReferralRedeemed) {
+                const user = await User.findById(req.user._id);
+                user.referralBalance = Math.max(0, (user.referralBalance || 0) - 50);
+                await user.save();
+            }
+
+            txn.status = "success";
+            txn.razorpayPaymentId = paymentId;
+            txn.razorpaySignature = signature;
+            await txn.save();
         }
-
-        txn.status = "success";
-        txn.razorpayPaymentId = razorpayPaymentId;
-        txn.razorpaySignature = razorpaySignature;
-        await txn.save();
 
         res.json({
             success: true,
             message: `${txn.grams}g gold credited to your account`,
-            data: { grams: txn.grams, totalGrams: bal.totalGrams, paymentId: razorpayPaymentId },
+            data: { grams: txn.grams, totalGrams: txn.grams, transaction: txn },
         });
     } catch (err) { next(err); }
 };
