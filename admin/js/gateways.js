@@ -20,6 +20,7 @@ async function loadGateways() {
         allGateways = res.data || [];
         renderGateways(allGateways);
     } catch (e) {
+        console.error("Error loading gateways:", e);
         body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading gateways</div></div>`;
     }
 }
@@ -47,11 +48,12 @@ function renderGateways(gateways) {
             </thead>
             <tbody>`;
 
-    gateways.forEach(g => {
+    gateways.forEach((g, idx) => {
         const isLive = g.mode === "live";
-        const isRzp = g.name === "razorpay";
+        const isRzp = (g.name || "").toLowerCase() === "razorpay";
         const keyDisplay = g.keyId || g.clientId || "—";
         const isDef = !!g.isDefault;
+        const gatewayId = g._id || g.id || idx;
 
         html += `
         <tr style="${isDef ? 'background:rgba(212,160,23,0.06)' : ''}">
@@ -62,32 +64,32 @@ function renderGateways(gateways) {
                     </div>
                     <div>
                         <div style="font-weight:800;color:#fff;font-size:14px;text-transform:capitalize">
-                            ${g.name}
+                            ${g.name || 'Gateway'}
                             <span class="badge ${isLive ? 'badge-success' : 'badge-warning'}" style="margin-left:6px;font-size:10px;text-transform:uppercase">${g.mode || 'live'}</span>
                         </div>
-                        <div style="font-size:11px;color:var(--text-dim)">Updated: ${new Date(g.updatedAt || g.createdAt).toLocaleDateString()}</div>
+                        <div style="font-size:11px;color:var(--text-dim)">Updated: ${new Date(g.updatedAt || g.createdAt || Date.now()).toLocaleDateString()}</div>
                     </div>
                 </div>
             </td>
             <td>
-                <code style="background:var(--subBg);padding:4px 8px;border-radius:6px;font-size:12px;color:var(--gold);border:1px solid var(--border)">${keyDisplay}</code>
+                <code style="background:var(--subBg, #0d1410);padding:4px 8px;border-radius:6px;font-size:12px;color:var(--gold, #d4a017);border:1px solid var(--border, #2a4736)">${keyDisplay}</code>
             </td>
             <td>
                 ${isDef ? 
                     `<span class="badge badge-success" style="background:#10B981;color:#000;font-weight:900;padding:4px 10px;border-radius:8px"><i class="fas fa-check-circle"></i> ACTIVE DEFAULT</span>` : 
-                    `<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px" onclick="setGatewayDefault('${g._id}')"><i class="fas fa-star"></i> Set as Default</button>`
+                    `<button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')"><i class="fas fa-star"></i> Set as Default</button>`
                 }
             </td>
             <td>
                 <label class="switch">
-                    <input type="checkbox" ${g.isActive ? 'checked' : ''} onchange="toggleGatewayActive('${g._id}', this.checked)">
+                    <input type="checkbox" ${g.isActive ? 'checked' : ''} onchange="toggleGatewayActive('${gatewayId}', this.checked)">
                     <span class="slider"></span>
                 </label>
             </td>
             <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px">
-                    <button class="btn btn-sm btn-outline" onclick="openGatewayModal('${g._id}')" title="Edit Gateway"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteGateway('${g._id}')" title="Delete Gateway"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openGatewayModal('${gatewayId}')" title="Edit Gateway" style="cursor:pointer;"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteGateway('${gatewayId}')" title="Delete Gateway" style="cursor:pointer;"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
         </tr>`;
@@ -98,31 +100,68 @@ function renderGateways(gateways) {
 }
 
 function openGatewayModal(id = null) {
-    editingGatewayId = id;
+    editingGatewayId = id ? id.toString() : null;
     const modal = document.getElementById("gateway-modal");
-    if (!modal) return;
+    if (!modal) {
+        console.error("Critical: #gateway-modal element not found in DOM!");
+        toast("Gateway modal not found in DOM", "danger");
+        return;
+    }
 
     if (id) {
-        const g = allGateways.find(item => item._id === id);
+        const g = allGateways.find(item => (item._id && item._id.toString() === id.toString()) || (item.id && item.id.toString() === id.toString()));
         if (g) {
-            document.getElementById("gateway-modal-title").textContent = "Edit Payment Gateway";
-            document.getElementById("gateway-name").value = g.name || "razorpay";
-            document.getElementById("gateway-mode").value = g.mode || "live";
-            document.getElementById("gateway-key").value = g.keyId || g.clientId || "";
-            document.getElementById("gateway-secret").value = "";
-            document.getElementById("gateway-secret").placeholder = "Leave blank to keep existing secret";
-            document.getElementById("gateway-is-default").checked = !!g.isDefault;
-            document.getElementById("gateway-is-active").checked = !!g.isActive;
+            const titleEl = document.getElementById("gateway-modal-title");
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-edit" style="color:var(--gold);margin-right:8px"></i> Edit Payment Gateway';
+            
+            const nameEl = document.getElementById("gateway-name");
+            if (nameEl) nameEl.value = (g.name || "razorpay").toLowerCase();
+            
+            const modeEl = document.getElementById("gateway-mode");
+            if (modeEl) modeEl.value = (g.mode || "live").toLowerCase();
+            
+            const keyEl = document.getElementById("gateway-key");
+            if (keyEl) keyEl.value = g.keyId || g.clientId || "";
+            
+            const secretEl = document.getElementById("gateway-secret");
+            if (secretEl) {
+                secretEl.value = "";
+                secretEl.placeholder = "Leave blank to keep existing (" + (g.keySecret || g.clientSecret || "••••") + ")";
+            }
+            
+            const defEl = document.getElementById("gateway-is-default");
+            if (defEl) defEl.checked = !!g.isDefault;
+            
+            const actEl = document.getElementById("gateway-is-active");
+            if (actEl) actEl.checked = g.isActive !== false;
         }
     } else {
-        document.getElementById("gateway-modal-title").textContent = "Add Payment Gateway";
-        document.getElementById("gateway-name").value = "razorpay";
-        document.getElementById("gateway-mode").value = "live";
-        document.getElementById("gateway-key").value = "";
-        document.getElementById("gateway-secret").value = "";
-        document.getElementById("gateway-secret").placeholder = "Enter API Secret Key";
-        document.getElementById("gateway-is-default").checked = allGateways.length === 0;
-        document.getElementById("gateway-is-active").checked = true;
+        const titleEl = document.getElementById("gateway-modal-title");
+        if (titleEl) titleEl.innerHTML = '<i class="fas fa-plus" style="color:var(--gold);margin-right:8px"></i> Add Payment Gateway';
+        
+        const formEl = document.getElementById("gateway-form");
+        if (formEl) formEl.reset();
+        
+        const nameEl = document.getElementById("gateway-name");
+        if (nameEl) nameEl.value = "razorpay";
+        
+        const modeEl = document.getElementById("gateway-mode");
+        if (modeEl) modeEl.value = "live";
+        
+        const keyEl = document.getElementById("gateway-key");
+        if (keyEl) keyEl.value = "";
+        
+        const secretEl = document.getElementById("gateway-secret");
+        if (secretEl) {
+            secretEl.value = "";
+            secretEl.placeholder = "Enter API Secret Key";
+        }
+        
+        const defEl = document.getElementById("gateway-is-default");
+        if (defEl) defEl.checked = allGateways.length === 0;
+        
+        const actEl = document.getElementById("gateway-is-active");
+        if (actEl) actEl.checked = true;
     }
 
     modal.style.display = "flex";
@@ -139,8 +178,8 @@ async function saveGateway() {
     const mode = document.getElementById("gateway-mode")?.value.trim().toLowerCase() || "live";
     const keyId = document.getElementById("gateway-key")?.value.trim();
     const secretKey = document.getElementById("gateway-secret")?.value.trim();
-    const isDefault = document.getElementById("gateway-is-default")?.checked;
-    const isActive = document.getElementById("gateway-is-active")?.checked;
+    const isDefault = !!document.getElementById("gateway-is-default")?.checked;
+    const isActive = !!document.getElementById("gateway-is-active")?.checked;
 
     if (!name || !keyId) {
         toast("Please provide gateway name and Key ID / Client ID", "warning");
@@ -156,7 +195,7 @@ async function saveGateway() {
         isDefault,
     };
 
-    if (secretKey) {
+    if (secretKey && secretKey.length > 0 && !secretKey.includes("••••")) {
         payload.keySecret = secretKey;
         payload.clientSecret = secretKey;
     }
@@ -169,15 +208,16 @@ async function saveGateway() {
             res = await api("/admin/payment-gateways", { method: "POST", body: JSON.stringify(payload) });
         }
 
-        if (res.success) {
+        if (res && res.success) {
             toast(res.message || "Gateway saved successfully", "success");
             closeGatewayModal();
             loadGateways();
         } else {
-            toast(res.message || "Failed to save gateway", "danger");
+            toast(res?.message || "Failed to save gateway", "danger");
         }
     } catch (e) {
-        toast("Network error saving gateway", "danger");
+        console.error("Save gateway error:", e);
+        toast(e.message || "Network error saving gateway", "danger");
     }
 }
 
@@ -187,14 +227,15 @@ async function toggleGatewayActive(id, isActive) {
             method: "PATCH",
             body: JSON.stringify({ isActive })
         });
-        if (res.success) {
+        if (res && res.success) {
             toast(res.message || "Gateway status updated", "success");
             loadGateways();
         } else {
-            toast(res.message || "Failed to toggle status", "danger");
+            toast(res?.message || "Failed to toggle status", "danger");
             loadGateways();
         }
     } catch (e) {
+        console.error("Toggle gateway error:", e);
         toast("Network error", "danger");
         loadGateways();
     }
@@ -203,13 +244,14 @@ async function toggleGatewayActive(id, isActive) {
 async function setGatewayDefault(id) {
     try {
         const res = await api(`/admin/payment-gateways/${id}/set-default`, { method: "PATCH" });
-        if (res.success) {
+        if (res && res.success) {
             toast(res.message || "Default gateway updated", "success");
             loadGateways();
         } else {
-            toast(res.message || "Failed to set default", "danger");
+            toast(res?.message || "Failed to set default", "danger");
         }
     } catch (e) {
+        console.error("Set default error:", e);
         toast("Network error", "danger");
     }
 }
@@ -218,13 +260,14 @@ async function deleteGateway(id) {
     if (!confirm("Are you sure you want to delete this payment gateway configuration?")) return;
     try {
         const res = await api(`/admin/payment-gateways/${id}`, { method: "DELETE" });
-        if (res.success) {
+        if (res && res.success) {
             toast("Gateway deleted successfully", "success");
             loadGateways();
         } else {
-            toast(res.message || "Failed to delete gateway", "danger");
+            toast(res?.message || "Failed to delete gateway", "danger");
         }
     } catch (e) {
+        console.error("Delete gateway error:", e);
         toast("Network error", "danger");
     }
 }
