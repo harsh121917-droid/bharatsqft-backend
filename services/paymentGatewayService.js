@@ -84,7 +84,7 @@ async function createRazorpaySubscription({ amount, frequency, totalCycles, note
         plan_id: plan.id,
         total_count: totalCycles || 12,
         quantity: 1,
-        customer_notify: 1,
+        customer_notify: 0,
         notes,
     });
 
