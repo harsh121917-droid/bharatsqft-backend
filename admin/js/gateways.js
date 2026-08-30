@@ -101,6 +101,13 @@ function renderGateways(gateways) {
 
 function openGatewayModal(id = null) {
     editingGatewayId = id ? id.toString() : null;
+    const secretInput = document.getElementById("gateway-secret");
+    const secretIcon = document.getElementById("toggle-gateway-secret-icon");
+    if (secretInput) secretInput.type = "password";
+    if (secretIcon) {
+        secretIcon.className = "fas fa-eye";
+        secretIcon.style.color = "var(--text-dim, #94a3b8)";
+    }
     const modal = document.getElementById("gateway-modal");
     if (!modal) {
         console.error("Critical: #gateway-modal element not found in DOM!");
@@ -269,5 +276,21 @@ async function deleteGateway(id) {
     } catch (e) {
         console.error("Delete gateway error:", e);
         toast("Network error", "danger");
+    }
+}
+
+function toggleSecretVisibility() {
+    const input = document.getElementById("gateway-secret");
+    const icon = document.getElementById("toggle-gateway-secret-icon");
+    if (!input || !icon) return;
+
+    if (input.type === "password") {
+        input.type = "text";
+        icon.className = "fas fa-eye-slash";
+        icon.style.color = "var(--gold, #d4a017)";
+    } else {
+        input.type = "password";
+        icon.className = "fas fa-eye";
+        icon.style.color = "var(--text-dim, #94a3b8)";
     }
 }

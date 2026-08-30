@@ -3261,203 +3261,207 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeRestockModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveRestock()"><i class="fas fa-check"></i> Update Inventory Stock</button>
+                <button class="btn btn-primary" onclick="saveRestock()"><i class="fas fa-check"></i> Update Inventory
+                    Stock</button>
             </div>
         </div>
     </div>
 
-        <!-- Coupon Offer Modal -->
-        <div class="modal-overlay" id="coupon-modal" style="display:none">
-            <div class="modal modal-md">
-                <div class="modal-header">
-                    <div class="modal-title" id="coupon-modal-title">Create New Coupon</div>
-                    <button class="modal-close" onclick="closeCouponModal()">×</button>
-                </div>
-                <div class="modal-body">
-                    <form id="coupon-form" onsubmit="event.preventDefault(); saveCoupon();">
-                        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                            <div class="form-group">
-                                <label class="form-label">Coupon Code</label>
-                                <input class="form-control font-mono" id="coupon-code" placeholder="e.g. WELCOME50"
-                                    style="text-transform:uppercase;font-weight:700;letter-spacing:1px" required />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Applies To Metal</label>
-                                <select class="form-control" id="coupon-metal">
-                                    <option value="both">All Metals (Gold & Silver)</option>
-                                    <option value="gold">24K Gold Only</option>
-                                    <option value="silver">999 Silver Only</option>
-                                </select>
-                            </div>
+    <!-- Coupon Offer Modal -->
+    <div class="modal-overlay" id="coupon-modal" style="display:none">
+        <div class="modal modal-md">
+            <div class="modal-header">
+                <div class="modal-title" id="coupon-modal-title">Create New Coupon</div>
+                <button class="modal-close" onclick="closeCouponModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="coupon-form" onsubmit="event.preventDefault(); saveCoupon();">
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group">
+                            <label class="form-label">Coupon Code</label>
+                            <input class="form-control font-mono" id="coupon-code" placeholder="e.g. WELCOME50"
+                                style="text-transform:uppercase;font-weight:700;letter-spacing:1px" required />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Description / Offer Tagline</label>
-                            <input class="form-control" id="coupon-desc" placeholder="e.g. Get ₹50 Free Extra 24K Gold"
-                                required />
+                            <label class="form-label">Applies To Metal</label>
+                            <select class="form-control" id="coupon-metal">
+                                <option value="both">All Metals (Gold & Silver)</option>
+                                <option value="gold">24K Gold Only</option>
+                                <option value="silver">999 Silver Only</option>
+                            </select>
                         </div>
-                        <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                            <div class="form-group">
-                                <label class="form-label">Benefit Type</label>
-                                <select class="form-control" id="coupon-type">
-                                    <option value="extra_gold">Free Extra Metal Bonus (Credited to Vault)</option>
-                                    <option value="discount">Price Discount (Direct ₹ Off)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Value Calculation</label>
-                                <select class="form-control" id="coupon-val-type">
-                                    <option value="percentage">Percentage (%)</option>
-                                    <option value="flat">Flat Amount (₹)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-grid-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-                            <div class="form-group">
-                                <label class="form-label">Benefit Value</label>
-                                <input class="form-control" type="number" step="any" id="coupon-val"
-                                    placeholder="e.g. 50 or 5" required />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Min Purchase (₹)</label>
-                                <input class="form-control" type="number" id="coupon-min-amt"
-                                    placeholder="0 = No Min" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Max Benefit Cap (₹)</label>
-                                <input class="form-control" type="number" id="coupon-max-disc"
-                                    placeholder="0 = No Cap" />
-                            </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description / Offer Tagline</label>
+                        <input class="form-control" id="coupon-desc" placeholder="e.g. Get ₹50 Free Extra 24K Gold"
+                            required />
+                    </div>
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div class="form-group">
+                            <label class="form-label">Benefit Type</label>
+                            <select class="form-control" id="coupon-type">
+                                <option value="extra_gold">Free Extra Metal Bonus (Credited to Vault)</option>
+                                <option value="discount">Price Discount (Direct ₹ Off)</option>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Expiry Date (Leave empty for lifetime)</label>
-                            <input class="form-control" type="date" id="coupon-expiry" />
+                            <label class="form-label">Value Calculation</label>
+                            <select class="form-control" id="coupon-val-type">
+                                <option value="percentage">Percentage (%)</option>
+                                <option value="flat">Flat Amount (₹)</option>
+                            </select>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveCoupon()"><i class="fas fa-save"></i> Save
-                        Coupon</button>
-                </div>
+                    </div>
+                    <div class="form-grid-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                        <div class="form-group">
+                            <label class="form-label">Benefit Value</label>
+                            <input class="form-control" type="number" step="any" id="coupon-val"
+                                placeholder="e.g. 50 or 5" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Min Purchase (₹)</label>
+                            <input class="form-control" type="number" id="coupon-min-amt" placeholder="0 = No Min" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Max Benefit Cap (₹)</label>
+                            <input class="form-control" type="number" id="coupon-max-disc" placeholder="0 = No Cap" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expiry Date (Leave empty for lifetime)</label>
+                        <input class="form-control" type="date" id="coupon-expiry" />
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveCoupon()"><i class="fas fa-save"></i> Save
+                    Coupon</button>
             </div>
         </div>
+    </div>
 
-        <!-- Payment Gateway Modal -->
-        <div class="modal-overlay" id="gateway-modal" style="display:none">
-            <div class="modal">
-                <div class="modal-header">
-                    <div class="modal-title" id="gateway-modal-title"><i class="fas fa-credit-card"
-                            style="color:var(--gold);margin-right:8px"></i> Payment Gateway</div>
-                    <button class="modal-close" onclick="closeGatewayModal()">×</button>
-                </div>
-                <div class="modal-body">
-                    <form id="gateway-form" onsubmit="event.preventDefault(); saveGateway();">
-                        <div class="form-group">
-                            <label class="form-label">Gateway Provider</label>
-                            <select class="form-control" id="gateway-name">
-                                <option value="razorpay">Razorpay (UPI, AutoPay, Cards, NetBanking)</option>
-                                <option value="cashfree">Cashfree Payments</option>
-                                <option value="cashfree_payout">Cashfree Payouts (Bank Transfers)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Environment Mode</label>
-                            <select class="form-control" id="gateway-mode">
-                                <option value="live">Live (Production)</option>
-                                <option value="demo">Demo / Test (Sandbox)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Key ID / Client ID</label>
-                            <input class="form-control" id="gateway-key" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx"
-                                required style="font-family:monospace;" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">API Secret Key (Leave blank to keep existing)</label>
+    <!-- Payment Gateway Modal -->
+    <div class="modal-overlay" id="gateway-modal" style="display:none">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="gateway-modal-title"><i class="fas fa-credit-card"
+                        style="color:var(--gold);margin-right:8px"></i> Payment Gateway</div>
+                <button class="modal-close" onclick="closeGatewayModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="gateway-form" onsubmit="event.preventDefault(); saveGateway();">
+                    <div class="form-group">
+                        <label class="form-label">Gateway Provider</label>
+                        <select class="form-control" id="gateway-name">
+                            <option value="razorpay">Razorpay (UPI, AutoPay, Cards, NetBanking)</option>
+                            <option value="cashfree">Cashfree Payments</option>
+                            <option value="cashfree_payout">Cashfree Payouts (Bank Transfers)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Environment Mode</label>
+                        <select class="form-control" id="gateway-mode">
+                            <option value="live">Live (Production)</option>
+                            <option value="demo">Demo / Test (Sandbox)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Key ID / Client ID</label>
+                        <input class="form-control" id="gateway-key" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx" required
+                            style="font-family:monospace;" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">API Secret Key (Leave blank to keep existing)</label>
+                        <div style="position:relative;display:flex;align-items:center;">
                             <input class="form-control" type="password" id="gateway-secret" placeholder="••••••••••••"
-                                style="font-family:monospace;" />
+                                style="font-family:monospace;padding-right:42px;width:100%;" />
+                            <button type="button" id="toggle-gateway-secret-btn" onclick="toggleSecretVisibility()"
+                                style="position:absolute;right:10px;background:none;border:none;color:var(--text-dim,#94a3b8);cursor:pointer;font-size:15px;padding:6px;display:flex;align-items:center;justify-content:center;" title="Show/Hide Secret">
+                                <i class="fas fa-eye" id="toggle-gateway-secret-icon"></i>
+                            </button>
                         </div>
-                        <div
-                            style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:12px">
-                            <div
-                                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                                <div>
-                                    <div style="color:#fff;font-weight:700;font-size:13px">Set as Active Default Gateway
-                                    </div>
-                                    <div style="color:var(--text-dim);font-size:11px">Mobile app & backend will use this
-                                        gateway for all transactions.</div>
+                    </div>
+                    <div
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:12px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                            <div>
+                                <div style="color:#fff;font-weight:700;font-size:13px">Set as Active Default Gateway
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" id="gateway-is-default" />
-                                    <span class="slider"></span>
-                                </label>
+                                <div style="color:var(--text-dim);font-size:11px">Mobile app & backend will use this
+                                    gateway for all transactions.</div>
                             </div>
-                            <div style="display:flex;align-items:center;justify-content:space-between">
-                                <div>
-                                    <div style="color:#fff;font-weight:700;font-size:13px">Enable Gateway</div>
-                                    <div style="color:var(--text-dim);font-size:11px">Allow transactions through this
-                                        provider.</div>
-                                </div>
-                                <label class="switch">
-                                    <input type="checkbox" id="gateway-is-active" checked />
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="gateway-is-default" />
+                                <span class="slider"></span>
+                            </label>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveGateway()"><i class="fas fa-save"></i> Save
-                        Gateway</button>
-                </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <div>
+                                <div style="color:#fff;font-weight:700;font-size:13px">Enable Gateway</div>
+                                <div style="color:var(--text-dim);font-size:11px">Allow transactions through this
+                                    provider.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="gateway-is-active" checked />
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveGateway()"><i class="fas fa-save"></i> Save
+                    Gateway</button>
             </div>
         </div>
+    </div>
 
-        <!-- ══════════════════════════════════════════════════════════
+    <!-- ══════════════════════════════════════════════════════════
          Logout Confirmation Popup Modal
          ══════════════════════════════════════════════════════════ -->
-        <div class="modal-overlay" id="logout-modal" style="display:none">
-            <div class="modal modal-sm logout-modal-card">
-                <div class="logout-modal-content">
-                    <div class="logout-icon-glow">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </div>
-                    <div class="logout-modal-title">Sign Out of Console?</div>
-                    <div class="logout-modal-desc">
-                        Are you sure you want to end your current session? You will need to log back in with your
-                        credentials to access the admin suite.
-                    </div>
-                    <div class="logout-modal-actions">
-                        <button class="btn btn-secondary" onclick="closeLogoutModal()" style="flex:1;height:42px">
-                            Cancel
-                        </button>
-                        <button class="btn btn-danger" onclick="doLogout()" style="flex:1;height:42px">
-                            <i class="fas fa-sign-out-alt"></i> Sign Out
-                        </button>
-                    </div>
+    <div class="modal-overlay" id="logout-modal" style="display:none">
+        <div class="modal modal-sm logout-modal-card">
+            <div class="logout-modal-content">
+                <div class="logout-icon-glow">
+                    <i class="fas fa-sign-out-alt"></i>
+                </div>
+                <div class="logout-modal-title">Sign Out of Console?</div>
+                <div class="logout-modal-desc">
+                    Are you sure you want to end your current session? You will need to log back in with your
+                    credentials to access the admin suite.
+                </div>
+                <div class="logout-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeLogoutModal()" style="flex:1;height:42px">
+                        Cancel
+                    </button>
+                    <button class="btn btn-danger" onclick="doLogout()" style="flex:1;height:42px">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </button>
                 </div>
             </div>
         </div>
+    </div>
 
 
-        <!-- ══════════════════════════════════════════════════════════
+    <!-- ══════════════════════════════════════════════════════════
          5. MODULAR JAVASCRIPT BUNDLE
          ══════════════════════════════════════════════════════════ -->
-        <script src="js/config.js"></script>
-        <script src="js/api.js"></script>
-        <script src="js/dashboard.js"></script>
-        <script src="js/users.js"></script>
-        <script src="js/kyc.js"></script>
-        <script src="js/properties.js"></script>
-        <script src="js/schemes.js"></script>
-        <script src="js/transactions.js"></script>
-        <script src="js/jewellery.js"></script>
-        <script src="js/gateways.js?v=2.1"></script>
-        <script src="js/rewards.js"></script>
-        <script src="js/notifications.js"></script>
-        <script src="js/coupons.js"></script>
-        <script src="js/app.js?v=2.1"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/kyc.js"></script>
+    <script src="js/properties.js"></script>
+    <script src="js/schemes.js"></script>
+    <script src="js/transactions.js"></script>
+    <script src="js/jewellery.js"></script>
+    <script src="js/gateways.js?v=2.1"></script>
+    <script src="js/rewards.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/coupons.js"></script>
+    <script src="js/app.js?v=2.1"></script>
 </body>
 
 </html>
