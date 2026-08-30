@@ -114,10 +114,10 @@ exports.createSip = async (req, res, next) => {
         } = req.body;
 
         const amount = parseFloat(installmentAmount);
-        if (!amount || isNaN(amount) || amount < 100) {
+        if (!amount || isNaN(amount) || amount < 1) {
             return res.status(400).json({
                 success: false,
-                message: "Minimum SIP installment amount is ₹100.",
+                message: "Minimum SIP installment amount is ₹1.",
             });
         }
 
@@ -713,10 +713,10 @@ exports.createAutoPaySip = async (req, res, next) => {
         } = req.body;
 
         const amount = parseFloat(installmentAmount);
-        if (!amount || isNaN(amount) || amount < 100) {
+        if (!amount || isNaN(amount) || amount < 1) {
             return res.status(400).json({
                 success: false,
-                message: "Minimum SIP installment amount is ₹100.",
+                message: "Minimum SIP installment amount is ₹1.",
             });
         }
 

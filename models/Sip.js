@@ -42,7 +42,7 @@ const SipSchema = new mongoose.Schema(
         installmentAmount: {
             type: Number,
             required: true,
-            min: [100, "Minimum SIP installment is ₹100"],
+            min: [1, "Minimum SIP installment is ₹1"],
         },
         durationMonths: {
             type: Number,
