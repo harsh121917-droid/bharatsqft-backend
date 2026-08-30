@@ -796,16 +796,13 @@ exports.createAutoPaySip = async (req, res, next) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/sip/verify-autopay — Verify Razorpay e-Mandate or Order & Activate SIP
 // ══════════════════════════════════════════════════════════════════════════════
 exports.verifyAutoPaySip = async (req, res, next) => {
     try {
         const userId = req.user._id;
         const {
-            razorpayPaymentId,
-            razorpaySubscriptionId,
-            razorpayOrderId,
-            razorpaySignature,
             metal = "gold",
             frequency = "monthly",
             installmentAmount,
@@ -814,10 +811,16 @@ exports.verifyAutoPaySip = async (req, res, next) => {
             goalTitle = "Wealth Building",
         } = req.body;
 
-        if (!razorpayPaymentId || !razorpaySignature || (!razorpaySubscriptionId && !razorpayOrderId)) {
+        const paymentId = req.body.razorpayPaymentId || req.body.razorpay_payment_id || req.body.paymentId;
+        const subscriptionId = req.body.razorpaySubscriptionId || req.body.razorpay_subscription_id || req.body.subscriptionId;
+        const orderId = req.body.razorpayOrderId || req.body.razorpay_order_id || req.body.orderId;
+        const signature = req.body.razorpaySignature || req.body.razorpay_signature || req.body.signature;
+
+        if (!paymentId || !signature || (!subscriptionId && !orderId)) {
             return res.status(400).json({
                 success: false,
                 message: "Missing Razorpay payment parameters.",
+                details: { paymentId: !!paymentId, signature: !!signature, subscriptionId: !!subscriptionId, orderId: !!orderId },
             });
         }
 
@@ -825,18 +828,18 @@ exports.verifyAutoPaySip = async (req, res, next) => {
         const keySecret = await getRazorpayKeySecret();
         
         let isValid = false;
-        if (razorpaySubscriptionId) {
+        if (subscriptionId) {
             isValid = verifyRazorpaySubscriptionSignature({
-                paymentId: razorpayPaymentId,
-                subscriptionId: razorpaySubscriptionId,
-                signature: razorpaySignature,
+                paymentId,
+                subscriptionId,
+                signature,
                 keySecret,
             });
-        } else if (razorpayOrderId) {
+        } else if (orderId) {
             isValid = verifyRazorpaySignature({
-                orderId: razorpayOrderId,
-                paymentId: razorpayPaymentId,
-                signature: razorpaySignature,
+                orderId,
+                paymentId,
+                signature,
                 keySecret,
             });
         }
@@ -879,17 +882,17 @@ exports.verifyAutoPaySip = async (req, res, next) => {
             startDate: new Date(),
             completedAt: totalCycles <= 1 ? new Date() : null,
             nextDueDate: new Date(),
-            isAutopay: !!razorpaySubscriptionId,
-            razorpaySubscriptionId: razorpaySubscriptionId || "",
-            razorpayPaymentId: razorpayPaymentId || "",
-            razorpaySignature: razorpaySignature || "",
+            isAutopay: !!subscriptionId,
+            razorpaySubscriptionId: subscriptionId || "",
+            razorpayPaymentId: paymentId || "",
+            razorpaySignature: signature || "",
             installments: [
                 {
                     installmentNo: 1,
                     amount,
                     ratePerGram: metalRate,
                     grams: parseFloat(gramsCredited.toFixed(6)),
-                    paymentMethod: razorpaySubscriptionId ? "auto" : "razorpay",
+                    paymentMethod: subscriptionId ? "auto" : "razorpay",
                     txnId: txnId,
                     paidAt: new Date(),
                 },
