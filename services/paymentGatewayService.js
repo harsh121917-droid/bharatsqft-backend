@@ -53,6 +53,53 @@ function verifyRazorpaySignature({ orderId, paymentId, signature, keySecret }) {
     return expected === signature;
 }
 
+
+async function createRazorpaySubscription({ amount, frequency, totalCycles, notes, mode }) {
+    const config = await resolveGateway({ gateway: "razorpay", mode });
+    const razorpay = new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
+
+    let period = "monthly";
+    let interval = 1;
+    switch (frequency) {
+        case "daily": period = "daily"; interval = 1; break;
+        case "weekly": period = "weekly"; interval = 1; break;
+        case "monthly": period = "monthly"; interval = 1; break;
+        case "quarterly": period = "monthly"; interval = 3; break;
+        case "yearly": period = "yearly"; interval = 1; break;
+        default: period = "monthly"; interval = 1;
+    }
+
+    const plan = await razorpay.plans.create({
+        period,
+        interval,
+        item: {
+            name: (notes && notes.goalTitle) ? notes.goalTitle : "Payvika Bullion SIP",
+            amount: Math.round(amount * 100), // paise
+            currency: "INR",
+            description: `${(notes && notes.metal) ? notes.metal.toUpperCase() : "GOLD"} SIP AutoPay`,
+        },
+        notes,
+    });
+
+    const subscription = await razorpay.subscriptions.create({
+        plan_id: plan.id,
+        total_count: totalCycles || 12,
+        quantity: 1,
+        customer_notify: 1,
+        notes,
+    });
+
+    return { subscription, plan, keyId: config.keyId, mode: config.mode };
+}
+
+function verifyRazorpaySubscriptionSignature({ paymentId, subscriptionId, signature, keySecret }) {
+    const expected = crypto
+        .createHmac("sha256", keySecret)
+        .update(`${paymentId}|${subscriptionId}`)
+        .digest("hex");
+    return expected === signature;
+}
+
 async function getRazorpayKeySecret(mode) {
     const config = await resolveGateway({ gateway: "razorpay", mode });
     return config.keySecret;

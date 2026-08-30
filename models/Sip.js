@@ -18,6 +18,15 @@ const SipSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
+        goalCategory: {
+            type: String,
+            enum: ["baby", "travel", "wedding", "festival", "home", "education", "wealth", "custom"],
+            default: "wealth",
+        },
+        goalTitle: {
+            type: String,
+            default: "Wealth Building",
+        },
         metal: {
             type: String,
             enum: ["gold", "silver", "copper"],
@@ -73,6 +82,11 @@ const SipSchema = new mongoose.Schema(
         completedAt: {
             type: Date,
         },
+        isAutopay: { type: Boolean, default: false },
+        razorpayPlanId: { type: String, default: "" },
+        razorpaySubscriptionId: { type: String, default: "" },
+        razorpayPaymentId: { type: String, default: "" },
+        razorpaySignature: { type: String, default: "" },
         installments: [SipInstallmentSchema],
     },
     {

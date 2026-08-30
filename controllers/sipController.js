@@ -105,6 +105,8 @@ exports.createSip = async (req, res, next) => {
         const userId = req.user._id;
         const {
             metal = "gold",
+            goalCategory = "wealth",
+            goalTitle = "Wealth Building",
             frequency = "monthly",
             installmentAmount,
             durationMonths = 12,
@@ -187,6 +189,8 @@ exports.createSip = async (req, res, next) => {
         // Create SIP Document
         const sip = new Sip({
             user: userId,
+            goalCategory: goalCategory.toLowerCase(),
+            goalTitle: goalTitle || "Wealth Building",
             metal: metalKey,
             frequency: frequency.toLowerCase(),
             installmentAmount: amount,
@@ -569,6 +573,290 @@ exports.getAdminSips = async (req, res, next) => {
             page,
             pages: Math.ceil(total / limit),
             data: sips,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+// POST /api/sip/:id/remind — Send SIP installment reminder to single subscriber
+exports.sendSipReminder = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const sip = await Sip.findById(id).populate("user", "name phone email fcmTokens");
+        if (!sip) {
+            return res.status(404).json({ success: false, message: "SIP subscription not found" });
+        }
+
+        if (sip.status !== "active") {
+            return res.status(400).json({ success: false, message: `Cannot send reminder for ${sip.status} SIP.` });
+        }
+
+        const user = sip.user;
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Associated customer not found" });
+        }
+
+        const metal = (sip.metal || "gold").toUpperCase();
+        const amt = sip.amount || sip.amountPerCycle || 1000;
+        const title = `🪙 ${metal} SIP Installment Reminder`;
+        const body = `Dear ${user.name || "Customer"}, your ${sip.frequency || "monthly"} ${metal} SIP installment of ₹${amt.toLocaleString("en-IN")} is scheduled. Keep building your bullion savings!`;
+        const deepLink = "buy_gold";
+
+        const { sendFcmMessage } = require("../config/firebase");
+        const NotificationLog = require("../models/NotificationLog");
+
+        let fcmResult = { success: true, sentCount: 0 };
+        if (user.fcmTokens && user.fcmTokens.length > 0) {
+            fcmResult = await sendFcmMessage({
+                tokens: user.fcmTokens,
+                title,
+                body,
+                deepLink,
+            });
+        }
+
+        await NotificationLog.create({
+            title,
+            body,
+            deepLink,
+            targetType: "user",
+            targetUser: user._id,
+            sentBy: req.user?.name || "Admin",
+            sentCount: fcmResult.sentCount || (user.fcmTokens?.length || 0),
+            successCount: fcmResult.successCount || 0,
+            failureCount: fcmResult.failureCount || 0,
+            status: "sent",
+        });
+
+        res.json({
+            success: true,
+            message: `SIP reminder sent to ${user.name || "customer"} successfully!`,
+            fcmResult,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// POST /api/sip/admin/remind-all — Send bulk SIP installment reminders
+exports.sendBulkSipReminders = async (req, res, next) => {
+    try {
+        const activeSips = await Sip.find({ status: "active" }).populate("user", "name phone email fcmTokens");
+        if (!activeSips || activeSips.length === 0) {
+            return res.json({ success: true, message: "No active SIP subscribers found." });
+        }
+
+        const { sendFcmMessage } = require("../config/firebase");
+        const NotificationLog = require("../models/NotificationLog");
+
+        let sentTotal = 0;
+        for (const sip of activeSips) {
+            const user = sip.user;
+            if (!user) continue;
+
+            const metal = (sip.metal || "gold").toUpperCase();
+            const amt = sip.amount || sip.amountPerCycle || 1000;
+            const title = `🪙 ${metal} SIP Savings Reminder`;
+            const body = `Hi ${user.name || "Customer"}, your ${metal} SIP of ₹${amt.toLocaleString("en-IN")} is due. Complete your installment to keep accumulating pure ${metal}!`;
+            const deepLink = "buy_gold";
+
+            if (user.fcmTokens && user.fcmTokens.length > 0) {
+                await sendFcmMessage({
+                    tokens: user.fcmTokens,
+                    title,
+                    body,
+                    deepLink,
+                });
+            }
+
+            await NotificationLog.create({
+                title,
+                body,
+                deepLink,
+                targetType: "user",
+                targetUser: user._id,
+                sentBy: req.user?.name || "Admin",
+                sentCount: user.fcmTokens?.length || 0,
+                status: "sent",
+            });
+
+            sentTotal++;
+        }
+
+        res.json({
+            success: true,
+            message: `Dispatched SIP reminders to ${sentTotal} active subscribers!`,
+            count: sentTotal,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/sip/create-autopay — Create Razorpay Subscription for SIP AutoPay
+// ══════════════════════════════════════════════════════════════════════════════
+exports.createAutoPaySip = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const {
+            metal = "gold",
+            frequency = "monthly",
+            installmentAmount,
+            durationMonths = 12,
+            goalCategory = "wealth",
+            goalTitle = "Wealth Building",
+        } = req.body;
+
+        const amount = parseFloat(installmentAmount);
+        if (!amount || isNaN(amount) || amount < 100) {
+            return res.status(400).json({
+                success: false,
+                message: "Minimum SIP installment amount is ₹100.",
+            });
+        }
+
+        const validMetals = ["gold", "silver", "copper"];
+        if (!validMetals.includes(metal.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: "Metal must be gold, silver, or copper.",
+            });
+        }
+
+        const totalCycles = computeTotalCycles(durationMonths, frequency);
+
+        const { createRazorpaySubscription } = require("../services/paymentGatewayService");
+        const subData = await createRazorpaySubscription({
+            amount,
+            frequency: frequency.toLowerCase(),
+            totalCycles,
+            notes: {
+                userId: userId.toString(),
+                metal: metal.toLowerCase(),
+                goalCategory,
+                goalTitle,
+                durationMonths,
+            },
+        });
+
+        res.json({
+            success: true,
+            subscriptionId: subData.subscription.id,
+            planId: subData.plan.id,
+            keyId: subData.keyId,
+            amount,
+            frequency: frequency.toLowerCase(),
+            durationMonths,
+            totalCycles,
+            goalCategory,
+            goalTitle,
+            metal: metal.toLowerCase(),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/sip/verify-autopay — Verify Razorpay e-Mandate & Activate AutoPay SIP
+// ══════════════════════════════════════════════════════════════════════════════
+exports.verifyAutoPaySip = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const {
+            razorpayPaymentId,
+            razorpaySubscriptionId,
+            razorpaySignature,
+            metal = "gold",
+            frequency = "monthly",
+            installmentAmount,
+            durationMonths = 12,
+            goalCategory = "wealth",
+            goalTitle = "Wealth Building",
+        } = req.body;
+
+        if (!razorpayPaymentId || !razorpaySubscriptionId || !razorpaySignature) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing Razorpay subscription payment parameters.",
+            });
+        }
+
+        const { getRazorpayKeySecret, verifyRazorpaySubscriptionSignature } = require("../services/paymentGatewayService");
+        const keySecret = await getRazorpayKeySecret();
+        const isValid = verifyRazorpaySubscriptionSignature({
+            paymentId: razorpayPaymentId,
+            subscriptionId: razorpaySubscriptionId,
+            signature: razorpaySignature,
+            keySecret,
+        });
+
+        if (!isValid) {
+            return res.status(400).json({
+                success: false,
+                message: "Razorpay subscription signature verification failed.",
+            });
+        }
+
+        const amount = parseFloat(installmentAmount);
+        const totalCycles = computeTotalCycles(durationMonths, frequency);
+
+        // Fetch live rates
+        const rates = await fetchLiveRates();
+        const metalKey = metal.toLowerCase();
+        const metalRate = rates[metalKey]?.buyRate || 7500.0;
+        const gstPct = metalKey === "copper" ? 18 : 3;
+        const netExGst = amount / (1 + gstPct / 100);
+        const gramsCredited = netExGst / metalRate;
+
+        // Credit bullion to vault
+        const txnId = await creditGramsToVault(userId, metalKey, gramsCredited, amount, metalRate, 1);
+
+        // Create AutoPay SIP Document
+        const sip = new Sip({
+            user: userId,
+            metal: metalKey,
+            goalCategory: goalCategory.toLowerCase(),
+            goalTitle: goalTitle || "Wealth Building",
+            frequency: frequency.toLowerCase(),
+            installmentAmount: amount,
+            durationMonths: parseInt(durationMonths, 10) || 12,
+            totalCycles,
+            cyclesCompleted: 1,
+            totalInvested: amount,
+            totalGrams: parseFloat(gramsCredited.toFixed(6)),
+            status: totalCycles <= 1 ? "completed" : "active",
+            startDate: new Date(),
+            completedAt: totalCycles <= 1 ? new Date() : null,
+            nextDueDate: new Date(),
+            isAutopay: true,
+            razorpaySubscriptionId,
+            razorpayPaymentId,
+            razorpaySignature,
+            installments: [
+                {
+                    installmentNo: 1,
+                    amount,
+                    ratePerGram: metalRate,
+                    grams: parseFloat(gramsCredited.toFixed(6)),
+                    paymentMethod: "auto",
+                    txnId: txnId,
+                    paidAt: new Date(),
+                },
+            ],
+        });
+
+        sip.nextDueDate = sip.calculateNextDueDate(new Date());
+        await sip.save();
+
+        res.status(201).json({
+            success: true,
+            message: `🎉 AutoPay Active! Your ${metal.toUpperCase()} SIP is set up on Auto-Debit and first installment is credited.`,
+            data: sip,
         });
     } catch (err) {
         next(err);

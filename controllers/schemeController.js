@@ -287,3 +287,116 @@ exports.cancelEnrollment = async (req, res, next) => {
         res.json({ success: true, message: "Scheme cancelled. Gold already credited remains in your account." });
     } catch (err) { next(err); }
 };
+
+// POST /api/schemes/enrollments/:id/remind — Send installment reminder to single scheme subscriber
+exports.sendSchemeEnrollmentReminder = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const enrollment = await SchemeEnrollment.findById(id).populate("user", "name phone email fcmTokens");
+        if (!enrollment) {
+            return res.status(404).json({ success: false, message: "Scheme enrollment not found" });
+        }
+
+        if (enrollment.status !== "active") {
+            return res.status(400).json({ success: false, message: `Cannot send reminder for ${enrollment.status} scheme.` });
+        }
+
+        const user = enrollment.user;
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Associated customer not found" });
+        }
+
+        const nextInstallmentNo = (enrollment.installmentsPaid || 0) + 1;
+        const title = `💰 Gold Scheme Installment #${nextInstallmentNo} Due`;
+        const body = `Dear ${user.name || "Customer"}, your installment #${nextInstallmentNo} of ₹${enrollment.monthlyAmount.toLocaleString("en-IN")} for ${enrollment.schemeName} is due. Pay now to maintain your 1-month FREE bonus!`;
+        const deepLink = "schemes";
+
+        const { sendFcmMessage } = require("../config/firebase");
+        const NotificationLog = require("../models/NotificationLog");
+
+        let fcmResult = { success: true, sentCount: 0 };
+        if (user.fcmTokens && user.fcmTokens.length > 0) {
+            fcmResult = await sendFcmMessage({
+                tokens: user.fcmTokens,
+                title,
+                body,
+                deepLink,
+            });
+        }
+
+        await NotificationLog.create({
+            title,
+            body,
+            deepLink,
+            targetType: "user",
+            targetUser: user._id,
+            sentBy: req.user?.name || "Admin",
+            sentCount: fcmResult.sentCount || (user.fcmTokens?.length || 0),
+            successCount: fcmResult.successCount || 0,
+            failureCount: fcmResult.failureCount || 0,
+            status: "sent",
+        });
+
+        res.json({
+            success: true,
+            message: `Installment reminder sent to ${user.name || "customer"} successfully!`,
+            fcmResult,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// POST /api/schemes/admin/remind-all — Send bulk installment reminders to all active scheme subscribers
+exports.sendBulkSchemeReminders = async (req, res, next) => {
+    try {
+        const activeEnrollments = await SchemeEnrollment.find({ status: "active" }).populate("user", "name phone email fcmTokens");
+        if (!activeEnrollments || activeEnrollments.length === 0) {
+            return res.json({ success: true, message: "No active scheme subscribers found." });
+        }
+
+        const { sendFcmMessage } = require("../config/firebase");
+        const NotificationLog = require("../models/NotificationLog");
+
+        let sentTotal = 0;
+        for (const enrollment of activeEnrollments) {
+            const user = enrollment.user;
+            if (!user) continue;
+
+            const nextInstallmentNo = (enrollment.installmentsPaid || 0) + 1;
+            const title = `💰 Gold Scheme Installment #${nextInstallmentNo} Due`;
+            const body = `Hi ${user.name || "Customer"}, your installment of ₹${enrollment.monthlyAmount.toLocaleString("en-IN")} for ${enrollment.schemeName} is due. Complete payment to secure your free bonus gold!`;
+            const deepLink = "schemes";
+
+            if (user.fcmTokens && user.fcmTokens.length > 0) {
+                await sendFcmMessage({
+                    tokens: user.fcmTokens,
+                    title,
+                    body,
+                    deepLink,
+                });
+            }
+
+            await NotificationLog.create({
+                title,
+                body,
+                deepLink,
+                targetType: "user",
+                targetUser: user._id,
+                sentBy: req.user?.name || "Admin",
+                sentCount: user.fcmTokens?.length || 0,
+                status: "sent",
+            });
+
+            sentTotal++;
+        }
+
+        res.json({
+            success: true,
+            message: `Dispatched installment reminders to ${sentTotal} active scheme subscribers!`,
+            count: sentTotal,
+        });
+    } catch (err) {
+        next(err);
+    }
+};

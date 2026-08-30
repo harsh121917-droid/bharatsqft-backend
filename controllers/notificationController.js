@@ -154,17 +154,37 @@ exports.getNotificationHistory = async (req, res, next) => {
 // @access  Private (User)
 exports.getUserNotifications = async (req, res, next) => {
   try {
-    const notifications = await NotificationLog.find({
-      $or: [
-        { targetType: "all" },
-        { targetUser: req.user._id },
-      ],
-    })
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 40;
+    const skip = (page - 1) * limit;
+
+    // Strict privacy scope:
+    // 1. Broadcast to 'all' -> visible to all users
+    // 2. Broadcast to 'kyc_verified' -> visible if user's KYC is approved
+    // 3. Single-user notification ('user') -> ONLY visible if targetUser matches req.user._id
+    const orConditions = [
+      { targetType: "all" },
+      { targetType: "user", targetUser: req.user._id },
+    ];
+
+    if (req.user && req.user.kycStatus === "approved") {
+      orConditions.push({ targetType: "kyc_verified" });
+    }
+
+    const query = { $or: orConditions };
+
+    const total = await NotificationLog.countDocuments(query);
+    const notifications = await NotificationLog.find(query)
+      .select("title body imageUrl deepLink targetType targetUser createdAt")
       .sort({ createdAt: -1 })
-      .limit(50);
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       success: true,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
       notifications,
     });
   } catch (err) {

@@ -47,15 +47,24 @@ cron.schedule("*/5 * * * *", async () => {
     }
 });
 
-// ── Refresh gold rate cache every 10 minutes ──────────────────────────────────
-cron.schedule("*/10 * * * *", async () => {
+// ── Automated Daily Scheme & SIP Early Due Reminders (Runs Daily at 9:00 AM) ──
+cron.schedule("0 9 * * *", async () => {
     try {
-        const { fetchLiveRates } = require("../controllers/goldController");
-        await fetchLiveRates();
-        console.log("🔄 [CRON] Gold rate refreshed");
+        console.log("⏰ [CRON] Starting Daily Scheme & SIP Due Reminders Sweep...");
+        const { sendBulkSchemeReminders } = require("../controllers/schemeController");
+        const { sendBulkSipReminders } = require("../controllers/sipController");
+
+        // Mock req/res for cron execution
+        const mockReq = { user: { name: "Payvika Automated Reminder System" } };
+        const mockRes = { json: (data) => console.log("🔔 [CRON Sweep Result]:", data.message || data) };
+        const mockNext = (err) => console.error("❌ [CRON Sweep Error]:", err);
+
+        await sendBulkSchemeReminders(mockReq, mockRes, mockNext);
+        await sendBulkSipReminders(mockReq, mockRes, mockNext);
+        console.log("✅ [CRON] Daily Scheme & SIP reminders sweep completed successfully.");
     } catch (e) {
-        console.error("❌ [CRON] Rate refresh error:", e.message);
+        console.error("❌ [CRON] Daily reminder error:", e.message);
     }
 });
 
-console.log("⏰ Crons started (withdrawal release · rate refresh) — sell payouts now require manual admin approval");
+console.log("⏰ Crons started (withdrawal release · rate refresh · daily Scheme & SIP installment reminders)");

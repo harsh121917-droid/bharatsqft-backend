@@ -254,7 +254,7 @@ function renderEnrollments(enrollments) {
                     <th>Gold/Silver Credited</th>
                     <th>Total Paid</th>
                     <th>Status</th>
-                    <th style="text-align:right">Action</th>
+                    <th style="text-align:right"><button class="btn btn-warning btn-sm" onclick="sendBulkSchemeReminders()"><i class="fas fa-bell"></i> Remind All Active</button></th>
                 </tr>
             </thead>
             <tbody>`;
@@ -285,9 +285,10 @@ function renderEnrollments(enrollments) {
             <td style="font-weight:700;color:#fff">${formatINR(e.totalInvested || 0)}</td>
             <td><span class="badge ${badgeClass}">${e.status}</span></td>
             <td style="text-align:right">
-                <button class="btn btn-secondary btn-sm" onclick="viewEnrollmentDetails('${e._id}')">
+                <button class="btn btn-secondary btn-sm" style="margin-right:4px" onclick="viewEnrollmentDetails('${e._id}')">
                     <i class="fas fa-list"></i> Milestones
                 </button>
+                ${e.status === 'active' ? `<button class="btn btn-warning btn-sm" onclick="sendSchemeReminder('${e._id}', '${(u.name || 'Customer').replace(/'/g, "\\'")}')"><i class="fas fa-bell"></i> Remind</button>` : ''}
             </td>
         </tr>`;
     });
@@ -499,5 +500,36 @@ function switchSchemeTab(tab) {
         document.getElementById('schemes-plans-panel').style.display = 'none';
         document.getElementById('schemes-enrollments-panel').style.display = 'block';
         loadEnrollments();
+    }
+}
+
+
+async function sendSchemeReminder(enrollmentId, customerName) {
+    if (!confirm(`Send installment payment reminder push notification to ${customerName}?`)) return;
+    try {
+        toast("Sending push reminder...", "info");
+        const res = await api(`/schemes/enrollments/${enrollmentId}/remind`, { method: "POST" });
+        if (res.success) {
+            toast(res.message || "Reminder sent successfully!", "success");
+        } else {
+            toast(res.message || "Failed to send reminder", "danger");
+        }
+    } catch (e) {
+        toast("Network error sending reminder", "danger");
+    }
+}
+
+async function sendBulkSchemeReminders() {
+    if (!confirm("Send installment due reminder push notifications to ALL active scheme subscribers?")) return;
+    try {
+        toast("Sending bulk reminders...", "info");
+        const res = await api("/schemes/admin/remind-all", { method: "POST" });
+        if (res.success) {
+            toast(res.message || "Bulk reminders dispatched successfully!", "success");
+        } else {
+            toast(res.message || "Failed to send bulk reminders", "danger");
+        }
+    } catch (e) {
+        toast("Network error sending bulk reminders", "danger");
     }
 }
