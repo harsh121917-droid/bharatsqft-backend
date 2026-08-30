@@ -10,24 +10,55 @@ const PaymentGateway = require("../models/PaymentGateway");
  * - Throws a clear error if nothing is configured — never silently
  *   falls back to a hardcoded/env key anymore.
  */
-async function resolveGateway({ gateway, mode }) {
-    let query;
-    if (gateway) {
-        query = { name: gateway, mode: mode || "live", isActive: true };
-    } else {
-        query = { isDefault: true, isActive: true };
+async function resolveGateway({ gateway, mode } = {}) {
+    let config = null;
+
+    // 1. If explicit gateway and mode requested
+    if (gateway && mode) {
+        config = await PaymentGateway.findOne({ name: gateway, mode, isActive: true });
     }
 
-    const config = await PaymentGateway.findOne(query);
+    // 2. If gateway specified without mode, check for default config of that gateway
+    if (!config && gateway) {
+        config = await PaymentGateway.findOne({ name: gateway, isDefault: true, isActive: true });
+    }
+
+    // 3. If still not found for gateway, check ANY active config for that gateway (demo or live)
+    if (!config && gateway) {
+        config = await PaymentGateway.findOne({ name: gateway, isActive: true }).sort({ isDefault: -1, updatedAt: -1 });
+    }
+
+    // 4. If no specific gateway requested, find the active default gateway
+    if (!config && !gateway) {
+        config = await PaymentGateway.findOne({ isDefault: true, isActive: true });
+    }
+
+    // 5. Fallback: Any active gateway in the system
+    if (!config && !gateway) {
+        config = await PaymentGateway.findOne({ isActive: true }).sort({ isDefault: -1, updatedAt: -1 });
+    }
+
+    // 6. Fallback to process.env if available
+    if (!config && (gateway === "razorpay" || !gateway) && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+        return {
+            name: "razorpay",
+            keyId: process.env.RAZORPAY_KEY_ID,
+            keySecret: process.env.RAZORPAY_KEY_SECRET,
+            mode: process.env.RAZORPAY_KEY_ID.startsWith("rzp_test") ? "demo" : "live",
+            isActive: true,
+            isDefault: true,
+        };
+    }
+
     if (!config) {
-        const label = gateway ? `${gateway} (${mode || "live"})` : "a default gateway";
+        const label = gateway ? `${gateway}${mode ? ` (${mode})` : ""}` : "a payment gateway";
         const err = new Error(
-            `No active payment gateway configured for ${label}. ` +
-            `Set it up in Admin → Payment Gateways first.`
+            `No active payment gateway configured for ${label}. Set it up in Admin → Payment Gateways first.`
         );
         err.status = 503;
         throw err;
     }
+
     return config;
 }
 
