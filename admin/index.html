@@ -537,7 +537,8 @@
                             </div>
 
                             <div class="investment-trend-header">
-                                <div class="investment-trend-label">Total Portfolio Valuation (Gold + Silver + Copper)</div>
+                                <div class="investment-trend-label">Total Portfolio Valuation (Gold + Silver + Copper)
+                                </div>
                                 <div class="investment-trend-val-wrap">
                                     <span class="investment-trend-main-val" id="trend-total-val-display">₹0</span>
                                 </div>
@@ -656,8 +657,8 @@
                                     </div>
                                     <div class="rate-mini-footer">
                                         <span id="rate-copper-time">Updated today</span>
-                                        <span style="cursor:pointer;color:var(--copper, #ea580c)" onclick="loadDashboard()"><i
-                                                class="fas fa-sync-alt"></i></span>
+                                        <span style="cursor:pointer;color:var(--copper, #ea580c)"
+                                            onclick="loadDashboard()"><i class="fas fa-sync-alt"></i></span>
                                     </div>
                                 </div>
                             </div>
@@ -770,26 +771,37 @@
             <div class="page" id="page-kyc">
                 <div class="section-header">
                     <div>
-                        <div class="section-title"><i class="fas fa-id-card" style="color:var(--warning)"></i> KYC Verification Suite</div>
-                        <div class="section-subtitle">Review government identity proofs, PAN, Aadhaar, and approve / reject / revoke verifications</div>
+                        <div class="section-title"><i class="fas fa-id-card" style="color:var(--warning)"></i> KYC
+                            Verification Suite</div>
+                        <div class="section-subtitle">Review government identity proofs, PAN, Aadhaar, and approve /
+                            reject / revoke verifications</div>
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                         <input class="search-bar" id="kyc-search" placeholder="🔍 Search name, phone, PAN..."
                             oninput="debouncedSearchKyc(this.value)" style="max-width:260px" />
                         <div class="chart-pill-group">
-                            <button class="chart-pill-btn kyc-filter-pill active" id="kyc-pill-pending" onclick="setKycFilter('pending')">
-                                Pending <span class="badge badge-warning" id="kyc-badge-pending" style="font-size:10px;margin-left:4px">0</span>
+                            <button class="chart-pill-btn kyc-filter-pill active" id="kyc-pill-pending"
+                                onclick="setKycFilter('pending')">
+                                Pending <span class="badge badge-warning" id="kyc-badge-pending"
+                                    style="font-size:10px;margin-left:4px">0</span>
                             </button>
-                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-approved" onclick="setKycFilter('approved')">
-                                Approved <span class="badge badge-success" id="kyc-badge-approved" style="font-size:10px;margin-left:4px">0</span>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-approved"
+                                onclick="setKycFilter('approved')">
+                                Approved <span class="badge badge-success" id="kyc-badge-approved"
+                                    style="font-size:10px;margin-left:4px">0</span>
                             </button>
-                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-rejected" onclick="setKycFilter('rejected')">
-                                Rejected <span class="badge badge-danger" id="kyc-badge-rejected" style="font-size:10px;margin-left:4px">0</span>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-rejected"
+                                onclick="setKycFilter('rejected')">
+                                Rejected <span class="badge badge-danger" id="kyc-badge-rejected"
+                                    style="font-size:10px;margin-left:4px">0</span>
                             </button>
-                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-revoked" onclick="setKycFilter('revoked')">
-                                Revoked <span class="badge badge-amber" id="kyc-badge-revoked" style="font-size:10px;margin-left:4px">0</span>
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-revoked"
+                                onclick="setKycFilter('revoked')">
+                                Revoked <span class="badge badge-amber" id="kyc-badge-revoked"
+                                    style="font-size:10px;margin-left:4px">0</span>
                             </button>
-                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-all" onclick="setKycFilter('all')">
+                            <button class="chart-pill-btn kyc-filter-pill" id="kyc-pill-all"
+                                onclick="setKycFilter('all')">
                                 All Submissions
                             </button>
                         </div>
@@ -1569,38 +1581,52 @@
 
                         <!-- ── REWARD POINTS EXPIRY CONTROLS ── -->
                         <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08)">
-                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem">
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem">
                                 <div style="display:flex;align-items:center;gap:10px">
-                                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(239,68,68,0.15);color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid rgba(239,68,68,0.3)">
+                                    <div
+                                        style="width:36px;height:36px;border-radius:10px;background:rgba(239,68,68,0.15);color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid rgba(239,68,68,0.3)">
                                         <i class="fas fa-hourglass-half"></i>
                                     </div>
                                     <div>
-                                        <div style="font-weight:800;font-size:15px;color:#fff">Reward Points Expiry Management</div>
-                                        <div style="font-size:12px;color:var(--text-dim)">Set point expiration validity periods (weekly, monthly, custom) to protect platform liability</div>
+                                        <div style="font-weight:800;font-size:15px;color:#fff">Reward Points Expiry
+                                            Management</div>
+                                        <div style="font-size:12px;color:var(--text-dim)">Set point expiration validity
+                                            periods (weekly, monthly, custom) to protect platform liability</div>
                                     </div>
                                 </div>
                                 <div style="display:flex;gap:8px;align-items:center">
-                                    <button class="btn btn-secondary btn-sm" id="btn-run-expiry-sweep" onclick="runRewardExpirySweep()" style="border-color:rgba(239,68,68,0.4);color:#fca5a5">
+                                    <button class="btn btn-secondary btn-sm" id="btn-run-expiry-sweep"
+                                        onclick="runRewardExpirySweep()"
+                                        style="border-color:rgba(239,68,68,0.4);color:#fca5a5">
                                         <i class="fas fa-bolt"></i> Run Expiry Check Now
                                     </button>
                                 </div>
                             </div>
 
-                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1.25rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:1.25rem">
+                            <div
+                                style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1.25rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-lg);padding:1.25rem">
                                 <div>
-                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">Points Expiration Status</label>
+                                    <label class="form-label"
+                                        style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">Points
+                                        Expiration Status</label>
                                     <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
                                         <label class="switch">
-                                            <input type="checkbox" id="reward-expiry-enabled" onchange="toggleRewardExpiryControls()" />
+                                            <input type="checkbox" id="reward-expiry-enabled"
+                                                onchange="toggleRewardExpiryControls()" />
                                             <span class="slider"></span>
                                         </label>
-                                        <span id="reward-expiry-status-text" style="font-size:13px;font-weight:600;color:#fff">Enabled</span>
+                                        <span id="reward-expiry-status-text"
+                                            style="font-size:13px;font-weight:600;color:#fff">Enabled</span>
                                     </div>
                                 </div>
 
                                 <div id="reward-expiry-preset-wrap">
-                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Expiry Validity Period</label>
-                                    <select class="form-control" id="reward-expiry-type" onchange="onRewardExpiryTypeChange()">
+                                    <label class="form-label"
+                                        style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Expiry
+                                        Validity Period</label>
+                                    <select class="form-control" id="reward-expiry-type"
+                                        onchange="onRewardExpiryTypeChange()">
                                         <option value="weekly">Weekly (7 Days)</option>
                                         <option value="monthly">Monthly (30 Days)</option>
                                         <option value="quarterly">Quarterly (90 Days)</option>
@@ -1611,8 +1637,11 @@
                                 </div>
 
                                 <div id="reward-expiry-custom-days-wrap" style="display:none">
-                                    <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Custom Expiry Days</label>
-                                    <input class="form-control" type="number" min="1" id="reward-expiry-days" placeholder="e.g. 45" value="30" />
+                                    <label class="form-label"
+                                        style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">Custom
+                                        Expiry Days</label>
+                                    <input class="form-control" type="number" min="1" id="reward-expiry-days"
+                                        placeholder="e.g. 45" value="30" />
                                 </div>
                             </div>
                         </div>
@@ -2032,9 +2061,13 @@
 
                         <div class="form-group" id="notif-user-select-box" style="display:none">
                             <label class="form-label">Target Customer</label>
-                            <input class="form-control" id="notif-user-search" placeholder="🔍 Type customer name, phone, or email to search..." oninput="filterNotifUsers(this.value)" style="margin-bottom:6px" />
-                            <select class="form-control" id="notif-user-dropdown" onchange="onNotifUserSelected()"></select>
-                            <div id="notif-user-fcm-info" style="font-size:11.5px;color:var(--text-dim);margin-top:4px"></div>
+                            <input class="form-control" id="notif-user-search"
+                                placeholder="🔍 Type customer name, phone, or email to search..."
+                                oninput="filterNotifUsers(this.value)" style="margin-bottom:6px" />
+                            <select class="form-control" id="notif-user-dropdown"
+                                onchange="onNotifUserSelected()"></select>
+                            <div id="notif-user-fcm-info" style="font-size:11.5px;color:var(--text-dim);margin-top:4px">
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -2055,12 +2088,16 @@
                             <div style="display:flex;gap:8px;flex-wrap:wrap">
                                 <input type="file" id="notif-file-input" class="form-control" accept="image/*"
                                     onchange="uploadNotificationImage(event)" style="flex:1;min-width:200px" />
-                                <input type="text" id="notif-img-url" class="form-control" placeholder="Or paste image URL (https://...)"
+                                <input type="text" id="notif-img-url" class="form-control"
+                                    placeholder="Or paste image URL (https://...)"
                                     oninput="setNotifImageUrl(this.value)" style="flex:1;min-width:200px" />
                             </div>
-                            <div id="notif-img-status" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:12px;color:var(--success);align-items:center;gap:6px">
-                                <i class="fas fa-check-circle"></i> <span id="notif-img-status-text">Image Attached</span>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearNotifImage()" style="margin-left:auto;padding:2px 8px;font-size:11px;color:var(--danger)">
+                            <div id="notif-img-status"
+                                style="display:none;margin-top:8px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:12px;color:var(--success);align-items:center;gap:6px">
+                                <i class="fas fa-check-circle"></i> <span id="notif-img-status-text">Image
+                                    Attached</span>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearNotifImage()"
+                                    style="margin-left:auto;padding:2px 8px;font-size:11px;color:var(--danger)">
                                     <i class="fas fa-times"></i> Remove
                                 </button>
                             </div>
@@ -2634,79 +2671,6 @@
             <div class="modal-body" id="enrollment-modal-body"></div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeEnrollmentModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Coupon Modal -->
-    <div class="modal-overlay" id="coupon-modal" style="display:none">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title" id="coupon-modal-title">Create Coupon</div>
-                <button class="modal-close" onclick="closeCouponModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <form id="coupon-form" onsubmit="event.preventDefault()">
-                    <div class="form-group">
-                        <label class="form-label">Coupon Code (Uppercase)</label>
-                        <input class="form-control" id="coupon-code" placeholder="DIWALI2026" required
-                            style="font-family:var(--font-mono);font-weight:700" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <input class="form-control" id="coupon-desc"
-                            placeholder="Get 2% extra gold on your festive purchases" required />
-                    </div>
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Benefit Type</label>
-                            <select class="form-control" id="coupon-type">
-                                <option value="extra_gold">Extra Bullion Metal</option>
-                                <option value="discount">Cash Discount (₹)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Value Calculation</label>
-                            <select class="form-control" id="coupon-val-type">
-                                <option value="percentage">Percentage (%)</option>
-                                <option value="flat">Flat Amount (₹)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Value</label>
-                            <input class="form-control" type="number" id="coupon-val" placeholder="e.g. 2 or 500"
-                                required />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Min Purchase (₹)</label>
-                            <input class="form-control" type="number" id="coupon-min-amt" value="0" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Max Cap (₹)</label>
-                            <input class="form-control" type="number" id="coupon-max-disc" value="0" />
-                        </div>
-                    </div>
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label class="form-label">Metal</label>
-                            <select class="form-control" id="coupon-metal">
-                                <option value="both">Both Gold & Silver</option>
-                                <option value="gold">Gold Only</option>
-                                <option value="silver">Silver Only</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Expiry Date</label>
-                            <input class="form-control" type="date" id="coupon-expiry" />
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveCoupon()">Save Coupon</button>
             </div>
         </div>
     </div>
@@ -3297,10 +3261,10 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeRestockModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveRestock()"><i class="fas fa-check"></i> Update Inventory
-                    Stock</button>
+                <button class="btn btn-primary" onclick="saveRestock()"><i class="fas fa-check"></i> Update Inventory Stock</button>
             </div>
         </div>
+    </div>
 
         <!-- Coupon Offer Modal -->
         <div class="modal-overlay" id="coupon-modal" style="display:none">
@@ -3314,7 +3278,8 @@
                         <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                             <div class="form-group">
                                 <label class="form-label">Coupon Code</label>
-                                <input class="form-control font-mono" id="coupon-code" placeholder="e.g. WELCOME50" style="text-transform:uppercase;font-weight:700;letter-spacing:1px" required />
+                                <input class="form-control font-mono" id="coupon-code" placeholder="e.g. WELCOME50"
+                                    style="text-transform:uppercase;font-weight:700;letter-spacing:1px" required />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Applies To Metal</label>
@@ -3327,7 +3292,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Description / Offer Tagline</label>
-                            <input class="form-control" id="coupon-desc" placeholder="e.g. Get ₹50 Free Extra 24K Gold" required />
+                            <input class="form-control" id="coupon-desc" placeholder="e.g. Get ₹50 Free Extra 24K Gold"
+                                required />
                         </div>
                         <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                             <div class="form-group">
@@ -3348,15 +3314,18 @@
                         <div class="form-grid-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
                             <div class="form-group">
                                 <label class="form-label">Benefit Value</label>
-                                <input class="form-control" type="number" step="any" id="coupon-val" placeholder="e.g. 50 or 5" required />
+                                <input class="form-control" type="number" step="any" id="coupon-val"
+                                    placeholder="e.g. 50 or 5" required />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Min Purchase (₹)</label>
-                                <input class="form-control" type="number" id="coupon-min-amt" placeholder="0 = No Min" />
+                                <input class="form-control" type="number" id="coupon-min-amt"
+                                    placeholder="0 = No Min" />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Max Benefit Cap (₹)</label>
-                                <input class="form-control" type="number" id="coupon-max-disc" placeholder="0 = No Cap" />
+                                <input class="form-control" type="number" id="coupon-max-disc"
+                                    placeholder="0 = No Cap" />
                             </div>
                         </div>
                         <div class="form-group">
@@ -3367,7 +3336,8 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveCoupon()"><i class="fas fa-save"></i> Save Coupon</button>
+                    <button class="btn btn-primary" onclick="saveCoupon()"><i class="fas fa-save"></i> Save
+                        Coupon</button>
                 </div>
             </div>
         </div>
@@ -3376,7 +3346,8 @@
         <div class="modal-overlay" id="gateway-modal" style="display:none">
             <div class="modal">
                 <div class="modal-header">
-                    <div class="modal-title" id="gateway-modal-title"><i class="fas fa-credit-card" style="color:var(--gold);margin-right:8px"></i> Payment Gateway</div>
+                    <div class="modal-title" id="gateway-modal-title"><i class="fas fa-credit-card"
+                            style="color:var(--gold);margin-right:8px"></i> Payment Gateway</div>
                     <button class="modal-close" onclick="closeGatewayModal()">×</button>
                 </div>
                 <div class="modal-body">
@@ -3398,17 +3369,23 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Key ID / Client ID</label>
-                            <input class="form-control" id="gateway-key" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx" required style="font-family:monospace;" />
+                            <input class="form-control" id="gateway-key" placeholder="e.g. rzp_live_xxxxxxxxxxxxxx"
+                                required style="font-family:monospace;" />
                         </div>
                         <div class="form-group">
                             <label class="form-label">API Secret Key (Leave blank to keep existing)</label>
-                            <input class="form-control" type="password" id="gateway-secret" placeholder="••••••••••••" style="font-family:monospace;" />
+                            <input class="form-control" type="password" id="gateway-secret" placeholder="••••••••••••"
+                                style="font-family:monospace;" />
                         </div>
-                        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:12px">
-                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                        <div
+                            style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:12px">
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
                                 <div>
-                                    <div style="color:#fff;font-weight:700;font-size:13px">Set as Active Default Gateway</div>
-                                    <div style="color:var(--text-dim);font-size:11px">Mobile app & backend will use this gateway for all transactions.</div>
+                                    <div style="color:#fff;font-weight:700;font-size:13px">Set as Active Default Gateway
+                                    </div>
+                                    <div style="color:var(--text-dim);font-size:11px">Mobile app & backend will use this
+                                        gateway for all transactions.</div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="gateway-is-default" />
@@ -3418,7 +3395,8 @@
                             <div style="display:flex;align-items:center;justify-content:space-between">
                                 <div>
                                     <div style="color:#fff;font-weight:700;font-size:13px">Enable Gateway</div>
-                                    <div style="color:var(--text-dim);font-size:11px">Allow transactions through this provider.</div>
+                                    <div style="color:var(--text-dim);font-size:11px">Allow transactions through this
+                                        provider.</div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="gateway-is-active" checked />
@@ -3430,7 +3408,8 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeGatewayModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveGateway()"><i class="fas fa-save"></i> Save Gateway</button>
+                    <button class="btn btn-primary" onclick="saveGateway()"><i class="fas fa-save"></i> Save
+                        Gateway</button>
                 </div>
             </div>
         </div>
@@ -3461,7 +3440,7 @@
             </div>
         </div>
 
-        
+
         <!-- ══════════════════════════════════════════════════════════
          5. MODULAR JAVASCRIPT BUNDLE
          ══════════════════════════════════════════════════════════ -->
