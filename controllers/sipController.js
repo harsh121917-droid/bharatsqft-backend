@@ -697,7 +697,8 @@ exports.sendBulkSipReminders = async (req, res, next) => {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/sip/create-autopay — Create Razorpay Subscription for SIP AutoPay
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/sip/create-autopay — Resilient Razorpay Subscriptions / Order
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createAutoPaySip = async (req, res, next) => {
     try {
@@ -729,40 +730,73 @@ exports.createAutoPaySip = async (req, res, next) => {
 
         const totalCycles = computeTotalCycles(durationMonths, frequency);
 
-        const { createRazorpaySubscription } = require("../services/paymentGatewayService");
-        const subData = await createRazorpaySubscription({
-            amount,
-            frequency: frequency.toLowerCase(),
-            totalCycles,
-            notes: {
-                userId: userId.toString(),
-                metal: metal.toLowerCase(),
+        const { createRazorpaySubscription, createRazorpayOrder } = require("../services/paymentGatewayService");
+        
+        let subData = null;
+        try {
+            subData = await createRazorpaySubscription({
+                amount,
+                frequency: frequency.toLowerCase(),
+                totalCycles,
+                notes: {
+                    userId: userId.toString(),
+                    metal: metal.toLowerCase(),
+                    goalCategory,
+                    goalTitle,
+                    durationMonths,
+                },
+            });
+
+            return res.json({
+                success: true,
+                isSubscription: true,
+                subscriptionId: subData.subscription.id,
+                planId: subData.plan.id,
+                keyId: subData.keyId,
+                amount,
+                frequency: frequency.toLowerCase(),
+                durationMonths,
+                totalCycles,
                 goalCategory,
                 goalTitle,
-                durationMonths,
-            },
-        });
+                metal: metal.toLowerCase(),
+            });
+        } catch (subErr) {
+            console.warn("Razorpay subscription create bypassed/failed (CFB or permissions), creating standard Razorpay order:", subErr.message);
+            const orderData = await createRazorpayOrder({
+                amount,
+                notes: {
+                    userId: userId.toString(),
+                    metal: metal.toLowerCase(),
+                    goalCategory,
+                    goalTitle,
+                    durationMonths,
+                    frequency,
+                    type: "sip_first_installment",
+                },
+            });
 
-        res.json({
-            success: true,
-            subscriptionId: subData.subscription.id,
-            planId: subData.plan.id,
-            keyId: subData.keyId,
-            amount,
-            frequency: frequency.toLowerCase(),
-            durationMonths,
-            totalCycles,
-            goalCategory,
-            goalTitle,
-            metal: metal.toLowerCase(),
-        });
+            return res.json({
+                success: true,
+                isOrder: true,
+                orderId: orderData.order.id,
+                keyId: orderData.keyId,
+                amount,
+                frequency: frequency.toLowerCase(),
+                durationMonths,
+                totalCycles,
+                goalCategory,
+                goalTitle,
+                metal: metal.toLowerCase(),
+            });
+        }
     } catch (err) {
         next(err);
     }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/sip/verify-autopay — Verify Razorpay e-Mandate & Activate AutoPay SIP
+// POST /api/sip/verify-autopay — Verify Razorpay e-Mandate or Order & Activate SIP
 // ══════════════════════════════════════════════════════════════════════════════
 exports.verifyAutoPaySip = async (req, res, next) => {
     try {
@@ -770,6 +804,7 @@ exports.verifyAutoPaySip = async (req, res, next) => {
         const {
             razorpayPaymentId,
             razorpaySubscriptionId,
+            razorpayOrderId,
             razorpaySignature,
             metal = "gold",
             frequency = "monthly",
@@ -779,26 +814,37 @@ exports.verifyAutoPaySip = async (req, res, next) => {
             goalTitle = "Wealth Building",
         } = req.body;
 
-        if (!razorpayPaymentId || !razorpaySubscriptionId || !razorpaySignature) {
+        if (!razorpayPaymentId || !razorpaySignature || (!razorpaySubscriptionId && !razorpayOrderId)) {
             return res.status(400).json({
                 success: false,
-                message: "Missing Razorpay subscription payment parameters.",
+                message: "Missing Razorpay payment parameters.",
             });
         }
 
-        const { getRazorpayKeySecret, verifyRazorpaySubscriptionSignature } = require("../services/paymentGatewayService");
+        const { getRazorpayKeySecret, verifyRazorpaySubscriptionSignature, verifyRazorpaySignature } = require("../services/paymentGatewayService");
         const keySecret = await getRazorpayKeySecret();
-        const isValid = verifyRazorpaySubscriptionSignature({
-            paymentId: razorpayPaymentId,
-            subscriptionId: razorpaySubscriptionId,
-            signature: razorpaySignature,
-            keySecret,
-        });
+        
+        let isValid = false;
+        if (razorpaySubscriptionId) {
+            isValid = verifyRazorpaySubscriptionSignature({
+                paymentId: razorpayPaymentId,
+                subscriptionId: razorpaySubscriptionId,
+                signature: razorpaySignature,
+                keySecret,
+            });
+        } else if (razorpayOrderId) {
+            isValid = verifyRazorpaySignature({
+                orderId: razorpayOrderId,
+                paymentId: razorpayPaymentId,
+                signature: razorpaySignature,
+                keySecret,
+            });
+        }
 
         if (!isValid) {
             return res.status(400).json({
                 success: false,
-                message: "Razorpay subscription signature verification failed.",
+                message: "Razorpay signature verification failed.",
             });
         }
 
@@ -816,7 +862,7 @@ exports.verifyAutoPaySip = async (req, res, next) => {
         // Credit bullion to vault
         const txnId = await creditGramsToVault(userId, metalKey, gramsCredited, amount, metalRate, 1);
 
-        // Create AutoPay SIP Document
+        // Create SIP Document
         const sip = new Sip({
             user: userId,
             metal: metalKey,
@@ -833,17 +879,17 @@ exports.verifyAutoPaySip = async (req, res, next) => {
             startDate: new Date(),
             completedAt: totalCycles <= 1 ? new Date() : null,
             nextDueDate: new Date(),
-            isAutopay: true,
-            razorpaySubscriptionId,
-            razorpayPaymentId,
-            razorpaySignature,
+            isAutopay: !!razorpaySubscriptionId,
+            razorpaySubscriptionId: razorpaySubscriptionId || "",
+            razorpayPaymentId: razorpayPaymentId || "",
+            razorpaySignature: razorpaySignature || "",
             installments: [
                 {
                     installmentNo: 1,
                     amount,
                     ratePerGram: metalRate,
                     grams: parseFloat(gramsCredited.toFixed(6)),
-                    paymentMethod: "auto",
+                    paymentMethod: razorpaySubscriptionId ? "auto" : "razorpay",
                     txnId: txnId,
                     paidAt: new Date(),
                 },
@@ -855,7 +901,7 @@ exports.verifyAutoPaySip = async (req, res, next) => {
 
         res.status(201).json({
             success: true,
-            message: `🎉 AutoPay Active! Your ${metal.toUpperCase()} SIP is set up on Auto-Debit and first installment is credited.`,
+            message: `🎉 Success! Your ${metal.toUpperCase()} SIP is activated and first installment is credited to your vault.`,
             data: sip,
         });
     } catch (err) {
