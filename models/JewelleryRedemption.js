@@ -11,6 +11,7 @@ const jewelleryRedemptionSchema = new mongoose.Schema({
     vaultGramsDeducted: { type: Number, default: 0 },
     vaultDiscountAmt: { type: Number, default: 0 },
     makingCharges: { type: Number, required: true },
+    priceAdjustment: { type: Number, default: 0 },
     gstAmount: { type: Number, required: true },
     totalPaid: { type: Number, required: true }, // Paid via Razorpay or Wallet
     purchaseType: { type: String, enum: ["vault_redeem", "direct_buy", "hybrid"], default: "direct_buy" },

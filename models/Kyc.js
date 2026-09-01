@@ -11,12 +11,12 @@ const KycSchema = new mongoose.Schema(
 
         // Personal details
         fullName: { type: String, required: [true, "Full name is required"], trim: true },
-        dob: { type: Date, required: [true, "Date of birth is required"] },
+        dob: { type: Date },
         address: {
-            line1: { type: String, required: [true, "Address is required"], trim: true },
-            city: { type: String, required: true, trim: true },
-            state: { type: String, required: true, trim: true },
-            pincode: { type: String, required: true, trim: true },
+            line1: { type: String, trim: true, default: "" },
+            city: { type: String, trim: true, default: "" },
+            state: { type: String, trim: true, default: "" },
+            pincode: { type: String, trim: true, default: "" },
         },
 
         // PAN
@@ -28,24 +28,22 @@ const KycSchema = new mongoose.Schema(
             match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format"],
         },
         panImage: {
-            url: { type: String, required: true },
+            url: { type: String, default: "cashfree_verified" },
             uploadedAt: { type: Date, default: Date.now },
         },
 
-        // Aadhaar
+        // Aadhaar (Optional for PAN-only verification)
         aadhaarNumber: {
             type: String,
-            required: [true, "Aadhaar number is required"],
             trim: true,
-            match: [/^\d{12}$/, "Aadhaar must be 12 digits"],
             select: false, // sensitive — hide by default
         },
         aadhaarFront: {
-            url: { type: String, required: true },
+            url: { type: String, default: "" },
             uploadedAt: { type: Date, default: Date.now },
         },
         aadhaarBack: {
-            url: { type: String, required: true },
+            url: { type: String, default: "" },
             uploadedAt: { type: Date, default: Date.now },
         },
 

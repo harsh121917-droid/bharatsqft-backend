@@ -430,7 +430,23 @@ exports.initiateRedeemOrder = async (req, res, next) => {
         const metalType = jewellery.metalType;
         const { fetchLiveRates } = require("./goldController");
         const rates = await fetchLiveRates();
-        const rate = (metalType === "gold") ? rates.gold.buyRate : rates.silver.buyRate;
+        
+        // Purity-adjusted live base rate
+        let rate = (metalType === "gold") ? rates.gold.buyRate : rates.silver.buyRate;
+        const purityStr = (jewellery.purity || "").toLowerCase();
+        if (metalType === "gold") {
+            if (purityStr.includes("18k") || purityStr.includes("750")) {
+                rate = Math.round(rate * 18 / 24);
+            } else if (purityStr.includes("14k") || purityStr.includes("585")) {
+                rate = Math.round(rate * 14 / 24);
+            } else if (!purityStr.includes("24k") && !purityStr.includes("999") && !purityStr.includes("99.9")) {
+                rate = Math.round(rate * 22 / 24); // default 22K (916)
+            }
+        } else {
+            if (purityStr.includes("925")) {
+                rate = Math.round(rate * 0.925);
+            }
+        }
 
         // Fetch user's available vault balance
         let availableVaultGrams = 0;
@@ -456,13 +472,26 @@ exports.initiateRedeemOrder = async (req, res, next) => {
         const remainingGrams = parseFloat(Math.max(0, weightGrams - deductedGrams).toFixed(6));
         const vaultDiscountAmt = Math.round(deductedGrams * rate);
         const remainingMetalValue = Math.round(remainingGrams * rate);
-        const making = jewellery.makingCharges || 1500;
-        const gstPercentage = jewellery.gstPercentage || 3;
+        const making = Number(jewellery.makingCharges || 0);
+        const gstPercentage = Number(jewellery.gstPercentage || 3);
+        const priceAdj = Number(jewellery.priceAdjustment || 0);
+        const fixedPrice = Number(jewellery.price || 0);
 
-        // Net cash calculation: (Remaining Metal Value + Making Charges) + 3% GST
-        const taxableCashAmount = remainingMetalValue + making;
-        const gst = Math.round((taxableCashAmount * gstPercentage) / 100);
-        const totalAmount = taxableCashAmount + gst;
+        // Net cash calculation: If fixed price is set (>0), base off fixed price; else (Remaining Metal + Making + Admin Adj) + GST
+        let taxableCashAmount = 0;
+        let gst = 0;
+        let totalAmount = 0;
+
+        if (fixedPrice > 0) {
+            const baseAfterVault = Math.max(0, fixedPrice - vaultDiscountAmt);
+            totalAmount = Math.max(0, Math.round(baseAfterVault + priceAdj));
+            gst = Math.round((totalAmount * gstPercentage) / (100 + gstPercentage));
+            taxableCashAmount = totalAmount - gst;
+        } else {
+            taxableCashAmount = Math.max(0, remainingMetalValue + making + priceAdj);
+            gst = Math.round((taxableCashAmount * gstPercentage) / 100);
+            totalAmount = taxableCashAmount + gst;
+        }
 
         const mode = deductedGrams >= weightGrams ? "vault_redeem" : (deductedGrams > 0 ? "hybrid" : "direct_buy");
 
@@ -547,6 +576,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
                 vaultDiscountAmt: vaultDiscountAmt,
                 quantity: 1,
                 makingCharges: making,
+                priceAdjustment: priceAdj,
                 gstAmount: gst,
                 totalPaid: totalAmount,
                 purchaseType: mode,
@@ -600,6 +630,7 @@ exports.initiateRedeemOrder = async (req, res, next) => {
             vaultDiscountAmt: vaultDiscountAmt,
             quantity: 1,
             makingCharges: making,
+            priceAdjustment: priceAdj,
             gstAmount: gst,
             totalPaid: totalAmount,
             purchaseType: mode,
