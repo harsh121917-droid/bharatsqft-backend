@@ -570,8 +570,9 @@ exports.sellGold = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getTransactions = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, type } = req.query;
+        const { page = 1, limit = 20, type, status = "success" } = req.query;
         const query = { user: req.user._id };
+        if (status && status !== "all") query.status = status;
         if (type) query.type = type;
 
         const [txns, total, all] = await Promise.all([
