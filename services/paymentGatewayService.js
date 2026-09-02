@@ -28,7 +28,7 @@ function sanitizeRazorpayNotes(rawNotes = {}, purpose = "investment") {
 /**
  * Resolves which gateway config to use for a request.
  * - Supports dual Razorpay routing:
- *   - purpose: "spot" -> Uses 'razorpay_hdfc' (0% charge for buy gold/silver/copper, wallet, orders)
+ *   - purpose: "spot" -> Uses 'razorpay_idfc' (0% charge for buy gold/silver/copper, wallet, orders)
  *   - purpose: "sip_scheme" -> Uses 'razorpay_standard' (for SIP AutoPay & Savings Schemes)
  * - If explicit gateway and mode requested, uses that.
  * - Falls back to default gateway or general 'razorpay'.
@@ -36,7 +36,7 @@ function sanitizeRazorpayNotes(rawNotes = {}, purpose = "investment") {
 async function resolveGateway({ gateway, purpose, mode } = {}) {
     let config = null;
 
-    // 1. If explicit gateway name passed (e.g. "razorpay_hdfc", "razorpay_standard", "razorpay", "cashfree")
+    // 1. If explicit gateway name passed (e.g. "razorpay_idfc", "razorpay_hdfc", "razorpay_standard", "razorpay", "cashfree")
     if (gateway && mode) {
         config = await PaymentGateway.findOne({ name: gateway.toLowerCase(), mode, isActive: true });
     }
@@ -49,8 +49,8 @@ async function resolveGateway({ gateway, purpose, mode } = {}) {
 
     // 2. If purpose is "spot" (Buy Gold/Silver/Copper, Wallet, Coins, Jewellery, Properties)
     if (!config && purpose === "spot") {
-        // Priority 1: razorpay_hdfc
-        config = await PaymentGateway.findOne({ name: "razorpay_hdfc", isActive: true });
+        // Priority 1: razorpay_idfc or razorpay_hdfc
+        config = await PaymentGateway.findOne({ name: { $in: ["razorpay_idfc", "razorpay_hdfc"] }, isActive: true });
         // Priority 2: general razorpay marked isDefault
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isDefault: true, isActive: true });
         // Priority 3: any active razorpay
@@ -105,7 +105,7 @@ async function resolveGateway({ gateway, purpose, mode } = {}) {
 // Razorpay Orders & Subscriptions
 // ══════════════════════════════════════════════════════════════════════════════
 async function createRazorpayOrder({ amount, notes = {}, mode, purpose = "spot", gateway }) {
-    const config = await resolveGateway({ gateway: gateway || (purpose === "sip_scheme" ? "razorpay_standard" : "razorpay_hdfc"), purpose, mode });
+    const config = await resolveGateway({ gateway: gateway || (purpose === "sip_scheme" ? "razorpay_standard" : "razorpay_idfc"), purpose, mode });
     const razorpay = new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
     
     // Sanitize notes so Razorpay never receives metal or sensitive details
@@ -135,7 +135,7 @@ async function verifyRazorpaySignatureWithFallback({ orderId, paymentId, signatu
         return true;
     }
     const configs = await PaymentGateway.find({
-        name: { $in: ["razorpay", "razorpay_hdfc", "razorpay_standard"] },
+        name: { $in: ["razorpay", "razorpay_idfc", "razorpay_hdfc", "razorpay_standard"] },
         isActive: true,
         keySecret: { $exists: true, $ne: "" }
     });
@@ -210,7 +210,7 @@ async function verifyRazorpaySubscriptionSignatureWithFallback({ paymentId, subs
         return true;
     }
     const configs = await PaymentGateway.find({
-        name: { $in: ["razorpay", "razorpay_hdfc", "razorpay_standard"] },
+        name: { $in: ["razorpay", "razorpay_idfc", "razorpay_hdfc", "razorpay_standard"] },
         isActive: true,
         keySecret: { $exists: true, $ne: "" }
     });

@@ -35,8 +35,8 @@ exports.upsertGateway = async (req, res, next) => {
         let defaultLabel = label;
         let defaultPurpose = purpose || "all";
 
-        if (lowerName === "razorpay_hdfc") {
-            defaultLabel = label || "HDFC Razorpay (0% Fee — Buy Metals, Wallet, Orders)";
+        if (lowerName === "razorpay_idfc" || lowerName === "razorpay_hdfc") {
+            defaultLabel = label || "IDFC Razorpay (0% Fee — Buy Metals, Wallet, Orders)";
             defaultPurpose = purpose || "spot";
         } else if (lowerName === "razorpay_standard") {
             defaultLabel = label || "Normal Razorpay (SIP Subscriptions & Schemes)";

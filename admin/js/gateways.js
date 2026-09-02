@@ -30,7 +30,7 @@ function renderGateways(gateways) {
     if (!body) return;
 
     if (!gateways || gateways.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-credit-card" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No payment gateways configured yet</div><div style="font-size:12px;color:var(--text-dim)">Click "+ Add Gateway" above to configure HDFC Razorpay, Normal Razorpay, or Cashfree.</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-credit-card" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No payment gateways configured yet</div><div style="font-size:12px;color:var(--text-dim)">Click "+ Add Gateway" above to configure IDFC Razorpay, Normal Razorpay, or Cashfree.</div></div>`;
         return;
     }
 
@@ -53,7 +53,7 @@ function renderGateways(gateways) {
         const isLive = g.mode === "live";
         const rawName = (g.name || "").toLowerCase();
         const isRzp = rawName.includes("razorpay");
-        const isHdfc = rawName === "razorpay_hdfc";
+        const isIdfc = rawName === "razorpay_idfc" || rawName === "razorpay_hdfc";
         const isStandard = rawName === "razorpay_standard";
         const isPayout = rawName === "cashfree_payout";
         const keyDisplay = g.keyId || g.clientId || "—";
@@ -66,11 +66,11 @@ function renderGateways(gateways) {
         let title = g.label || g.name || "Gateway";
         let purposeBadge = `<span class="badge badge-blue"><i class="fas fa-bolt"></i> General</span>`;
 
-        if (isHdfc) {
+        if (isIdfc) {
             iconClass = "fas fa-building-columns";
             iconBg = "rgba(212,160,23,0.18)";
             iconColor = "#D4A017";
-            title = "🏛️ HDFC Razorpay (0% Fee)";
+            title = "🏛️ IDFC Razorpay (0% Fee)";
             purposeBadge = `<span class="badge badge-gold" style="font-size:11px;font-weight:700"><i class="fas fa-coins"></i> Buy Metals & Wallet Add</span>`;
         } else if (isStandard) {
             iconClass = "fas fa-sync-alt";
