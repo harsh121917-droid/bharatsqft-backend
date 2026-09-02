@@ -70,7 +70,16 @@ exports.upsertGateway = async (req, res, next) => {
         );
 
         if (isDefault === true || isDefault === "true") {
-            await PaymentGateway.updateMany({ _id: { $ne: config._id } }, { isDefault: false });
+            const targetPurpose = (defaultPurpose === "spot" || lowerName === "razorpay_idfc" || lowerName === "razorpay_hdfc")
+                ? "spot"
+                : (defaultPurpose === "sip_scheme" || lowerName === "razorpay_standard")
+                ? "sip_scheme"
+                : null;
+            if (targetPurpose) {
+                await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: targetPurpose }, { isDefault: false });
+            } else {
+                await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: { $nin: ["spot", "sip_scheme"] } }, { isDefault: false });
+            }
             config.isDefault = true;
             await config.save();
         }
@@ -98,8 +107,19 @@ exports.updateGateway = async (req, res, next) => {
         config.updatedBy = req.user._id;
 
         if (isDefault === true || isDefault === "true") {
-            await PaymentGateway.updateMany({ _id: { $ne: config._id } }, { isDefault: false });
+            const targetPurpose = (config.purpose === "spot" || config.name === "razorpay_idfc" || config.name === "razorpay_hdfc")
+                ? "spot"
+                : (config.purpose === "sip_scheme" || config.name === "razorpay_standard")
+                ? "sip_scheme"
+                : null;
+            if (targetPurpose) {
+                await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: targetPurpose }, { isDefault: false });
+            } else {
+                await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: { $nin: ["spot", "sip_scheme"] } }, { isDefault: false });
+            }
             config.isDefault = true;
+        } else if (isDefault === false || isDefault === "false") {
+            config.isDefault = false;
         }
 
         await config.save();
@@ -135,9 +155,44 @@ exports.setDefaultGateway = async (req, res, next) => {
         if (!config) return res.status(404).json({ success: false, message: "Gateway not found" });
         
         config.isActive = true;
-        await PaymentGateway.updateMany({}, { isDefault: false });
+
+        // If clicking on an already-default gateway, allow toggling it off
+        if (config.isDefault) {
+            config.isDefault = false;
+            await config.save();
+            return res.json({
+                success: true,
+                message: `${config.label || config.name} default status removed`,
+                data: maskConfig(config)
+            });
+        }
+
+        // Target purpose: allows 2 active defaults (1 for spot / IDFC, 1 for sip_scheme / standard)
+        const targetPurpose = (config.purpose === "spot" || config.name === "razorpay_idfc" || config.name === "razorpay_hdfc")
+            ? "spot"
+            : (config.purpose === "sip_scheme" || config.name === "razorpay_standard")
+            ? "sip_scheme"
+            : null;
+
+        if (targetPurpose) {
+            await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: targetPurpose }, { isDefault: false });
+        } else {
+            await PaymentGateway.updateMany({ _id: { $ne: config._id }, purpose: { $nin: ["spot", "sip_scheme"] } }, { isDefault: false });
+        }
+
         config.isDefault = true;
         await config.save();
-        res.json({ success: true, message: `${config.name} (${config.mode}) is now the DEFAULT gateway for all transactions`, data: maskConfig(config) });
+
+        const purposeLabel = targetPurpose === "spot"
+            ? "Spot (Buy Metals, Wallet Top-ups, Orders)"
+            : targetPurpose === "sip_scheme"
+            ? "SIP AutoPay & Schemes"
+            : "General Transactions";
+
+        res.json({
+            success: true,
+            message: `${config.label || config.name} is now the ACTIVE DEFAULT for ${purposeLabel}`,
+            data: maskConfig(config)
+        });
     } catch (err) { next(err); }
 };

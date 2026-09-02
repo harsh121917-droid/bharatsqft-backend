@@ -116,8 +116,8 @@ function renderGateways(gateways) {
             </td>
             <td>
                 ${isDef ? 
-                    `<span class="badge badge-success" style="background:#10B981;color:#000;font-weight:900;padding:4px 10px;border-radius:8px"><i class="fas fa-check-circle"></i> ACTIVE DEFAULT</span>` : 
-                    `<button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')"><i class="fas fa-star"></i> Set as Default</button>`
+                    `<button type="button" class="btn btn-sm" style="background:${isIdfc ? 'linear-gradient(135deg,#D4A017,#F59E0B)' : isStandard ? 'linear-gradient(135deg,#A855F7,#7C3AED)' : '#10B981'};color:${isStandard ? '#fff' : '#000'};font-weight:900;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')" title="Active default for this flow. Click to toggle."><i class="fas fa-check-circle"></i> ${isIdfc ? 'DEFAULT (BUY & WALLET)' : isStandard ? 'DEFAULT (SIP & SCHEMES)' : 'ACTIVE DEFAULT'}</button>` : 
+                    `<button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:5px 10px;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')"><i class="fas fa-star" style="color:var(--gold)"></i> Set as Default</button>`
                 }
             </td>
             <td>

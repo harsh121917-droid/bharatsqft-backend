@@ -965,31 +965,46 @@ exports.createAutoPaySip = async (req, res, next) => {
                 metal: metal.toLowerCase(),
             });
         } catch (subErr) {
-            console.warn("Razorpay subscription create bypassed/failed (CFB or permissions), creating standard Razorpay order:", subErr.message);
-            const orderData = await createRazorpayOrder({
-                amount,
-                purpose: "sip_scheme",
-                notes: {
-                    userId: userId.toString(),
-                    durationMonths,
-                    frequency: frequency.toLowerCase(),
-                    type: "investment",
-                },
-            });
+            console.warn("Razorpay subscription create bypassed/failed (CFB or permissions), creating standard Razorpay order:", subErr.message || subErr);
+            
+            try {
+                const orderData = await createRazorpayOrder({
+                    amount,
+                    purpose: "sip_scheme",
+                    notes: {
+                        userId: userId.toString(),
+                        durationMonths,
+                        frequency: frequency.toLowerCase(),
+                        type: "investment",
+                    },
+                });
 
-            return res.json({
-                success: true,
-                isOrder: true,
-                orderId: orderData.order.id,
-                keyId: orderData.keyId,
-                amount,
-                frequency: frequency.toLowerCase(),
-                durationMonths,
-                totalCycles,
-                goalCategory,
-                goalTitle,
-                metal: metal.toLowerCase(),
-            });
+                return res.json({
+                    success: true,
+                    isOrder: true,
+                    orderId: orderData.order.id,
+                    keyId: orderData.keyId,
+                    amount,
+                    frequency: frequency.toLowerCase(),
+                    durationMonths,
+                    totalCycles,
+                    goalCategory,
+                    goalTitle,
+                    metal: metal.toLowerCase(),
+                });
+            } catch (orderErr) {
+                console.error("Razorpay order create error:", orderErr);
+                const isAuthErr = (orderErr.message || "").toLowerCase().includes("authentication failed") ||
+                                  (orderErr?.error?.description || "").toLowerCase().includes("authentication failed");
+                if (isAuthErr) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Payment Gateway Authentication Failed: Razorpay rejected the API credentials. Please check Key ID and Key Secret in Admin Panel -> Payment Gateways.",
+                        details: "Make sure Normal Razorpay (or active default gateway) has valid live Key ID and Key Secret without extra spaces."
+                    });
+                }
+                throw orderErr;
+            }
         }
     } catch (err) {
         next(err);

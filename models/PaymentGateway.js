@@ -20,12 +20,12 @@ const PaymentGatewaySchema = new mongoose.Schema(
         },
 
         // Razorpay
-        keyId: { type: String },
-        keySecret: { type: String },
+        keyId: { type: String, trim: true },
+        keySecret: { type: String, trim: true },
 
         // Cashfree (payments) / Cashfree Payout — same shape, different creds
-        clientId: { type: String },
-        clientSecret: { type: String },
+        clientId: { type: String, trim: true },
+        clientSecret: { type: String, trim: true },
 
         isActive: { type: Boolean, default: true },
         isDefault: { type: Boolean, default: false }, // used when request omits gateway/mode

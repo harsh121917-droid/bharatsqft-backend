@@ -49,21 +49,29 @@ async function resolveGateway({ gateway, purpose, mode } = {}) {
 
     // 2. If purpose is "spot" (Buy Gold/Silver/Copper, Wallet, Coins, Jewellery, Properties)
     if (!config && purpose === "spot") {
-        // Priority 1: razorpay_idfc or razorpay_hdfc
-        config = await PaymentGateway.findOne({ name: { $in: ["razorpay_idfc", "razorpay_hdfc"] }, isActive: true });
-        // Priority 2: general razorpay marked isDefault
+        // Priority 1: IDFC Razorpay marked default & active
+        config = await PaymentGateway.findOne({ name: { $in: ["razorpay_idfc", "razorpay_hdfc"] }, isDefault: true, isActive: true });
+        // Priority 2: any active IDFC Razorpay
+        if (!config) config = await PaymentGateway.findOne({ name: { $in: ["razorpay_idfc", "razorpay_hdfc"] }, isActive: true });
+        // Priority 3: any active gateway marked isDefault with purpose: "spot"
+        if (!config) config = await PaymentGateway.findOne({ purpose: "spot", isDefault: true, isActive: true });
+        // Priority 4: general razorpay marked isDefault
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isDefault: true, isActive: true });
-        // Priority 3: any active razorpay
+        // Priority 5: any active razorpay
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isActive: true });
     }
 
     // 3. If purpose is "sip_scheme" (SIP Subscriptions, SIP Orders, 11+1 Schemes)
     if (!config && purpose === "sip_scheme") {
-        // Priority 1: razorpay_standard
-        config = await PaymentGateway.findOne({ name: "razorpay_standard", isActive: true });
-        // Priority 2: general razorpay marked isDefault
+        // Priority 1: razorpay_standard marked default & active
+        config = await PaymentGateway.findOne({ name: "razorpay_standard", isDefault: true, isActive: true });
+        // Priority 2: any active razorpay_standard
+        if (!config) config = await PaymentGateway.findOne({ name: "razorpay_standard", isActive: true });
+        // Priority 3: any active gateway marked isDefault with purpose: "sip_scheme"
+        if (!config) config = await PaymentGateway.findOne({ purpose: "sip_scheme", isDefault: true, isActive: true });
+        // Priority 4: general razorpay marked isDefault
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isDefault: true, isActive: true });
-        // Priority 3: any active razorpay
+        // Priority 5: any active razorpay
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isActive: true });
     }
 
