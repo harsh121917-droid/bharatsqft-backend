@@ -30,7 +30,7 @@ function renderGateways(gateways) {
     if (!body) return;
 
     if (!gateways || gateways.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-credit-card" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No payment gateways configured yet</div><div style="font-size:12px;color:var(--text-dim)">Click "+ Add Gateway" above to configure Razorpay or Cashfree.</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-credit-card" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No payment gateways configured yet</div><div style="font-size:12px;color:var(--text-dim)">Click "+ Add Gateway" above to configure HDFC Razorpay, Normal Razorpay, or Cashfree.</div></div>`;
         return;
     }
 
@@ -39,8 +39,9 @@ function renderGateways(gateways) {
         <table class="table">
             <thead>
                 <tr>
-                    <th>Gateway & Environment</th>
+                    <th>Gateway Provider & Purpose</th>
                     <th>Key / Client ID</th>
+                    <th>Assigned Flows</th>
                     <th>System Default</th>
                     <th>Status</th>
                     <th style="text-align:right">Actions</th>
@@ -50,29 +51,68 @@ function renderGateways(gateways) {
 
     gateways.forEach((g, idx) => {
         const isLive = g.mode === "live";
-        const isRzp = (g.name || "").toLowerCase() === "razorpay";
+        const rawName = (g.name || "").toLowerCase();
+        const isRzp = rawName.includes("razorpay");
+        const isHdfc = rawName === "razorpay_hdfc";
+        const isStandard = rawName === "razorpay_standard";
+        const isPayout = rawName === "cashfree_payout";
         const keyDisplay = g.keyId || g.clientId || "—";
         const isDef = !!g.isDefault;
         const gatewayId = g._id || g.id || idx;
 
+        let iconClass = "fas fa-bolt";
+        let iconBg = "rgba(59,130,246,0.15)";
+        let iconColor = "#3B82F6";
+        let title = g.label || g.name || "Gateway";
+        let purposeBadge = `<span class="badge badge-blue"><i class="fas fa-bolt"></i> General</span>`;
+
+        if (isHdfc) {
+            iconClass = "fas fa-building-columns";
+            iconBg = "rgba(212,160,23,0.18)";
+            iconColor = "#D4A017";
+            title = "🏛️ HDFC Razorpay (0% Fee)";
+            purposeBadge = `<span class="badge badge-gold" style="font-size:11px;font-weight:700"><i class="fas fa-coins"></i> Buy Metals & Wallet Add</span>`;
+        } else if (isStandard) {
+            iconClass = "fas fa-sync-alt";
+            iconBg = "rgba(168,85,247,0.18)";
+            iconColor = "#A855F7";
+            title = "🔄 Normal Razorpay (Sub Fee)";
+            purposeBadge = `<span class="badge badge-purple" style="font-size:11px;font-weight:700"><i class="fas fa-calendar-alt"></i> SIP AutoPay & Savings Schemes</span>`;
+        } else if (isPayout) {
+            iconClass = "fas fa-money-bill-transfer";
+            iconBg = "rgba(16,185,129,0.18)";
+            iconColor = "#10B981";
+            title = "🏦 Cashfree Payouts";
+            purposeBadge = `<span class="badge badge-success" style="font-size:11px"><i class="fas fa-hand-holding-dollar"></i> Bank Payouts</span>`;
+        } else if (rawName === "cashfree") {
+            iconClass = "fas fa-wallet";
+            iconBg = "rgba(16,185,129,0.18)";
+            iconColor = "#10B981";
+            title = "💳 Cashfree PG";
+            purposeBadge = `<span class="badge badge-success" style="font-size:11px"><i class="fas fa-credit-card"></i> Card & UPI</span>`;
+        }
+
         html += `
         <tr style="${isDef ? 'background:rgba(212,160,23,0.06)' : ''}">
             <td>
-                <div style="display:flex;align-items:center;gap:10px">
-                    <div style="width:36px;height:36px;border-radius:10px;background:${isRzp ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)'};display:flex;align-items:center;justify-content:center;color:${isRzp ? '#3B82F6' : '#10B981'};font-size:16px">
-                        <i class="${isRzp ? 'fas fa-bolt' : 'fas fa-wallet'}"></i>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:38px;height:38px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;color:${iconColor};font-size:17px;flex-shrink:0">
+                        <i class="${iconClass}"></i>
                     </div>
                     <div>
-                        <div style="font-weight:800;color:#fff;font-size:14px;text-transform:capitalize">
-                            ${g.name || 'Gateway'}
-                            <span class="badge ${isLive ? 'badge-success' : 'badge-warning'}" style="margin-left:6px;font-size:10px;text-transform:uppercase">${g.mode || 'live'}</span>
+                        <div style="font-weight:800;color:#fff;font-size:13.5px">
+                            ${title}
+                            <span class="badge ${isLive ? 'badge-success' : 'badge-warning'}" style="margin-left:6px;font-size:9.5px;text-transform:uppercase">${g.mode || 'live'}</span>
                         </div>
-                        <div style="font-size:11px;color:var(--text-dim)">Updated: ${new Date(g.updatedAt || g.createdAt || Date.now()).toLocaleDateString()}</div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:2px">Key ID: <code style="font-family:monospace;color:var(--gold)">${keyDisplay.slice(0, 18)}${keyDisplay.length > 18 ? '...' : ''}</code></div>
                     </div>
                 </div>
             </td>
             <td>
                 <code style="background:var(--subBg, #0d1410);padding:4px 8px;border-radius:6px;font-size:12px;color:var(--gold, #d4a017);border:1px solid var(--border, #2a4736)">${keyDisplay}</code>
+            </td>
+            <td>
+                ${purposeBadge}
             </td>
             <td>
                 ${isDef ? 

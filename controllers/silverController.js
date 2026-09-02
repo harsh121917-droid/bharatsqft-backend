@@ -195,10 +195,10 @@ exports.initiateBuy = async (req, res, next) => {
 
         const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
             amount: totalAmt,
+            purpose: "spot",
             notes: {
                 userId: req.user._id.toString(),
-                type: "silver_buy",
-                grams: gramsToAdd,
+                type: "investment",
                 couponCode: appliedCoupon ? appliedCoupon.code : "",
             },
         });
@@ -253,12 +253,13 @@ exports.verifyBuy = async (req, res, next) => {
         const paymentId = razorpayPaymentId || razorpay_payment_id;
         const signature = razorpaySignature || razorpay_signature;
 
-        const keySecret = await paymentGatewayService.getRazorpayKeySecret();
-        const isValid = paymentGatewayService.verifyRazorpaySignature({
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "spot" });
+        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
             orderId,
             paymentId,
             signature,
             keySecret,
+            purpose: "spot",
         });
 
         if (!isValid) {

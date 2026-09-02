@@ -112,6 +112,11 @@
                 <div class="nav-item-icon"><i class="fas fa-receipt"></i></div>
                 <span class="nav-item-label">Wallet Ledger</span>
             </div>
+            <div class="nav-item" onclick="showPage('sips')" id="nav-sips">
+                <div class="nav-item-icon"><i class="fas fa-bullseye"></i></div>
+                <span class="nav-item-label">SIP & Milestones</span>
+                <span class="nav-badge badge-gold" id="sips-active-badge" style="display:none">0</span>
+            </div>
             <div class="nav-item" onclick="showPage('schemes')" id="nav-schemes">
                 <div class="nav-item-icon"><i class="fas fa-award"></i></div>
                 <span class="nav-item-label">Scheme Management</span>
@@ -1146,6 +1151,131 @@
                                 class="fas fa-chevron-left"></i> Previous</button>
                         <button class="btn btn-secondary btn-sm" id="btn-next-ledger" onclick="nextLedgerPage()">Next <i
                                 class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════
+                 DIGI GOLD: SIP SYSTEMATIC INVESTMENT PLANS & MILESTONES
+                 ══════════════════════════════════════════════════ -->
+            <div class="page" id="page-sips">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">
+                            <i class="fas fa-bullseye" style="color:var(--gold)"></i> SIP Plans & Subscriber Milestones
+                        </div>
+                        <div class="section-subtitle">
+                            Monitor customer digital bullion SIP enrollments, track fulfillment milestones, and manage automated recurring savings
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <button class="btn btn-warning" onclick="sendBulkSipReminders()">
+                            <i class="fas fa-bell"></i> Bulk Remind Active
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadSips(1); loadSipSummary();">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SIP KPI Summary Cards -->
+                <div class="fulfillment-kpi-grid" style="grid-template-columns:repeat(4, 1fr);margin-bottom:1.5rem">
+                    <div class="fulfillment-kpi-card card-purple">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-users"></i></div>
+                            <span class="fulfillment-tag tag-purple">Subscribers</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Active / Total SIPs</div>
+                            <div class="fulfillment-val val-purple" id="sip-kpi-active">0 / 0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-chart-line"></i> Recurring bullion plans</div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-green">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-rupee-sign"></i></div>
+                            <span class="fulfillment-tag tag-green">Recurring Inflow</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Monthly SIP Volume</div>
+                            <div class="fulfillment-val val-green" id="sip-kpi-inflow">₹0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-calendar-alt"></i> Expected monthly inflow</div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-gold">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-gold-glow"><i class="fas fa-coins"></i></div>
+                            <span class="fulfillment-tag tag-gold">Vault Bullion</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Gold Accumulated</div>
+                            <div class="fulfillment-val val-gold" id="sip-kpi-gold">0.0000 g</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-cubes"></i> Silver: <span id="sip-kpi-silver">0.00 g</span></div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-amber">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-amber-glow"><i class="fas fa-clock"></i></div>
+                            <span class="fulfillment-tag tag-amber">Due Action</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Due / Overdue Today</div>
+                            <div class="fulfillment-val val-amber" id="sip-kpi-due">0</div>
+                            <div class="fulfillment-subtext"><i class="fas fa-bell"></i> Pending installment cycles</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search & Filters Container -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem;background:var(--surface2);padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border)">
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1">
+                        <input class="search-bar" id="sip-filter-search"
+                            placeholder="🔍 Search customer name, phone, email, or goal..."
+                            oninput="onSipSearchInput()" style="min-width:280px;flex:1" />
+                        <select class="form-control" id="sip-filter-metal" onchange="loadSips(1)" style="width:130px">
+                            <option value="all">All Metals</option>
+                            <option value="gold">Gold (24K)</option>
+                            <option value="silver">Silver (999)</option>
+                            <option value="copper">Copper</option>
+                        </select>
+                        <select class="form-control" id="sip-filter-freq" onchange="loadSips(1)" style="width:140px">
+                            <option value="all">All Frequencies</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                        <select class="form-control" id="sip-filter-status" onchange="loadSips(1)" style="width:140px">
+                            <option value="all">All Statuses</option>
+                            <option value="active">● Active</option>
+                            <option value="paused">⏸ Paused</option>
+                            <option value="completed">★ Completed</option>
+                            <option value="cancelled">✕ Cancelled</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadSips(1)"><i class="fas fa-filter"></i> Apply Filters</button>
+                </div>
+
+                <!-- SIP Subscribers Table -->
+                <div class="table-wrap">
+                    <div id="sips-table-body">
+                        <div class="loading-box">
+                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                            <div>Loading SIP subscribers & milestones...</div>
+                        </div>
+                    </div>
+                    <div class="pagination">
+                        <span id="sips-pagination-info">Showing subscriptions...</span>
+                        <div class="pagination-controls">
+                            <button class="btn btn-secondary btn-sm" id="btn-prev-sips" onclick="prevSipsPage()"><i
+                                    class="fas fa-chevron-left"></i> Prev</button>
+                            <button class="btn btn-secondary btn-sm" id="btn-next-sips" onclick="nextSipsPage()">Next <i
+                                    class="fas fa-chevron-right"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2675,6 +2805,20 @@
         </div>
     </div>
 
+    <!-- SIP Systematic Investment Plan Milestone & Journey Modal -->
+    <div class="modal-overlay" id="sip-milestone-modal" style="display:none">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-flag-checkered" style="color:var(--gold)"></i> Subscriber SIP Milestone Roadmap & Fulfillment History
+                </div>
+                <button class="modal-close" onclick="closeSipMilestoneModal()">×</button>
+            </div>
+            <div class="modal-body" id="sip-milestone-modal-body"></div>
+            <div class="modal-footer" id="sip-milestone-modal-footer"></div>
+        </div>
+    </div>
+
     <!-- Jewellery Modal -->
     <div class="modal-overlay" id="jewellery-modal" style="display:none">
         <div class="modal modal-lg">
@@ -3354,9 +3498,11 @@
                     <div class="form-group">
                         <label class="form-label">Gateway Provider</label>
                         <select class="form-control" id="gateway-name">
-                            <option value="razorpay">Razorpay (UPI, AutoPay, Cards, NetBanking)</option>
-                            <option value="cashfree">Cashfree Payments</option>
-                            <option value="cashfree_payout">Cashfree Payouts (Bank Transfers)</option>
+                            <option value="razorpay_hdfc">🏛️ HDFC Razorpay (0% Charge — Buy Gold, Silver, Copper, Wallet Add, Orders)</option>
+                            <option value="razorpay_standard">🔄 Normal Razorpay (Standard Fee — SIP AutoPay & 11+1 Schemes)</option>
+                            <option value="razorpay">⚡ General Razorpay (Fallback)</option>
+                            <option value="cashfree">💳 Cashfree Payments</option>
+                            <option value="cashfree_payout">🏦 Cashfree Payouts (Bank Transfers)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -3455,6 +3601,7 @@
     <script src="js/users.js"></script>
     <script src="js/kyc.js"></script>
     <script src="js/properties.js"></script>
+    <script src="js/sip.js?v=1.0"></script>
     <script src="js/schemes.js"></script>
     <script src="js/transactions.js"></script>
     <script src="js/jewellery.js"></script>

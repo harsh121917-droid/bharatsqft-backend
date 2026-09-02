@@ -124,4 +124,14 @@ router.get("/inventory", getInventory);
 router.put("/inventory/:type/:id", updateInventoryStock);
 router.post("/inventory/backfill-skus", backfillInventorySkus);
 
+// SIP Systematic Investment Plans & Milestones Management
+const sipController = require("../controllers/sipController");
+router.get("/sips", sipController.getAdminSips);
+router.get("/sips/summary", sipController.getAdminSipsSummary);
+router.get("/sips/:id", sipController.getSipDetail);
+router.post("/sips/:id/status", sipController.adminUpdateSipStatus);
+router.post("/sips/:id/record-installment", sipController.adminRecordInstallment);
+router.post("/sips/:id/remind", sipController.sendSipReminder);
+router.post("/sips/remind-all", sipController.sendBulkSipReminders);
+
 module.exports = router;

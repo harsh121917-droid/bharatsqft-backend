@@ -119,18 +119,10 @@ exports.initiateAdd = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Minimum add is ₹100" });
         }
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({
-                success: false,
-                message: `Active default payment gateway is '${config.name}', but this endpoint only supports Razorpay. Please configure Razorpay as default in Admin.`,
-            });
-        }
-
-        const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
+        const { order, keyId, mode } = await paymentGatewayService.createRazorpayOrder({
             amount,
-            notes: { userId: req.user._id.toString(), type: "wallet_add" },
-            mode: config.mode,
+            purpose: "spot",
+            notes: { userId: req.user._id.toString(), type: "digital_wallet" },
         });
 
         res.json({
@@ -148,16 +140,13 @@ exports.verifyAdd = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, amount } = req.body;
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
-        }
-
-        const isValid = paymentGatewayService.verifyRazorpaySignature({
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "spot" });
+        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
             orderId: razorpayOrderId,
             paymentId: razorpayPaymentId,
             signature: razorpaySignature,
-            keySecret: config.keySecret,
+            keySecret,
+            purpose: "spot",
         });
 
         if (!isValid) {

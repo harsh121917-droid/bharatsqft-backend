@@ -47,28 +47,19 @@ exports.createOrder = async (req, res, next) => {
 
         const totalAmount = bricks * property.brickPrice;
         const amountPaise = totalAmount * 100;
-
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({
-                success: false,
-                message: `Active default payment gateway is '${config.name}', but brick investments only support Razorpay. Please set Razorpay as default in Admin.`,
-            });
-        }
-
         let order;
+        let keyId;
         try {
             const result = await paymentGatewayService.createRazorpayOrder({
                 amount: totalAmount,
+                purpose: "spot",
                 notes: {
-                    propertyId: propertyId,
-                    propertyTitle: property.title,
-                    bricks: String(bricks),
                     userId: String(req.user._id),
+                    type: "investment",
                 },
-                mode: config.mode,
             });
             order = result.order;
+            keyId = result.keyId;
         } catch (rzpErr) {
             console.error("Razorpay error:", JSON.stringify(rzpErr));
             return res.status(500).json({ success: false, message: "Payment gateway error: " + (rzpErr?.error?.description || rzpErr?.message || JSON.stringify(rzpErr)) });
@@ -94,28 +85,28 @@ exports.createOrder = async (req, res, next) => {
                 totalAmount,
                 propertyTitle: property.title,
             },
-            key: config.keyId,
+            key: keyId,
         });
     } catch (err) {
         console.error("createOrder error:", err?.message || JSON.stringify(err));
-        return res.status(500).json({ success: false, message: err?.message || JSON.stringify(err) || "Server error" });
+        next(err);
     }
 };
 
+// @desc    Verify Razorpay payment signature and mark investment paid
+// @route   POST /api/payments/verify
+// @access  Private
 exports.verifyPayment = async (req, res, next) => {
     try {
         const { razorpayOrderId, razorpayPaymentId, razorpaySignature, investmentId } = req.body;
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
-        }
-
-        const isValid = paymentGatewayService.verifyRazorpaySignature({
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "spot" });
+        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
             orderId: razorpayOrderId,
             paymentId: razorpayPaymentId,
             signature: razorpaySignature,
-            keySecret: config.keySecret,
+            keySecret,
+            purpose: "spot",
         });
 
         if (!isValid) {

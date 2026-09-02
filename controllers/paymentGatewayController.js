@@ -26,12 +26,37 @@ exports.getGateways = async (req, res, next) => {
 // POST /api/admin/payment-gateways
 exports.upsertGateway = async (req, res, next) => {
     try {
-        const { name, mode = "live", keyId, keySecret, clientId, clientSecret, isActive = true, isDefault = false } = req.body;
+        const { name, mode = "live", keyId, keySecret, clientId, clientSecret, label, purpose, isActive = true, isDefault = false } = req.body;
         if (!name || !mode) {
             return res.status(400).json({ success: false, message: "name and mode are required" });
         }
 
-        const update = { updatedBy: req.user._id, mode: mode.toLowerCase() };
+        const lowerName = name.toLowerCase();
+        let defaultLabel = label;
+        let defaultPurpose = purpose || "all";
+
+        if (lowerName === "razorpay_hdfc") {
+            defaultLabel = label || "HDFC Razorpay (0% Fee — Buy Metals, Wallet, Orders)";
+            defaultPurpose = purpose || "spot";
+        } else if (lowerName === "razorpay_standard") {
+            defaultLabel = label || "Normal Razorpay (SIP Subscriptions & Schemes)";
+            defaultPurpose = purpose || "sip_scheme";
+        } else if (lowerName === "razorpay") {
+            defaultLabel = label || "General Razorpay";
+        } else if (lowerName === "cashfree") {
+            defaultLabel = label || "Cashfree Payments";
+            defaultPurpose = purpose || "spot";
+        } else if (lowerName === "cashfree_payout") {
+            defaultLabel = label || "Cashfree Payouts (Bank Transfers)";
+            defaultPurpose = purpose || "payout";
+        }
+
+        const update = {
+            updatedBy: req.user._id,
+            mode: mode.toLowerCase(),
+            label: defaultLabel,
+            purpose: defaultPurpose
+        };
         if (keyId !== undefined) update.keyId = keyId;
         if (keySecret !== undefined && keySecret !== "") update.keySecret = keySecret;
         if (clientId !== undefined) update.clientId = clientId;
@@ -39,7 +64,7 @@ exports.upsertGateway = async (req, res, next) => {
         if (isActive !== undefined) update.isActive = isActive;
 
         const config = await PaymentGateway.findOneAndUpdate(
-            { name: name.toLowerCase(), mode: mode.toLowerCase() },
+            { name: lowerName, mode: mode.toLowerCase() },
             update,
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
@@ -50,19 +75,21 @@ exports.upsertGateway = async (req, res, next) => {
             await config.save();
         }
 
-        res.json({ success: true, message: `${name} (${mode}) saved successfully`, data: maskConfig(config) });
+        res.json({ success: true, message: `${config.label || name} (${mode}) saved successfully`, data: maskConfig(config) });
     } catch (err) { next(err); }
 };
 
 // PUT /api/admin/payment-gateways/:id
 exports.updateGateway = async (req, res, next) => {
     try {
-        const { name, mode, keyId, keySecret, clientId, clientSecret, isActive, isDefault } = req.body;
+        const { name, mode, keyId, keySecret, clientId, clientSecret, label, purpose, isActive, isDefault } = req.body;
         const config = await PaymentGateway.findById(req.params.id);
         if (!config) return res.status(404).json({ success: false, message: "Gateway not found" });
 
         if (name) config.name = name.toLowerCase();
         if (mode) config.mode = mode.toLowerCase();
+        if (label !== undefined) config.label = label;
+        if (purpose !== undefined) config.purpose = purpose;
         if (keyId !== undefined) config.keyId = keyId;
         if (keySecret && keySecret.trim() !== "" && !keySecret.includes("••••")) config.keySecret = keySecret.trim();
         if (clientId !== undefined) config.clientId = clientId;
@@ -76,7 +103,7 @@ exports.updateGateway = async (req, res, next) => {
         }
 
         await config.save();
-        res.json({ success: true, message: "Gateway updated successfully", data: maskConfig(config) });
+        res.json({ success: true, message: `${config.label || config.name} updated successfully`, data: maskConfig(config) });
     } catch (err) { next(err); }
 };
 

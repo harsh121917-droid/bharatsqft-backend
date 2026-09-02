@@ -8,10 +8,16 @@ const PaymentGatewaySchema = new mongoose.Schema(
     {
         name: {
             type: String,
-            enum: ["razorpay", "cashfree", "cashfree_payout"],
+            enum: ["razorpay", "razorpay_hdfc", "razorpay_standard", "cashfree", "cashfree_payout"],
             required: true,
         },
         mode: { type: String, enum: ["live", "demo"], required: true },
+        label: { type: String }, // e.g. "HDFC Razorpay (0% Fee - Spot / Wallet)"
+        purpose: {
+            type: String,
+            enum: ["all", "spot", "sip_scheme", "payout"],
+            default: "all"
+        },
 
         // Razorpay
         keyId: { type: String },

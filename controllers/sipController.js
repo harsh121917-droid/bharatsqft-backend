@@ -304,8 +304,11 @@ exports.getMySips = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getSipDetail = async (req, res, next) => {
     try {
-        const userId = req.user._id;
-        const sip = await Sip.findOne({ _id: req.params.id, user: userId });
+        const query = req.user.role === "admin"
+            ? { _id: req.params.id }
+            : { _id: req.params.id, user: req.user._id };
+
+        const sip = await Sip.findOne(query).populate("user", "name email phone referralCode kycStatus avatar");
         if (!sip) {
             return res.status(404).json({ success: false, message: "SIP subscription not found." });
         }
@@ -483,8 +486,8 @@ exports.payInstallment = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.toggleSipStatus = async (req, res, next) => {
     try {
-        const userId = req.user._id;
-        const sip = await Sip.findOne({ _id: req.params.id, user: userId });
+        const query = req.user.role === "admin" ? { _id: req.params.id } : { _id: req.params.id, user: req.user._id };
+        const sip = await Sip.findOne(query);
         if (!sip) {
             return res.status(404).json({ success: false, message: "SIP subscription not found." });
         }
@@ -514,8 +517,8 @@ exports.toggleSipStatus = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.cancelSip = async (req, res, next) => {
     try {
-        const userId = req.user._id;
-        const sip = await Sip.findOne({ _id: req.params.id, user: userId });
+        const query = req.user.role === "admin" ? { _id: req.params.id } : { _id: req.params.id, user: req.user._id };
+        const sip = await Sip.findOne(query);
         if (!sip) {
             return res.status(404).json({ success: false, message: "SIP subscription not found." });
         }
@@ -549,6 +552,7 @@ exports.getAdminSips = async (req, res, next) => {
         const filter = {};
         if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
         if (req.query.metal && req.query.metal !== "all") filter.metal = req.query.metal;
+        if (req.query.frequency && req.query.frequency !== "all") filter.frequency = req.query.frequency;
 
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search.trim(), "i");
@@ -558,26 +562,220 @@ exports.getAdminSips = async (req, res, next) => {
             filter.user = { $in: matchingUsers.map((u) => u._id) };
         }
 
+        const rates = await fetchLiveRates();
+
         const [sips, total] = await Promise.all([
             Sip.find(filter)
-                .populate("user", "name email phone referralCode")
+                .populate("user", "name email phone referralCode kycStatus")
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
             Sip.countDocuments(filter),
         ]);
 
+        const formattedSips = sips.map((sip) => {
+            const metal = sip.metal || "gold";
+            const liveSellRate = rates[metal]?.sellRate || rates[metal]?.buyRate || 0;
+            const currentValuation = parseFloat(((sip.totalGrams || 0) * liveSellRate).toFixed(2));
+            const invested = parseFloat((sip.totalInvested || 0).toFixed(2));
+            const returnsAmt = parseFloat((currentValuation - invested).toFixed(2));
+            const returnsPct = invested > 0 ? parseFloat(((returnsAmt / invested) * 100).toFixed(2)) : 0;
+            const progressPct = sip.totalCycles > 0 ? parseFloat(((sip.cyclesCompleted / sip.totalCycles) * 100).toFixed(1)) : 0;
+            const isDue = sip.status === "active" && sip.nextDueDate && new Date(sip.nextDueDate) <= new Date();
+
+            return {
+                ...sip.toObject(),
+                currentLiveRate: liveSellRate,
+                currentValuation,
+                returnsAmt,
+                returnsPct,
+                progressPct,
+                isDue,
+            };
+        });
+
         res.json({
             success: true,
             total,
             page,
             pages: Math.ceil(total / limit),
-            data: sips,
+            data: formattedSips,
         });
     } catch (err) {
         next(err);
     }
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 8. GET /api/sip/admin/summary — High-level SIP Portfolio Analytics for Admin
+// ══════════════════════════════════════════════════════════════════════════════
+exports.getAdminSipsSummary = async (req, res, next) => {
+    try {
+        const allSips = await Sip.find({});
+        const now = new Date();
+
+        let totalSips = allSips.length;
+        let activeSips = 0;
+        let pausedSips = 0;
+        let completedSips = 0;
+        let cancelledSips = 0;
+        let totalInvested = 0;
+        let totalMonthlyInflow = 0;
+        let totalGramsGold = 0;
+        let totalGramsSilver = 0;
+        let totalGramsCopper = 0;
+        let dueOrOverdueCount = 0;
+
+        allSips.forEach((s) => {
+            totalInvested += s.totalInvested || 0;
+
+            if (s.metal === "gold") totalGramsGold += s.totalGrams || 0;
+            else if (s.metal === "silver") totalGramsSilver += s.totalGrams || 0;
+            else if (s.metal === "copper") totalGramsCopper += s.totalGrams || 0;
+
+            if (s.status === "active") {
+                activeSips++;
+                // Monthly recurring normalized
+                if (s.frequency === "monthly") totalMonthlyInflow += s.installmentAmount || 0;
+                else if (s.frequency === "daily") totalMonthlyInflow += (s.installmentAmount || 0) * 30;
+                else if (s.frequency === "weekly") totalMonthlyInflow += (s.installmentAmount || 0) * 4;
+                else if (s.frequency === "quarterly") totalMonthlyInflow += (s.installmentAmount || 0) / 3;
+                else if (s.frequency === "yearly") totalMonthlyInflow += (s.installmentAmount || 0) / 12;
+
+                if (s.nextDueDate && new Date(s.nextDueDate) <= now) {
+                    dueOrOverdueCount++;
+                }
+            } else if (s.status === "paused") {
+                pausedSips++;
+            } else if (s.status === "completed") {
+                completedSips++;
+            } else if (s.status === "cancelled") {
+                cancelledSips++;
+            }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                totalSips,
+                activeSips,
+                pausedSips,
+                completedSips,
+                cancelledSips,
+                totalInvested: parseFloat(totalInvested.toFixed(2)),
+                totalMonthlyInflow: parseFloat(totalMonthlyInflow.toFixed(2)),
+                totalGramsGold: parseFloat(totalGramsGold.toFixed(4)),
+                totalGramsSilver: parseFloat(totalGramsSilver.toFixed(4)),
+                totalGramsCopper: parseFloat(totalGramsCopper.toFixed(4)),
+                dueOrOverdueCount,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 9. POST /api/sip/admin/:id/status — Admin change status (active/paused/cancelled/completed)
+// ══════════════════════════════════════════════════════════════════════════════
+exports.adminUpdateSipStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const validStatuses = ["active", "paused", "cancelled", "completed"];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+        }
+
+        const sip = await Sip.findById(id).populate("user", "name email phone");
+        if (!sip) {
+            return res.status(404).json({ success: false, message: "SIP subscription not found" });
+        }
+
+        const prevStatus = sip.status;
+        sip.status = status;
+        if (status === "completed" && !sip.completedAt) {
+            sip.completedAt = new Date();
+        } else if (status === "active" && (!sip.nextDueDate || new Date(sip.nextDueDate) < new Date())) {
+            sip.nextDueDate = sip.calculateNextDueDate(new Date());
+        }
+
+        await sip.save();
+
+        res.json({
+            success: true,
+            message: `SIP for ${sip.user?.name || "Customer"} changed from ${prevStatus.toUpperCase()} to ${status.toUpperCase()}`,
+            data: sip,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 10. POST /api/sip/admin/:id/record-installment — Admin manually credit installment
+// ══════════════════════════════════════════════════════════════════════════════
+exports.adminRecordInstallment = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { paymentMethod = "manual_admin", txnId = "", customAmount, customRate } = req.body;
+
+        const sip = await Sip.findById(id).populate("user", "name email phone");
+        if (!sip) {
+            return res.status(404).json({ success: false, message: "SIP subscription not found" });
+        }
+
+        if (sip.status === "completed") {
+            return res.status(400).json({ success: false, message: "SIP is already completed" });
+        }
+
+        const amount = customAmount ? parseFloat(customAmount) : sip.installmentAmount;
+        const metal = sip.metal || "gold";
+
+        const rates = await fetchLiveRates();
+        const metalRate = customRate ? parseFloat(customRate) : (rates[metal]?.buyRate || 7500);
+
+        const gstPct = metal === "copper" ? 18 : 3;
+        const netExGst = amount / (1 + gstPct / 100);
+        const gramsCredited = netExGst / metalRate;
+
+        const nextCycleNo = sip.cyclesCompleted + 1;
+        const creditedTxnId = await creditGramsToVault(sip.user._id, metal, gramsCredited, amount, metalRate, nextCycleNo);
+
+        sip.cyclesCompleted = nextCycleNo;
+        sip.totalInvested = parseFloat(((sip.totalInvested || 0) + amount).toFixed(2));
+        sip.totalGrams = parseFloat(((sip.totalGrams || 0) + gramsCredited).toFixed(6));
+        sip.installments.push({
+            installmentNo: nextCycleNo,
+            amount,
+            ratePerGram: metalRate,
+            grams: parseFloat(gramsCredited.toFixed(6)),
+            paymentMethod: paymentMethod || "manual_admin",
+            txnId: txnId || creditedTxnId,
+            paidAt: new Date(),
+        });
+
+        if (sip.cyclesCompleted >= sip.totalCycles) {
+            sip.status = "completed";
+            sip.completedAt = new Date();
+        } else {
+            sip.nextDueDate = sip.calculateNextDueDate(new Date());
+        }
+
+        await sip.save();
+
+        res.json({
+            success: true,
+            message: `Manual Installment #${nextCycleNo} (₹${amount}) credited to ${sip.user?.name || "Customer"}'s ${metal.toUpperCase()} vault!`,
+            data: sip,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
 
 
 // POST /api/sip/:id/remind — Send SIP installment reminder to single subscriber
@@ -730,7 +928,12 @@ exports.createAutoPaySip = async (req, res, next) => {
 
         const totalCycles = computeTotalCycles(durationMonths, frequency);
 
-        const { createRazorpaySubscription, createRazorpayOrder } = require("../services/paymentGatewayService");
+        const {
+            createRazorpaySubscription,
+            createRazorpayOrder,
+            verifyRazorpaySubscriptionSignatureWithFallback,
+            verifyRazorpaySignatureWithFallback
+        } = require("../services/paymentGatewayService");
         
         let subData = null;
         try {
@@ -738,12 +941,12 @@ exports.createAutoPaySip = async (req, res, next) => {
                 amount,
                 frequency: frequency.toLowerCase(),
                 totalCycles,
+                purpose: "sip_scheme",
                 notes: {
                     userId: userId.toString(),
-                    metal: metal.toLowerCase(),
-                    goalCategory,
-                    goalTitle,
                     durationMonths,
+                    frequency: frequency.toLowerCase(),
+                    type: "investment",
                 },
             });
 
@@ -765,14 +968,12 @@ exports.createAutoPaySip = async (req, res, next) => {
             console.warn("Razorpay subscription create bypassed/failed (CFB or permissions), creating standard Razorpay order:", subErr.message);
             const orderData = await createRazorpayOrder({
                 amount,
+                purpose: "sip_scheme",
                 notes: {
                     userId: userId.toString(),
-                    metal: metal.toLowerCase(),
-                    goalCategory,
-                    goalTitle,
                     durationMonths,
-                    frequency,
-                    type: "sip_first_installment",
+                    frequency: frequency.toLowerCase(),
+                    type: "investment",
                 },
             });
 
@@ -824,23 +1025,28 @@ exports.verifyAutoPaySip = async (req, res, next) => {
             });
         }
 
-        const { getRazorpayKeySecret, verifyRazorpaySubscriptionSignature, verifyRazorpaySignature } = require("../services/paymentGatewayService");
-        const keySecret = await getRazorpayKeySecret();
+        const {
+            getRazorpayKeySecret,
+            verifyRazorpaySubscriptionSignatureWithFallback,
+            verifyRazorpaySignatureWithFallback
+        } = require("../services/paymentGatewayService");
+        const keySecret = await getRazorpayKeySecret(undefined, { purpose: "sip_scheme" });
         
         let isValid = false;
         if (subscriptionId) {
-            isValid = verifyRazorpaySubscriptionSignature({
+            isValid = await verifyRazorpaySubscriptionSignatureWithFallback({
                 paymentId,
                 subscriptionId,
                 signature,
                 keySecret,
             });
         } else if (orderId) {
-            isValid = verifyRazorpaySignature({
+            isValid = await verifyRazorpaySignatureWithFallback({
                 orderId,
                 paymentId,
                 signature,
                 keySecret,
+                purpose: "sip_scheme",
             });
         }
 

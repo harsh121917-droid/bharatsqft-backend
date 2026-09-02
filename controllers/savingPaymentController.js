@@ -11,23 +11,14 @@ exports.initiateFirstPayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "First payment already completed" });
         }
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({
-                success: false,
-                message: `Active default payment gateway is '${config.name}', but savings schemes only support Razorpay. Please set Razorpay as default in Admin.`,
-            });
-        }
-
         const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
             amount: saving.amountPerCycle,
+            purpose: "sip_scheme",
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
-                type: saving.type,
-                amountPerCycle: saving.amountPerCycle,
+                type: "investment",
             },
-            mode: config.mode,
         });
 
         // store order id on saving for verification
@@ -59,16 +50,13 @@ exports.verifyFirstPayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Missing payment fields" });
         }
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
-        }
-
-        const isValid = paymentGatewayService.verifyRazorpaySignature({
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "sip_scheme" });
+        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
             orderId: razorpay_order_id,
             paymentId: razorpay_payment_id,
             signature: razorpay_signature,
-            keySecret: config.keySecret,
+            keySecret,
+            purpose: "sip_scheme",
         });
 
         if (!isValid) {
@@ -86,7 +74,7 @@ exports.verifyFirstPayment = async (req, res, next) => {
         saving.cycles.push({
             date: new Date(),
             amount: saving.amountPerCycle,
-            note: `First payment via Razorpay (${config.mode})`,
+            note: `First installment completed`,
         });
         await saving.save();
 
@@ -114,23 +102,14 @@ exports.initiateCyclePayment = async (req, res, next) => {
             ? parseInt(req.body.amount, 10)
             : saving.amountPerCycle;
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({
-                success: false,
-                message: `Active default payment gateway is '${config.name}', but savings schemes only support Razorpay. Please set Razorpay as default in Admin.`,
-            });
-        }
-
         const { order, keyId } = await paymentGatewayService.createRazorpayOrder({
             amount: cycleAmount,
+            purpose: "sip_scheme",
             notes: {
                 savingId: saving._id.toString(),
                 userId: req.user._id.toString(),
-                type: saving.type,
-                cycleAmount,
+                type: "investment",
             },
-            mode: config.mode,
         });
 
         saving.razorpayOrderId = order.id;
@@ -161,16 +140,13 @@ exports.verifyCyclePayment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Missing payment fields" });
         }
 
-        const config = await paymentGatewayService.resolveGateway({});
-        if (config.name !== "razorpay") {
-            return res.status(400).json({ success: false, message: "Default payment gateway is not Razorpay" });
-        }
-
-        const isValid = paymentGatewayService.verifyRazorpaySignature({
+        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "sip_scheme" });
+        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
             orderId: razorpay_order_id,
             paymentId: razorpay_payment_id,
             signature: razorpay_signature,
-            keySecret: config.keySecret,
+            keySecret,
+            purpose: "sip_scheme",
         });
 
         if (!isValid) {

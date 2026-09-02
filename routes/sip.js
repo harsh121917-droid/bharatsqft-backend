@@ -18,7 +18,12 @@ router.post("/:id/cancel", sipController.cancelSip);
 
 // Admin SIP endpoints
 router.get("/admin/all", adminOnly, sipController.getAdminSips);
+router.get("/admin/summary", adminOnly, sipController.getAdminSipsSummary);
+router.get("/admin/:id", adminOnly, sipController.getSipDetail);
+router.post("/admin/:id/status", adminOnly, sipController.adminUpdateSipStatus);
+router.post("/admin/:id/record-installment", adminOnly, sipController.adminRecordInstallment);
 router.post("/:id/remind", adminOnly, sipController.sendSipReminder);
 router.post("/admin/remind-all", adminOnly, sipController.sendBulkSipReminders);
 
 module.exports = router;
+
