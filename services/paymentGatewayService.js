@@ -14,25 +14,13 @@ function sanitizeRazorpayNotes(rawNotes = {}, purpose = "investment") {
     // 1. Keep safe internal routing identifiers
     if (rawNotes.userId) cleanNotes.userId = rawNotes.userId.toString();
     if (rawNotes.savingId) cleanNotes.savingId = rawNotes.savingId.toString();
-    if (rawNotes.orderId) cleanNotes.orderRef = rawNotes.orderId.toString();
-    if (rawNotes.couponCode) cleanNotes.promo = rawNotes.couponCode.toString();
+    if (rawNotes.orderRef || rawNotes.orderId) cleanNotes.orderRef = (rawNotes.orderRef || rawNotes.orderId).toString();
+    if (rawNotes.couponCode || rawNotes.promo) cleanNotes.promo = (rawNotes.couponCode || rawNotes.promo).toString();
     if (rawNotes.frequency) cleanNotes.frequency = rawNotes.frequency.toString().toLowerCase();
     if (rawNotes.durationMonths) cleanNotes.durationMonths = parseInt(rawNotes.durationMonths, 10) || 12;
 
-    // 2. Normalize and mask `type` to generic investment/service categories
-    const rawType = (rawNotes.type || purpose || "").toString().toLowerCase();
-    if (rawType.includes("wallet")) {
-        cleanNotes.type = "digital_wallet";
-    } else if (rawType.includes("order") || rawType.includes("jewellery")) {
-        cleanNotes.type = "services";
-    } else {
-        cleanNotes.type = "investment";
-    }
-
-    // 3. Fallback generic note
-    if (Object.keys(cleanNotes).length === 0) {
-        cleanNotes.type = "investment";
-    }
+    // 2. Always pass generic type: "investment" (no digital_wallet or other terms)
+    cleanNotes.type = "investment";
 
     return cleanNotes;
 }
@@ -187,10 +175,10 @@ async function createRazorpaySubscription({ amount, frequency, totalCycles, note
         period,
         interval,
         item: {
-            name: "Digital Investment Plan",
+            name: "Investment",
             amount: Math.round(amount * 100), // paise
             currency: "INR",
-            description: "Recurring Portfolio Service",
+            description: "Investment",
         },
         notes: cleanNotes,
     });
