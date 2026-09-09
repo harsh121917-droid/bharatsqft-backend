@@ -60,6 +60,15 @@ const UserSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected", "revoked", "not_submitted"],
       default: "not_submitted",
     },
+    isSoldierVerified: {
+      type: Boolean,
+      default: false,
+    },
+    soldierKycStatus: {
+      type: String,
+      enum: ["not_submitted", "pending", "approved", "rejected"],
+      default: "not_submitted",
+    },
     avatar: {
       type: String,
       default: "",

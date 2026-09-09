@@ -32,7 +32,7 @@ const docStorage = new CloudinaryStorage({
     },
 });
 
-/* ── KYC Documents (PAN / Aadhaar images) ── */
+/* ── KYC Documents (PAN / Aadhaar / Soldier ID images) ── */
 const kycStorage = new CloudinaryStorage({
     cloudinary,
     params: {
@@ -67,7 +67,7 @@ const uploadDoc = multer({
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 }).single("document");
 
-/* KYC upload — expects 3 files: panImage, aadhaarFront, aadhaarBack */
+/* KYC upload — expects files: panImage, aadhaarFront, aadhaarBack, optional soldierIdCard */
 const uploadKycDocs = multer({
     storage: kycStorage,
     limits: { fileSize: 8 * 1024 * 1024 }, // 8MB per file
@@ -75,7 +75,14 @@ const uploadKycDocs = multer({
     { name: "panImage", maxCount: 1 },
     { name: "aadhaarFront", maxCount: 1 },
     { name: "aadhaarBack", maxCount: 1 },
+    { name: "soldierIdCard", maxCount: 1 },
 ]);
+
+/* Standalone Soldier ID Card upload */
+const uploadSoldierDoc = multer({
+    storage: kycStorage,
+    limits: { fileSize: 8 * 1024 * 1024 }, // 8MB limit
+}).single("soldierIdCard");
 
 /* ── General Single Image Upload (useful for coins, avatars, etc) ── */
 const singleImageStorage = new CloudinaryStorage({
@@ -104,4 +111,12 @@ const uploadJewelleryImages = multer({
 }).array("images", 10); // allow up to 10 images
 
 module.exports = {
-    uploadJewelleryImages, uploadImages, uploadVideo, uploadDoc, uploadKycDocs, uploadSingleImage, uploadJewelleryImage };
+    uploadJewelleryImages,
+    uploadImages,
+    uploadVideo,
+    uploadDoc,
+    uploadKycDocs,
+    uploadSoldierDoc,
+    uploadSingleImage,
+    uploadJewelleryImage,
+};

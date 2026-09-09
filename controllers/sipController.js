@@ -137,6 +137,18 @@ exports.createSip = async (req, res, next) => {
             });
         }
 
+        // Dedicated Soldier / Armed Forces verification check
+        if (goalCategory && goalCategory.toLowerCase() === "soldier") {
+            const user = await User.findById(userId).select("isSoldierVerified soldierKycStatus");
+            if (!user || (!user.isSoldierVerified && user.soldierKycStatus !== "approved")) {
+                return res.status(403).json({
+                    success: false,
+                    message: "The Soldier Goal is exclusively reserved for verified armed forces & police personnel. Please complete and get your Soldier ID approved in KYC first.",
+                    requiresSoldierKyc: true,
+                });
+            }
+        }
+
         const totalCycles = computeTotalCycles(durationMonths, frequency);
 
         // Fetch live rates
@@ -924,6 +936,18 @@ exports.createAutoPaySip = async (req, res, next) => {
                 success: false,
                 message: "Metal must be gold, silver, or copper.",
             });
+        }
+
+        // Dedicated Soldier / Armed Forces verification check
+        if (goalCategory && goalCategory.toLowerCase() === "soldier") {
+            const user = await User.findById(userId).select("isSoldierVerified soldierKycStatus");
+            if (!user || (!user.isSoldierVerified && user.soldierKycStatus !== "approved")) {
+                return res.status(403).json({
+                    success: false,
+                    message: "The Soldier Goal is exclusively reserved for verified armed forces & police personnel. Please complete and get your Soldier ID approved in KYC first.",
+                    requiresSoldierKyc: true,
+                });
+            }
         }
 
         const totalCycles = computeTotalCycles(durationMonths, frequency);

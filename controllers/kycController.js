@@ -20,35 +20,75 @@ exports.submitKyc = async (req, res, next) => {
             "bankDetails.accountNumber": accountNumber,
             "bankDetails.ifscCode": ifscCode,
             "bankDetails.bankName": bankName,
+            isPhotoOnly,
         } = req.body;
 
-        if (!fullName || !dob || !line1 || !city || !state || !pincode || !panNumber || !aadhaarNumber) {
-            return res.status(400).json({ success: false, message: "All required fields must be filled" });
-        }
-
         const files = req.files || {};
-        if (!files.panImage || !files.aadhaarFront || !files.aadhaarBack) {
-            return res.status(400).json({ success: false, message: "PAN image, Aadhaar front and back are required" });
+        const hasPanImage = !!(files.panImage && files.panImage[0]);
+        const hasAadhaarFront = !!(files.aadhaarFront && files.aadhaarFront[0]);
+        const hasAadhaarBack = !!(files.aadhaarBack && files.aadhaarBack[0]);
+
+        // Detect if this is a Quick Photo KYC submission
+        const isPhotoKyc = isPhotoOnly === "true" || isPhotoOnly === true ||
+            ((hasPanImage || hasAadhaarFront) && (!panNumber || !aadhaarNumber || !line1));
+
+        if (isPhotoKyc) {
+            if (!hasPanImage && !hasAadhaarFront) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Please upload at least PAN card or Aadhaar card photo to submit",
+                });
+            }
+        } else {
+            if (!fullName || !dob || !line1 || !city || !state || !pincode || !panNumber || !aadhaarNumber) {
+                return res.status(400).json({ success: false, message: "All required fields must be filled" });
+            }
+            if (!hasPanImage || !hasAadhaarFront || !hasAadhaarBack) {
+                return res.status(400).json({ success: false, message: "PAN image, Aadhaar front and back are required" });
+            }
         }
 
         let kyc = await Kyc.findOne({ user: req.user._id });
 
+        const resolvedFullName = (fullName && fullName.trim()) ? fullName.trim() : (req.user?.name || "Account Holder");
+        const resolvedPan = (panNumber && panNumber.trim()) ? panNumber.trim().toUpperCase() : "PHOTO_SUBMITTED";
+        const resolvedAadhaar = (aadhaarNumber && aadhaarNumber.trim()) ? aadhaarNumber.trim() : "PHOTO_SUBMITTED";
+        const resolvedLine1 = (line1 && line1.trim()) ? line1.trim() : "Document Photo Uploaded (Review Required)";
+
         const payload = {
             user: req.user._id,
-            fullName, dob,
-            address: { line1, city, state, pincode },
-            panNumber: panNumber.toUpperCase(),
-            aadhaarNumber,
-            panImage: { url: files.panImage[0].path, uploadedAt: new Date() },
-            aadhaarFront: { url: files.aadhaarFront[0].path, uploadedAt: new Date() },
-            aadhaarBack: { url: files.aadhaarBack[0].path, uploadedAt: new Date() },
-            bankDetails: { accountHolderName, accountNumber, ifscCode, bankName },
+            fullName: resolvedFullName,
+            dob: dob ? new Date(dob) : (kyc?.dob || new Date("2000-01-01")),
+            address: {
+                line1: resolvedLine1,
+                city: city || kyc?.address?.city || "",
+                state: state || kyc?.address?.state || "",
+                pincode: pincode || kyc?.address?.pincode || "",
+            },
+            panNumber: resolvedPan,
+            aadhaarNumber: resolvedAadhaar,
+            bankDetails: {
+                accountHolderName: accountHolderName || kyc?.bankDetails?.accountHolderName || "",
+                accountNumber: accountNumber || kyc?.bankDetails?.accountNumber || "",
+                ifscCode: ifscCode || kyc?.bankDetails?.ifscCode || "",
+                bankName: bankName || kyc?.bankDetails?.bankName || "",
+            },
             status: "pending",
             rejectionReason: undefined,
             reviewedBy: undefined,
             reviewedAt: undefined,
             submittedAt: new Date(),
         };
+
+        if (hasPanImage) {
+            payload.panImage = { url: files.panImage[0].path, uploadedAt: new Date() };
+        }
+        if (hasAadhaarFront) {
+            payload.aadhaarFront = { url: files.aadhaarFront[0].path, uploadedAt: new Date() };
+        }
+        if (hasAadhaarBack) {
+            payload.aadhaarBack = { url: files.aadhaarBack[0].path, uploadedAt: new Date() };
+        }
 
         if (kyc) {
             Object.assign(kyc, payload);
@@ -57,7 +97,15 @@ exports.submitKyc = async (req, res, next) => {
             kyc = await Kyc.create(payload);
         }
 
-        res.json({ success: true, message: "KYC submitted successfully. Pending review.", data: kyc });
+        // Keep User kycStatus in sync
+        const User = require("../models/User");
+        await User.findByIdAndUpdate(req.user._id, { kycStatus: "pending" });
+
+        res.json({
+            success: true,
+            message: "KYC submitted successfully. Pending admin review.",
+            data: kyc,
+        });
     } catch (err) {
         if (err.code === 11000) {
             return res.status(400).json({ success: false, message: "KYC already exists for this user" });
@@ -72,11 +120,27 @@ exports.submitKyc = async (req, res, next) => {
 ───────────────────────────────────────── */
 exports.getMyKyc = async (req, res, next) => {
     try {
-        const kyc = await Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber");
+        const User = require("../models/User");
+        const [kyc, user] = await Promise.all([
+            Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber"),
+            User.findById(req.user._id).select("isSoldierVerified soldierKycStatus kycStatus"),
+        ]);
         if (!kyc) {
-            return res.json({ success: true, data: null, status: "not_submitted" });
+            return res.json({
+                success: true,
+                data: null,
+                status: user?.kycStatus || "not_submitted",
+                isSoldierVerified: user?.isSoldierVerified || false,
+                soldierKycStatus: user?.soldierKycStatus || "not_submitted",
+            });
         }
-        res.json({ success: true, data: kyc, status: kyc.status });
+        res.json({
+            success: true,
+            data: kyc,
+            status: kyc.status,
+            isSoldierVerified: user?.isSoldierVerified || (kyc.soldierDetails?.status === "approved"),
+            soldierKycStatus: user?.soldierKycStatus || kyc.soldierDetails?.status || "not_submitted",
+        });
     } catch (err) { next(err); }
 };
 
@@ -93,7 +157,14 @@ exports.getAllKyc = async (req, res, next) => {
 
         const filter = {};
         if (req.query.status && req.query.status !== "all") {
-            filter.status = req.query.status;
+            if (req.query.status === "soldier_pending") {
+                filter["soldierDetails.status"] = "pending";
+            } else {
+                filter.status = req.query.status;
+            }
+        }
+        if (req.query.soldierStatus && req.query.soldierStatus !== "all") {
+            filter["soldierDetails.status"] = req.query.soldierStatus;
         }
 
         if (req.query.search) {
@@ -111,13 +182,14 @@ exports.getAllKyc = async (req, res, next) => {
             filter.$or = [
                 { fullName: searchRegex },
                 { panNumber: searchRegex },
+                { "soldierDetails.soldierIdNumber": searchRegex },
                 { user: { $in: userIds } }
             ];
         }
 
-        const [items, total, pendingCount, approvedCount, rejectedCount, revokedCount] = await Promise.all([
+        const [items, total, pendingCount, approvedCount, rejectedCount, revokedCount, soldierPendingCount] = await Promise.all([
             Kyc.find(filter)
-                .populate("user", "name email phone")
+                .populate("user", "name email phone isSoldierVerified soldierKycStatus")
                 .select("+aadhaarNumber")
                 .sort("-submittedAt")
                 .skip(skip).limit(limit),
@@ -126,6 +198,7 @@ exports.getAllKyc = async (req, res, next) => {
             Kyc.countDocuments({ status: "approved" }),
             Kyc.countDocuments({ status: "rejected" }),
             Kyc.countDocuments({ status: "revoked" }),
+            Kyc.countDocuments({ "soldierDetails.status": "pending" }),
         ]);
 
         res.json({
@@ -137,6 +210,7 @@ exports.getAllKyc = async (req, res, next) => {
             approvedCount,
             rejectedCount,
             revokedCount,
+            soldierPendingCount,
             data: items,
         });
     } catch (err) { next(err); }
@@ -206,6 +280,134 @@ exports.reviewKyc = async (req, res, next) => {
 
         res.json({ success: true, message: actionMsg, data: kyc });
     } catch (err) { next(err); }
+};
+
+/* ─────────────────────────────────────────
+   POST /api/kyc/soldier/submit
+   Submit / update Soldier ID verification
+───────────────────────────────────────── */
+exports.submitSoldierKyc = async (req, res, next) => {
+    try {
+        const User = require("../models/User");
+        const { soldierIdNumber, serviceBranch } = req.body;
+
+        if (!soldierIdNumber || !soldierIdNumber.trim()) {
+            return res.status(400).json({ success: false, message: "Soldier ID / Service number is required" });
+        }
+        if (!serviceBranch || !serviceBranch.trim()) {
+            return res.status(400).json({ success: false, message: "Service branch is required (e.g., Army, Navy, Air Force, Police)" });
+        }
+
+        let idCardUrl = "";
+        if (req.file && req.file.path) {
+            idCardUrl = req.file.path;
+        } else if (req.body.soldierIdCardUrl) {
+            idCardUrl = req.body.soldierIdCardUrl;
+        }
+
+        if (!idCardUrl) {
+            return res.status(400).json({ success: false, message: "Soldier ID Card photo is required" });
+        }
+
+        let kyc = await Kyc.findOne({ user: req.user._id });
+
+        const soldierPayload = {
+            isSoldier: true,
+            soldierIdNumber: soldierIdNumber.trim().toUpperCase(),
+            serviceBranch: serviceBranch.trim(),
+            soldierIdCardUrl: idCardUrl,
+            status: "pending",
+            rejectionReason: undefined,
+            submittedAt: new Date(),
+            reviewedAt: undefined,
+            reviewedBy: undefined,
+        };
+
+        if (kyc) {
+            kyc.soldierDetails = soldierPayload;
+            await kyc.save();
+        } else {
+            kyc = await Kyc.create({
+                user: req.user._id,
+                fullName: req.user.name || "Soldier User",
+                panNumber: "PENDING",
+                status: "not_submitted",
+                soldierDetails: soldierPayload,
+            });
+        }
+
+        await User.findByIdAndUpdate(req.user._id, {
+            soldierKycStatus: "pending",
+            isSoldierVerified: false,
+        });
+
+        res.json({
+            success: true,
+            message: "Soldier ID submitted successfully. Under Admin Review.",
+            data: kyc.soldierDetails,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/* ─────────────────────────────────────────
+   PATCH /api/admin/kyc/:id/soldier-status
+   Admin: Approve or Reject Soldier ID Card verification
+───────────────────────────────────────── */
+exports.reviewSoldierKyc = async (req, res, next) => {
+    try {
+        const User = require("../models/User");
+        const { status, rejectionReason } = req.body;
+
+        if (!["approved", "rejected", "pending"].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Status must be 'approved', 'rejected', or 'pending'",
+            });
+        }
+
+        const kyc = await Kyc.findById(req.params.id).populate("user", "name email phone isSoldierVerified soldierKycStatus");
+        if (!kyc) {
+            return res.status(404).json({ success: false, message: "KYC record not found" });
+        }
+
+        if (!kyc.soldierDetails) {
+            kyc.soldierDetails = { isSoldier: true };
+        }
+
+        kyc.soldierDetails.status = status;
+        kyc.soldierDetails.reviewedAt = new Date();
+        kyc.soldierDetails.reviewedBy = req.user._id;
+
+        if (status === "rejected") {
+            kyc.soldierDetails.rejectionReason = rejectionReason || "Soldier ID rejected by Administrator";
+        } else if (status === "approved" || status === "pending") {
+            kyc.soldierDetails.rejectionReason = undefined;
+        }
+
+        await kyc.save();
+
+        const isApproved = status === "approved";
+        if (kyc.user) {
+            await User.findByIdAndUpdate(kyc.user._id, {
+                isSoldierVerified: isApproved,
+                soldierKycStatus: status,
+            });
+        }
+
+        let actionMsg = `Soldier verification set to ${status}`;
+        if (status === "approved") actionMsg = "Soldier ID Approved! User can now access Soldier Gold SIP.";
+        else if (status === "rejected") actionMsg = "Soldier ID Rejected.";
+
+        res.json({
+            success: true,
+            message: actionMsg,
+            data: kyc.soldierDetails,
+        });
+    } catch (err) {
+        next(err);
+    }
 };
 
 // ─── DIGIO KYC INTEGRATION (Aadhaar / DigiLocker) ──────────────────────────

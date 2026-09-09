@@ -55,6 +55,10 @@ async function loadKyc(status = currentKycFilter) {
             const elRev = document.getElementById("kyc-badge-revoked");
             if (elRev) elRev.textContent = res.revokedCount;
         }
+        if (res.soldierPendingCount !== undefined) {
+            const elSp = document.getElementById("kyc-badge-soldier-pending");
+            if (elSp) elSp.textContent = res.soldierPendingCount;
+        }
 
         renderKycTable(res.data || []);
     } catch (err) {
@@ -101,6 +105,18 @@ function renderKycTable(kycList) {
             statusLabel = "Revoked";
         }
 
+        let soldierBadge = "";
+        if (k.soldierDetails && k.soldierDetails.isSoldier) {
+            const sStatus = k.soldierDetails.status || "pending";
+            if (sStatus === "approved") {
+                soldierBadge = `<div style="margin-top:4px"><span class="badge" style="background:#065F46;color:#6EE7B7;font-size:10px">🎖️ Soldier Verified</span></div>`;
+            } else if (sStatus === "pending") {
+                soldierBadge = `<div style="margin-top:4px"><span class="badge" style="background:#064E3B;color:#34D399;border:1px solid #10B981;font-size:10px">🎖️ Soldier Pending</span></div>`;
+            } else if (sStatus === "rejected") {
+                soldierBadge = `<div style="margin-top:4px"><span class="badge" style="background:#7F1D1D;color:#FCA5A5;font-size:10px">🎖️ Soldier Rejected</span></div>`;
+            }
+        }
+
         const u = k.user || {};
         const bank = k.bankDetails || {};
 
@@ -110,14 +126,17 @@ function renderKycTable(kycList) {
                 <div style="font-weight:600;color:#fff">${k.fullName || u.name || '—'}</div>
                 <div style="font-size:12px;color:var(--text-dim)">${u.email || ''} • ${u.phone || ''}</div>
             </td>
-            <td><span style="font-family:var(--font-mono);font-weight:600;color:var(--gold)">${k.panNumber || '—'}</span></td>
+            <td>${k.panNumber === 'PHOTO_SUBMITTED' ? '<span class="badge" style="background:rgba(212,160,23,0.15);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-size:11px"><i class="fas fa-camera"></i> Photo KYC</span>' : `<span style="font-family:var(--font-mono);font-weight:600;color:var(--gold)">${k.panNumber || '—'}</span>`}</td>
             <td style="font-size:12.5px">${k.address?.city || '—'}, ${k.address?.state || '—'}</td>
             <td>
                 <div style="font-size:12.5px;font-weight:500">${bank.bankName || '—'}</div>
                 <div style="font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono)">${bank.accountNumber ? 'A/C: ' + bank.accountNumber : '—'}</div>
             </td>
             <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(k.submittedAt || k.createdAt)}</td>
-            <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+            <td>
+                <span class="badge ${badgeClass}">${statusLabel}</span>
+                ${soldierBadge}
+            </td>
             <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px;align-items:center">
                     <button class="btn btn-secondary btn-sm" onclick="openKycModal('${k._id}')" title="Inspect Documents & Info">
@@ -195,7 +214,7 @@ async function openKycModal(id) {
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1rem">
                 <!-- PAN Card -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
-                    <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:6px">PAN: ${k.panNumber || '—'}</div>
+                    <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:6px">${k.panNumber === 'PHOTO_SUBMITTED' ? '📸 PAN Card (Photo Uploaded)' : `PAN: ${k.panNumber || '—'}`}</div>
                     ${k.panImage?.url ? `<a href="${k.panImage.url}" target="_blank" title="Click to view full image"><img src="${k.panImage.url}" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" /></a>` : '<div style="color:var(--text-dim);font-size:12px">No PAN image uploaded</div>'}
                 </div>
 
@@ -222,6 +241,59 @@ async function openKycModal(id) {
                     <div><strong>IFSC:</strong> <span style="font-family:var(--font-mono)">${bank.ifscCode || '—'}</span></div>
                 </div>
             </div>
+
+            <!-- Soldier / Armed Forces & Police Verification Section -->
+            ${k.soldierDetails && k.soldierDetails.isSoldier ? `
+                <div style="background:linear-gradient(135deg, rgba(6,78,59,0.35) 0%, rgba(2,44,34,0.35) 100%);padding:1.25rem;border-radius:var(--radius-md);border:1.5px solid #10B981;box-shadow:0 4px 14px rgba(16,185,129,0.15)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <div style="font-size:13px;font-weight:800;color:#10B981;display:flex;align-items:center;gap:8px">
+                            <i class="fas fa-medal" style="font-size:16px"></i> ARMED FORCES / SOLDIER VERIFICATION (VEER JAWAN)
+                        </div>
+                        <div>
+                            ${k.soldierDetails.status === 'approved' 
+                                ? '<span class="badge badge-success" style="font-weight:700">🎖️ Soldier Verified (5% Extra)</span>' 
+                                : (k.soldierDetails.status === 'rejected' 
+                                    ? '<span class="badge badge-danger" style="font-weight:700">Soldier ID Rejected</span>' 
+                                    : '<span class="badge badge-warning" style="font-weight:700">Soldier ID Pending Review</span>')}
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;font-size:13px;color:#fff;margin-bottom:12px">
+                        <div><strong>Service Branch:</strong> <span style="color:var(--gold);font-weight:700">${k.soldierDetails.serviceBranch || '—'}</span></div>
+                        <div><strong>Soldier / Service ID:</strong> <span style="font-family:var(--font-mono);font-weight:800;color:#34D399;letter-spacing:0.5px">${k.soldierDetails.soldierIdNumber || '—'}</span></div>
+                        <div><strong>Submitted At:</strong> ${formatDateTime(k.soldierDetails.submittedAt || k.updatedAt)}</div>
+                    </div>
+                    
+                    <div style="margin-top:10px">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px">Soldier ID Card Photo:</div>
+                        ${k.soldierDetails.soldierIdCardUrl ? `
+                            <a href="${k.soldierDetails.soldierIdCardUrl}" target="_blank" title="Click to open full high-resolution image" style="display:inline-block">
+                                <img src="${k.soldierDetails.soldierIdCardUrl}" style="max-height:180px;border-radius:8px;border:1.5px solid #10B981;object-fit:cover;box-shadow:0 4px 10px rgba(0,0,0,0.3)" />
+                            </a>
+                            <div style="font-size:11px;color:var(--text-dim);margin-top:4px"><i class="fas fa-external-link-alt"></i> Click image to open in high-res</div>
+                        ` : '<div style="color:var(--text-dim);font-size:12px">No Soldier ID photo uploaded</div>'}
+                    </div>
+
+                    ${k.soldierDetails.rejectionReason ? `
+                        <div style="margin-top:10px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);padding:8px 12px;border-radius:6px;color:#fca5a5;font-size:12px">
+                            <strong><i class="fas fa-exclamation-circle"></i> Soldier Rejection Reason:</strong> ${k.soldierDetails.rejectionReason}
+                        </div>
+                    ` : ''}
+
+                    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(16,185,129,0.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <button class="btn btn-sm" style="background:#059669;color:#fff;font-weight:700;padding:6px 14px" onclick="reviewSoldierKyc('approved')">
+                            <i class="fas fa-check-circle"></i> Approve Soldier ID (Unlock 5% Extra Return)
+                        </button>
+                        <button class="btn btn-danger btn-sm" style="font-weight:700;padding:6px 14px" onclick="reviewSoldierKyc('rejected')">
+                            <i class="fas fa-times-circle"></i> Reject Soldier ID
+                        </button>
+                        ${k.soldierDetails.status !== 'pending' ? `
+                            <button class="btn btn-secondary btn-sm" onclick="reviewSoldierKyc('pending')">
+                                <i class="fas fa-undo"></i> Reset Soldier to Pending
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            ` : ''}
 
             ${k.rejectionReason || k.revokedReason ? `
                 <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:0.75rem 1rem;border-radius:var(--radius-sm);color:#fca5a5;font-size:13px">
@@ -317,3 +389,33 @@ async function reviewKyc(decision) {
         toast("Network error updating KYC", "danger");
     }
 }
+
+async function reviewSoldierKyc(decision) {
+    if (!currentKycId) return;
+
+    let reason = "";
+    if (decision === "rejected") {
+        reason = prompt("Please enter the reason for rejecting this Soldier ID card:");
+        if (reason === null) return;
+        if (!reason.trim()) reason = "Soldier ID document verification failed";
+    }
+
+    try {
+        const res = await api(`/admin/kyc/${currentKycId}/soldier-status`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: decision, rejectionReason: reason })
+        });
+
+        if (res.success) {
+            toast(res.message || `Soldier ID verification ${decision}!`, "success");
+            openKycModal(currentKycId);
+            loadKyc(currentKycFilter);
+            if (typeof loadDashboard === "function") loadDashboard();
+        } else {
+            toast(res.message || "Failed to update Soldier verification status", "danger");
+        }
+    } catch (e) {
+        toast("Network error updating Soldier status: " + e.message, "danger");
+    }
+}
+
