@@ -57,17 +57,21 @@ function renderProperties(props) {
                     <th>Bricks</th>
                     <th>Funded</th>
                     <th>Rental Yield</th>
-                    <th>Status</th>
+                    <th>Status / Visibility</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
             <tbody>`;
 
     props.forEach(p => {
-        const coverImg = (p.images || []).find(i => i.isCover)?.url || (p.images?.[0]?.url || "");
-        const statusBadge = p.isPublished
-            ? `<span class="badge badge-success">Published</span>`
-            : `<span class="badge badge-danger">Draft</span>`;
+        const coverImg = (p.images || []).find(i => i.isCover)?.url || (p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : ""));
+        const isPublished = p.status === "published" || p.status === "active" || p.isPublished === true;
+        const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : 0);
+        const fundedPct = p.fundedPercentage ?? (p.totalBricks > 0 ? Math.round(((p.soldBricks || 0) / p.totalBricks) * 100) : 0);
+
+        const statusBadge = isPublished
+            ? `<span class="badge badge-success" style="display:inline-flex;align-items:center;gap:4px"><i class="fas fa-check-circle"></i> Published</span>`
+            : `<span class="badge badge-danger" style="display:inline-flex;align-items:center;gap:4px"><i class="fas fa-eye-slash"></i> Draft</span>`;
 
         html += `
         <tr>
@@ -81,20 +85,28 @@ function renderProperties(props) {
                 </div>
             </td>
             <td style="font-size:13px">${p.location?.city || '—'}, ${p.location?.state || '—'}</td>
-            <td style="font-weight:700;color:var(--gold)">${formatPrice(p.totalInvestmentRequired)}</td>
+            <td style="font-weight:700;color:var(--gold)">${formatPrice(totalVal)}</td>
             <td style="font-family:var(--font-mono);font-size:13px">${p.totalBricks || 0}</td>
             <td>
-                <div style="font-weight:600">${p.fundedPercentage || 0}%</div>
+                <div style="font-weight:600">${fundedPct}%</div>
                 <div style="width:70px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:3px">
-                    <div style="width:${Math.min(p.fundedPercentage || 0, 100)}%;height:100%;background:var(--success)"></div>
+                    <div style="width:${Math.min(fundedPct, 100)}%;height:100%;background:var(--success)"></div>
                 </div>
             </td>
             <td style="font-weight:600;color:var(--success)">${p.expectedRentalYield || 0}%</td>
-            <td>${statusBadge}</td>
+            <td>
+                <div style="display:inline-flex;align-items:center;gap:8px">
+                    <label class="switch" title="${isPublished ? 'Published in App (Click to unpublish)' : 'Draft / Hidden from App (Click to publish)'}">
+                        <input type="checkbox" ${isPublished ? 'checked' : ''} onchange="togglePublish('${p._id}', this)">
+                        <span class="slider"></span>
+                    </label>
+                    ${statusBadge}
+                </div>
+            </td>
             <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px">
-                    <button class="btn-icon" title="Toggle Publish" onclick="togglePublish('${p._id}')">
-                        <i class="fas ${p.isPublished ? 'fa-eye-slash' : 'fa-eye'}" style="color:${p.isPublished ? 'var(--warning)' : 'var(--success)'}"></i>
+                    <button class="btn-icon" title="${isPublished ? 'Unpublish' : 'Publish'}" onclick="togglePublish('${p._id}')">
+                        <i class="fas ${isPublished ? 'fa-eye-slash' : 'fa-eye'}" style="color:${isPublished ? 'var(--warning)' : 'var(--success)'}"></i>
                     </button>
                     <button class="btn-icon" title="Edit Property" onclick="editProperty('${p._id}')">
                         <i class="fas fa-edit"></i>
@@ -212,20 +224,30 @@ async function saveProperty() {
     const rentalYield = Number(document.getElementById("prop-rental-yield")?.value);
 
     if (!title || !totalInvestment || !totalBricks) {
-        toast("Please fill in all required property details", "warning");
+        toast("Please fill in all required property details (Title, Total Investment, Total Bricks)", "warning");
         return;
     }
 
+    const brickPrice = totalBricks > 0 ? Math.round(totalInvestment / totalBricks) : 0;
+
     const payload = {
         title,
-        description,
+        description: description || title,
         location: { city, state },
         totalInvestmentRequired: totalInvestment,
         totalBricks,
-        brickPrice: totalInvestment / totalBricks,
-        expectedRentalYield: rentalYield,
+        brickPrice,
+        price: {
+            amount: totalInvestment,
+            currency: "INR",
+            label: "onwards"
+        },
+        expectedRentalYield: rentalYield || 3,
+        investmentEnabled: true,
+        featured: true,
+        status: "published", // Automatically published so it is visible in app immediately!
         amenities: currentAmenities,
-        images: uploadedImages
+        images: uploadedImages.map(img => ({ url: img.url, isCover: !!img.isCover }))
     };
 
     try {
@@ -243,14 +265,14 @@ async function saveProperty() {
         }
 
         if (res.success) {
-            toast(`Property ${editingPropertyId ? 'updated' : 'created'} successfully`, "success");
+            toast(`Property ${editingPropertyId ? 'updated' : 'created and published'} successfully! Visible in app.`, "success");
             closePropertyModal();
             loadProperties();
         } else {
             toast(res.message || "Failed to save property", "danger");
         }
     } catch (e) {
-        toast("Network error saving property", "danger");
+        toast(e.message || "Network error saving property", "danger");
     }
 }
 
@@ -265,11 +287,15 @@ async function editProperty(id) {
             document.getElementById("prop-desc").value = p.description || "";
             document.getElementById("prop-city").value = p.location?.city || "";
             document.getElementById("prop-state").value = p.location?.state || "";
-            document.getElementById("prop-total-investment").value = p.totalInvestmentRequired || "";
+            const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : "");
+            document.getElementById("prop-total-investment").value = totalVal || "";
             document.getElementById("prop-total-bricks").value = p.totalBricks || "";
             document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
             currentAmenities = p.amenities || [];
-            uploadedImages = p.images || [];
+            uploadedImages = (p.images || []).map(img => typeof img === 'string' ? { url: img, isCover: false } : { url: img.url, isCover: !!img.isCover });
+            if (uploadedImages.length > 0 && !uploadedImages.some(i => i.isCover)) {
+                uploadedImages[0].isCover = true;
+            }
             renderAmenityTags();
             renderImagesGrid();
             document.getElementById("prop-modal").style.display = "flex";
@@ -279,17 +305,21 @@ async function editProperty(id) {
     }
 }
 
-async function togglePublish(id) {
+async function togglePublish(id, inputEl) {
     try {
+        toast("Updating property status...", "info");
         const res = await api(`/admin/properties/${id}/toggle`, { method: "PATCH" });
         if (res.success) {
-            toast("Property status toggled", "success");
+            const isNowPub = res.status === "published" || res.status === "active" || res.isPublished === true;
+            toast(`Property ${isNowPub ? 'published (live in app)' : 'moved to draft (hidden from app)'}`, "success");
             loadProperties();
         } else {
             toast(res.message || "Failed to toggle status", "danger");
+            if (inputEl) inputEl.checked = !inputEl.checked;
         }
     } catch (e) {
-        toast("Network error", "danger");
+        toast(e.message || "Network error toggling status", "danger");
+        if (inputEl) inputEl.checked = !inputEl.checked;
     }
 }
 

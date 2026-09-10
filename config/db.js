@@ -20,6 +20,44 @@ const connectDB = async () => {
             ]);
             console.log("✅ Default coins seeded successfully!");
         }
+
+        // Auto-heal & publish any properties stuck in draft/unpublished
+        try {
+            const Property = require("../models/Property");
+            const props = await Property.find({});
+            for (const p of props) {
+                let changed = false;
+                const update = {};
+                if (p.status !== "published") {
+                    update.status = "published";
+                    changed = true;
+                }
+                if (!p.featured) {
+                    update.featured = true;
+                    changed = true;
+                }
+                if (!p.investmentEnabled) {
+                    update.investmentEnabled = true;
+                    changed = true;
+                }
+                if (!p.price?.amount && (p.totalInvestmentRequired || (p.brickPrice && p.totalBricks))) {
+                    update["price.amount"] = p.totalInvestmentRequired || (p.brickPrice * p.totalBricks);
+                    update["price.currency"] = "INR";
+                    update["price.label"] = "onwards";
+                    changed = true;
+                }
+                if (!p.totalInvestmentRequired && p.price?.amount) {
+                    update.totalInvestmentRequired = p.price.amount;
+                    changed = true;
+                }
+                if (changed) {
+                    await Property.findByIdAndUpdate(p._id, { $set: update });
+                    console.log(`✅ Auto-synced property: "${p.title}" (${p._id}) -> published & featured`);
+                }
+            }
+        } catch (propErr) {
+            console.warn("⚠️ Property sync non-fatal error:", propErr.message);
+        }
     } catch (err) {
         console.error(`❌ MongoDB connection error: ${err.message}`);
         process.exit(1);

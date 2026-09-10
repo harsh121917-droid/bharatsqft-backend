@@ -39,12 +39,12 @@ const PropertySchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["published", "unpublished", "draft"],
-            default: "draft",
+            enum: ["published", "unpublished", "draft", "active", "inactive"],
+            default: "published",
         },
         featured: {
             type: Boolean,
-            default: false,
+            default: true,
         },
         // SEO fields
         seo: {
@@ -53,15 +53,20 @@ const PropertySchema = new mongoose.Schema(
             slug: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
         },
         // Brick Investment fields
+        totalInvestmentRequired: { type: Number }, // total property valuation
         brickPrice: { type: Number, default: 0 },   // price per brick in INR
         totalBricks: { type: Number, default: 0 },   // total bricks available
         soldBricks: { type: Number, default: 0 },   // auto-updated on payment
-        investmentEnabled: { type: Boolean, default: false }, // toggle on/off
+        investmentEnabled: { type: Boolean, default: true }, // toggle on/off
         expectedAppreciation: { type: Number, default: 8 },  // % per year, capital growth
         expectedRentalYield: { type: Number, default: 3 },  // % per year, rental income
 
-        // Media — will add upload in later phase
-        images: [new (require('mongoose')).Schema({ url: String, caption: String }, { _id: true })],
+        // Media
+        images: [{
+            url: { type: String, default: "" },
+            caption: { type: String, default: "" },
+            isCover: { type: Boolean, default: false }
+        }],
         videos: [{ url: String, title: String }],
         documents: [{ url: String, title: String, type: String }],
 
@@ -73,14 +78,24 @@ const PropertySchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-/* Auto-generate slug from title if not provided */
+/* Auto-generate slug and sync price/totalInvestmentRequired */
 PropertySchema.pre("save", function (next) {
+    if (!this.seo) this.seo = {};
     if (!this.seo.slug && this.title) {
         this.seo.slug = this.title
             .toLowerCase()
             .replace(/[^a-z0-9\s-]/g, "")
             .replace(/\s+/g, "-")
             .substring(0, 100);
+    }
+    if (!this.price) {
+        this.price = { currency: "INR", label: "onwards" };
+    }
+    if (!this.price.amount && (this.totalInvestmentRequired || (this.brickPrice && this.totalBricks))) {
+        this.price.amount = this.totalInvestmentRequired || (this.brickPrice * this.totalBricks);
+    }
+    if (!this.totalInvestmentRequired && this.price.amount) {
+        this.totalInvestmentRequired = this.price.amount;
     }
     next();
 });
