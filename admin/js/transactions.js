@@ -244,12 +244,13 @@ function renderDigiGoldUserInvestmentsTable(users) {
 
 // ── 2. Real Estate: Bharat SQFT Property Investments Hub ───────
 let allRealEstateInvestments = [];
+let activeReCustomerId = null;
 let reInvestmentFilters = {
     search: "",
     property: "all",
     status: "all",
-    sortBy: "newest",
-    viewMode: "grid"
+    sortBy: "highest_amt",
+    viewMode: "customers" // 'customers' (default) or 'txns'
 };
 
 async function loadInvestments() {
@@ -258,7 +259,7 @@ async function loadInvestments() {
     body.innerHTML = `
     <div class="loading-box">
         <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
-        <div>Loading Bharat SQFT real estate investments & brick allocations...</div>
+        <div>Loading Bharat SQFT real estate investments & customer portfolios...</div>
     </div>`;
 
     try {
@@ -327,7 +328,6 @@ function updateInvestmentKpis(apiRes) {
     const uniqueInvestors = new Set(paidList.map(x => x.user?._id || x.user)).size;
     const avgTicket = uniqueInvestors > 0 ? +(totalFunded / uniqueInvestors).toFixed(2) : 0;
 
-    // Calculate weighted average expected rental yield
     let totalYieldWeighted = 0;
     let totalWeightAmt = 0;
     paidList.forEach(inv => {
@@ -397,148 +397,467 @@ function filterAndRenderInvestments() {
         });
     }
 
-    // 4. Sort
-    if (reInvestmentFilters.sortBy === "highest_amt") {
-        filtered.sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0));
-    } else if (reInvestmentFilters.sortBy === "most_bricks") {
-        filtered.sort((a, b) => (b.bricks || 0) - (a.bricks || 0));
-    } else if (reInvestmentFilters.sortBy === "name_asc") {
-        filtered.sort((a, b) => (a.user?.name || "").localeCompare(b.user?.name || ""));
-    } else {
-        // newest first
-        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }
-
     if (filtered.length === 0) {
         body.innerHTML = `
         <div class="loading-box" style="padding:3.5rem 1rem">
             <div style="width:60px;height:60px;border-radius:14px;background:rgba(168,85,247,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto">
                 <i class="fas fa-building-circle-xmark" style="font-size:28px;color:#c084fc"></i>
             </div>
-            <div style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.35rem">No Matching Investments Found</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.35rem">No Matching Real Estate Records</div>
             <div style="font-size:0.85rem;color:#94a3b8;max-width:400px;margin:0 auto">
-                Try clearing your search query or selecting a different property filter.
+                Try adjusting your search query or selecting a different project filter.
             </div>
         </div>`;
         return;
     }
 
-    if (reInvestmentFilters.viewMode === "table") {
+    if (reInvestmentFilters.viewMode === "txns") {
+        // Detailed All Transactions Table View
+        if (reInvestmentFilters.sortBy === "highest_amt") {
+            filtered.sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0));
+        } else if (reInvestmentFilters.sortBy === "most_bricks") {
+            filtered.sort((a, b) => (b.bricks || 0) - (a.bricks || 0));
+        } else if (reInvestmentFilters.sortBy === "name_asc") {
+            filtered.sort((a, b) => (a.user?.name || "").localeCompare(b.user?.name || ""));
+        } else {
+            filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
         renderInvestmentsTableView(filtered, body);
     } else {
-        renderInvestmentsGridView(filtered, body);
+        // Customer-Wise Grouped View (DEFAULT & RECOMMENDED)
+        const customerMap = new Map();
+        filtered.forEach(inv => {
+            const uid = String(inv.user?._id || inv.user || "anonymous");
+            if (!customerMap.has(uid)) {
+                customerMap.set(uid, {
+                    userId: uid,
+                    user: inv.user || { _id: uid, name: "Anonymous Customer" },
+                    investments: [],
+                    totalBricks: 0,
+                    totalInvested: 0,
+                    propertiesMap: new Map(),
+                    estAnnualDividend: 0,
+                    lastInvestmentDate: inv.createdAt
+                });
+            }
+            const c = customerMap.get(uid);
+            c.investments.push(inv);
+            if (inv.status === "paid") {
+                c.totalBricks += (inv.bricks || 0);
+                c.totalInvested += (inv.totalAmount || 0);
+                const yieldPct = inv.property?.expectedRentalYield || 8.5;
+                c.estAnnualDividend += +((inv.totalAmount || 0) * (yieldPct / 100));
+
+                const pId = String(inv.property?._id || inv.property || "");
+                if (pId) {
+                    if (!c.propertiesMap.has(pId)) {
+                        c.propertiesMap.set(pId, {
+                            property: inv.property || { title: "Property Project" },
+                            bricks: 0,
+                            invested: 0
+                        });
+                    }
+                    const pm = c.propertiesMap.get(pId);
+                    pm.bricks += (inv.bricks || 0);
+                    pm.invested += (inv.totalAmount || 0);
+                }
+            }
+            if (new Date(inv.createdAt) > new Date(c.lastInvestmentDate)) {
+                c.lastInvestmentDate = inv.createdAt;
+            }
+        });
+
+        const customerList = Array.from(customerMap.values());
+
+        // Sort Customer List
+        if (reInvestmentFilters.sortBy === "highest_amt") {
+            customerList.sort((a, b) => b.totalInvested - a.totalInvested);
+        } else if (reInvestmentFilters.sortBy === "most_bricks") {
+            customerList.sort((a, b) => b.totalBricks - a.totalBricks);
+        } else if (reInvestmentFilters.sortBy === "name_asc") {
+            customerList.sort((a, b) => (a.user?.name || "").localeCompare(b.user?.name || ""));
+        } else {
+            // newest
+            customerList.sort((a, b) => new Date(b.lastInvestmentDate) - new Date(a.lastInvestmentDate));
+        }
+
+        renderInvestmentsCustomersView(customerList, body);
     }
 }
 
-// ── View 1: Rich Cards Grid View ──────────────────────────────
-function renderInvestmentsGridView(list, mount) {
-    let html = `<div class="re-cards-grid">`;
+// ── CUSTOMER-WISE VIEW: Cards Grid ────────────────────────────
+function renderInvestmentsCustomersView(customerList, mount) {
+    let html = `<div class="re-customer-grid">`;
 
-    list.forEach(inv => {
-        const u = inv.user || {};
-        const p = inv.property || {};
-        const isPaid = inv.status === "paid";
-        const statusClass = isPaid ? "paid" : "pending";
-        const statusLabel = isPaid ? "Paid & Confirmed" : (inv.status || "Pending");
-        
-        const yieldPct = p.expectedRentalYield || 8.5;
-        const annualDividend = +((inv.totalAmount || 0) * (yieldPct / 100)).toFixed(2);
-        const monthlyDividend = +(annualDividend / 12).toFixed(2);
+    customerList.forEach(c => {
+        const u = c.user || {};
+        const userName = u.name || "Verified Customer";
+        const avatarLetter = userName.charAt(0).toUpperCase();
+        const contactStr = u.phone || u.email || "No contact info";
+        const propsCount = c.propertiesMap.size;
+        const lastDateStr = formatDate(c.lastInvestmentDate);
 
-        const ownershipPct = inv.ownershipPercent !== undefined ? inv.ownershipPercent : (p.totalBricks ? +((inv.bricks / p.totalBricks) * 100).toFixed(4) : 0);
-
-        const coverImg = p.images?.find(i => i.isCover)?.url || p.images?.[0]?.url;
-        const propType = p.propertyType || "Commercial";
-        const cityStr = p.location?.city ? `${p.location.city}${p.location.state ? ', ' + p.location.state : ''}` : 'Prime Hub';
+        // Build property chips (up to 3)
+        let propChipsHtml = "";
+        let chipIdx = 0;
+        c.propertiesMap.forEach((pData) => {
+            if (chipIdx < 3) {
+                const pTitle = pData.property?.title || "Property";
+                propChipsHtml += `
+                <span class="re-cust-chip" title="${pTitle}: ${pData.bricks} Bricks">
+                    <i class="fas fa-building" style="color:#c084fc"></i>
+                    <span>${pTitle.length > 18 ? pTitle.slice(0, 18) + '...' : pTitle}</span>
+                    <strong>${pData.bricks}b</strong>
+                </span>`;
+                chipIdx++;
+            }
+        });
+        if (c.propertiesMap.size > 3) {
+            propChipsHtml += `<span class="re-cust-chip" style="background:rgba(255,255,255,0.06);color:#94a3b8">+${c.propertiesMap.size - 3} more</span>`;
+        }
+        if (c.propertiesMap.size === 0) {
+            propChipsHtml = `<span style="font-size:11px;color:#64748b">No active paid properties</span>`;
+        }
 
         html += `
-        <div class="re-card">
-            <!-- Property Header -->
-            <div class="re-card-prop-header">
-                ${coverImg ? `
-                    <img src="${coverImg}" class="re-prop-thumb" alt="${p.title || 'Property'}" onerror="this.outerHTML='<div class=\\'re-prop-thumb-fallback\\'><i class=\\'fas fa-building\\'></i></div>'" />
-                ` : `
-                    <div class="re-prop-thumb-fallback"><i class="fas fa-building"></i></div>
-                `}
-                <div class="re-prop-info">
-                    <div class="re-prop-badge-row">
-                        <span class="re-badge-type">${propType}</span>
-                        <span class="re-prop-city"><i class="fas fa-map-marker-alt" style="color:#ef4444"></i> ${cityStr}</span>
+        <div class="re-cust-card" onclick="openCustomerRealEstateDetails('${c.userId}')">
+            <!-- Customer Header -->
+            <div class="re-cust-header">
+                <div class="re-cust-avatar">
+                    ${u.avatar || u.profilePicture ? `
+                        <img src="${u.avatar || u.profilePicture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${avatarLetter}'" />
+                    ` : avatarLetter}
+                </div>
+                <div class="re-cust-info">
+                    <div class="re-cust-name-row">
+                        <span class="re-cust-name" title="${userName}">${userName}</span>
+                        <span class="re-cust-badge"><i class="fas fa-check-circle"></i> Investor</span>
                     </div>
-                    <div class="re-prop-title" title="${p.title || 'Property Project'}">${p.title || 'Untitled Property'}</div>
+                    <div class="re-cust-contact">${contactStr}</div>
                 </div>
             </div>
 
-            <!-- Investor Profile Strip -->
-            <div class="re-investor-strip">
-                <div class="re-investor-profile" onclick="viewUserDetails('${u._id}')" title="Click to open full investor profile">
-                    <div class="re-investor-avatar">
-                        ${(u.name || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <div class="re-investor-name">
-                            <span>${u.name || 'Anonymous Investor'}</span>
-                            <i class="fas fa-external-link-alt" style="font-size:10px;color:#60a5fa"></i>
-                        </div>
-                        <div class="re-investor-contact">${u.phone || u.email || 'No contact on file'}</div>
-                    </div>
+            <!-- 3 Core Financial Metrics -->
+            <div class="re-cust-stats">
+                <div class="re-cust-stat-item">
+                    <span class="re-cust-stat-label">Bricks Owned</span>
+                    <span class="re-cust-stat-val purple">${c.totalBricks.toLocaleString()}</span>
                 </div>
-                <button class="btn-re-user" onclick="viewUserDetails('${u._id}')" title="View Customer Account">
-                    <i class="fas fa-user"></i>
-                </button>
-            </div>
-
-            <!-- Key Financial Metrics -->
-            <div class="re-metrics-box">
-                <div class="re-metric-item">
-                    <span class="re-metric-label"><i class="fas fa-cubes" style="color:#c084fc"></i> Bricks Allotted</span>
-                    <span class="re-metric-val purple">${inv.bricks || 0} Bricks</span>
+                <div class="re-cust-stat-item">
+                    <span class="re-cust-stat-label">Total Invested</span>
+                    <span class="re-cust-stat-val gold">${formatINR(c.totalInvested)}</span>
                 </div>
-                <div class="re-metric-item">
-                    <span class="re-metric-label"><i class="fas fa-coins" style="color:#f59e0b"></i> Total Consideration</span>
-                    <span class="re-metric-val gold">${formatINR(inv.totalAmount)}</span>
-                </div>
-                <div class="re-metric-item">
-                    <span class="re-metric-label"><i class="fas fa-tag" style="color:#94a3b8"></i> Price / Brick</span>
-                    <span class="re-metric-val" style="font-size:0.95rem">${formatINR(inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0))}</span>
-                </div>
-                <div class="re-metric-item">
-                    <span class="re-metric-label"><i class="fas fa-arrow-trend-up" style="color:#34d399"></i> Rental Yield</span>
-                    <span class="re-metric-val green">${yieldPct}% p.a.</span>
-                    <span style="font-size:10px;color:#34d399;font-family:var(--font-mono)">~${formatINR(monthlyDividend)}/mo</span>
+                <div class="re-cust-stat-item">
+                    <span class="re-cust-stat-label">Annual Yield</span>
+                    <span class="re-cust-stat-val green">~${formatINR(c.estAnnualDividend)}</span>
                 </div>
             </div>
 
-            <!-- Fractional Ownership Progress Bar -->
-            <div class="re-ownership-bar-wrap">
-                <div class="re-ownership-meta">
-                    <span><i class="fas fa-chart-pie" style="color:#a855f7"></i> Equity Stake: <strong style="color:#fff">${ownershipPct}%</strong></span>
-                    <span>${p.totalBricks ? `${inv.bricks} / ${p.totalBricks.toLocaleString()} Total Bricks` : 'Fractional Share'}</span>
+            <!-- Projects Funded Chips -->
+            <div class="re-cust-props-strip">
+                <div class="re-cust-props-label">
+                    <i class="fas fa-city" style="color:#60a5fa"></i> Funded Projects (${propsCount})
                 </div>
-                <div class="re-progress-track">
-                    <div class="re-progress-fill" style="width:${Math.min(Math.max(ownershipPct * 2, 6), 100)}%"></div>
+                <div class="re-cust-props-chips">
+                    ${propChipsHtml}
                 </div>
             </div>
 
-            <!-- Card Footer -->
-            <div class="re-card-footer">
-                <div class="re-date-status">
-                    <span class="re-status-pill ${statusClass}">
-                        <i class="fas ${isPaid ? 'fa-check-circle' : 'fa-clock'}"></i> ${statusLabel}
-                    </span>
-                    <span class="re-date-text"><i class="far fa-calendar-alt"></i> ${formatDateTime(inv.createdAt)}</span>
-                </div>
-                <div class="re-action-btns">
-                    <button class="btn-re-cert" onclick="openInvestmentCertificate('${inv._id}')" title="View Official Allotment Certificate">
-                        <i class="fas fa-certificate"></i> Certificate
-                    </button>
-                </div>
+            <!-- Footer & Call to Action -->
+            <div class="re-cust-footer">
+                <span class="re-cust-last-date"><i class="far fa-clock"></i> Last invested: ${lastDateStr}</span>
+                <span class="re-cust-view-btn">
+                    <span>View Real Estate Portfolio</span>
+                    <i class="fas fa-arrow-right"></i>
+                </span>
             </div>
         </div>`;
     });
 
     html += `</div>`;
     mount.innerHTML = html;
+}
+
+function reSetText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (val !== undefined && val !== null) ? val : "—";
+}
+
+// ── DEDICATED CUSTOMER DETAILS SCREEN (NOT A POPUP) ───────────
+function openCustomerRealEstateDetails(userId) {
+    if (!userId) return;
+    activeReCustomerId = userId;
+
+    const directoryView = document.getElementById("re-investors-directory-view");
+    const detailView = document.getElementById("re-investor-detail-view");
+    if (directoryView) directoryView.style.display = "none";
+    if (detailView) detailView.style.display = "block";
+
+    // Find all investments for this user
+    const userInvestments = allRealEstateInvestments.filter(x => String(x.user?._id || x.user) === String(userId));
+    const firstObjUser = userInvestments.find(x => x.user && typeof x.user === "object")?.user;
+    const u = firstObjUser || { _id: userId, name: `Customer #${String(userId).slice(-6).toUpperCase()}` };
+
+    const userName = u.name || `Customer #${String(userId).slice(-6).toUpperCase()}`;
+    reSetText("re-cust-bc-name", userName);
+    reSetText("re-hero-name", userName);
+    reSetText("re-hero-phone", u.phone || "No phone linked");
+    reSetText("re-hero-email", u.email || "No email on file");
+    reSetText("re-hero-id", String(userId).slice(-8).toUpperCase());
+
+    const avatarMount = document.getElementById("re-hero-avatar");
+    if (avatarMount) {
+        if (u.avatar || u.profilePicture) {
+            avatarMount.innerHTML = `<img src="${u.avatar || u.profilePicture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${userName.charAt(0).toUpperCase()}'" />`;
+        } else {
+            avatarMount.textContent = userName.charAt(0).toUpperCase();
+        }
+    }
+
+    // Compute Customer Stats
+    const paidList = userInvestments.filter(x => x.status === "paid");
+    const totalBricks = paidList.reduce((s, x) => s + (x.bricks || 0), 0);
+    const totalInvested = paidList.reduce((s, x) => s + (x.totalAmount || 0), 0);
+
+    let estDividend = 0;
+    paidList.forEach(inv => {
+        const yieldPct = inv.property?.expectedRentalYield || 8.5;
+        estDividend += ((inv.totalAmount || 0) * (yieldPct / 100));
+    });
+
+    // Group by property
+    const propMap = new Map();
+    paidList.forEach(inv => {
+        const p = inv.property || {};
+        const pid = String(p._id || "unknown");
+        if (!propMap.has(pid)) {
+            propMap.set(pid, {
+                property: p,
+                bricks: 0,
+                invested: 0,
+                allotments: []
+            });
+        }
+        const pm = propMap.get(pid);
+        pm.bricks += (inv.bricks || 0);
+        pm.invested += (inv.totalAmount || 0);
+        pm.allotments.push(inv);
+    });
+
+    reSetText("re-hero-total-bricks", `${totalBricks.toLocaleString()} Bricks`);
+    reSetText("re-hero-total-invested", formatINR(totalInvested));
+    reSetText("re-hero-annual-yield", `~${formatINR(estDividend)} /yr`);
+    reSetText("re-hero-projects-count", `${propMap.size} Properties`);
+
+    // 1. Render Property Projects Portfolio Breakdown
+    renderCustomerProjectsBreakdown(propMap);
+
+    // 2. Render Allotment Transactions Ledger
+    renderCustomerTransactionsLedger(userInvestments);
+
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderCustomerProjectsBreakdown(propMap) {
+    const mount = document.getElementById("re-detail-projects-mount");
+    if (!mount) return;
+
+    if (propMap.size === 0) {
+        mount.innerHTML = `
+        <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.08);border-radius:12px;padding:2rem;text-align:center;color:#64748b;font-size:13px">
+            <i class="fas fa-building" style="font-size:28px;opacity:0.3;margin-bottom:6px"></i><br>
+            No active confirmed property projects in this portfolio yet.
+        </div>`;
+        return;
+    }
+
+    let html = "";
+    propMap.forEach((data, pid) => {
+        const p = data.property || {};
+        const coverImg = p.images?.find(i => i.isCover)?.url || p.images?.[0]?.url;
+        const propTitle = p.title || "Untitled Property Project";
+        const propType = p.propertyType || "Commercial";
+        const cityStr = p.location?.city ? `${p.location.city}${p.location.state ? ', ' + p.location.state : ''}` : 'Prime Location';
+
+        const yieldPct = p.expectedRentalYield || 8.5;
+        const annualPayout = +((data.invested * (yieldPct / 100))).toFixed(2);
+        const monthlyPayout = +(annualPayout / 12).toFixed(2);
+
+        const ownershipPct = p.totalBricks ? +((data.bricks / p.totalBricks) * 100).toFixed(3) : 0;
+        const latestAllotment = data.allotments[0] || {};
+
+        html += `
+        <div class="re-detail-project-card">
+            <!-- Left: Property Project Info -->
+            <div class="re-dproj-left">
+                ${coverImg ? `
+                    <img src="${coverImg}" class="re-dproj-img" alt="${propTitle}" onerror="this.outerHTML='<div class=\\'re-prop-thumb-fallback\\'><i class=\\'fas fa-building\\'></i></div>'" />
+                ` : `
+                    <div class="re-prop-thumb-fallback"><i class="fas fa-building"></i></div>
+                `}
+                <div class="re-dproj-info">
+                    <span class="re-badge-type" style="margin-bottom:4px;display:inline-block">${propType}</span>
+                    <h4 title="${propTitle}">${propTitle}</h4>
+                    <p><i class="fas fa-map-marker-alt" style="color:#ef4444"></i> ${cityStr}</p>
+                </div>
+            </div>
+
+            <!-- Middle: Financial Metrics & Equity Bar -->
+            <div class="re-dproj-metrics">
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-cubes" style="color:#c084fc"></i> Bricks Owned</span>
+                    <span class="re-metric-val purple">${data.bricks} Bricks</span>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-coins" style="color:#f59e0b"></i> Capital Invested</span>
+                    <span class="re-metric-val gold">${formatINR(data.invested)}</span>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-chart-pie" style="color:#60a5fa"></i> Fractional Stake</span>
+                    <span class="re-metric-val blue">${ownershipPct}%</span>
+                    <div class="re-progress-track" style="height:4px;margin-top:4px">
+                        <div class="re-progress-fill" style="width:${Math.min(Math.max(ownershipPct * 2, 8), 100)}%"></div>
+                    </div>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-arrow-trend-up" style="color:#34d399"></i> Rental Yield</span>
+                    <span class="re-metric-val green">${yieldPct}% p.a.</span>
+                    <span style="font-size:10px;color:#34d399;font-family:var(--font-mono)">~${formatINR(monthlyPayout)} /mo</span>
+                </div>
+            </div>
+
+            <!-- Right: Actions -->
+            <div class="re-dproj-actions">
+                ${latestAllotment._id ? `
+                    <button class="btn-re-cert" onclick="openInvestmentCertificate('${latestAllotment._id}')">
+                        <i class="fas fa-certificate"></i> View Certificate
+                    </button>
+                ` : ''}
+            </div>
+        </div>`;
+    });
+
+    mount.innerHTML = html;
+}
+
+function renderCustomerTransactionsLedger(allotments) {
+    const mount = document.getElementById("re-detail-txns-mount");
+    if (!mount) return;
+
+    if (allotments.length === 0) {
+        mount.innerHTML = `<div style="padding:1.5rem;color:#64748b;text-align:center;font-size:12px">No transaction records found.</div>`;
+        return;
+    }
+
+    allotments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    let html = `
+    <div class="re-table-wrap">
+        <table class="re-table">
+            <thead>
+                <tr>
+                    <th>Allotment Reference</th>
+                    <th>Property Project</th>
+                    <th>Bricks</th>
+                    <th>Price / Brick</th>
+                    <th>Total Amount</th>
+                    <th>Status</th>
+                    <th>Date & Time</th>
+                    <th style="text-align:right">Certificate</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    allotments.forEach(inv => {
+        const p = inv.property || {};
+        const isPaid = inv.status === "paid";
+        const pricePerBrick = inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0);
+
+        html += `
+        <tr>
+            <td style="font-family:var(--font-mono);font-size:11.5px;color:#60a5fa">
+                ${inv._id ? `BSQFT-${inv._id.slice(-6).toUpperCase()}` : '—'}
+            </td>
+            <td>
+                <div style="font-weight:700;color:#fff">${p.title || 'Untitled Property'}</div>
+                <div style="font-size:11px;color:#94a3b8">${p.location?.city || 'Prime Hub'}</div>
+            </td>
+            <td>
+                <span class="badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-weight:700;border:1px solid rgba(168,85,247,0.3)">
+                    ${inv.bricks} Bricks
+                </span>
+            </td>
+            <td style="font-family:var(--font-mono);color:#cbd5e1">${formatINR(pricePerBrick)}</td>
+            <td style="font-family:var(--font-mono);font-weight:800;color:#f59e0b">${formatINR(inv.totalAmount)}</td>
+            <td>
+                <span class="re-status-pill ${isPaid ? 'paid' : 'pending'}">
+                    <i class="fas ${isPaid ? 'fa-check-circle' : 'fa-clock'}"></i> ${(inv.status || 'paid').toUpperCase()}
+                </span>
+            </td>
+            <td style="font-size:11.5px;color:#94a3b8">${formatDateTime(inv.createdAt)}</td>
+            <td style="text-align:right">
+                <button class="btn-re-cert" onclick="openInvestmentCertificate('${inv._id}')">
+                    <i class="fas fa-certificate"></i> Cert
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    mount.innerHTML = html;
+}
+
+function backToAllInvestors() {
+    activeReCustomerId = null;
+    const directoryView = document.getElementById("re-investors-directory-view");
+    const detailView = document.getElementById("re-investor-detail-view");
+    if (detailView) detailView.style.display = "none";
+    if (directoryView) directoryView.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function viewCustomerFullAccount() {
+    if (activeReCustomerId && typeof viewUserDetails === "function") {
+        viewUserDetails(activeReCustomerId);
+    }
+}
+
+function exportCustomerRealEstateCSV() {
+    if (!activeReCustomerId) return;
+    const userInvestments = allRealEstateInvestments.filter(x => String(x.user?._id || x.user) === String(activeReCustomerId));
+    if (userInvestments.length === 0) {
+        toast("No records found for this customer", "warning");
+        return;
+    }
+
+    const u = userInvestments[0]?.user || {};
+    const headers = ["Reference ID", "Customer Name", "Phone", "Property Project", "Bricks", "Price Per Brick", "Total Paid", "Status", "Date"];
+    const rows = userInvestments.map(inv => {
+        const p = inv.property || {};
+        return [
+            `BSQFT-${(inv._id || '').slice(-6).toUpperCase()}`,
+            `"${(u.name || '').replace(/"/g, '""')}"`,
+            `"${(u.phone || '').replace(/"/g, '""')}"`,
+            `"${(p.title || '').replace(/"/g, '""')}"`,
+            inv.bricks || 0,
+            inv.pricePerBrick || 0,
+            inv.totalAmount || 0,
+            inv.status || 'paid',
+            `"${new Date(inv.createdAt).toISOString()}"`
+        ];
+    });
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `BharatSQFT_Customer_Portfolio_${String(u.name || 'Investor').replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast("Customer portfolio CSV exported ✓", "success");
 }
 
 // ── View 2: High Density Modern Table ─────────────────────────
@@ -591,10 +910,10 @@ function renderInvestmentsTableView(list, mount) {
 
             <!-- Investor Column -->
             <td>
-                <div style="cursor:pointer" onclick="viewUserDetails('${u._id}')">
+                <div style="cursor:pointer" onclick="openCustomerRealEstateDetails('${u._id}')">
                     <div style="font-weight:700;color:#fff;display:flex;align-items:center;gap:4px">
                         <span>${u.name || 'Anonymous Investor'}</span>
-                        <i class="fas fa-external-link-alt" style="font-size:9px;color:#60a5fa"></i>
+                        <i class="fas fa-arrow-right" style="font-size:9px;color:#c084fc"></i>
                     </div>
                     <div style="font-size:11.5px;color:#94a3b8;font-family:var(--font-mono)">${u.phone || u.email || '—'}</div>
                 </div>
@@ -653,8 +972,8 @@ function renderInvestmentsTableView(list, mount) {
                     <button class="btn-re-cert" onclick="openInvestmentCertificate('${inv._id}')" title="View Digital Certificate">
                         <i class="fas fa-certificate"></i> Cert
                     </button>
-                    <button class="btn-re-user" onclick="viewUserDetails('${u._id}')" title="Open Investor Profile">
-                        <i class="fas fa-user"></i>
+                    <button class="btn-re-user" onclick="openCustomerRealEstateDetails('${u._id}')" title="Open Customer Portfolio Screen">
+                        <i class="fas fa-folder-open"></i>
                     </button>
                 </div>
             </td>
@@ -692,10 +1011,10 @@ function handleInvestmentsSort(sortBy) {
 
 function setInvestmentsViewMode(mode) {
     reInvestmentFilters.viewMode = mode;
-    const gridBtn = document.getElementById("re-view-grid-btn");
-    const tableBtn = document.getElementById("re-view-table-btn");
-    if (gridBtn) gridBtn.classList.toggle("active", mode === "grid");
-    if (tableBtn) tableBtn.classList.toggle("active", mode === "table");
+    const custBtn = document.getElementById("re-view-customers-btn");
+    const txnsBtn = document.getElementById("re-view-txns-btn");
+    if (custBtn) custBtn.classList.toggle("active", mode === "customers");
+    if (txnsBtn) txnsBtn.classList.toggle("active", mode === "txns");
     filterAndRenderInvestments();
 }
 

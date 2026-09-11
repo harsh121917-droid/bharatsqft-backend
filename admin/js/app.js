@@ -245,6 +245,9 @@ function showPage(pageId) {
             loadProperties();
             break;
         case "investments":
+            if (typeof backToAllInvestors === "function") {
+                backToAllInvestors();
+            }
             loadInvestments();
             break;
         case "enquiries":

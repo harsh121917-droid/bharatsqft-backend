@@ -828,3 +828,440 @@
         display: none !important;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   CUSTOMER-WISE INVESTMENTS DIRECTORY STYLES
+   ══════════════════════════════════════════════════════════════ */
+.re-customer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.re-cust-card {
+    background: #0d1527;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s, border-color 0.25s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.re-cust-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #a855f7, #60a5fa);
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.re-cust-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+.re-cust-card:hover::before {
+    opacity: 1;
+}
+
+.re-cust-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.re-cust-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 2px solid rgba(168, 85, 247, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #c084fc;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
+
+.re-cust-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.re-cust-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.2rem;
+}
+
+.re-cust-name {
+    font-size: 0.98rem;
+    font-weight: 800;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.re-cust-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+}
+
+.re-cust-contact {
+    font-size: 0.74rem;
+    color: #94a3b8;
+    font-family: var(--font-mono, monospace);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 3-Metrics Grid in Customer Card */
+.re-cust-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 0.75rem 0.6rem;
+    margin-bottom: 0.85rem;
+    text-align: center;
+}
+
+.re-cust-stat-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.re-cust-stat-label {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+}
+
+.re-cust-stat-val {
+    font-size: 1.05rem;
+    font-weight: 800;
+    font-family: var(--font-mono, monospace);
+}
+
+.re-cust-stat-val.purple { color: #c084fc; }
+.re-cust-stat-val.gold { color: #f59e0b; }
+.re-cust-stat-val.green { color: #34d399; }
+
+/* Property Project Chips in Customer Card */
+.re-cust-props-strip {
+    margin-bottom: 0.85rem;
+}
+
+.re-cust-props-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.re-cust-props-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.re-cust-chip {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.re-cust-chip strong {
+    color: #c084fc;
+}
+
+.re-cust-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.re-cust-last-date {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.re-cust-view-btn {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.1));
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: #c084fc;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s;
+}
+
+.re-cust-card:hover .re-cust-view-btn {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DEDICATED CUSTOMER REAL ESTATE SCREEN (NOT A POPUP)
+   ══════════════════════════════════════════════════════════════ */
+.re-detail-screen {
+    animation: fadeIn 0.25s ease-out;
+}
+
+.re-detail-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.btn-back-investors {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+    padding: 0.55rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-back-investors:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    transform: translateX(-2px);
+}
+
+.re-detail-hero {
+    background: #0d1527;
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 1024px) {
+    .re-detail-hero {
+        grid-template-columns: 1fr;
+    }
+}
+
+.re-detail-profile-col {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.re-detail-avatar-wrap {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 2px solid #a855f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #c084fc;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+    flex-shrink: 0;
+}
+
+.re-detail-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+}
+
+.re-detail-contact {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.re-detail-hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+    .re-detail-hero-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.re-dstat-tile {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.re-dstat-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.re-dstat-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    font-family: var(--font-mono, monospace);
+}
+
+.re-dstat-val.purple { color: #c084fc; }
+.re-dstat-val.gold { color: #f59e0b; }
+.re-dstat-val.green { color: #34d399; }
+.re-dstat-val.blue { color: #60a5fa; }
+
+/* Property Project Cards Inside Customer Screen */
+.re-detail-section-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.re-detail-project-card {
+    background: #0d1527;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+    display: grid;
+    grid-template-columns: 240px 1fr auto;
+    gap: 1.5rem;
+    align-items: center;
+    transition: border-color 0.2s;
+}
+
+@media (max-width: 1024px) {
+    .re-detail-project-card {
+        grid-template-columns: 1fr;
+    }
+}
+
+.re-detail-project-card:hover {
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+.re-dproj-left {
+    display: flex;
+    gap: 0.85rem;
+    align-items: center;
+}
+
+.re-dproj-img {
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #1e293b;
+    flex-shrink: 0;
+}
+
+.re-dproj-info h4 {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 0.25rem 0;
+}
+
+.re-dproj-info p {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.re-dproj-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 1.25rem;
+}
+
+@media (max-width: 768px) {
+    .re-dproj-metrics {
+        grid-template-columns: repeat(2, 1fr);
+        border: none;
+        padding: 0;
+    }
+}
+
+.re-dproj-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
