@@ -1882,43 +1882,97 @@ function renderUdPropertyTab(u) {
     if (!mount) return;
     const items = u.overview?.propertyItems || [];
     if (items.length === 0) {
-        mount.innerHTML = `<div style="padding:2rem;text-align:center;color:#64748b;font-size:13px"><i class="fas fa-building" style="font-size:32px;margin-bottom:8px;opacity:0.3"></i><br>This user does not currently own any fractional real estate bricks.</div>`;
+        mount.innerHTML = `
+        <div style="padding:3rem 1.5rem;text-align:center;color:#64748b;font-size:13px">
+            <div style="width:56px;height:56px;border-radius:12px;background:rgba(192,132,252,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 10px auto">
+                <i class="fas fa-building" style="font-size:24px;color:#c084fc"></i>
+            </div>
+            <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">No Fractional Bricks Owned</div>
+            <div style="font-size:12px;color:#94a3b8">This customer has not yet invested in any Bharat SQFT real estate properties.</div>
+        </div>`;
         return;
     }
 
+    const totalBricks = items.reduce((s, i) => s + (i.bricks || 0), 0);
+    const totalInvested = items.reduce((s, i) => s + (i.totalAmount || 0), 0);
+    const estAnnualDividend = items.reduce((s, i) => s + ((i.totalAmount || 0) * ((i.expectedYield || 8.5) / 100)), 0);
+
     let html = `
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
-                <th style="padding:8px 10px">Property Project</th>
-                <th style="padding:8px 10px">Location</th>
-                <th style="padding:8px 10px">Bricks Owned</th>
-                <th style="padding:8px 10px">Price/Brick</th>
-                <th style="padding:8px 10px">Total Invested</th>
-                <th style="padding:8px 10px">Ownership %</th>
-                <th style="padding:8px 10px">Expected Yield</th>
-                <th style="padding:8px 10px">Status</th>
-                <th style="padding:8px 10px">Date</th>
-            </tr>
-        </thead>
-        <tbody>`;
+    <!-- Top Summary Metrics -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1rem;margin-bottom:1.5rem">
+        <div style="background:rgba(192,132,252,0.06);border:1px solid rgba(192,132,252,0.25);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#c084fc;font-weight:700">Total Fractional Bricks</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#c084fc;font-family:var(--font-mono)">${totalBricks} Bricks</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">Total Real Estate Invested</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b;font-family:var(--font-mono)">${formatINR(totalInvested)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700">Projects Funded</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#60a5fa;font-family:var(--font-mono)">${items.length} Properties</div>
+        </div>
+        <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#34d399;font-weight:700">Est. Annual Rental Dividend</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#34d399;font-family:var(--font-mono)">~${formatINR(estAnnualDividend)}/yr</div>
+        </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <i class="fas fa-cubes" style="color:#c084fc"></i> Fractional Ownership Allotments
+    </div>
+    <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
+                    <th style="padding:10px 12px">Property Project</th>
+                    <th style="padding:10px 12px">Location</th>
+                    <th style="padding:10px 12px">Bricks Owned</th>
+                    <th style="padding:10px 12px">Price/Brick</th>
+                    <th style="padding:10px 12px">Total Invested</th>
+                    <th style="padding:10px 12px">Ownership Equity</th>
+                    <th style="padding:10px 12px">Rental Yield</th>
+                    <th style="padding:10px 12px">Status</th>
+                    <th style="padding:10px 12px">Date</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
     items.forEach(p => {
         html += `
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-            <td style="padding:8px 10px;font-weight:700;color:#fff"><i class="fas fa-building" style="color:#c084fc;margin-right:6px"></i> ${p.title}</td>
-            <td style="padding:8px 10px;color:#cbd5e1">${p.city ? `${p.city}, ${p.state || ''}` : 'Prime Location'}</td>
-            <td style="padding:8px 10px"><span class="badge badge-purple">${p.bricks} Bricks</span></td>
-            <td style="padding:8px 10px;font-family:var(--font-mono)">${formatINR(p.pricePerBrick)}</td>
-            <td style="padding:8px 10px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatINR(p.totalAmount)}</td>
-            <td style="padding:8px 10px;font-family:var(--font-mono);color:#60a5fa">${p.ownershipPercent || 0}%</td>
-            <td style="padding:8px 10px;font-weight:700;color:#34d399">${p.expectedYield || 8.5}% p.a.</td>
-            <td style="padding:8px 10px"><span class="ud-status-pill success">${p.status || 'Paid'}</span></td>
-            <td style="padding:8px 10px;color:#94a3b8">${formatDate(p.date)}</td>
+            <td style="padding:10px 12px;font-weight:700;color:#fff">
+                <i class="fas fa-building" style="color:#c084fc;margin-right:6px"></i> ${p.title}
+            </td>
+            <td style="padding:10px 12px;color:#cbd5e1">
+                <i class="fas fa-map-marker-alt" style="color:#ef4444;font-size:10px"></i> ${p.city ? `${p.city}${p.state ? ', ' + p.state : ''}` : 'Prime Location'}
+            </td>
+            <td style="padding:10px 12px">
+                <span class="badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-weight:700;border:1px solid rgba(168,85,247,0.3)">
+                    ${p.bricks} Bricks
+                </span>
+            </td>
+            <td style="padding:10px 12px;font-family:var(--font-mono)">${formatINR(p.pricePerBrick)}</td>
+            <td style="padding:10px 12px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatINR(p.totalAmount)}</td>
+            <td style="padding:10px 12px">
+                <div style="min-width:90px">
+                    <span style="font-family:var(--font-mono);font-weight:700;color:#60a5fa">${p.ownershipPercent || 0}%</span>
+                    <div style="width:100%;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:3px;overflow:hidden">
+                        <div style="width:${Math.min(Math.max((p.ownershipPercent || 0) * 2, 8), 100)}%;height:100%;background:#60a5fa"></div>
+                    </div>
+                </div>
+            </td>
+            <td style="padding:10px 12px;font-weight:700;color:#34d399">
+                <i class="fas fa-arrow-trend-up"></i> ${p.expectedYield || 8.5}% p.a.
+            </td>
+            <td style="padding:10px 12px">
+                <span class="ud-status-pill success"><i class="fas fa-check-circle"></i> ${p.status || 'Paid'}</span>
+            </td>
+            <td style="padding:10px 12px;color:#94a3b8">${formatDate(p.date)}</td>
         </tr>`;
     });
 
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
     mount.innerHTML = html;
 }
 

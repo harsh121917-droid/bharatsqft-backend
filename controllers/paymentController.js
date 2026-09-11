@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const User = require("../models/User");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
 const Kyc = require("../models/Kyc");
@@ -148,29 +149,43 @@ exports.getMyInvestments = async (req, res, next) => {
 exports.getAllInvestments = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const limit = parseInt(req.query.limit) || 100;
         const skip = (page - 1) * limit;
         const filter = {};
-        if (req.query.status) filter.status = req.query.status;
-        if (req.query.propertyId) filter.property = req.query.propertyId;
+        if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
+        if (req.query.propertyId && req.query.propertyId !== "all") filter.property = req.query.propertyId;
 
-        const [investments, total] = await Promise.all([
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search.trim(), "i");
+            const [matchingUsers, matchingProps] = await Promise.all([
+                User.find({ $or: [{ name: searchRegex }, { email: searchRegex }, { phone: searchRegex }] }).select("_id"),
+                Property.find({ $or: [{ title: searchRegex }, { "location.city": searchRegex }] }).select("_id")
+            ]);
+            filter.$or = [
+                { user: { $in: matchingUsers.map(u => u._id) } },
+                { property: { $in: matchingProps.map(p => p._id) } }
+            ];
+        }
+
+        const [investments, total, revenueAgg, uniqueInvestors] = await Promise.all([
             Investment.find(filter)
-                .populate("user", "name email phone")
-                .populate("property", "title location")
+                .populate("user", "name email phone avatar profilePicture")
+                .populate("property", "title location brickPrice totalBricks soldBricks expectedRentalYield expectedAppreciation propertyType images price totalInvestmentRequired")
                 .sort("-createdAt").skip(skip).limit(limit),
             Investment.countDocuments(filter),
-        ]);
-
-        const revenue = await Investment.aggregate([
-            { $match: { status: "paid" } },
-            { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+            Investment.aggregate([
+                { $match: { status: "paid" } },
+                { $group: { _id: null, total: { $sum: "$totalAmount" }, totalBricks: { $sum: "$bricks" } } }
+            ]),
+            Investment.distinct("user", { status: "paid" })
         ]);
 
         return res.json({
             success: true, total, page,
             pages: Math.ceil(total / limit),
-            totalRevenue: revenue[0]?.total || 0,
+            totalRevenue: revenueAgg[0]?.total || 0,
+            totalBricks: revenueAgg[0]?.totalBricks || 0,
+            uniqueInvestorsCount: uniqueInvestors?.length || 0,
             data: investments,
         });
     } catch (err) { next(err); }

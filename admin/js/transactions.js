@@ -242,81 +242,554 @@ function renderDigiGoldUserInvestmentsTable(users) {
     body.innerHTML = html;
 }
 
-// ── 2. Real Estate: Property Investments (Bricks Allocation) ───
+// ── 2. Real Estate: Bharat SQFT Property Investments Hub ───────
+let allRealEstateInvestments = [];
+let reInvestmentFilters = {
+    search: "",
+    property: "all",
+    status: "all",
+    sortBy: "newest",
+    viewMode: "grid"
+};
+
 async function loadInvestments() {
     const body = document.getElementById("investments-body");
     if (!body) return;
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading real estate brick investments...</div></div>`;
+    body.innerHTML = `
+    <div class="loading-box">
+        <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+        <div>Loading Bharat SQFT real estate investments & brick allocations...</div>
+    </div>`;
 
     try {
-        const res = await api("/admin/investments");
+        const res = await api("/admin/investments?limit=150");
         if (!res.success) {
-            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load investments"}</div></div>`;
+            body.innerHTML = `
+            <div class="loading-box">
+                <i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i>
+                <div>${res.message || "Failed to load investments"}</div>
+            </div>`;
             return;
         }
 
-        renderRealEstateInvestmentsTable(res.data || []);
-        const revEl = document.getElementById("investments-total-revenue");
-        if (revEl && res.totalRevenue !== undefined) {
-            revEl.textContent = `Total Funded: ${formatINR(res.totalRevenue)}`;
-        }
+        allRealEstateInvestments = Array.isArray(res.data) ? res.data : [];
+
+        // 1. Populate Property Projects Filter Dropdown
+        populatePropertyFilterDropdown(allRealEstateInvestments);
+
+        // 2. Update Top Executive KPI Cards
+        updateInvestmentKpis(res);
+
+        // 3. Filter & Render
+        filterAndRenderInvestments();
+
     } catch (err) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error</div></div>`;
+        body.innerHTML = `
+        <div class="loading-box">
+            <i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i>
+            <div>Network error loading investments</div>
+        </div>`;
     }
 }
 
-function renderRealEstateInvestmentsTable(investments) {
+function populatePropertyFilterDropdown(investments) {
+    const select = document.getElementById("re-property-filter");
+    if (!select) return;
+
+    const uniqueProps = new Map();
+    investments.forEach(inv => {
+        const p = inv.property;
+        if (p && p._id && !uniqueProps.has(String(p._id))) {
+            uniqueProps.set(String(p._id), p.title || "Untitled Property");
+        }
+    });
+
+    let opts = `<option value="all">All Real Estate Projects (${uniqueProps.size})</option>`;
+    uniqueProps.forEach((title, id) => {
+        opts += `<option value="${id}">${title}</option>`;
+    });
+    select.innerHTML = opts;
+    select.value = reInvestmentFilters.property || "all";
+}
+
+function updateInvestmentKpis(apiRes) {
+    const list = allRealEstateInvestments;
+    const paidList = list.filter(x => x.status === "paid");
+
+    const totalFunded = apiRes.totalRevenue !== undefined 
+        ? apiRes.totalRevenue 
+        : paidList.reduce((sum, x) => sum + (x.totalAmount || 0), 0);
+
+    const totalBricks = apiRes.totalBricks !== undefined 
+        ? apiRes.totalBricks 
+        : paidList.reduce((sum, x) => sum + (x.bricks || 0), 0);
+
+    const uniqueInvestors = new Set(paidList.map(x => x.user?._id || x.user)).size;
+    const avgTicket = uniqueInvestors > 0 ? +(totalFunded / uniqueInvestors).toFixed(2) : 0;
+
+    // Calculate weighted average expected rental yield
+    let totalYieldWeighted = 0;
+    let totalWeightAmt = 0;
+    paidList.forEach(inv => {
+        const yieldPct = inv.property?.expectedRentalYield || 8.5;
+        const amt = inv.totalAmount || 0;
+        totalYieldWeighted += (yieldPct * amt);
+        totalWeightAmt += amt;
+    });
+    const avgYield = totalWeightAmt > 0 ? +(totalYieldWeighted / totalWeightAmt).toFixed(1) : 8.5;
+    const estAnnualDividend = +((totalFunded * (avgYield / 100))).toFixed(2);
+
+    // Update DOM
+    const elFunded = document.getElementById("re-stat-total-funded");
+    if (elFunded) elFunded.textContent = formatINR(totalFunded);
+
+    const elBricks = document.getElementById("re-stat-total-bricks");
+    if (elBricks) elBricks.textContent = `${totalBricks.toLocaleString()} Bricks`;
+
+    const elInvestors = document.getElementById("re-stat-total-investors");
+    if (elInvestors) elInvestors.textContent = `${uniqueInvestors} Investors`;
+
+    const elAvgTicket = document.getElementById("re-stat-avg-ticket");
+    if (elAvgTicket) elAvgTicket.textContent = `Avg ticket: ${formatINR(avgTicket)} / investor`;
+
+    const elYield = document.getElementById("re-stat-projected-yield");
+    if (elYield) elYield.textContent = `~${avgYield}% p.a.`;
+
+    const elDiv = document.getElementById("re-stat-annual-dividend");
+    if (elDiv) elDiv.innerHTML = `<i class="fas fa-coins" style="color:#34d399"></i> ~${formatINR(estAnnualDividend)}/yr rental pool`;
+
+    // Counts on pills
+    const cntAll = document.getElementById("re-count-all");
+    if (cntAll) cntAll.textContent = list.length;
+    const cntPaid = document.getElementById("re-count-paid");
+    if (cntPaid) cntPaid.textContent = paidList.length;
+    const cntPending = document.getElementById("re-count-pending");
+    if (cntPending) cntPending.textContent = list.length - paidList.length;
+}
+
+function filterAndRenderInvestments() {
     const body = document.getElementById("investments-body");
     if (!body) return;
 
-    if (!investments || investments.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-building" style="font-size:32px;color:var(--text-dim)"></i><div>No property investments recorded</div></div>`;
+    let filtered = [...allRealEstateInvestments];
+
+    // 1. Status Filter
+    if (reInvestmentFilters.status && reInvestmentFilters.status !== "all") {
+        filtered = filtered.filter(x => x.status === reInvestmentFilters.status);
+    }
+
+    // 2. Property Filter
+    if (reInvestmentFilters.property && reInvestmentFilters.property !== "all") {
+        filtered = filtered.filter(x => String(x.property?._id || x.property) === String(reInvestmentFilters.property));
+    }
+
+    // 3. Search Query
+    if (reInvestmentFilters.search) {
+        const q = reInvestmentFilters.search.toLowerCase().trim();
+        filtered = filtered.filter(inv => {
+            const uName = (inv.user?.name || "").toLowerCase();
+            const uPhone = (inv.user?.phone || "").toLowerCase();
+            const uEmail = (inv.user?.email || "").toLowerCase();
+            const pTitle = (inv.property?.title || "").toLowerCase();
+            const pCity = (inv.property?.location?.city || "").toLowerCase();
+            const pState = (inv.property?.location?.state || "").toLowerCase();
+            return uName.includes(q) || uPhone.includes(q) || uEmail.includes(q) || pTitle.includes(q) || pCity.includes(q) || pState.includes(q);
+        });
+    }
+
+    // 4. Sort
+    if (reInvestmentFilters.sortBy === "highest_amt") {
+        filtered.sort((a, b) => (b.totalAmount || 0) - (a.totalAmount || 0));
+    } else if (reInvestmentFilters.sortBy === "most_bricks") {
+        filtered.sort((a, b) => (b.bricks || 0) - (a.bricks || 0));
+    } else if (reInvestmentFilters.sortBy === "name_asc") {
+        filtered.sort((a, b) => (a.user?.name || "").localeCompare(b.user?.name || ""));
+    } else {
+        // newest first
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    if (filtered.length === 0) {
+        body.innerHTML = `
+        <div class="loading-box" style="padding:3.5rem 1rem">
+            <div style="width:60px;height:60px;border-radius:14px;background:rgba(168,85,247,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto">
+                <i class="fas fa-building-circle-xmark" style="font-size:28px;color:#c084fc"></i>
+            </div>
+            <div style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.35rem">No Matching Investments Found</div>
+            <div style="font-size:0.85rem;color:#94a3b8;max-width:400px;margin:0 auto">
+                Try clearing your search query or selecting a different property filter.
+            </div>
+        </div>`;
         return;
     }
 
+    if (reInvestmentFilters.viewMode === "table") {
+        renderInvestmentsTableView(filtered, body);
+    } else {
+        renderInvestmentsGridView(filtered, body);
+    }
+}
+
+// ── View 1: Rich Cards Grid View ──────────────────────────────
+function renderInvestmentsGridView(list, mount) {
+    let html = `<div class="re-cards-grid">`;
+
+    list.forEach(inv => {
+        const u = inv.user || {};
+        const p = inv.property || {};
+        const isPaid = inv.status === "paid";
+        const statusClass = isPaid ? "paid" : "pending";
+        const statusLabel = isPaid ? "Paid & Confirmed" : (inv.status || "Pending");
+        
+        const yieldPct = p.expectedRentalYield || 8.5;
+        const annualDividend = +((inv.totalAmount || 0) * (yieldPct / 100)).toFixed(2);
+        const monthlyDividend = +(annualDividend / 12).toFixed(2);
+
+        const ownershipPct = inv.ownershipPercent !== undefined ? inv.ownershipPercent : (p.totalBricks ? +((inv.bricks / p.totalBricks) * 100).toFixed(4) : 0);
+
+        const coverImg = p.images?.find(i => i.isCover)?.url || p.images?.[0]?.url;
+        const propType = p.propertyType || "Commercial";
+        const cityStr = p.location?.city ? `${p.location.city}${p.location.state ? ', ' + p.location.state : ''}` : 'Prime Hub';
+
+        html += `
+        <div class="re-card">
+            <!-- Property Header -->
+            <div class="re-card-prop-header">
+                ${coverImg ? `
+                    <img src="${coverImg}" class="re-prop-thumb" alt="${p.title || 'Property'}" onerror="this.outerHTML='<div class=\\'re-prop-thumb-fallback\\'><i class=\\'fas fa-building\\'></i></div>'" />
+                ` : `
+                    <div class="re-prop-thumb-fallback"><i class="fas fa-building"></i></div>
+                `}
+                <div class="re-prop-info">
+                    <div class="re-prop-badge-row">
+                        <span class="re-badge-type">${propType}</span>
+                        <span class="re-prop-city"><i class="fas fa-map-marker-alt" style="color:#ef4444"></i> ${cityStr}</span>
+                    </div>
+                    <div class="re-prop-title" title="${p.title || 'Property Project'}">${p.title || 'Untitled Property'}</div>
+                </div>
+            </div>
+
+            <!-- Investor Profile Strip -->
+            <div class="re-investor-strip">
+                <div class="re-investor-profile" onclick="viewUserDetails('${u._id}')" title="Click to open full investor profile">
+                    <div class="re-investor-avatar">
+                        ${(u.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="re-investor-name">
+                            <span>${u.name || 'Anonymous Investor'}</span>
+                            <i class="fas fa-external-link-alt" style="font-size:10px;color:#60a5fa"></i>
+                        </div>
+                        <div class="re-investor-contact">${u.phone || u.email || 'No contact on file'}</div>
+                    </div>
+                </div>
+                <button class="btn-re-user" onclick="viewUserDetails('${u._id}')" title="View Customer Account">
+                    <i class="fas fa-user"></i>
+                </button>
+            </div>
+
+            <!-- Key Financial Metrics -->
+            <div class="re-metrics-box">
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-cubes" style="color:#c084fc"></i> Bricks Allotted</span>
+                    <span class="re-metric-val purple">${inv.bricks || 0} Bricks</span>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-coins" style="color:#f59e0b"></i> Total Consideration</span>
+                    <span class="re-metric-val gold">${formatINR(inv.totalAmount)}</span>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-tag" style="color:#94a3b8"></i> Price / Brick</span>
+                    <span class="re-metric-val" style="font-size:0.95rem">${formatINR(inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0))}</span>
+                </div>
+                <div class="re-metric-item">
+                    <span class="re-metric-label"><i class="fas fa-arrow-trend-up" style="color:#34d399"></i> Rental Yield</span>
+                    <span class="re-metric-val green">${yieldPct}% p.a.</span>
+                    <span style="font-size:10px;color:#34d399;font-family:var(--font-mono)">~${formatINR(monthlyDividend)}/mo</span>
+                </div>
+            </div>
+
+            <!-- Fractional Ownership Progress Bar -->
+            <div class="re-ownership-bar-wrap">
+                <div class="re-ownership-meta">
+                    <span><i class="fas fa-chart-pie" style="color:#a855f7"></i> Equity Stake: <strong style="color:#fff">${ownershipPct}%</strong></span>
+                    <span>${p.totalBricks ? `${inv.bricks} / ${p.totalBricks.toLocaleString()} Total Bricks` : 'Fractional Share'}</span>
+                </div>
+                <div class="re-progress-track">
+                    <div class="re-progress-fill" style="width:${Math.min(Math.max(ownershipPct * 2, 6), 100)}%"></div>
+                </div>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="re-card-footer">
+                <div class="re-date-status">
+                    <span class="re-status-pill ${statusClass}">
+                        <i class="fas ${isPaid ? 'fa-check-circle' : 'fa-clock'}"></i> ${statusLabel}
+                    </span>
+                    <span class="re-date-text"><i class="far fa-calendar-alt"></i> ${formatDateTime(inv.createdAt)}</span>
+                </div>
+                <div class="re-action-btns">
+                    <button class="btn-re-cert" onclick="openInvestmentCertificate('${inv._id}')" title="View Official Allotment Certificate">
+                        <i class="fas fa-certificate"></i> Certificate
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    html += `</div>`;
+    mount.innerHTML = html;
+}
+
+// ── View 2: High Density Modern Table ─────────────────────────
+function renderInvestmentsTableView(list, mount) {
     let html = `
-    <div class="table-responsive">
-        <table>
+    <div class="re-table-wrap">
+        <table class="re-table">
             <thead>
                 <tr>
-                    <th>Investor</th>
-                    <th>Property</th>
-                    <th>Bricks</th>
+                    <th>Property Project</th>
+                    <th>Investor Customer</th>
+                    <th>Bricks & Rate</th>
+                    <th>Total Capital</th>
                     <th>Ownership %</th>
-                    <th>Amount Paid</th>
-                    <th>Status</th>
-                    <th>Date</th>
+                    <th>Est. Rental Yield</th>
+                    <th>Status & Date</th>
+                    <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
             <tbody>`;
 
-    investments.forEach(inv => {
+    list.forEach(inv => {
         const u = inv.user || {};
         const p = inv.property || {};
-        const statusBadge = inv.status === "paid"
-            ? `<span class="badge badge-success">Paid</span>`
-            : `<span class="badge badge-pending">${inv.status}</span>`;
+        const isPaid = inv.status === "paid";
+        const statusClass = isPaid ? "paid" : "pending";
+        const statusLabel = isPaid ? "Paid" : (inv.status || "Pending");
+        const yieldPct = p.expectedRentalYield || 8.5;
+        const ownershipPct = inv.ownershipPercent !== undefined ? inv.ownershipPercent : (p.totalBricks ? +((inv.bricks / p.totalBricks) * 100).toFixed(4) : 0);
+        const coverImg = p.images?.find(i => i.isCover)?.url || p.images?.[0]?.url;
 
         html += `
         <tr>
+            <!-- Property Column -->
             <td>
-                <div style="font-weight:600;color:#fff">${u.name || '—'}</div>
-                <div style="font-size:12px;color:var(--text-dim)">${u.phone || u.email || ''}</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    ${coverImg ? `
+                        <img src="${coverImg}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.1)" />
+                    ` : `
+                        <div style="width:40px;height:40px;border-radius:8px;background:rgba(168,85,247,0.15);display:flex;align-items:center;justify-content:center;color:#c084fc;font-size:16px">
+                            <i class="fas fa-building"></i>
+                        </div>
+                    `}
+                    <div>
+                        <div style="font-weight:700;color:#ffffff">${p.title || 'Untitled Property'}</div>
+                        <div style="font-size:11.5px;color:#94a3b8"><i class="fas fa-map-marker-alt" style="color:#ef4444;font-size:10px"></i> ${p.location?.city || 'Prime Location'}</div>
+                    </div>
+                </div>
             </td>
+
+            <!-- Investor Column -->
             <td>
-                <div style="font-weight:600">${p.title || 'Untitled Property'}</div>
-                <div style="font-size:11.5px;color:var(--text-dim)">${p.location?.city || ''}</div>
+                <div style="cursor:pointer" onclick="viewUserDetails('${u._id}')">
+                    <div style="font-weight:700;color:#fff;display:flex;align-items:center;gap:4px">
+                        <span>${u.name || 'Anonymous Investor'}</span>
+                        <i class="fas fa-external-link-alt" style="font-size:9px;color:#60a5fa"></i>
+                    </div>
+                    <div style="font-size:11.5px;color:#94a3b8;font-family:var(--font-mono)">${u.phone || u.email || '—'}</div>
+                </div>
             </td>
-            <td style="font-family:var(--font-mono);font-size:13px;font-weight:600">${inv.bricks || 0}</td>
-            <td style="font-weight:600;color:var(--gold)">${inv.ownershipPercent || 0}%</td>
-            <td style="font-weight:700;color:#fff">${formatINR(inv.totalAmount)}</td>
-            <td>${statusBadge}</td>
-            <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(inv.createdAt)}</td>
+
+            <!-- Bricks & Rate -->
+            <td>
+                <div>
+                    <span class="badge" style="background:rgba(168,85,247,0.2);color:#c084fc;font-weight:700;border:1px solid rgba(168,85,247,0.3)">
+                        ${inv.bricks || 0} Bricks
+                    </span>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;font-family:var(--font-mono)">
+                        @ ${formatINR(inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0))}
+                    </div>
+                </div>
+            </td>
+
+            <!-- Total Consideration -->
+            <td>
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#f59e0b">
+                    ${formatINR(inv.totalAmount)}
+                </div>
+            </td>
+
+            <!-- Ownership Progress Bar -->
+            <td>
+                <div style="min-width:110px">
+                    <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:#fff;margin-bottom:2px">
+                        <span>${ownershipPct}%</span>
+                    </div>
+                    <div class="re-progress-track" style="height:5px">
+                        <div class="re-progress-fill" style="width:${Math.min(Math.max(ownershipPct * 2, 8), 100)}%"></div>
+                    </div>
+                </div>
+            </td>
+
+            <!-- Rental Yield -->
+            <td>
+                <div style="font-weight:700;color:#34d399;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-arrow-trend-up"></i> ${yieldPct}% p.a.
+                </div>
+                <div style="font-size:11px;color:#94a3b8">Rental Yield</div>
+            </td>
+
+            <!-- Status & Date -->
+            <td>
+                <span class="re-status-pill ${statusClass}" style="margin-bottom:3px">
+                    <i class="fas ${isPaid ? 'fa-check-circle' : 'fa-clock'}"></i> ${statusLabel}
+                </span>
+                <div style="font-size:11px;color:#64748b">${formatDate(inv.createdAt)}</div>
+            </td>
+
+            <!-- Action -->
+            <td style="text-align:right">
+                <div style="display:inline-flex;gap:6px">
+                    <button class="btn-re-cert" onclick="openInvestmentCertificate('${inv._id}')" title="View Digital Certificate">
+                        <i class="fas fa-certificate"></i> Cert
+                    </button>
+                    <button class="btn-re-user" onclick="viewUserDetails('${u._id}')" title="Open Investor Profile">
+                        <i class="fas fa-user"></i>
+                    </button>
+                </div>
+            </td>
         </tr>`;
     });
 
     html += `</tbody></table></div>`;
-    body.innerHTML = html;
+    mount.innerHTML = html;
+}
+
+// ── Event Handlers & View Modes ───────────────────────────────
+function handleInvestmentsSearch(val) {
+    reInvestmentFilters.search = val;
+    filterAndRenderInvestments();
+}
+
+function handleInvestmentsPropertyFilter(val) {
+    reInvestmentFilters.property = val;
+    filterAndRenderInvestments();
+}
+
+function setInvestmentsStatusFilter(status) {
+    reInvestmentFilters.status = status;
+    ["all", "paid", "pending"].forEach(s => {
+        const btn = document.getElementById(`re-pill-${s}`);
+        if (btn) btn.classList.toggle("active", s === status);
+    });
+    filterAndRenderInvestments();
+}
+
+function handleInvestmentsSort(sortBy) {
+    reInvestmentFilters.sortBy = sortBy;
+    filterAndRenderInvestments();
+}
+
+function setInvestmentsViewMode(mode) {
+    reInvestmentFilters.viewMode = mode;
+    const gridBtn = document.getElementById("re-view-grid-btn");
+    const tableBtn = document.getElementById("re-view-table-btn");
+    if (gridBtn) gridBtn.classList.toggle("active", mode === "grid");
+    if (tableBtn) tableBtn.classList.toggle("active", mode === "table");
+    filterAndRenderInvestments();
+}
+
+// ── Official Digital Certificate Modal Handler ───────────────
+function openInvestmentCertificate(invId) {
+    const inv = allRealEstateInvestments.find(x => String(x._id) === String(invId));
+    if (!inv) {
+        toast("Investment details not found", "warning");
+        return;
+    }
+
+    const u = inv.user || {};
+    const p = inv.property || {};
+    const yieldPct = p.expectedRentalYield || 8.5;
+    const ownershipPct = inv.ownershipPercent !== undefined ? inv.ownershipPercent : (p.totalBricks ? +((inv.bricks / p.totalBricks) * 100).toFixed(4) : 0);
+    const pricePerBrick = inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0);
+
+    const certRef = `BSQFT-BRK-${(inv._id || '').slice(-6).toUpperCase()}`;
+
+    udSetText("cert-ref-id", certRef);
+    udSetText("cert-investor-name", u.name || "Verified Bharat SQFT Investor");
+    udSetText("cert-investor-contact", `${u.phone || u.email || 'On File'} · ID: ${String(u._id || '').slice(-6).toUpperCase()}`);
+    udSetText("cert-prop-title", p.title || "Real Estate Project");
+    udSetText("cert-prop-location", p.location?.city ? `${p.location.address ? p.location.address + ', ' : ''}${p.location.city}, ${p.location.state || ''}` : 'Prime Hub');
+    udSetText("cert-bricks-count", `${(inv.bricks || 0).toLocaleString()} Fractional Bricks`);
+    udSetText("cert-brick-price", `${formatINR(pricePerBrick)} / Brick`);
+    udSetText("cert-total-amount", formatINR(inv.totalAmount));
+    udSetText("cert-ownership-pct", `${ownershipPct}% Fractional Equity`);
+    udSetText("cert-expected-yield", `~${yieldPct}% p.a. Projected Rental Yield`);
+    udSetText("cert-allot-date", `${formatDateTime(inv.createdAt)} · Status: ${(inv.status || 'paid').toUpperCase()}`);
+
+    const modal = document.getElementById("inv-certificate-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeInvestmentCertificate() {
+    const modal = document.getElementById("inv-certificate-modal");
+    if (modal) modal.style.display = "none";
+}
+
+// ── Export Investments to CSV ─────────────────────────────────
+function exportInvestmentsCSV() {
+    if (!allRealEstateInvestments || allRealEstateInvestments.length === 0) {
+        toast("No investment records to export", "warning");
+        return;
+    }
+
+    const headers = [
+        "Allotment ID",
+        "Investor Name",
+        "Phone",
+        "Email",
+        "Property Project",
+        "City",
+        "Bricks Allotted",
+        "Price Per Brick",
+        "Total Amount Paid",
+        "Ownership Equity (%)",
+        "Projected Rental Yield (%)",
+        "Status",
+        "Transaction Date"
+    ];
+
+    const rows = allRealEstateInvestments.map(inv => {
+        const u = inv.user || {};
+        const p = inv.property || {};
+        const pricePerBrick = inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0);
+        return [
+            inv._id,
+            `"${(u.name || '').replace(/"/g, '""')}"`,
+            `"${(u.phone || '').replace(/"/g, '""')}"`,
+            `"${(u.email || '').replace(/"/g, '""')}"`,
+            `"${(p.title || '').replace(/"/g, '""')}"`,
+            `"${(p.location?.city || '').replace(/"/g, '""')}"`,
+            inv.bricks || 0,
+            pricePerBrick,
+            inv.totalAmount || 0,
+            inv.ownershipPercent || 0,
+            p.expectedRentalYield || 8.5,
+            inv.status || 'paid',
+            `"${new Date(inv.createdAt).toISOString()}"`
+        ];
+    });
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `BharatSQFT_Property_Investments_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast("Investments CSV exported successfully ✓", "success");
 }
 
 // ── 3. Bank Withdrawals Queue ──────────────────────────────────

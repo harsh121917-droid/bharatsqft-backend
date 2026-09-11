@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="css/user-details.css" />
+    <link rel="stylesheet" href="css/investments.css" />
 </head>
 
 <body>
@@ -3037,24 +3038,102 @@
                  REAL ESTATE: 2. INVESTMENTS (BRICKS)
                  ══════════════════════════════════════════════════ -->
             <div class="page" id="page-investments">
-                <div class="section-header">
+                <!-- Section Header -->
+                <div class="section-header" style="align-items:flex-start">
                     <div>
-                        <div class="section-title"><i class="fas fa-cubes" style="color:var(--gold)"></i> Investments
-                            <span class="badge badge-info" id="investments-total-revenue"
-                                style="font-size:12px;margin-left:6px">Total Funded: ₹0</span>
+                        <div class="section-title">
+                            <i class="fas fa-building" style="color:#c084fc"></i> Real Estate Brick Investments
+                            <span class="badge" style="font-size:11px;margin-left:6px;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3)">
+                                <i class="fas fa-cubes"></i> Bharat SQFT Fractional Hub
+                            </span>
                         </div>
-                        <div class="section-subtitle">Real estate brick investor ledger and fractional ownership
-                            allocations</div>
+                        <div class="section-subtitle">Real estate brick investor ledger, fractional ownership allocations, and projected rental dividend yields</div>
                     </div>
-                    <button class="btn btn-secondary" onclick="loadInvestments()"><i class="fas fa-sync-alt"></i>
-                        Refresh</button>
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-secondary btn-sm" onclick="exportInvestmentsCSV()">
+                            <i class="fas fa-file-csv" style="color:#34d399"></i> Export CSV
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadInvestments()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
                 </div>
-                <div class="table-wrap">
-                    <div id="investments-body">
-                        <div class="loading-box">
-                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
-                            <div>Loading real estate investments...</div>
+
+                <!-- 1. Executive Top KPI Summary Cards -->
+                <div class="re-kpi-grid">
+                    <div class="re-kpi-card purple">
+                        <div class="re-kpi-header">
+                            <span class="re-kpi-label">Total Capital Funded</span>
+                            <div class="re-kpi-icon purple"><i class="fas fa-sack-dollar"></i></div>
                         </div>
+                        <div class="re-kpi-val" id="re-stat-total-funded">₹ 0.00</div>
+                        <div class="re-kpi-sub"><i class="fas fa-shield-alt" style="color:#c084fc"></i> Cumulative fractional equity</div>
+                    </div>
+                    <div class="re-kpi-card gold">
+                        <div class="re-kpi-header">
+                            <span class="re-kpi-label">Total Bricks Allocated</span>
+                            <div class="re-kpi-icon gold"><i class="fas fa-cubes"></i></div>
+                        </div>
+                        <div class="re-kpi-val" id="re-stat-total-bricks" style="color:#f59e0b">0 Bricks</div>
+                        <div class="re-kpi-sub"><i class="fas fa-check-circle" style="color:#f59e0b"></i> Across active projects</div>
+                    </div>
+                    <div class="re-kpi-card blue">
+                        <div class="re-kpi-header">
+                            <span class="re-kpi-label">Active Brick Investors</span>
+                            <div class="re-kpi-icon blue"><i class="fas fa-users"></i></div>
+                        </div>
+                        <div class="re-kpi-val" id="re-stat-total-investors" style="color:#60a5fa">0 Investors</div>
+                        <div class="re-kpi-sub" id="re-stat-avg-ticket">Avg ticket: ₹0 / investor</div>
+                    </div>
+                    <div class="re-kpi-card green">
+                        <div class="re-kpi-header">
+                            <span class="re-kpi-label">Est. Annual Rental Yield</span>
+                            <div class="re-kpi-icon green"><i class="fas fa-chart-line"></i></div>
+                        </div>
+                        <div class="re-kpi-val" id="re-stat-projected-yield" style="color:#34d399">~8.5% p.a.</div>
+                        <div class="re-kpi-sub" id="re-stat-annual-dividend"><i class="fas fa-coins" style="color:#34d399"></i> Projected rental payouts</div>
+                    </div>
+                </div>
+
+                <!-- 2. Smart Toolbar & Filters -->
+                <div class="re-toolbar">
+                    <div class="re-toolbar-left">
+                        <div class="re-search-input-wrap">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="re-search-input" id="re-search-input" placeholder="Search investor, phone, property or city..." oninput="handleInvestmentsSearch(this.value)" />
+                        </div>
+                        <select class="re-filter-select" id="re-property-filter" onchange="handleInvestmentsPropertyFilter(this.value)">
+                            <option value="all">All Real Estate Projects</option>
+                        </select>
+                        <div class="re-pills-group">
+                            <button class="re-pill-btn active" id="re-pill-all" onclick="setInvestmentsStatusFilter('all')">All (<span id="re-count-all">0</span>)</button>
+                            <button class="re-pill-btn" id="re-pill-paid" onclick="setInvestmentsStatusFilter('paid')">Paid (<span id="re-count-paid">0</span>)</button>
+                            <button class="re-pill-btn" id="re-pill-pending" onclick="setInvestmentsStatusFilter('pending')">Pending (<span id="re-count-pending">0</span>)</button>
+                        </div>
+                    </div>
+                    <div class="re-toolbar-right">
+                        <select class="re-filter-select" id="re-sort-select" onchange="handleInvestmentsSort(this.value)">
+                            <option value="newest">Sort: Newest First</option>
+                            <option value="highest_amt">Sort: Highest Investment</option>
+                            <option value="most_bricks">Sort: Most Bricks</option>
+                            <option value="name_asc">Sort: Investor Name (A-Z)</option>
+                        </select>
+                        <div class="re-view-toggle">
+                            <button class="re-toggle-btn active" id="re-view-grid-btn" onclick="setInvestmentsViewMode('grid')" title="Visual Cards Grid View">
+                                <i class="fas fa-th-large"></i>
+                            </button>
+                            <button class="re-toggle-btn" id="re-view-table-btn" onclick="setInvestmentsViewMode('table')" title="Detailed Table View">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Dynamic Content Mount Container -->
+                <div id="investments-body">
+                    <div class="loading-box">
+                        <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                        <div>Loading Bharat SQFT real estate investments...</div>
                     </div>
                 </div>
             </div>
@@ -4238,6 +4317,86 @@
                         <i class="fas fa-sign-out-alt"></i> Sign Out
                     </button>
                 </div>
+            </div>
+    <!-- Real Estate Fractional Ownership Certificate & Allotment Receipt Modal -->
+    <div class="cert-modal-overlay" id="inv-certificate-modal" style="display:none" onclick="if(event.target===this) closeInvestmentCertificate()">
+        <div class="cert-container">
+            <div class="cert-inner-frame">
+                <div class="cert-header">
+                    <div class="cert-emblem">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="cert-title-sub">Bharat SQFT Real Estate Asset Platform</div>
+                    <div class="cert-title-main">Certificate of Fractional Property Ownership</div>
+                    <div class="cert-ref-no">Certificate ID: <strong id="cert-ref-id" style="color:#c084fc">BSQFT-CERT-00000</strong></div>
+                </div>
+
+                <div class="cert-body-p">
+                    This is to certify that the investor named below has been officially allotted fractional property bricks in the specified real estate project under the Bharat SQFT fractional ownership initiative, with proportional rights to capital growth and monthly rental yields.
+                </div>
+
+                <div class="cert-grid-2">
+                    <div>
+                        <div class="cert-spec-label">Investor Full Name</div>
+                        <div class="cert-spec-val" id="cert-investor-name">—</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Investor Contact / User ID</div>
+                        <div class="cert-spec-val" id="cert-investor-contact">—</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Property Project</div>
+                        <div class="cert-spec-val purple" id="cert-prop-title">—</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Project Location</div>
+                        <div class="cert-spec-val" id="cert-prop-location">—</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Fractional Bricks Allotted</div>
+                        <div class="cert-spec-val purple" id="cert-bricks-count">0 Bricks</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Price per Brick</div>
+                        <div class="cert-spec-val" id="cert-brick-price">₹0</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Total Consideration Paid</div>
+                        <div class="cert-spec-val gold" id="cert-total-amount">₹0.00</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Ownership Equity Stake</div>
+                        <div class="cert-spec-val gold" id="cert-ownership-pct">0.00%</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Projected Annual Rental Yield</div>
+                        <div class="cert-spec-val" id="cert-expected-yield" style="color:#34d399">~8.5% p.a.</div>
+                    </div>
+                    <div>
+                        <div class="cert-spec-label">Allotment Date & Status</div>
+                        <div class="cert-spec-val" id="cert-allot-date" style="color:#34d399">Paid / Confirmed</div>
+                    </div>
+                </div>
+
+                <div class="cert-footer-stamp-row">
+                    <div class="cert-seal">
+                        <i class="fas fa-certificate"></i> Verified Digital Allotment<br>
+                        <span style="font-size:8px;color:#94a3b8">Immutable Digital Registry</span>
+                    </div>
+                    <div class="cert-signature">
+                        <div class="cert-sig-line">Bharat SQFT</div>
+                        <div class="cert-sig-label">Authorized Real Estate Custodian</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cert-actions-bar">
+                <button class="btn-cert-print" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print Official Certificate
+                </button>
+                <button class="btn-cert-close" onclick="closeInvestmentCertificate()">
+                    Close
+                </button>
             </div>
         </div>
     </div>
