@@ -804,9 +804,9 @@ function copyTxnIdToClipboard(txnId) {
     }
 }
 
-// ── 6. User Modal Embedded Live Ledger ─────────────────────────
-async function loadUserWalletLedger(userId) {
-    const mount = document.getElementById("user-modal-ledger-mount");
+// ── 6. User Modal & Details Embedded Live Ledger ───────────────
+async function loadUserWalletLedger(userId, targetId = "user-modal-ledger-mount") {
+    const mount = document.getElementById(targetId);
     if (!mount || !userId) return;
 
     mount.innerHTML = `<div style="padding:15px;text-align:center;color:var(--text-dim);font-size:12px"><i class="fas fa-spinner fa-spin"></i> Loading user wallet ledger...</div>`;

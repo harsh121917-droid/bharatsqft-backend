@@ -139,6 +139,7 @@ const pageTitles = {
     // 1. Core & Common
     dashboard: "Dashboard 👋",
     users: "Users",
+    userdetails: "User Details",
     kyc: "KYC Management",
 
     // 2. Digi Gold

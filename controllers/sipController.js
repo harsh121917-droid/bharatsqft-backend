@@ -562,6 +562,7 @@ exports.getAdminSips = async (req, res, next) => {
         const skip = (page - 1) * limit;
 
         const filter = {};
+        if (req.query.user) filter.user = req.query.user;
         if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
         if (req.query.metal && req.query.metal !== "all") filter.metal = req.query.metal;
         if (req.query.frequency && req.query.frequency !== "all") filter.frequency = req.query.frequency;

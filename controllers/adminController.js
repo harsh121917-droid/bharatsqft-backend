@@ -13,6 +13,8 @@ const Investment = require("../models/Investment");
 const Property = require("../models/Property");
 const JewelleryRedemption = require("../models/JewelleryRedemption");
 const Jewellery = require("../models/Jewellery");
+const Sip = require("../models/Sip");
+const BankAccount = require("../models/BankAccount");
 
 exports.getAllUsers = async (req, res, next) => {
     try {
@@ -289,16 +291,282 @@ exports.getUserById = async (req, res, next) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
-        const wallet = await Wallet.findOne({ user: user._id });
+
+        const results = await Promise.allSettled([
+            Wallet.findOne({ user: user._id }),
+            GoldBalance.findOne({ user: user._id }),
+            SilverBalance.findOne({ user: user._id }),
+            CopperBalance.findOne({ user: user._id }),
+            Investment.find({ user: user._id }).populate("property").sort({ createdAt: -1 }),
+            Kyc.findOne({ user: user._id }),
+            BankAccount.findOne({ user: user._id }),
+            Sip.find({ user: user._id }).sort({ createdAt: -1 }),
+            SchemeEnrollment.find({ user: user._id }).sort({ createdAt: -1 }),
+            GoldRate.findOne({ isActive: true }).sort({ createdAt: -1 }),
+            GoldTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
+            SilverTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
+            CopperTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
+            WalletTxn.find({ user: user._id }).sort({ createdAt: -1 }).limit(20)
+        ]);
+
+        const wallet = results[0].status === "fulfilled" ? results[0].value : null;
+        const goldBal = results[1].status === "fulfilled" ? results[1].value : null;
+        const silverBal = results[2].status === "fulfilled" ? results[2].value : null;
+        const copperBal = results[3].status === "fulfilled" ? results[3].value : null;
+        const propertyInvestments = results[4].status === "fulfilled" ? (results[4].value || []) : [];
+        const kycDoc = results[5].status === "fulfilled" ? results[5].value : null;
+        const bankDoc = results[6].status === "fulfilled" ? results[6].value : null;
+        const sips = results[7].status === "fulfilled" ? (results[7].value || []) : [];
+        const schemes = results[8].status === "fulfilled" ? (results[8].value || []) : [];
+        const rates = results[9].status === "fulfilled" ? results[9].value : null;
+        const goldTxns = results[10].status === "fulfilled" ? (results[10].value || []) : [];
+        const silverTxns = results[11].status === "fulfilled" ? (results[11].value || []) : [];
+        const copperTxns = results[12].status === "fulfilled" ? (results[12].value || []) : [];
+        const walletTxns = results[13].status === "fulfilled" ? (results[13].value || []) : [];
+
         const walletBalance = wallet ? wallet.balance : 0;
+
+        // Current market rates
+        const goldRate = rates?.buyRate || rates?.sellRate || 8000;
+        const silverRate = rates?.silverBuyRate || rates?.silverSellRate || 92;
+        const copperRate = rates?.copperBuyRate || rates?.copperSellRate || 0.85;
+
+        // Gold holdings
+        const goldGrams = goldBal?.totalGrams || 0;
+        const goldInvested = goldBal?.investedAmt || 0;
+        const goldCurrentVal = +(goldGrams * goldRate).toFixed(2);
+        const goldAvgPrice = goldGrams > 0 ? +(goldInvested / goldGrams).toFixed(2) : 0;
+        const goldProfitLoss = +(goldCurrentVal - goldInvested).toFixed(2);
+
+        // Silver holdings
+        const silverGrams = silverBal?.totalGrams || 0;
+        const silverInvested = silverBal?.investedAmt || 0;
+        const silverCurrentVal = +(silverGrams * silverRate).toFixed(2);
+        const silverAvgPrice = silverGrams > 0 ? +(silverInvested / silverGrams).toFixed(2) : 0;
+        const silverProfitLoss = +(silverCurrentVal - silverInvested).toFixed(2);
+
+        // Copper holdings
+        const copperGrams = copperBal?.totalGrams || 0;
+        const copperInvested = copperBal?.investedAmt || 0;
+        const copperCurrentVal = +(copperGrams * copperRate).toFixed(2);
+        const copperAvgPrice = copperGrams > 0 ? +(copperInvested / copperGrams).toFixed(2) : 0;
+        const copperProfitLoss = +(copperCurrentVal - copperInvested).toFixed(2);
+
+        // Real Estate Property Bricks
+        let propTotalBricks = 0;
+        let propTotalInvested = 0;
+        const propItems = (propertyInvestments || []).map(p => {
+            const prop = p.property || {};
+            propTotalBricks += (p.bricks || 0);
+            propTotalInvested += (p.totalAmount || 0);
+            return {
+                id: p._id,
+                propertyId: prop._id,
+                title: prop.title || "Real Estate Property",
+                city: prop.city || "",
+                state: prop.state || "",
+                bricks: p.bricks || 0,
+                pricePerBrick: p.pricePerBrick || (prop.totalBricks ? +(prop.totalInvestment / prop.totalBricks).toFixed(2) : 0),
+                totalAmount: p.totalAmount || 0,
+                ownershipPercent: p.ownershipPercent || 0,
+                expectedYield: prop.expectedYield || 0,
+                status: p.status || "paid",
+                date: p.createdAt
+            };
+        });
+
+        const totalInvested = +(goldInvested + silverInvested + copperInvested + propTotalInvested).toFixed(2);
+        const totalCurrentVal = +(goldCurrentVal + silverCurrentVal + copperCurrentVal + propTotalInvested).toFixed(2);
+        const totalReturns = +(totalCurrentVal - totalInvested).toFixed(2);
+        const returnsPct = totalInvested > 0 ? +((totalReturns / totalInvested) * 100).toFixed(2) : 0;
+
+        // Merge recent transactions into one unified array
+        const unifiedTxns = [];
+        (goldTxns || []).forEach(t => unifiedTxns.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Gold",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        (silverTxns || []).forEach(t => unifiedTxns.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Silver",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        (copperTxns || []).forEach(t => unifiedTxns.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Copper",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        (propertyInvestments || []).forEach(p => unifiedTxns.push({
+            id: p._id,
+            type: "brick_purchase",
+            metal: "Property",
+            grams: p.bricks || 0,
+            amount: p.totalAmount || 0,
+            date: p.createdAt,
+            status: p.status || "success",
+            invoiceNo: p.property?.title || "Property Brick"
+        }));
+        (walletTxns || []).forEach(w => unifiedTxns.push({
+            id: w._id,
+            type: w.type || (w.entryType === "credit" ? "wallet_credit" : "wallet_debit"),
+            metal: "Wallet",
+            grams: 0,
+            amount: w.amount || 0,
+            date: w.createdAt,
+            status: w.status || "success",
+            invoiceNo: w.txnId || ""
+        }));
+
+        unifiedTxns.sort((a, b) => new Date(b.date) - new Date(a.date));
+
         res.json({
             success: true,
             data: {
                 ...user.toObject(),
-                walletBalance
+                walletBalance,
+                rates: { gold: goldRate, silver: silverRate, copper: copperRate },
+                overview: {
+                    goldBalance: goldGrams,
+                    goldWorth: goldCurrentVal,
+                    goldInvested,
+                    goldAvgPrice,
+                    goldProfitLoss,
+                    silverBalance: silverGrams,
+                    silverWorth: silverCurrentVal,
+                    silverInvested,
+                    silverAvgPrice,
+                    silverProfitLoss,
+                    copperBalance: copperGrams,
+                    copperWorth: copperCurrentVal,
+                    copperInvested,
+                    copperAvgPrice,
+                    copperProfitLoss,
+                    propertyBricks: propTotalBricks,
+                    propertyInvested: propTotalInvested,
+                    propertyItems: propItems,
+                    totalInvested,
+                    totalCurrentVal,
+                    totalReturns,
+                    returnsPct,
+                    walletBalance
+                },
+                kyc: kycDoc || null,
+                bank: bankDoc || (kycDoc?.bankDetails ? {
+                    bankName: kycDoc.bankDetails.bankName || "Linked Bank",
+                    accountHolder: kycDoc.bankDetails.accountHolderName || user.name,
+                    accountNumber: kycDoc.bankDetails.accountNumber || "",
+                    ifsc: kycDoc.bankDetails.ifscCode || "",
+                    isVerified: kycDoc.status === "approved"
+                } : null),
+                sips: sips || [],
+                schemes: schemes || [],
+                recentTransactions: unifiedTxns.slice(0, 20)
             }
         });
     } catch (err) { next(err); }
+};
+
+// ── GET All Unified Transactions for User (Gold, Silver, Copper, Bricks, Wallet) ──
+exports.getUserTransactions = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const results = await Promise.allSettled([
+            GoldTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
+            SilverTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
+            CopperTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
+            Investment.find({ user: userId }).populate("property").sort({ createdAt: -1 }).limit(50),
+            WalletTxn.find({ user: userId }).sort({ createdAt: -1 }).limit(50)
+        ]);
+
+        const goldTxns = results[0].status === "fulfilled" ? (results[0].value || []) : [];
+        const silverTxns = results[1].status === "fulfilled" ? (results[1].value || []) : [];
+        const copperTxns = results[2].status === "fulfilled" ? (results[2].value || []) : [];
+        const propTxns = results[3].status === "fulfilled" ? (results[3].value || []) : [];
+        const walletTxns = results[4].status === "fulfilled" ? (results[4].value || []) : [];
+
+        const unified = [];
+        goldTxns.forEach(t => unified.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Gold",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            ratePerGram: t.ratePerGram || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        silverTxns.forEach(t => unified.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Silver",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            ratePerGram: t.ratePerGram || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        copperTxns.forEach(t => unified.push({
+            id: t._id,
+            type: t.type || "buy",
+            metal: "Copper",
+            grams: t.grams || 0,
+            amount: t.totalAmt || t.amount || 0,
+            ratePerGram: t.ratePerGram || 0,
+            date: t.createdAt,
+            status: t.status || "success",
+            invoiceNo: t.invoiceNo || ""
+        }));
+        propTxns.forEach(p => unified.push({
+            id: p._id,
+            type: "brick_purchase",
+            metal: "Property",
+            grams: p.bricks || 0,
+            amount: p.totalAmount || 0,
+            ratePerGram: p.pricePerBrick || 0,
+            date: p.createdAt,
+            status: p.status || "paid",
+            invoiceNo: p.property?.title || "Property Brick"
+        }));
+        walletTxns.forEach(w => unified.push({
+            id: w._id,
+            type: w.type || (w.entryType === "credit" ? "wallet_credit" : "wallet_debit"),
+            metal: "Wallet",
+            grams: 0,
+            amount: w.amount || 0,
+            ratePerGram: 0,
+            date: w.createdAt,
+            status: w.status || "success",
+            invoiceNo: w.txnId || ""
+        }));
+
+        unified.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        res.json({
+            success: true,
+            count: unified.length,
+            data: unified
+        });
+    } catch (err) {
+        next(err);
+    }
 };
 
 exports.updateUser = async (req, res, next) => {
@@ -1786,6 +2054,7 @@ exports.getSchemeEnrollments = async (req, res, next) => {
         const skip = (page - 1) * limit;
 
         const filter = {};
+        if (req.query.user) filter.user = req.query.user;
 
         // Metal filter
         if (req.query.metal && req.query.metal !== "all") {

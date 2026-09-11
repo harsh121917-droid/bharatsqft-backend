@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/dashboard.css" />
+    <link rel="stylesheet" href="css/user-details.css" />
 </head>
 
 <body>
@@ -765,6 +766,650 @@
                                     class="fas fa-chevron-left"></i> Prev</button>
                             <button class="btn btn-secondary btn-sm" id="btn-next-users" onclick="nextUsersPage()">Next
                                 <i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════
+                 USER DETAILS VIEW (Executive Suite & Complete Asset Portfolio)
+                 ══════════════════════════════════════════════════ -->
+            <div class="page" id="page-userdetails">
+                <div class="user-details-wrap">
+                    <!-- Top Breadcrumbs & Actions Bar -->
+                    <div class="ud-topbar">
+                        <div class="ud-title-group">
+                            <div class="ud-breadcrumbs">
+                                <a href="#" onclick="showPage('dashboard');return false"><i class="fas fa-home"></i> Dashboard</a>
+                                <span class="sep">/</span>
+                                <a href="#" onclick="showPage('users');return false"><i class="fas fa-users"></i> Users</a>
+                                <span class="sep">/</span>
+                                <span class="ud-bc-active" id="ud-bc-name">Loading User...</span>
+                            </div>
+                        </div>
+                        <div class="ud-topbar-actions">
+                            <button class="btn-back-users" onclick="showPage('users')" title="Return to Users table">
+                                <i class="fas fa-arrow-left"></i> <span>Back to Users</span>
+                            </button>
+                            <button class="btn-ud-quick-edit" onclick="openUserModal(activeUserId)" title="Quick Edit Customer Profile">
+                                <i class="fas fa-user-edit" style="color:#60a5fa"></i> <span>Edit Profile</span>
+                            </button>
+                            <button class="btn-ud-quick-wallet" onclick="quickScrollToSection('ud-tools-wallet-box')" title="Instant Add/Deduct Money">
+                                <i class="fas fa-wallet" style="color:#f59e0b"></i> <span>Add / Deduct Money</span>
+                            </button>
+                            <div class="ud-actions-dropdown">
+                                <button class="btn-ud-actions" onclick="toggleUdActionsMenu(event)">
+                                    <i class="fas fa-sliders-h"></i> <span>More Actions</span> <i class="fas fa-chevron-down" style="font-size:10px"></i>
+                                </button>
+                                <div class="ud-dropdown-menu" id="ud-actions-menu">
+                                    <button class="ud-dropdown-item" onclick="openUserModal(activeUserId)">
+                                        <i class="fas fa-user-edit" style="color:#60a5fa"></i> Edit Profile
+                                    </button>
+                                    <button class="ud-dropdown-item" onclick="quickScrollToSection('ud-tools-wallet-box')">
+                                        <i class="fas fa-wallet" style="color:#f59e0b"></i> Add / Deduct Money
+                                    </button>
+                                    <button class="ud-dropdown-item" onclick="recalculateUserVault(activeUserId)">
+                                        <i class="fas fa-sync-alt" style="color:#a78bfa"></i> Recalculate Vault
+                                    </button>
+                                    <div class="ud-dropdown-divider"></div>
+                                    <button class="ud-dropdown-item" onclick="clearUserLocation(activeUserId, event)">
+                                        <i class="fas fa-map-marker-slash" style="color:#fbbf24"></i> Delete Location
+                                    </button>
+                                    <button class="ud-dropdown-item danger" onclick="resetUserWalletData(activeUserId)">
+                                        <i class="fas fa-coins"></i> Reset Wallet (₹0)
+                                    </button>
+                                    <button class="ud-dropdown-item danger" onclick="resetUserVaultData(activeUserId)">
+                                        <i class="fas fa-boxes"></i> Clear Vault Holdings
+                                    </button>
+                                    <button class="ud-dropdown-item danger" onclick="resetUserRewardsData(activeUserId)">
+                                        <i class="fas fa-gift"></i> Reset Rewards & Spins
+                                    </button>
+                                    <button class="ud-dropdown-item danger" onclick="resetAllUserTestingData(activeUserId)">
+                                        <i class="fas fa-bomb"></i> Wipe All Testing Data
+                                    </button>
+                                    <div class="ud-dropdown-divider"></div>
+                                    <button class="ud-dropdown-item danger" onclick="deleteUser(activeUserId)">
+                                        <i class="fas fa-trash-alt"></i> Delete Account
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Main Hero Card (Profile, KYC & Asset Overview) -->
+                    <!-- User Main Hero Card (Profile & Asset Overview) -->
+                    <div class="ud-hero-card" id="ud-hero-card">
+                        <!-- Column 1: Profile -->
+                        <div class="ud-profile-col">
+                            <div class="ud-avatar-wrap" id="ud-avatar-mount">
+                                <div class="ud-avatar-fallback" id="ud-avatar-letter">U</div>
+                            </div>
+                            <div class="ud-profile-info">
+                                <div class="ud-name-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                    <span class="ud-user-name" id="ud-header-name">—</span>
+                                    <span class="ud-badge-active" id="ud-header-status"><i class="fas fa-circle" style="font-size:6px"></i> Active</span>
+                                    <span class="ud-kyc-status-pill verified" id="ud-kyc-pill" style="font-size:11px;padding:2px 8px">
+                                        <i class="fas fa-shield-alt"></i> <span id="ud-kyc-status-text">Verified</span>
+                                    </span>
+                                </div>
+                                <div class="ud-id-row">
+                                    <span>User ID: <strong id="ud-header-id" style="font-family:var(--font-mono);color:#fff">USR00000</strong></span>
+                                    <button class="ud-copy-btn" onclick="copyUdText('ud-header-id', 'User ID copied')" title="Copy User ID">
+                                        <i class="far fa-copy"></i>
+                                    </button>
+                                </div>
+                                <div class="ud-meta-list">
+                                    <div class="ud-meta-item">
+                                        <i class="fas fa-phone"></i>
+                                        <span id="ud-header-phone">—</span>
+                                    </div>
+                                    <div class="ud-meta-item">
+                                        <i class="fas fa-envelope"></i>
+                                        <span id="ud-header-email">—</span>
+                                    </div>
+                                </div>
+                                <div class="ud-meta-dates">
+                                    <span><i class="far fa-calendar-alt"></i> Joined: <strong id="ud-header-joined">—</strong></span>
+                                    <span>•</span>
+                                    <span><i class="far fa-clock"></i> Last Login: <strong id="ud-header-lastlogin">—</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Column 2: User Overview Assets Grid (Generous 4-Column Layout) -->
+                        <div class="ud-overview-col">
+                            <div class="ud-overview-title">Asset & Investment Overview</div>
+                            <div class="ud-overview-grid">
+                                <!-- Gold -->
+                                <div class="ud-overview-tile gold">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-coins" style="color:#f59e0b"></i> Gold Balance (g)</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-gold">0.000</div>
+                                </div>
+                                <!-- Silver -->
+                                <div class="ud-overview-tile silver">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-cubes" style="color:#cbd5e1"></i> Silver Balance (g)</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-silver">0.000</div>
+                                </div>
+                                <!-- Copper (Explicitly added) -->
+                                <div class="ud-overview-tile copper">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-layer-group" style="color:#ea580c"></i> Copper Balance (g)</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-copper">0.000</div>
+                                </div>
+                                <!-- Property Bricks (Explicitly added) -->
+                                <div class="ud-overview-tile property">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-building" style="color:#c084fc"></i> Property Bricks</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-bricks">0 Bricks</div>
+                                </div>
+                                <!-- Wallet Balance -->
+                                <div class="ud-overview-tile wallet">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-wallet" style="color:#38bdf8"></i> Wallet Balance</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-wallet">₹ 0.00</div>
+                                </div>
+                                <!-- Total Invested -->
+                                <div class="ud-overview-tile">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-chart-pie" style="color:#60a5fa"></i> Total Invested</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-invested">₹ 0.00</div>
+                                </div>
+                                <!-- Total Returns -->
+                                <div class="ud-overview-tile returns">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-arrow-trend-up" style="color:#34d399"></i> Total Returns</div>
+                                    <div class="ud-overview-tile-val" id="ud-ov-returns">₹ 0.00</div>
+                                </div>
+                                <!-- Referral Code -->
+                                <div class="ud-overview-tile">
+                                    <div class="ud-overview-tile-label"><i class="fas fa-ticket-alt" style="color:#f59e0b"></i> Refer Code</div>
+                                    <div style="display:flex;align-items:center;gap:4px">
+                                        <span class="ud-refer-code" id="ud-ov-referral">—</span>
+                                        <button class="ud-copy-btn" onclick="copyUdText('ud-ov-referral', 'Referral code copied')" title="Copy Code">
+                                            <i class="far fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Tabs Bar -->
+                    <div class="ud-tabs-nav">
+                        <button class="ud-tab-btn active" id="ud-tab-btn-overview" onclick="switchUdTab('overview')">
+                            <i class="fas fa-th-large"></i> Overview
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-gold" onclick="switchUdTab('gold')">
+                            <i class="fas fa-coins" style="color:#f59e0b"></i> Gold Portfolio
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-silver" onclick="switchUdTab('silver')">
+                            <i class="fas fa-cubes" style="color:#cbd5e1"></i> Silver Portfolio
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-copper" onclick="switchUdTab('copper')">
+                            <i class="fas fa-layer-group" style="color:#ea580c"></i> Copper Portfolio
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-property" onclick="switchUdTab('property')">
+                            <i class="fas fa-building" style="color:#c084fc"></i> Property Bricks (Real Estate)
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-investments" onclick="switchUdTab('investments')">
+                            <i class="fas fa-piggy-bank" style="color:#38bdf8"></i> Investments (SIP & Schemes)
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-transactions" onclick="switchUdTab('transactions')">
+                            <i class="fas fa-receipt"></i> Transactions
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-wallet" onclick="switchUdTab('wallet')">
+                            <i class="fas fa-wallet" style="color:#a78bfa"></i> Payments & Wallet
+                        </button>
+                        <button class="ud-tab-btn" id="ud-tab-btn-kyc" onclick="switchUdTab('kyc')">
+                            <i class="fas fa-id-card"></i> KYC & Profile
+                        </button>
+                    </div>
+
+                    <!-- TAB 1: OVERVIEW -->
+                    <div class="ud-tab-pane active" id="ud-pane-overview">
+                        <!-- KPI Cards Row (4 Cards per Row) -->
+                        <div class="ud-kpi-grid">
+                            <!-- Card 1: Gold -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Gold Balance (24K)</div>
+                                        <div class="ud-kpi-icon-wrap gold"><i class="fas fa-coins"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-gold-grams">0.000 g</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-gold-worth">₹ 0.00</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Avg. Buy: <strong id="ud-kpi-gold-avg" style="color:#fff">₹ 0.00 /g</strong></span>
+                                    <span id="ud-kpi-gold-pl" style="color:#34d399">+₹0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Silver -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Silver Balance (999)</div>
+                                        <div class="ud-kpi-icon-wrap silver"><i class="fas fa-cubes"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-silver-grams">0.000 g</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-silver-worth">₹ 0.00</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Avg. Buy: <strong id="ud-kpi-silver-avg" style="color:#fff">₹ 0.00 /g</strong></span>
+                                    <span id="ud-kpi-silver-pl" style="color:#34d399">+₹0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Copper (999 Pure) -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Copper Balance (999)</div>
+                                        <div class="ud-kpi-icon-wrap copper"><i class="fas fa-layer-group"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-copper-grams">0.000 g</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-copper-worth">₹ 0.00</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Avg. Buy: <strong id="ud-kpi-copper-avg" style="color:#fff">₹ 0.00 /g</strong></span>
+                                    <span id="ud-kpi-copper-pl" style="color:#34d399">+₹0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Fractional Real Estate (Bricks) -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Fractional Real Estate</div>
+                                        <div class="ud-kpi-icon-wrap property"><i class="fas fa-building"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-property-bricks">0 Bricks</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-property-worth">₹ 0.00 Invested</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Holdings: <strong id="ud-kpi-property-count" style="color:#fff">0 Properties</strong></span>
+                                    <span style="color:#c084fc">Yield: ~8.5%</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 5: Total Invested -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Total Invested</div>
+                                        <div class="ud-kpi-icon-wrap invested"><i class="fas fa-sack-dollar"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-total-invested">₹ 0.00</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-invested-breakdown" style="font-size:0.75rem">Gold: ₹0 · Silver: ₹0 · Copper: ₹0</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Portfolio Assets: <strong>4 Categories</strong></span>
+                                    <span style="color:#60a5fa"><i class="fas fa-shield-check"></i> Safe Vault</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 6: Total Returns -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Total Returns</div>
+                                        <div class="ud-kpi-icon-wrap returns"><i class="fas fa-arrow-trend-up"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-total-returns" style="color:#34d399">₹ 0.00</div>
+                                    <div class="ud-kpi-sub-val" id="ud-kpi-returns-pct" style="color:#34d399"><i class="fas fa-caret-up"></i> +0.00%</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Valuation Model: <strong>Live Spot Rates</strong></span>
+                                    <span style="color:#34d399">Unrealized P&L</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 7: Total Current Valuation -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Total Valuation (Live)</div>
+                                        <div class="ud-kpi-icon-wrap" style="background:rgba(52,211,153,0.12);color:#34d399"><i class="fas fa-chart-line"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-total-val" style="color:#34d399">₹ 0.00</div>
+                                    <div class="ud-kpi-sub-val">Net Worth in Payvika</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <span>Bullion + Bricks + Wallet</span>
+                                    <span style="color:#34d399"><i class="fas fa-check-circle"></i> Live Rate</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 8: Wallet Balance -->
+                            <div class="ud-kpi-card">
+                                <div>
+                                    <div class="ud-kpi-header">
+                                        <div class="ud-kpi-title">Wallet Balance</div>
+                                        <div class="ud-kpi-icon-wrap wallet"><i class="fas fa-wallet"></i></div>
+                                    </div>
+                                    <div class="ud-kpi-main-val" id="ud-kpi-wallet-bal" style="color:#38bdf8">₹ 0.00</div>
+                                    <div class="ud-kpi-sub-val">Available for 1-click buy</div>
+                                </div>
+                                <div class="ud-kpi-footer">
+                                    <button class="btn-kpi-add-money" onclick="quickScrollToSection('ud-tools-wallet-box')">
+                                        <i class="fas fa-plus"></i> Add Money
+                                    </button>
+                                    <span style="font-size:0.72rem;color:#64748b">Instant Credit</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Cards: Row 2 (Recent Transactions, Active SIPs, Schemes, Property Bricks) -->
+                        <div class="ud-cards-row">
+                            <!-- Recent Transactions -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-history" style="color:#f59e0b"></i> Recent Transactions</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('transactions')">View All</a>
+                                </div>
+                                <div id="ud-recent-txns-mount">
+                                    <!-- Populated dynamically -->
+                                    <div style="font-size:0.8rem;color:#64748b;padding:1rem 0;text-align:center">No transactions recorded.</div>
+                                </div>
+                            </div>
+
+                            <!-- Active SIPs -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-calendar-check" style="color:#38bdf8"></i> Active SIPs</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('investments')">View All</a>
+                                </div>
+                                <div id="ud-active-sips-mount">
+                                    <!-- Populated dynamically -->
+                                    <div style="font-size:0.8rem;color:#64748b;padding:1rem 0;text-align:center">No active SIP plans.</div>
+                                </div>
+                            </div>
+
+                            <!-- Invested in Schemes -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-gem" style="color:#a855f7"></i> Invested in Schemes</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('investments')">View All</a>
+                                </div>
+                                <div id="ud-active-schemes-mount">
+                                    <!-- Populated dynamically -->
+                                    <div style="font-size:0.8rem;color:#64748b;padding:1rem 0;text-align:center">No enrolled savings schemes.</div>
+                                </div>
+                            </div>
+
+                            <!-- Fractional Property Bricks -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-building" style="color:#c084fc"></i> Real Estate Bricks</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('property')">View All</a>
+                                </div>
+                                <div id="ud-property-bricks-mount">
+                                    <!-- Populated dynamically -->
+                                    <div style="font-size:0.8rem;color:#64748b;padding:1rem 0;text-align:center">No active real estate bricks.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Cards: Row 3 (KYC Information, Bank Details, Device & Login Info) -->
+                        <div class="ud-cards-row ud-cards-row-3">
+                            <!-- KYC Information -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-id-card" style="color:#10b981"></i> KYC Information</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('kyc')">View KYC</a>
+                                </div>
+                                <div class="ud-sub-grid-2" style="margin-bottom:0.75rem">
+                                    <div>
+                                        <div class="ud-sub-label">PAN Number</div>
+                                        <div class="ud-sub-val" id="ud-kyc-pan-val">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="ud-sub-label">Aadhaar Number</div>
+                                        <div class="ud-sub-val" id="ud-kyc-aadhaar-val">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="ud-sub-label">Full Legal Name</div>
+                                        <div class="ud-sub-val" id="ud-kyc-name-val">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="ud-sub-label">Date of Birth</div>
+                                        <div class="ud-sub-val" id="ud-kyc-dob-val">—</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="ud-sub-label">Address</div>
+                                    <div class="ud-sub-val" id="ud-kyc-address-val" style="font-size:0.8rem;margin-top:2px;font-family:inherit">—</div>
+                                </div>
+                            </div>
+
+                            <!-- Bank Details -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-university" style="color:#ef4444"></i> Bank Details</div>
+                                    <a class="ud-card-view-all" onclick="switchUdTab('wallet')">View All</a>
+                                </div>
+                                <div class="ud-bank-brand">
+                                    <div class="ud-bank-icon"><i class="fas fa-building-columns"></i></div>
+                                    <div>
+                                        <div class="ud-bank-name" id="ud-bank-name-val">HDFC Bank</div>
+                                        <span class="ud-status-pill success" id="ud-bank-status-pill"><i class="fas fa-check-circle"></i> Verified</span>
+                                    </div>
+                                </div>
+                                <div class="ud-sub-grid-2">
+                                    <div>
+                                        <div class="ud-sub-label">Account No.</div>
+                                        <div class="ud-sub-val" id="ud-bank-acc-val">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="ud-sub-label">IFSC Code</div>
+                                        <div class="ud-sub-val" id="ud-bank-ifsc-val">—</div>
+                                    </div>
+                                    <div style="grid-column:1/-1;margin-top:4px">
+                                        <div class="ud-sub-label">Account Holder Name</div>
+                                        <div class="ud-sub-val" id="ud-bank-holder-val">—</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Device & Login Information -->
+                            <div class="ud-section-card">
+                                <div class="ud-card-header">
+                                    <div class="ud-card-title"><i class="fas fa-shield-alt" style="color:#38bdf8"></i> Device & Login Information</div>
+                                    <span class="ud-card-view-all" style="opacity:0.7">Audit Security</span>
+                                </div>
+                                <div class="ud-device-row">
+                                    <div class="ud-device-icon"><i class="far fa-clock"></i></div>
+                                    <div>
+                                        <div class="ud-sub-label">Last Login</div>
+                                        <div class="ud-sub-val" id="ud-dev-lastlogin">—</div>
+                                    </div>
+                                </div>
+                                <div class="ud-device-row">
+                                    <div class="ud-device-icon"><i class="fas fa-network-wired"></i></div>
+                                    <div>
+                                        <div class="ud-sub-label">IP Address</div>
+                                        <div class="ud-sub-val" id="ud-dev-ip">—</div>
+                                    </div>
+                                </div>
+                                <div class="ud-device-row">
+                                    <div class="ud-device-icon"><i class="fas fa-laptop"></i></div>
+                                    <div>
+                                        <div class="ud-sub-label">Platform & Browser</div>
+                                        <div class="ud-sub-val" id="ud-dev-platform">Payvika Mobile App / Web</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════
+                             Row 4: PRESERVED ESSENTIAL CAPABILITIES
+                             1. Live Customer GPS Location
+                             2. Add Money / Wallet Adjustment & Audit Ledger
+                             3. Developer & Testing Reset Utilities
+                             ══════════════════════════════════════════════════ -->
+                        <div class="ud-tools-grid">
+                            <!-- 1. Customer Live Location Card -->
+                            <div class="ud-tool-box" id="ud-tools-location-box">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                                    <div style="font-size:0.95rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px">
+                                        <i class="fas fa-map-marker-alt" style="color:#ef4444"></i> Customer GPS Live Location
+                                    </div>
+                                    <span class="badge badge-info" style="font-size:10px"><i class="fas fa-satellite"></i> Geo-Tracking</span>
+                                </div>
+                                <div id="ud-location-mount">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- 2. Wallet Management & Add/Deduct Money Card -->
+                            <div class="ud-tool-box" id="ud-tools-wallet-box">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                                    <div style="font-size:0.95rem;font-weight:700;color:#f59e0b;display:flex;align-items:center;gap:6px">
+                                        <i class="fas fa-wallet"></i> Instant Wallet Management
+                                    </div>
+                                    <span class="badge badge-gold" style="font-size:10.5px">Balance: <strong id="ud-fast-wallet-bal" style="color:#fff">₹0</strong></span>
+                                </div>
+                                <div class="form-grid-2" style="margin-bottom:0.75rem">
+                                    <div class="form-group" style="margin-bottom:0">
+                                        <label class="form-label" style="font-size:11.5px">Amount (₹)</label>
+                                        <input class="form-control" type="number" id="ud-wallet-amount-input" placeholder="e.g. 1000" min="1" step="any" />
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0">
+                                        <label class="form-label" style="font-size:11.5px">Reason / Note</label>
+                                        <input class="form-control" id="ud-wallet-note-input" placeholder="e.g. Bonus, Refund, Adjustment" />
+                                    </div>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);cursor:pointer">
+                                        <input type="checkbox" id="ud-wallet-show-tx" checked />
+                                        <span>Record in transaction logs</span>
+                                    </label>
+                                    <div style="display:flex;gap:8px">
+                                        <button class="btn btn-success btn-sm" id="btn-ud-add-money" onclick="adjustUserWalletFromDetails('add')">
+                                            <i class="fas fa-plus-circle"></i> Add Money (+)
+                                        </button>
+                                        <button class="btn btn-danger btn-sm" id="btn-ud-deduct-money" onclick="adjustUserWalletFromDetails('deduct')">
+                                            <i class="fas fa-minus-circle"></i> Deduct Money (-)
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Embedded Mini Audit Ledger -->
+                                <div style="margin-top:1rem;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px">
+                                    <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px;display:flex;justify-content:space-between">
+                                        <span><i class="fas fa-receipt"></i> Recent Wallet Audit Ledger</span>
+                                        <a onclick="switchUdTab('wallet')" style="color:#f59e0b;cursor:pointer">Full Trail ></a>
+                                    </div>
+                                    <div id="ud-mini-ledger-mount" style="max-height:140px;overflow-y:auto;font-size:11px">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. Developer & Testing Reset Utilities -->
+                            <div class="ud-tool-box danger-zone" id="ud-tools-reset-box">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                                    <div style="font-size:0.95rem;font-weight:700;color:var(--danger);display:flex;align-items:center;gap:6px">
+                                        <i class="fas fa-flask"></i> Testing & Developer Data Reset
+                                    </div>
+                                    <span class="badge badge-danger" style="font-size:10px">Admin Safe Mode</span>
+                                </div>
+                                <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:1rem">
+                                    Quickly wipe test trades, bullion balances, rewards, and wallets back to 0 without deleting user credentials.
+                                </div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                    <button class="btn btn-outline-danger btn-sm" onclick="resetUserWalletData(activeUserId)">
+                                        <i class="fas fa-wallet"></i> Reset Wallet (₹0)
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="resetUserVaultData(activeUserId)">
+                                        <i class="fas fa-coins"></i> Clear Bullion Vault (0g)
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="resetUserRewardsData(activeUserId)">
+                                        <i class="fas fa-gift"></i> Reset Rewards & Spins
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="recalculateUserVault(activeUserId)">
+                                        <i class="fas fa-sync-alt"></i> Recalculate Vault
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="resetAllUserTestingData(activeUserId)" style="font-weight:700">
+                                        <i class="fas fa-bomb"></i> Wipe All Testing Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: GOLD PORTFOLIO -->
+                    <div class="ud-tab-pane" id="ud-pane-gold">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-coins" style="color:#f59e0b"></i> 24K Digital Gold Holdings Breakdown</div>
+                            </div>
+                            <div id="ud-gold-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: SILVER PORTFOLIO -->
+                    <div class="ud-tab-pane" id="ud-pane-silver">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-cubes" style="color:#cbd5e1"></i> 999 Pure Silver Holdings Breakdown</div>
+                            </div>
+                            <div id="ud-silver-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: COPPER PORTFOLIO (Explicitly Added) -->
+                    <div class="ud-tab-pane" id="ud-pane-copper">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-layer-group" style="color:#ea580c"></i> 999 Pure Copper Holdings Breakdown</div>
+                            </div>
+                            <div id="ud-copper-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 5: PROPERTY BRICKS (Explicitly Added) -->
+                    <div class="ud-tab-pane" id="ud-pane-property">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-building" style="color:#c084fc"></i> Fractional Real Estate Property Bricks Portfolio</div>
+                            </div>
+                            <div id="ud-property-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 6: INVESTMENTS (SIP & SCHEMES) -->
+                    <div class="ud-tab-pane" id="ud-pane-investments">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-piggy-bank" style="color:#38bdf8"></i> Systematic Investment Plans (SIP) & Savings Schemes</div>
+                            </div>
+                            <div id="ud-investments-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 7: TRANSACTIONS -->
+                    <div class="ud-tab-pane" id="ud-pane-transactions">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-receipt" style="color:#f59e0b"></i> Comprehensive User Transaction History</div>
+                            </div>
+                            <div id="ud-transactions-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 8: PAYMENTS & WALLET -->
+                    <div class="ud-tab-pane" id="ud-pane-wallet">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-wallet" style="color:#a78bfa"></i> Complete Wallet Audit Trail & Ledger</div>
+                            </div>
+                            <div id="ud-wallet-tab-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 9: KYC & PROFILE -->
+                    <div class="ud-tab-pane" id="ud-pane-kyc">
+                        <div class="ud-section-card">
+                            <div class="ud-card-header">
+                                <div class="ud-card-title"><i class="fas fa-id-card" style="color:#10b981"></i> Customer KYC Documents & Account Settings</div>
+                            </div>
+                            <div id="ud-kyc-tab-content"></div>
                         </div>
                     </div>
                 </div>

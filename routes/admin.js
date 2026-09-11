@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
-  getAllUsers, getUserById, updateUser, deleteUser, clearUserLocation,
+  getAllUsers, getUserById, getUserTransactions, updateUser, deleteUser, clearUserLocation,
   getAllEnquiries, updateEnquiry, deleteEnquiry,
   getDashboard,
   getWithdrawals, completeWithdrawal,
@@ -46,6 +46,7 @@ router.get("/dashboard", getDashboard);
 // Users
 router.get("/users", getAllUsers);
 router.get("/users/:id", getUserById);
+router.get("/users/:id/transactions", getUserTransactions);
 router.get("/users/:id/wallet-ledger", getUserWalletLedger);
 router.post("/users/:id/add-money", addWalletMoney);
 router.post("/users/:id/deduct-money", deductWalletMoney);
