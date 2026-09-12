@@ -745,6 +745,13 @@
                             <option value="user">Users</option>
                             <option value="admin">Admins</option>
                         </select>
+                        <select class="form-control" id="user-segment-filter" onchange="resetAndLoadUsers()"
+                            style="width:200px;font-weight:600">
+                            <option value="">🌐 All Platforms / Apps</option>
+                            <option value="both">🌟 Both (Gold + Real Estate)</option>
+                            <option value="goldvikaone">🪙 GoldVikaone (DigiGold)</option>
+                            <option value="vikaone">🏢 Vikaone (Real Estate)</option>
+                        </select>
                         <select class="form-control" id="user-active-filter" onchange="resetAndLoadUsers()"
                             style="width:130px">
                             <option value="">All Status</option>
@@ -857,6 +864,12 @@
                                     <span class="ud-badge-active" id="ud-header-status"><i class="fas fa-circle" style="font-size:6px"></i> Active</span>
                                     <span class="ud-kyc-status-pill verified" id="ud-kyc-pill" style="font-size:11px;padding:2px 8px">
                                         <i class="fas fa-shield-alt"></i> <span id="ud-kyc-status-text">Verified</span>
+                                    </span>
+                                    <span class="ud-segment-pill" id="ud-header-segment" style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:5px;background:rgba(212,160,23,0.15);color:var(--gold);border:1px solid rgba(212,160,23,0.3)">
+                                        <i class="fas fa-layer-group"></i> <span>Ecosystem</span>
+                                    </span>
+                                    <span class="ud-login-pill" id="ud-header-login-source" style="font-size:10.5px;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);display:inline-flex;align-items:center;gap:4px">
+                                        <i class="fas fa-mobile-alt"></i> <span>Login Source</span>
                                     </span>
                                 </div>
                                 <div class="ud-id-row">
@@ -1235,9 +1248,16 @@
                                     </div>
                                 </div>
                                 <div class="ud-device-row">
-                                    <div class="ud-device-icon"><i class="fas fa-laptop"></i></div>
+                                    <div class="ud-device-icon"><i class="fas fa-layer-group" style="color:#d4a017"></i></div>
                                     <div>
-                                        <div class="ud-sub-label">Platform & Browser</div>
+                                        <div class="ud-sub-label">Customer Ecosystem Segment</div>
+                                        <div class="ud-sub-val" id="ud-dev-segment">DigiGold / GoldVikaone</div>
+                                    </div>
+                                </div>
+                                <div class="ud-device-row">
+                                    <div class="ud-device-icon"><i class="fas fa-mobile-alt" style="color:#60a5fa"></i></div>
+                                    <div>
+                                        <div class="ud-sub-label">Login Apps & Devices</div>
                                         <div class="ud-sub-val" id="ud-dev-platform">Payvika Mobile App / Web</div>
                                     </div>
                                 </div>

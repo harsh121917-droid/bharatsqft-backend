@@ -15,11 +15,13 @@ async function loadUsers(page = 1) {
 
     const search = document.getElementById("user-search")?.value.trim() || "";
     const role = document.getElementById("user-role-filter")?.value || "";
+    const segment = document.getElementById("user-segment-filter")?.value || "";
     const active = document.getElementById("user-active-filter")?.value || "";
 
     const params = new URLSearchParams({ page, limit: 20 });
     if (search) params.append("search", search);
     if (role) params.append("role", role);
+    if (segment) params.append("segment", segment);
     if (active) params.append("active", active);
 
     try {
@@ -85,12 +87,13 @@ function renderUsersTable(users) {
             <thead>
                 <tr>
                     <th>User</th>
-                    <th>Role</th>
+                    <th>Platform & Segment</th>
                     <th>KYC</th>
                     <th>Location</th>
                     <th>Wallet Balance</th>
                     <th>Gold (24K)</th>
                     <th>Silver (999)</th>
+                    <th>Bricks</th>
                     <th>Status</th>
                     <th>Registered</th>
                     <th style="text-align:right">Actions</th>
@@ -116,7 +119,43 @@ function renderUsersTable(users) {
 
         const goldGrams = u.goldInvestments?.grams || 0;
         const silverGrams = u.silverInvestments?.grams || 0;
+        const propBricks = u.propertyInvestments?.totalBricks || (u.propertyInvestments?.items?.reduce((s, i) => s + (i.bricks || 0), 0)) || 0;
         const walletBal = u.walletBalance !== undefined ? u.walletBalance : (u.wallet?.balance || 0);
+
+        // Ecosystem Segment & Login Indicators
+        const seg = (u.ecosystemSegment || 'goldvikaone').toLowerCase();
+        let segmentBadge = '';
+        if (seg === 'both') {
+            segmentBadge = `
+            <div>
+                <span class="badge" style="background:linear-gradient(135deg, rgba(168,85,247,0.25), rgba(245,158,11,0.25));color:#f3e8ff;border:1px solid #c084fc;font-weight:700;font-size:11px;display:inline-flex;align-items:center;gap:4px">
+                    <i class="fas fa-gem" style="color:#fbbf24"></i> Both (Gold + Bricks)
+                </span>
+                <div style="font-size:10px;color:#a78bfa;margin-top:3px;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-check-double"></i> <span>Both Apps Active</span>
+                </div>
+            </div>`;
+        } else if (seg === 'vikaone') {
+            segmentBadge = `
+            <div>
+                <span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-weight:700;font-size:11px;display:inline-flex;align-items:center;gap:4px">
+                    <i class="fas fa-building"></i> Vikaone (Real Estate)
+                </span>
+                <div style="font-size:10px;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-city"></i> <span>${u.lastLoginPlatform || 'Vikaone App / Web'}</span>
+                </div>
+            </div>`;
+        } else {
+            segmentBadge = `
+            <div>
+                <span class="badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-weight:700;font-size:11px;display:inline-flex;align-items:center;gap:4px">
+                    <i class="fas fa-coins"></i> GoldVikaone (DigiGold)
+                </span>
+                <div style="font-size:10px;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-mobile-alt"></i> <span>${u.lastLoginPlatform || 'GoldVikaone App'}</span>
+                </div>
+            </div>`;
+        }
 
         // Location formatting
         const loc = u.location;
@@ -155,12 +194,13 @@ function renderUsersTable(users) {
                     <span class="badge" style="background:rgba(16,185,129,0.12);color:#34d399;font-size:10px" title="Referral Earnings & Points"><i class="fas fa-gift"></i> +${formatINR(u.referralRewardsEarned || 0)} (${u.referralsCount || 0} refs · ${u.totalRewardPointsEarned || u.rewardPoints || 0} pts)</span>
                 </div>
             </td>
-            <td><span class="badge ${u.role === 'admin' ? 'badge-gold' : 'badge-info'}">${u.role || 'user'}</span></td>
+            <td>${segmentBadge}</td>
             <td>${kycBadge}</td>
             <td>${locationCell}</td>
             <td style="font-family:var(--font-mono);font-weight:700;color:var(--gold)">${formatINR(walletBal)}</td>
             <td style="font-family:var(--font-mono);font-size:12.5px;color:var(--gold)">${formatGrams(goldGrams)}</td>
             <td style="font-family:var(--font-mono);font-size:12.5px;color:var(--silver)">${formatGrams(silverGrams)}</td>
+            <td style="font-family:var(--font-mono);font-size:12.5px;color:#c084fc;font-weight:700">${propBricks} Bricks</td>
             <td>${statusBadge}</td>
             <td style="font-size:12px;color:var(--text-dim)">${formatDate(u.createdAt)}</td>
             <td style="text-align:right" onclick="event.stopPropagation()">
@@ -1191,6 +1231,36 @@ function renderUserDetailsContent(u) {
     udSetText("ud-header-joined", formatDate(u.createdAt));
     udSetText("ud-header-lastlogin", u.lastLogin ? formatDateTime(u.lastLogin) : "Never logged in");
 
+    // Ecosystem & Login Source Badges in Hero Header
+    const seg = (u.ecosystemSegment || 'goldvikaone').toLowerCase();
+    const segBadge = document.getElementById("ud-header-segment");
+    if (segBadge) {
+        if (seg === 'both') {
+            segBadge.style.background = "linear-gradient(135deg, rgba(168,85,247,0.3), rgba(245,158,11,0.3))";
+            segBadge.style.color = "#f3e8ff";
+            segBadge.style.border = "1px solid #c084fc";
+            segBadge.innerHTML = `<i class="fas fa-gem" style="color:#fbbf24"></i> Both: DigiGold + Real Estate`;
+        } else if (seg === 'vikaone') {
+            segBadge.style.background = "rgba(59,130,246,0.18)";
+            segBadge.style.color = "#60a5fa";
+            segBadge.style.border = "1px solid rgba(59,130,246,0.4)";
+            segBadge.innerHTML = `<i class="fas fa-building"></i> Real Estate / Vikaone`;
+        } else {
+            segBadge.style.background = "rgba(245,158,11,0.18)";
+            segBadge.style.color = "#fbbf24";
+            segBadge.style.border = "1px solid rgba(245,158,11,0.4)";
+            segBadge.innerHTML = `<i class="fas fa-coins"></i> DigiGold / GoldVikaone`;
+        }
+    }
+
+    const loginPill = document.getElementById("ud-header-login-source");
+    if (loginPill) {
+        const logins = Array.isArray(u.loginPlatforms) && u.loginPlatforms.length > 0
+            ? u.loginPlatforms.map(p => p === 'goldvikaone' ? 'GoldVikaone' : (p === 'vikaone' ? 'Vikaone' : p)).join(" & ")
+            : (u.lastLoginPlatform || (seg === 'vikaone' ? 'Vikaone App' : 'GoldVikaone App'));
+        loginPill.innerHTML = `<i class="fas fa-mobile-alt"></i> ${logins}`;
+    }
+
     // KYC Status in Hero
     const rawKyc = (u.kycStatus || u.kyc?.status || (u.kycVerified ? "approved" : "not_submitted")).toLowerCase().trim();
     const kycPill = document.getElementById("ud-kyc-pill");
@@ -1624,7 +1694,17 @@ function renderUdBankDetails(b) {
 function renderUdDeviceInfo(u) {
     udSetText("ud-dev-lastlogin", u.lastLogin ? formatDateTime(u.lastLogin) : "Never");
     udSetText("ud-dev-ip", u.location?.ip || "103.211.XX.XX (Dynamic)");
-    udSetText("ud-dev-platform", "Payvika Mobile App (Android/iOS)");
+    
+    const seg = (u.ecosystemSegment || 'goldvikaone').toLowerCase();
+    const segText = seg === 'both'
+        ? '🌟 Both (DigiGold Bullion + Real Estate Bricks)'
+        : (seg === 'vikaone' ? '🏢 Vikaone / Bharat SQFT (Real Estate)' : '🪙 GoldVikaone (DigiGold Bullion)');
+    udSetText("ud-dev-segment", segText);
+
+    const logins = Array.isArray(u.loginPlatforms) && u.loginPlatforms.length > 0
+        ? u.loginPlatforms.map(p => p === 'goldvikaone' ? '📱 GoldVikaone App' : (p === 'vikaone' ? '🏢 Vikaone App' : p)).join(' & ')
+        : (u.lastLoginPlatform || 'GoldVikaone Mobile App');
+    udSetText("ud-dev-platform", logins);
 }
 
 function renderUdLocationCard(u) {

@@ -130,10 +130,77 @@ exports.getAllUsers = async (req, res, next) => {
                             "$silverInvestments.totalInvested",
                             "$copperInvestments.totalInvested"
                         ]
+                    },
+                    hasBullion: {
+                        $gt: [
+                            {
+                                $add: [
+                                    "$goldInvestments.grams",
+                                    "$silverInvestments.grams",
+                                    "$copperInvestments.grams",
+                                    "$goldInvestments.totalInvested",
+                                    "$silverInvestments.totalInvested",
+                                    "$copperInvestments.totalInvested"
+                                ]
+                            },
+                            0
+                        ]
+                    },
+                    hasRealEstate: {
+                        $gt: [
+                            {
+                                $add: [
+                                    { $size: { $ifNull: ["$propertyInvestments.items", []] } },
+                                    "$propertyInvestments.totalInvested"
+                                ]
+                            },
+                            0
+                        ]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    ecosystemSegment: {
+                        $cond: {
+                            if: {
+                                $or: [
+                                    { $and: [ { $eq: ["$hasBullion", true] }, { $eq: ["$hasRealEstate", true] } ] },
+                                    { $in: ["both", { $ifNull: ["$loginPlatforms", []] }] },
+                                    { $and: [
+                                        { $in: ["goldvikaone", { $ifNull: ["$loginPlatforms", []] }] },
+                                        { $in: ["vikaone", { $ifNull: ["$loginPlatforms", []] }] }
+                                    ]},
+                                    { $eq: ["$appSource", "both"] }
+                                ]
+                            },
+                            then: "both",
+                            else: {
+                                $cond: {
+                                    if: {
+                                        $or: [
+                                            { $eq: ["$hasRealEstate", true] },
+                                            { $in: ["vikaone", { $ifNull: ["$loginPlatforms", []] }] },
+                                            { $eq: ["$appSource", "vikaone"] }
+                                        ]
+                                    },
+                                    then: "vikaone",
+                                    else: "goldvikaone"
+                                }
+                            }
+                        }
                     }
                 }
             }
         ];
+
+        // Filtering by ecosystem segment (both, goldvikaone, vikaone)
+        if (req.query.segment) {
+            const seg = req.query.segment.toLowerCase().trim();
+            if (seg === "both" || seg === "goldvikaone" || seg === "vikaone") {
+                pipeline.push({ $match: { ecosystemSegment: seg } });
+            }
+        }
 
         // Filtering by investment presence
         if (req.query.hasInvestment === "true") {
@@ -255,13 +322,47 @@ exports.getAllUsers = async (req, res, next) => {
             const rewStat = rewardStatsMap[uidStr] || { totalPointsEarned: user.rewardPoints || 0, rewardTxnCount: 0 };
             const referrerInfo = user.referredBy ? (referrerMap[user.referredBy.toString()] || null) : null;
 
+            const propItems = user.propertyInvestments?.items || [];
+            const propBricks = propItems.reduce((acc, it) => acc + (it.bricks || 0), 0);
+            const propInvested = user.propertyInvestments?.totalInvested || 0;
+            const hasBullion = (goldGrams > 0 || silverGrams > 0 || copperGrams > 0 || goldSpent > 0 || silverSpent > 0 || copperSpent > 0);
+            const hasRealEstate = (propBricks > 0 || propInvested > 0 || propItems.length > 0);
+
+            const loginPlatforms = Array.isArray(user.loginPlatforms) && user.loginPlatforms.length > 0
+                ? user.loginPlatforms
+                : (user.appSource ? [user.appSource] : ["goldvikaone"]);
+            const hasBothLogins = loginPlatforms.includes("both") || (loginPlatforms.includes("goldvikaone") && loginPlatforms.includes("vikaone"));
+            const isVikaoneLogin = loginPlatforms.includes("vikaone");
+
+            let segment = "goldvikaone";
+            if ((hasBullion && hasRealEstate) || hasBothLogins || user.appSource === "both") {
+                segment = "both";
+            } else if (hasRealEstate || isVikaoneLogin || user.appSource === "vikaone") {
+                segment = "vikaone";
+            } else {
+                segment = user.appSource || "goldvikaone";
+            }
+
+            const segmentLabel = segment === "both"
+                ? "🌟 Both (DigiGold + Real Estate)"
+                : (segment === "vikaone" ? "🏢 Vikaone (Real Estate)" : "🪙 GoldVikaone (DigiGold)");
+
             return {
                 ...user,
+                ecosystemSegment: segment,
+                ecosystemLabel: segmentLabel,
+                loginPlatforms: loginPlatforms,
+                lastLoginPlatform: user.lastLoginPlatform || (segment === "vikaone" ? "Vikaone Real Estate App" : "GoldVikaone Mobile App"),
+                registeredFrom: user.registeredFrom || user.appSource || "goldvikaone",
                 walletBalance: walletMap[uidStr] || 0,
                 referralsCount: refStat.count || 0,
                 referralRewardsEarned: refStat.totalBonus || (user.referralBalance || 0),
                 totalRewardPointsEarned: rewStat.totalPointsEarned || (user.rewardPoints || 0),
                 referredByInfo: referrerInfo,
+                propertyInvestments: {
+                    ...user.propertyInvestments,
+                    totalBricks: propBricks,
+                },
                 goldInvestments: {
                     ...user.goldInvestments,
                     avgBuyPrice: goldAvgPrice,
@@ -435,10 +536,37 @@ exports.getUserById = async (req, res, next) => {
 
         unifiedTxns.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+        const userObj = user.toObject();
+        const hasBullion = (goldGrams > 0 || silverGrams > 0 || copperGrams > 0 || goldInvested > 0 || silverInvested > 0 || copperInvested > 0 || sips.length > 0 || schemes.length > 0);
+        const hasRealEstate = (propTotalBricks > 0 || propTotalInvested > 0 || (propItems && propItems.length > 0));
+        const loginPlatforms = Array.isArray(userObj.loginPlatforms) && userObj.loginPlatforms.length > 0
+            ? userObj.loginPlatforms
+            : (userObj.appSource ? [userObj.appSource] : ["goldvikaone"]);
+        const hasBothLogins = loginPlatforms.includes("both") || (loginPlatforms.includes("goldvikaone") && loginPlatforms.includes("vikaone"));
+        const isVikaoneLogin = loginPlatforms.includes("vikaone");
+
+        let ecosystemSegment = "goldvikaone";
+        if ((hasBullion && hasRealEstate) || hasBothLogins || userObj.appSource === "both") {
+            ecosystemSegment = "both";
+        } else if (hasRealEstate || isVikaoneLogin || userObj.appSource === "vikaone") {
+            ecosystemSegment = "vikaone";
+        } else {
+            ecosystemSegment = userObj.appSource || "goldvikaone";
+        }
+
+        const ecosystemLabel = ecosystemSegment === "both"
+            ? "🌟 Both (DigiGold + Real Estate)"
+            : (ecosystemSegment === "vikaone" ? "🏢 Vikaone (Real Estate / Vikadrx)" : "🪙 GoldVikaone (DigiGold)");
+
         res.json({
             success: true,
             data: {
-                ...user.toObject(),
+                ...userObj,
+                ecosystemSegment,
+                ecosystemLabel,
+                loginPlatforms,
+                lastLoginPlatform: userObj.lastLoginPlatform || (ecosystemSegment === "vikaone" ? "Vikaone Real Estate App" : "GoldVikaone Mobile App"),
+                registeredFrom: userObj.registeredFrom || userObj.appSource || "goldvikaone",
                 walletBalance,
                 rates: { gold: goldRate, silver: silverRate, copper: copperRate },
                 overview: {

@@ -38,6 +38,24 @@ const UserSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    appSource: {
+      type: String,
+      default: "goldvikaone",
+    },
+    registeredFrom: {
+      type: String,
+      default: "goldvikaone",
+    },
+    lastLoginPlatform: {
+      type: String,
+      default: "",
+    },
+    loginPlatforms: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     referralCode: {
       type: String,
       unique: true,

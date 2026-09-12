@@ -145,7 +145,20 @@ exports.register = async (req, res, next) => {
     const existsPhone = await User.findOne({ phone });
     if (existsPhone) return res.status(400).json({ success: false, message: "Phone number already registered" });
 
-    const user = await User.create({ name, email, phone, password, plainPassword: password });
+    const incomingApp = (req.body.appSource || req.headers["x-app-source"] || "goldvikaone").toLowerCase().trim();
+    const platform = (req.body.platform || req.headers["x-platform"] || incomingApp).trim();
+
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      password,
+      plainPassword: password,
+      appSource: incomingApp,
+      registeredFrom: incomingApp,
+      lastLoginPlatform: platform,
+      loginPlatforms: [incomingApp],
+    });
     await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);
   } catch (err) { next(err); }
@@ -158,7 +171,23 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email }).select("+password");
     if (!user || !(await user.matchPassword(password))) return res.status(401).json({ success: false, message: "Invalid credentials" });
     if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
+    
+    const incomingApp = (req.body.appSource || req.headers["x-app-source"] || "").toLowerCase().trim();
+    const platform = (req.body.platform || req.headers["x-platform"] || incomingApp || "").trim();
+    
     user.lastLogin = Date.now();
+    if (platform) user.lastLoginPlatform = platform;
+    if (incomingApp) {
+      if (!user.loginPlatforms) user.loginPlatforms = [];
+      if (!user.loginPlatforms.includes(incomingApp)) {
+        user.loginPlatforms.push(incomingApp);
+      }
+      if (!user.appSource || user.appSource === "goldvikaone") {
+        if (incomingApp !== "goldvikaone") {
+          user.appSource = user.loginPlatforms.length > 1 ? "both" : incomingApp;
+        }
+      }
+    }
     await user.save({ validateBeforeSave: false });
     sendToken(user, 200, res);
   } catch (err) { next(err); }
@@ -230,7 +259,19 @@ exports.registerWithOtp = async (req, res, next) => {
     // the schema's password requirement is still satisfied, but the user
     // will always log back in via OTP, never this random value.
     const randomPassword = require("crypto").randomBytes(16).toString("hex");
-    const user = await User.create({ name, email, phone, password: randomPassword });
+    const incomingApp = (req.body.appSource || req.headers["x-app-source"] || "goldvikaone").toLowerCase().trim();
+    const platform = (req.body.platform || req.headers["x-platform"] || incomingApp).trim();
+
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      password: randomPassword,
+      appSource: incomingApp,
+      registeredFrom: incomingApp,
+      lastLoginPlatform: platform,
+      loginPlatforms: [incomingApp],
+    });
     await processReferralAndRewards(user, referralCode);
     sendToken(user, 201, res);
   } catch (err) { next(err); }
@@ -261,7 +302,22 @@ exports.loginWithOtp = async (req, res, next) => {
     if (!user) return res.status(404).json({ success: false, message: "No account found with this mobile number" });
     if (!user.isActive) return res.status(403).json({ success: false, message: "Account deactivated" });
 
+    const incomingApp = (req.body.appSource || req.headers["x-app-source"] || "").toLowerCase().trim();
+    const platform = (req.body.platform || req.headers["x-platform"] || incomingApp || "").trim();
+
     user.lastLogin = Date.now();
+    if (platform) user.lastLoginPlatform = platform;
+    if (incomingApp) {
+      if (!user.loginPlatforms) user.loginPlatforms = [];
+      if (!user.loginPlatforms.includes(incomingApp)) {
+        user.loginPlatforms.push(incomingApp);
+      }
+      if (!user.appSource || user.appSource === "goldvikaone") {
+        if (incomingApp !== "goldvikaone") {
+          user.appSource = user.loginPlatforms.length > 1 ? "both" : incomingApp;
+        }
+      }
+    }
     await user.save({ validateBeforeSave: false });
     sendToken(user, 200, res);
   } catch (err) { next(err); }
