@@ -60,6 +60,11 @@ const PropertySchema = new mongoose.Schema(
         investmentEnabled: { type: Boolean, default: true }, // toggle on/off
         expectedAppreciation: { type: Number, default: 8 },  // % per year, capital growth
         expectedRentalYield: { type: Number, default: 3 },  // % per year, rental income
+        purchaseMode: {
+            type: String,
+            enum: ["both", "bricks", "direct"],
+            default: "both",
+        },
 
         // Media
         images: [{

@@ -7,10 +7,11 @@ const paymentGatewayService = require("../services/paymentGatewayService");
 
 exports.createOrder = async (req, res, next) => {
     try {
-        const { propertyId, bricks } = req.body;
+        let { propertyId, bricks, isDirectBuy, purchaseType } = req.body;
+        const isDirect = isDirectBuy === true || purchaseType === "direct";
 
-        if (!propertyId || !bricks || bricks < 1) {
-            return res.status(400).json({ success: false, message: "propertyId and bricks required" });
+        if (!propertyId) {
+            return res.status(400).json({ success: false, message: "propertyId is required" });
         }
 
         // KYC check — required before any brick investment
@@ -35,6 +36,20 @@ exports.createOrder = async (req, res, next) => {
         if (!property.brickPrice || property.brickPrice <= 0) return res.status(400).json({ success: false, message: "Brick price not set" });
         if (!property.totalBricks || property.totalBricks <= 0) return res.status(400).json({ success: false, message: "Total bricks not set" });
 
+        const pMode = property.purchaseMode || "both";
+        if (pMode === "direct" && !isDirect) {
+            return res.status(400).json({
+                success: false,
+                message: "This property is exclusively available for Direct Buy (Full Property Purchase) only."
+            });
+        }
+        if (pMode === "bricks" && isDirect) {
+            return res.status(400).json({
+                success: false,
+                message: "This property is available for Fractional Bricks investment only."
+            });
+        }
+
         const soldAgg = await Investment.aggregate([
             { $match: { property: property._id, status: "paid" } },
             { $group: { _id: null, total: { $sum: "$bricks" } } }
@@ -42,8 +57,19 @@ exports.createOrder = async (req, res, next) => {
         const sold = soldAgg[0]?.total || 0;
         const available = property.totalBricks - sold;
 
-        if (bricks > available) {
-            return res.status(400).json({ success: false, message: `Only ${available} bricks available` });
+        if (available <= 0) {
+            return res.status(400).json({ success: false, message: "This property is completely sold out" });
+        }
+
+        if (isDirect) {
+            bricks = available;
+        } else {
+            if (!bricks || bricks < 1) {
+                return res.status(400).json({ success: false, message: "Valid number of bricks required" });
+            }
+            if (bricks > available) {
+                return res.status(400).json({ success: false, message: `Only ${available} bricks available` });
+            }
         }
 
         const totalAmount = bricks * property.brickPrice;
@@ -56,7 +82,9 @@ exports.createOrder = async (req, res, next) => {
                 purpose: "spot",
                 notes: {
                     userId: String(req.user._id),
-                    type: "investment",
+                    type: isDirect ? "direct_buy" : "investment",
+                    propertyId: String(property._id),
+                    isDirectBuy: isDirect ? "true" : "false",
                 },
             });
             order = result.order;
@@ -74,6 +102,8 @@ exports.createOrder = async (req, res, next) => {
             totalAmount,
             razorpayOrderId: order.id,
             status: "pending",
+            purchaseType: isDirect ? "direct" : "bricks",
+            isDirectBuy: isDirect,
         });
 
         return res.json({
@@ -85,6 +115,8 @@ exports.createOrder = async (req, res, next) => {
                 pricePerBrick: property.brickPrice,
                 totalAmount,
                 propertyTitle: property.title,
+                isDirectBuy: isDirect,
+                purchaseType: isDirect ? "direct" : "bricks",
             },
             key: keyId,
         });

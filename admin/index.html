@@ -3534,6 +3534,19 @@
                                 placeholder="8.5" required />
                         </div>
                     </div>
+                    <div class="form-group" style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
+                        <label class="form-label" style="font-weight:700;color:#c084fc;display:flex;align-items:center;gap:6px">
+                            <i class="fas fa-shopping-bag"></i> Property Purchase Mode
+                        </label>
+                        <select class="form-control" id="prop-purchase-mode" onchange="handlePropPurchaseModeChange()" style="font-weight:600">
+                            <option value="both">🌟 Both Allowed (Bricks Buy & Full Direct Buy)</option>
+                            <option value="bricks">🧱 Fractional Only (Bricks Buy)</option>
+                            <option value="direct">🏢 Direct Buy Only (Full Property Buy / Outright 100% Purchase)</option>
+                        </select>
+                        <div id="prop-purchase-mode-hint" style="font-size:11.5px;color:var(--text-muted);margin-top:6px">
+                            <i class="fas fa-info-circle" style="color:var(--gold)"></i> <strong>Both Allowed:</strong> Investors can either purchase fractional bricks or buy the full property outright at 100% valuation.
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Description</label>
                         <textarea class="form-control" id="prop-desc" rows="3"

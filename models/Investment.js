@@ -38,6 +38,15 @@ const InvestmentSchema = new mongoose.Schema(
         ownershipPercent: {
             type: Number,
         },
+        purchaseType: {
+            type: String,
+            enum: ["bricks", "direct"],
+            default: "bricks",
+        },
+        isDirectBuy: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

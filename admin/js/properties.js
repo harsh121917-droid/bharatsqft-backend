@@ -53,6 +53,7 @@ function renderProperties(props) {
                 <tr>
                     <th>Property</th>
                     <th>Location</th>
+                    <th>Purchase Mode</th>
                     <th>Total Value</th>
                     <th>Bricks</th>
                     <th>Funded</th>
@@ -73,6 +74,14 @@ function renderProperties(props) {
             ? `<span class="badge badge-success" style="display:inline-flex;align-items:center;gap:4px"><i class="fas fa-check-circle"></i> Published</span>`
             : `<span class="badge badge-danger" style="display:inline-flex;align-items:center;gap:4px"><i class="fas fa-eye-slash"></i> Draft</span>`;
 
+        const mode = (p.purchaseMode || "both").toLowerCase();
+        let modeBadge = `<span class="badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-weight:700;font-size:10.5px;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-layer-group"></i> Bricks + Direct</span>`;
+        if (mode === "direct") {
+            modeBadge = `<span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:10.5px;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-building"></i> Direct Buy Only</span>`;
+        } else if (mode === "bricks") {
+            modeBadge = `<span class="badge" style="background:rgba(192,132,252,0.15);color:#c084fc;border:1px solid rgba(192,132,252,0.4);font-weight:700;font-size:10.5px;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-cubes"></i> Bricks Only</span>`;
+        }
+
         html += `
         <tr>
             <td>
@@ -85,6 +94,7 @@ function renderProperties(props) {
                 </div>
             </td>
             <td style="font-size:13px">${p.location?.city || '—'}, ${p.location?.state || '—'}</td>
+            <td>${modeBadge}</td>
             <td style="font-weight:700;color:var(--gold)">${formatPrice(totalVal)}</td>
             <td style="font-family:var(--font-mono);font-size:13px">${p.totalBricks || 0}</td>
             <td>
@@ -124,6 +134,19 @@ function renderProperties(props) {
 }
 
 // ── Property Modals & CRUD ────────────────────────────────────
+function handlePropPurchaseModeChange() {
+    const mode = document.getElementById("prop-purchase-mode")?.value || "both";
+    const hint = document.getElementById("prop-purchase-mode-hint");
+    if (!hint) return;
+    if (mode === "direct") {
+        hint.innerHTML = `<i class="fas fa-info-circle" style="color:#38bdf8"></i> <strong>Direct Buy Only:</strong> A single investor purchases 100% full ownership of this property in one single transaction.`;
+    } else if (mode === "bricks") {
+        hint.innerHTML = `<i class="fas fa-info-circle" style="color:#c084fc"></i> <strong>Bricks Buy Only:</strong> Investors can only purchase fractional bricks (e.g., 5, 10, 50 bricks).`;
+    } else {
+        hint.innerHTML = `<i class="fas fa-info-circle" style="color:var(--gold)"></i> <strong>Both Allowed:</strong> Investors can either buy individual fractional bricks OR buy the full property outright in one click.`;
+    }
+}
+
 function openPropertyModal() {
     editingPropertyId = null;
     currentAmenities = [];
@@ -133,6 +156,9 @@ function openPropertyModal() {
 
     document.getElementById("prop-modal-title").textContent = "Add New Property Listing";
     document.getElementById("prop-form")?.reset();
+    const modeSelect = document.getElementById("prop-purchase-mode");
+    if (modeSelect) modeSelect.value = "both";
+    handlePropPurchaseModeChange();
     renderAmenityTags();
     renderImagesGrid();
     modal.style.display = "flex";
@@ -222,6 +248,7 @@ async function saveProperty() {
     const totalInvestment = Number(document.getElementById("prop-total-investment")?.value);
     const totalBricks = Number(document.getElementById("prop-total-bricks")?.value);
     const rentalYield = Number(document.getElementById("prop-rental-yield")?.value);
+    const purchaseMode = document.getElementById("prop-purchase-mode")?.value || "both";
 
     if (!title || !totalInvestment || !totalBricks) {
         toast("Please fill in all required property details (Title, Total Investment, Total Bricks)", "warning");
@@ -243,6 +270,7 @@ async function saveProperty() {
             label: "onwards"
         },
         expectedRentalYield: rentalYield || 3,
+        purchaseMode,
         investmentEnabled: true,
         featured: true,
         status: "published", // Automatically published so it is visible in app immediately!
@@ -291,6 +319,9 @@ async function editProperty(id) {
             document.getElementById("prop-total-investment").value = totalVal || "";
             document.getElementById("prop-total-bricks").value = p.totalBricks || "";
             document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
+            const modeSelect = document.getElementById("prop-purchase-mode");
+            if (modeSelect) modeSelect.value = p.purchaseMode || "both";
+            handlePropPurchaseModeChange();
             currentAmenities = p.amenities || [];
             uploadedImages = (p.images || []).map(img => typeof img === 'string' ? { url: img, isCover: false } : { url: img.url, isCover: !!img.isCover });
             if (uploadedImages.length > 0 && !uploadedImages.some(i => i.isCover)) {
