@@ -15,10 +15,13 @@ const {
 } = require("../controllers/goldController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
+const { handleRazorpayWebhook } = require("../controllers/paymentController");
+
 // ── Public ────────────────────────────────────────────────────────────────────
 router.get("/rate", getRate);   // live rate — no auth needed (show on landing page too)
 router.get("/rates", getRate);  // alias for backward compatibility / frontend callers
 router.get("/history", getHistory);
+router.post("/webhook", handleRazorpayWebhook);
 
 // ── User (auth required) ──────────────────────────────────────────────────────
 router.use(protect);

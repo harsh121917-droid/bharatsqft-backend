@@ -27,6 +27,10 @@ const {
   resetUserWallet,
   resetUserRewards,
   resetAllUserData,
+  verifyTransactionWithGateway,
+  manuallyApproveTransaction,
+  manuallyRejectTransaction,
+  syncUserPendingPayments,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -56,8 +60,13 @@ router.post("/users/:id/reset-wallet", resetUserWallet);
 router.post("/users/:id/reset-rewards", resetUserRewards);
 router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
-router.delete("/users/:id/location", clearUserLocation);
 router.delete("/users/:id", deleteUser);
+
+// Payment Resolution & Verification Routes
+router.post("/users/:id/sync-payments", syncUserPendingPayments);
+router.post("/transactions/:metal/:id/verify", verifyTransactionWithGateway);
+router.post("/transactions/:metal/:id/approve", manuallyApproveTransaction);
+router.post("/transactions/:metal/:id/reject", manuallyRejectTransaction);
 
 // Wallet Transaction Ledger & Audit Trail
 router.get("/wallet-ledger", getWalletLedger);

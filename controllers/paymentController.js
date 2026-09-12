@@ -190,3 +190,32 @@ exports.getAllInvestments = async (req, res, next) => {
         });
     } catch (err) { next(err); }
 };
+
+// ── RAZORPAY WEBHOOK LISTENER ──────────────────────────────────
+// Webhook endpoint to catch order.paid, payment.captured, payment.authorized
+exports.handleRazorpayWebhook = async (req, res, next) => {
+    try {
+        const { resolveTransactionByRazorpayOrder } = require("../services/transactionResolutionService");
+        const event = req.body?.event;
+        const payload = req.body?.payload;
+
+        console.log(`[Razorpay Webhook Received] Event: ${event}`);
+
+        if (event === "order.paid" || event === "payment.captured" || event === "payment.authorized") {
+            const orderId = payload?.payment?.entity?.order_id || payload?.order?.entity?.id;
+            const paymentId = payload?.payment?.entity?.id;
+
+            if (orderId) {
+                const result = await resolveTransactionByRazorpayOrder(orderId, paymentId, "webhook");
+                if (result) {
+                    console.log(`[Razorpay Webhook] Auto-credited and completed order ${orderId}:`, result.message);
+                }
+            }
+        }
+
+        return res.status(200).json({ status: "ok" });
+    } catch (err) {
+        console.error("[Razorpay Webhook Error]:", err.message);
+        return res.status(200).json({ status: "error", message: err.message });
+    }
+};

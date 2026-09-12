@@ -2070,7 +2070,27 @@ function renderUdTransactionsTab(u) {
         return;
     }
 
-    let html = `
+    const pendingCount = txns.filter(t => t.status === "pending" || t.status === "processing").length;
+
+    let html = "";
+    if (pendingCount > 0) {
+        html += `
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+                <i class="fas fa-exclamation-triangle" style="color:#f59e0b;font-size:16px"></i>
+                <div>
+                    <strong style="color:#f59e0b;font-size:12px">${pendingCount} Pending Transaction${pendingCount > 1 ? 's' : ''} Detected!</strong>
+                    <div style="font-size:11px;color:#cbd5e1">If customer completed payment on UPI/Gateway, verify via Razorpay or click Approve & Credit to allocate balance immediately.</div>
+                </div>
+            </div>
+            <button class="btn btn-sm" onclick="syncUserPayments('${u._id}')" style="background:#f59e0b;color:#000;font-weight:700;border:none;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer">
+                <i class="fas fa-sync-alt"></i> Auto-Verify from Gateway
+            </button>
+        </div>`;
+    }
+
+    html += `
+    <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
             <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
@@ -2081,25 +2101,156 @@ function renderUdTransactionsTab(u) {
                 <th style="padding:8px">Amount</th>
                 <th style="padding:8px">Date & Time</th>
                 <th style="padding:8px">Status</th>
+                <th style="padding:8px;text-align:right">Resolution Actions</th>
             </tr>
         </thead>
         <tbody>`;
 
     txns.forEach(t => {
+        const isPending = t.status === "pending" || t.status === "processing";
+        const isSuccess = t.status === "success" || t.status === "paid";
+
+        let statusPill = "";
+        if (isPending) {
+            statusPill = `<span class="ud-status-pill pending" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px"><i class="fas fa-clock"></i> PENDING</span>`;
+        } else if (isSuccess) {
+            statusPill = `<span class="ud-status-pill success" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px"><i class="fas fa-check-circle"></i> COMPLETED</span>`;
+        } else {
+            statusPill = `<span class="ud-status-pill danger" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px"><i class="fas fa-times-circle"></i> FAILED</span>`;
+        }
+
+        let actionCell = "";
+        if (isPending) {
+            actionCell = `
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+                <button class="btn btn-secondary btn-sm" onclick="verifyTransactionWithGateway('${t.metal}', '${t.id}')" title="Check payment status directly on Razorpay Gateway" style="padding:4px 8px;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:5px;font-weight:600;cursor:pointer">
+                    <i class="fas fa-sync-alt"></i> Verify Gateway
+                </button>
+                <button class="btn btn-sm" onclick="approveTransactionManually('${t.metal}', '${t.id}', '${t.invoiceNo || ''}', '${t.amount}')" title="Customer completed payment — Mark as PAID and credit balance now" style="padding:4px 9px;font-size:11px;background:linear-gradient(135deg, #10b981, #059669);color:#ffffff;border:none;border-radius:5px;font-weight:700;box-shadow:0 2px 6px rgba(16,185,129,0.3);cursor:pointer">
+                    <i class="fas fa-check"></i> Approve & Credit
+                </button>
+                <button class="btn btn-sm" onclick="rejectTransactionManually('${t.metal}', '${t.id}')" title="Mark as cancelled/failed" style="padding:4px 7px;font-size:11px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:5px;cursor:pointer">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>`;
+        } else if (isSuccess) {
+            actionCell = `<span style="color:#10b981;font-size:11.5px;font-weight:600"><i class="fas fa-shield-check"></i> Credited to Vault</span>`;
+        } else {
+            actionCell = `<span style="color:#94a3b8;font-size:11px">No actions</span>`;
+        }
+
         html += `
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-            <td style="padding:8px;font-family:var(--font-mono);color:#60a5fa">${t.invoiceNo || (t.id ? t.id.slice(-6).toUpperCase() : '—')}</td>
+            <td style="padding:8px;font-family:var(--font-mono);color:#60a5fa">
+                <strong>${t.invoiceNo || (t.id ? t.id.slice(-6).toUpperCase() : '—')}</strong>
+                ${t.razorpayOrderId ? `<div style="font-size:10px;color:#64748b">${t.razorpayOrderId}</div>` : ''}
+            </td>
             <td style="padding:8px"><span class="ud-status-pill active">${(t.type || 'buy').toUpperCase()}</span></td>
             <td style="padding:8px;font-weight:700">${t.metal}</td>
             <td style="padding:8px;font-family:var(--font-mono)">${t.metal === 'Property' ? `${t.grams} Bricks` : formatGrams(t.grams)}</td>
             <td style="padding:8px;font-family:var(--font-mono);font-weight:700;color:#fff">${formatINR(t.amount)}</td>
             <td style="padding:8px;color:#94a3b8">${formatDateTime(t.date)}</td>
-            <td style="padding:8px"><span class="ud-status-pill success">${t.status || 'Success'}</span></td>
+            <td style="padding:8px">${statusPill}</td>
+            <td style="padding:8px;text-align:right">${actionCell}</td>
         </tr>`;
     });
 
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
     mount.innerHTML = html;
+}
+
+// ── TRANSACTION RESOLUTION ACTION HANDLERS ────────────────────
+async function syncUserPayments(userId) {
+    const btn = document.getElementById("btn-sync-user-payments");
+    const icon = document.getElementById("icon-sync-user-payments");
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add("fa-spin");
+
+    try {
+        toast("Checking payment gateway for pending orders...", "info");
+        const res = await api(`/admin/users/${userId}/sync-payments`, { method: "POST" });
+        if (res.success) {
+            toast(res.message, res.verifiedCount > 0 ? "success" : "info");
+            if (typeof viewUserDetails === "function") {
+                await viewUserDetails(userId);
+            }
+        } else {
+            toast(res.message || "Sync failed", "error");
+        }
+    } catch (err) {
+        toast("Error syncing payments: " + err.message, "error");
+    } finally {
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove("fa-spin");
+    }
+}
+
+async function verifyTransactionWithGateway(metal, id) {
+    try {
+        toast("Verifying order status with Razorpay...", "info");
+        const res = await api(`/admin/transactions/${metal}/${id}/verify`, { method: "POST" });
+        if (res.success) {
+            toast(res.message || "Payment verified and credited ✓", "success");
+            if (typeof activeUserId !== "undefined" && activeUserId) {
+                await viewUserDetails(activeUserId);
+            }
+        } else {
+            const shouldApprove = confirm(
+                `${res.message}\n\nWould you like to manually APPROVE & CREDIT this transaction now?`
+            );
+            if (shouldApprove) {
+                await approveTransactionManually(metal, id);
+            }
+        }
+    } catch (err) {
+        const shouldApprove = confirm(
+            `Gateway check: ${err.message}\n\nWould you like to manually APPROVE & CREDIT this transaction instead?`
+        );
+        if (shouldApprove) {
+            await approveTransactionManually(metal, id);
+        }
+    }
+}
+
+async function approveTransactionManually(metal, id, invoiceNo, amount) {
+    const invStr = invoiceNo ? ` (${invoiceNo})` : "";
+    const amtStr = amount ? ` of ${formatINR(amount)}` : "";
+    const ok = confirm(`Are you sure you want to approve this ${metal} transaction${invStr}${amtStr}?\n\nThis will immediately mark it as SUCCESS and credit the ${metal} balance to the customer's account.`);
+    if (!ok) return;
+
+    try {
+        toast("Approving transaction and crediting user...", "info");
+        const res = await api(`/admin/transactions/${metal}/${id}/approve`, { method: "POST" });
+        if (res.success) {
+            toast(res.message || "Transaction approved & balance credited ✓", "success");
+            if (typeof activeUserId !== "undefined" && activeUserId) {
+                await viewUserDetails(activeUserId);
+            }
+        } else {
+            toast(res.message || "Approval failed", "error");
+        }
+    } catch (err) {
+        toast("Error approving transaction: " + err.message, "error");
+    }
+}
+
+async function rejectTransactionManually(metal, id) {
+    const ok = confirm(`Are you sure you want to mark this pending ${metal} transaction as FAILED / CANCELLED?`);
+    if (!ok) return;
+
+    try {
+        const res = await api(`/admin/transactions/${metal}/${id}/reject`, { method: "POST" });
+        if (res.success) {
+            toast("Transaction marked as failed", "info");
+            if (typeof activeUserId !== "undefined" && activeUserId) {
+                await viewUserDetails(activeUserId);
+            }
+        } else {
+            toast(res.message || "Action failed", "error");
+        }
+    } catch (err) {
+        toast("Error: " + err.message, "error");
+    }
 }
 
 function renderUdWalletTab(u) {

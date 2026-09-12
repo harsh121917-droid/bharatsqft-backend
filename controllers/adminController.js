@@ -510,7 +510,10 @@ exports.getUserTransactions = async (req, res, next) => {
             ratePerGram: t.ratePerGram || 0,
             date: t.createdAt,
             status: t.status || "success",
-            invoiceNo: t.invoiceNo || ""
+            invoiceNo: t.invoiceNo || "",
+            razorpayOrderId: t.razorpayOrderId || "",
+            razorpayPaymentId: t.razorpayPaymentId || "",
+            note: t.note || ""
         }));
         silverTxns.forEach(t => unified.push({
             id: t._id,
@@ -521,7 +524,10 @@ exports.getUserTransactions = async (req, res, next) => {
             ratePerGram: t.ratePerGram || 0,
             date: t.createdAt,
             status: t.status || "success",
-            invoiceNo: t.invoiceNo || ""
+            invoiceNo: t.invoiceNo || "",
+            razorpayOrderId: t.razorpayOrderId || "",
+            razorpayPaymentId: t.razorpayPaymentId || "",
+            note: t.note || ""
         }));
         copperTxns.forEach(t => unified.push({
             id: t._id,
@@ -532,7 +538,10 @@ exports.getUserTransactions = async (req, res, next) => {
             ratePerGram: t.ratePerGram || 0,
             date: t.createdAt,
             status: t.status || "success",
-            invoiceNo: t.invoiceNo || ""
+            invoiceNo: t.invoiceNo || "",
+            razorpayOrderId: t.razorpayOrderId || "",
+            razorpayPaymentId: t.razorpayPaymentId || "",
+            note: t.note || ""
         }));
         propTxns.forEach(p => unified.push({
             id: p._id,
@@ -543,7 +552,10 @@ exports.getUserTransactions = async (req, res, next) => {
             ratePerGram: p.pricePerBrick || 0,
             date: p.createdAt,
             status: p.status || "paid",
-            invoiceNo: p.property?.title || "Property Brick"
+            invoiceNo: p.property?.title || "Property Brick",
+            razorpayOrderId: p.razorpayOrderId || "",
+            razorpayPaymentId: p.razorpayPaymentId || "",
+            note: ""
         }));
         walletTxns.forEach(w => unified.push({
             id: w._id,
@@ -554,7 +566,10 @@ exports.getUserTransactions = async (req, res, next) => {
             ratePerGram: 0,
             date: w.createdAt,
             status: w.status || "success",
-            invoiceNo: w.txnId || ""
+            invoiceNo: w.txnId || "",
+            razorpayOrderId: w.razorpayOrderId || "",
+            razorpayPaymentId: w.razorpayPaymentId || "",
+            note: w.note || ""
         }));
 
         unified.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -566,6 +581,227 @@ exports.getUserTransactions = async (req, res, next) => {
         });
     } catch (err) {
         next(err);
+    }
+};
+
+// ── VERIFY TRANSACTION WITH RAZORPAY GATEWAY ──────────────────
+exports.verifyTransactionWithGateway = async (req, res, next) => {
+    try {
+        const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
+        const { checkRazorpayOrderStatus } = require("../services/paymentGatewayService");
+        const { metal, id } = req.params;
+        let orderId = null;
+
+        const norm = String(metal || "").toLowerCase();
+        if (norm === "gold") {
+            const txn = await GoldTransaction.findById(id);
+            if (!txn) return res.status(404).json({ success: false, message: "Gold transaction not found" });
+            if (txn.status === "success") {
+                return res.json({ success: true, message: "Transaction is already completed", status: "success" });
+            }
+            orderId = txn.razorpayOrderId;
+        } else if (norm === "silver") {
+            const txn = await SilverTransaction.findById(id);
+            if (!txn) return res.status(404).json({ success: false, message: "Silver transaction not found" });
+            if (txn.status === "success") {
+                return res.json({ success: true, message: "Transaction is already completed", status: "success" });
+            }
+            orderId = txn.razorpayOrderId;
+        } else if (norm === "copper") {
+            const txn = await CopperTransaction.findById(id);
+            if (!txn) return res.status(404).json({ success: false, message: "Copper transaction not found" });
+            if (txn.status === "success") {
+                return res.json({ success: true, message: "Transaction is already completed", status: "success" });
+            }
+            orderId = txn.razorpayOrderId;
+        } else if (norm === "property" || norm === "brick") {
+            const inv = await Investment.findById(id);
+            if (!inv) return res.status(404).json({ success: false, message: "Property investment not found" });
+            if (inv.status === "paid") {
+                return res.json({ success: true, message: "Investment is already paid", status: "paid" });
+            }
+            orderId = inv.razorpayOrderId;
+        } else if (norm === "wallet") {
+            const txn = await WalletTxn.findById(id);
+            if (!txn) return res.status(404).json({ success: false, message: "Wallet transaction not found" });
+            if (txn.status === "success") {
+                return res.json({ success: true, message: "Wallet transaction is already completed", status: "success" });
+            }
+            orderId = txn.razorpayOrderId;
+        } else {
+            return res.status(400).json({ success: false, message: "Invalid metal or asset type: " + metal });
+        }
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: "No Razorpay Order ID found on this transaction. You can use 'Approve & Credit Manually' if payment was received."
+            });
+        }
+
+        const rzpStatus = await checkRazorpayOrderStatus(orderId);
+        if (rzpStatus.isPaid) {
+            const result = await creditAndCompleteTransaction(metal, id, {
+                paymentId: rzpStatus.paymentId,
+                verifiedBy: "gateway"
+            });
+            return res.json({
+                success: true,
+                message: `Payment confirmed on Razorpay! ${result.message}`,
+                data: result
+            });
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: `Razorpay reports order status as '${rzpStatus.orderStatus}'. Payment has not been captured yet.`,
+                orderStatus: rzpStatus.orderStatus
+            });
+        }
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to verify transaction with gateway"
+        });
+    }
+};
+
+// ── MANUALLY APPROVE & CREDIT TRANSACTION ─────────────────────
+exports.manuallyApproveTransaction = async (req, res, next) => {
+    try {
+        const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
+        const { metal, id } = req.params;
+        const result = await creditAndCompleteTransaction(metal, id, {
+            verifiedBy: "admin_manual"
+        });
+        return res.json({
+            success: true,
+            message: `Transaction successfully approved! ${result.message}`,
+            data: result
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to approve transaction"
+        });
+    }
+};
+
+// ── MANUALLY REJECT TRANSACTION ───────────────────────────────
+exports.manuallyRejectTransaction = async (req, res, next) => {
+    try {
+        const { metal, id } = req.params;
+        const norm = String(metal || "").toLowerCase();
+        let target = null;
+        if (norm === "gold") target = await GoldTransaction.findById(id);
+        else if (norm === "silver") target = await SilverTransaction.findById(id);
+        else if (norm === "copper") target = await CopperTransaction.findById(id);
+        else if (norm === "property" || norm === "brick") target = await Investment.findById(id);
+        else if (norm === "wallet") target = await WalletTxn.findById(id);
+
+        if (!target) return res.status(404).json({ success: false, message: "Transaction not found" });
+        target.status = norm === "property" ? "failed" : "failed";
+        target.note = (target.note ? target.note + " • " : "") + "Marked as failed/cancelled by Admin";
+        await target.save();
+
+        return res.json({ success: true, message: "Transaction marked as failed/cancelled" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to reject transaction" });
+    }
+};
+
+// ── SYNC ALL PENDING PAYMENTS FOR USER ────────────────────────
+exports.syncUserPendingPayments = async (req, res, next) => {
+    try {
+        const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
+        const { checkRazorpayOrderStatus } = require("../services/paymentGatewayService");
+        const userId = req.params.userId || req.params.id;
+
+        const [pendingGold, pendingSilver, pendingCopper, pendingProps, pendingWallet] = await Promise.all([
+            GoldTransaction.find({ user: userId, status: "pending", razorpayOrderId: { $exists: true, $ne: "" } }),
+            SilverTransaction.find({ user: userId, status: "pending", razorpayOrderId: { $exists: true, $ne: "" } }),
+            CopperTransaction.find({ user: userId, status: "pending", razorpayOrderId: { $exists: true, $ne: "" } }),
+            Investment.find({ user: userId, status: "pending", razorpayOrderId: { $exists: true, $ne: "" } }),
+            WalletTxn.find({ user: userId, status: "pending", razorpayOrderId: { $exists: true, $ne: "" } }),
+        ]);
+
+        let verifiedCount = 0;
+        const results = [];
+
+        // Check Gold
+        for (const t of pendingGold) {
+            try {
+                const rzp = await checkRazorpayOrderStatus(t.razorpayOrderId);
+                if (rzp.isPaid) {
+                    await creditAndCompleteTransaction("Gold", t._id, { paymentId: rzp.paymentId, verifiedBy: "gateway" });
+                    verifiedCount++;
+                    results.push({ metal: "Gold", id: t._id, invoiceNo: t.invoiceNo, amount: t.totalAmt, status: "credited" });
+                }
+            } catch (e) {}
+        }
+
+        // Check Silver
+        for (const t of pendingSilver) {
+            try {
+                const rzp = await checkRazorpayOrderStatus(t.razorpayOrderId);
+                if (rzp.isPaid) {
+                    await creditAndCompleteTransaction("Silver", t._id, { paymentId: rzp.paymentId, verifiedBy: "gateway" });
+                    verifiedCount++;
+                    results.push({ metal: "Silver", id: t._id, invoiceNo: t.invoiceNo, amount: t.totalAmt, status: "credited" });
+                }
+            } catch (e) {}
+        }
+
+        // Check Copper
+        for (const t of pendingCopper) {
+            try {
+                const rzp = await checkRazorpayOrderStatus(t.razorpayOrderId);
+                if (rzp.isPaid) {
+                    await creditAndCompleteTransaction("Copper", t._id, { paymentId: rzp.paymentId, verifiedBy: "gateway" });
+                    verifiedCount++;
+                    results.push({ metal: "Copper", id: t._id, invoiceNo: t.invoiceNo, amount: t.totalAmt, status: "credited" });
+                }
+            } catch (e) {}
+        }
+
+        // Check Property
+        for (const p of pendingProps) {
+            try {
+                const rzp = await checkRazorpayOrderStatus(p.razorpayOrderId);
+                if (rzp.isPaid) {
+                    await creditAndCompleteTransaction("Property", p._id, { paymentId: rzp.paymentId, verifiedBy: "gateway" });
+                    verifiedCount++;
+                    results.push({ metal: "Property", id: p._id, bricks: p.bricks, amount: p.totalAmount, status: "credited" });
+                }
+            } catch (e) {}
+        }
+
+        // Check Wallet
+        for (const w of pendingWallet) {
+            try {
+                const rzp = await checkRazorpayOrderStatus(w.razorpayOrderId);
+                if (rzp.isPaid) {
+                    await creditAndCompleteTransaction("Wallet", w._id, { paymentId: rzp.paymentId, verifiedBy: "gateway" });
+                    verifiedCount++;
+                    results.push({ metal: "Wallet", id: w._id, amount: w.amount, status: "credited" });
+                }
+            } catch (e) {}
+        }
+
+        const totalPending = pendingGold.length + pendingSilver.length + pendingCopper.length + pendingProps.length + pendingWallet.length;
+
+        return res.json({
+            success: true,
+            verifiedCount,
+            totalPending,
+            results,
+            message: verifiedCount > 0
+                ? `Successfully synced! ${verifiedCount} payment(s) verified from Razorpay and credited.`
+                : totalPending === 0
+                    ? "No pending payments found for this customer."
+                    : "Checked Razorpay for pending orders. Payments are not captured on Razorpay yet, or you can use 'Approve & Credit Manually' if confirmed in bank."
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to sync pending payments" });
     }
 };
 

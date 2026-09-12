@@ -795,6 +795,9 @@
                             <button class="btn-ud-quick-edit" onclick="openUserModal(activeUserId)" title="Quick Edit Customer Profile">
                                 <i class="fas fa-user-edit" style="color:#60a5fa"></i> <span>Edit Profile</span>
                             </button>
+                            <button class="btn btn-secondary btn-sm" id="btn-sync-user-payments" onclick="syncUserPayments(activeUserId)" title="Sync all pending payments with Gateway" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;padding:6px 12px;border-radius:6px">
+                                <i class="fas fa-sync-alt" id="icon-sync-user-payments"></i> <span>Sync Payments</span>
+                            </button>
                             <button class="btn-ud-quick-wallet" onclick="quickScrollToSection('ud-tools-wallet-box')" title="Instant Add/Deduct Money">
                                 <i class="fas fa-wallet" style="color:#f59e0b"></i> <span>Add / Deduct Money</span>
                             </button>
@@ -803,6 +806,9 @@
                                     <i class="fas fa-sliders-h"></i> <span>More Actions</span> <i class="fas fa-chevron-down" style="font-size:10px"></i>
                                 </button>
                                 <div class="ud-dropdown-menu" id="ud-actions-menu">
+                                    <button class="ud-dropdown-item" onclick="syncUserPayments(activeUserId)">
+                                        <i class="fas fa-sync-alt" style="color:#38bdf8"></i> Sync Gateway Payments
+                                    </button>
                                     <button class="ud-dropdown-item" onclick="openUserModal(activeUserId)">
                                         <i class="fas fa-user-edit" style="color:#60a5fa"></i> Edit Profile
                                     </button>

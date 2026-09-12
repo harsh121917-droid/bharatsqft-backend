@@ -240,6 +240,70 @@ async function getRazorpayKeySecret(mode, { gateway, purpose } = {}) {
     return config.keySecret;
 }
 
+/**
+ * Queries Razorpay directly to check if an order was paid/captured.
+ * Tests against all active Razorpay gateway configs (IDFC, standard, general).
+ */
+async function checkRazorpayOrderStatus(orderId, { purpose = "spot" } = {}) {
+    if (!orderId) throw new Error("Order ID is required to check status");
+
+    const configs = await PaymentGateway.find({
+        name: { $in: ["razorpay", "razorpay_idfc", "razorpay_hdfc", "razorpay_standard"] },
+        isActive: true,
+        keyId: { $exists: true, $ne: "" },
+        keySecret: { $exists: true, $ne: "" }
+    });
+
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+        configs.push({
+            name: "env_razorpay",
+            keyId: process.env.RAZORPAY_KEY_ID,
+            keySecret: process.env.RAZORPAY_KEY_SECRET
+        });
+    }
+
+    if (configs.length === 0) {
+        throw new Error("No active Razorpay credentials configured in Admin → Payment Gateways.");
+    }
+
+    let lastError = null;
+    for (const cfg of configs) {
+        try {
+            const rzp = new Razorpay({ key_id: cfg.keyId, key_secret: cfg.keySecret });
+            const order = await rzp.orders.fetch(orderId);
+            let capturedPayment = null;
+            let authorizedPayment = null;
+            let paymentsList = [];
+
+            try {
+                const payments = await rzp.orders.fetchPayments(orderId);
+                paymentsList = payments.items || [];
+                capturedPayment = paymentsList.find(p => p.status === "captured");
+                authorizedPayment = paymentsList.find(p => p.status === "authorized");
+            } catch (pErr) {
+                console.warn(`[checkRazorpayOrderStatus] fetchPayments warning for ${orderId}:`, pErr.message);
+            }
+
+            const isPaid = order.status === "paid" || !!capturedPayment || !!authorizedPayment;
+            const primaryPayment = capturedPayment || authorizedPayment || paymentsList[0] || null;
+
+            return {
+                isPaid,
+                orderStatus: order.status,
+                order,
+                paymentId: primaryPayment?.id || null,
+                paymentStatus: primaryPayment?.status || null,
+                amount: order.amount_paid ? order.amount_paid / 100 : (order.amount ? order.amount / 100 : 0),
+                gatewayName: cfg.name
+            };
+        } catch (err) {
+            lastError = err;
+        }
+    }
+
+    throw lastError || new Error(`Failed to query Razorpay order ${orderId}`);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Cashfree (payment collection) — real REST API, sandbox vs production base URL
 // per mode. Docs: https://docs.cashfree.com/docs/orders
@@ -317,6 +381,7 @@ module.exports = {
     verifyRazorpaySubscriptionSignature,
     verifyRazorpaySubscriptionSignatureWithFallback,
     getRazorpayKeySecret,
+    checkRazorpayOrderStatus,
     createCashfreeOrder,
     verifyCashfreeOrder,
     getCashfreePayoutToken,
