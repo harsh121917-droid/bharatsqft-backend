@@ -156,6 +156,8 @@ function openPropertyModal() {
 
     document.getElementById("prop-modal-title").textContent = "Add New Property Listing";
     document.getElementById("prop-form")?.reset();
+    const ytInput = document.getElementById("prop-youtube-url");
+    if (ytInput) ytInput.value = "";
     const modeSelect = document.getElementById("prop-purchase-mode");
     if (modeSelect) modeSelect.value = "both";
     handlePropPurchaseModeChange();
@@ -249,6 +251,7 @@ async function saveProperty() {
     const totalBricks = Number(document.getElementById("prop-total-bricks")?.value);
     const rentalYield = Number(document.getElementById("prop-rental-yield")?.value);
     const purchaseMode = document.getElementById("prop-purchase-mode")?.value || "both";
+    const youtubeUrl = document.getElementById("prop-youtube-url")?.value.trim() || "";
 
     if (!title || !totalInvestment || !totalBricks) {
         toast("Please fill in all required property details (Title, Total Investment, Total Bricks)", "warning");
@@ -271,6 +274,7 @@ async function saveProperty() {
         },
         expectedRentalYield: rentalYield || 3,
         purchaseMode,
+        youtubeUrl,
         investmentEnabled: true,
         featured: true,
         status: "published", // Automatically published so it is visible in app immediately!
@@ -319,6 +323,8 @@ async function editProperty(id) {
             document.getElementById("prop-total-investment").value = totalVal || "";
             document.getElementById("prop-total-bricks").value = p.totalBricks || "";
             document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
+            const ytInput = document.getElementById("prop-youtube-url");
+            if (ytInput) ytInput.value = p.youtubeUrl || (p.videos?.[0]?.url || "");
             const modeSelect = document.getElementById("prop-purchase-mode");
             if (modeSelect) modeSelect.value = p.purchaseMode || "both";
             handlePropPurchaseModeChange();

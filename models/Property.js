@@ -72,6 +72,7 @@ const PropertySchema = new mongoose.Schema(
             caption: { type: String, default: "" },
             isCover: { type: Boolean, default: false }
         }],
+        youtubeUrl: { type: String, trim: true, default: "" },
         videos: [{ url: String, title: String }],
         documents: [{ url: String, title: String, type: String }],
 
