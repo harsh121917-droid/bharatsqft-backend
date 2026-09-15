@@ -83,6 +83,18 @@ const PropertySchema = new mongoose.Schema(
             uploadedAt: { type: Date, default: Date.now }
         }],
 
+        // SPV & Escrow Investor Protection (Screenshots 1-4 Feature)
+        spvName: { type: String, trim: true, default: "VIKAONE REALTY SERIES 001 LLP" },
+        spvEscrowBank: { type: String, trim: true, default: "ICICI Bank" },
+        spvEscrowAccountNo: { type: String, trim: true, default: "705105000036" },
+        spvEscrowIfsc: { type: String, trim: true, default: "ICIC0007051" },
+        spvEscrowBranch: { type: String, trim: true, default: "ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018" },
+        spvEscrowCertificateUrl: { type: String, trim: true, default: "" },
+        spvTrusteeName: { type: String, trim: true, default: "Universal Trusteeship Services Limited" },
+        spvTrusteeAddress: { type: String, trim: true, default: "Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021" },
+        spvTrusteeCertificateUrl: { type: String, trim: true, default: "" },
+        spvLiquidityPolicy: { type: String, default: "" },
+
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

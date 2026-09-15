@@ -8,6 +8,8 @@ let currentAmenities = [];
 let uploadedImages = []; // { url, isCover }
 let currentValuationReport = { url: "", title: "" };
 let currentPropertyDocuments = []; // { url, title, type, uploadedAt }
+let currentSpvEscrowPdf = "";
+let currentSpvTrusteePdf = "";
 
 // ── Load Properties ───────────────────────────────────────────
 async function loadProperties() {
@@ -155,12 +157,24 @@ function openPropertyModal() {
     uploadedImages = [];
     currentValuationReport = { url: "", title: "Valuation & Audit Report" };
     currentPropertyDocuments = [];
+    currentSpvEscrowPdf = "";
+    currentSpvTrusteePdf = "";
 
     const modal = document.getElementById("prop-modal");
     if (!modal) return;
 
     document.getElementById("prop-modal-title").textContent = "Add New Property Listing";
     document.getElementById("prop-form")?.reset();
+
+    // Default specifications & financials
+    if (document.getElementById("prop-type")) document.getElementById("prop-type").value = "commercial";
+    if (document.getElementById("prop-bhk")) document.getElementById("prop-bhk").value = "";
+    if (document.getElementById("prop-area")) document.getElementById("prop-area").value = "";
+    if (document.getElementById("prop-address")) document.getElementById("prop-address").value = "";
+    if (document.getElementById("prop-pincode")) document.getElementById("prop-pincode").value = "";
+    if (document.getElementById("prop-sold-bricks")) document.getElementById("prop-sold-bricks").value = "0";
+    if (document.getElementById("prop-appreciation")) document.getElementById("prop-appreciation").value = "8.5";
+
     const ytInput = document.getElementById("prop-youtube-url");
     if (ytInput) ytInput.value = "";
     const modeSelect = document.getElementById("prop-purchase-mode");
@@ -180,6 +194,18 @@ function openPropertyModal() {
     const docFile = document.getElementById("new-doc-file");
     if (docFile) docFile.value = "";
     renderPropertyDocumentsList();
+
+    // Reset SPV & Escrow Protection details to defaults
+    if (document.getElementById("prop-spv-name")) document.getElementById("prop-spv-name").value = "VIKAONE REALTY SERIES 001 LLP";
+    if (document.getElementById("prop-spv-bank")) document.getElementById("prop-spv-bank").value = "ICICI Bank";
+    if (document.getElementById("prop-spv-account-no")) document.getElementById("prop-spv-account-no").value = "705105000036";
+    if (document.getElementById("prop-spv-ifsc")) document.getElementById("prop-spv-ifsc").value = "ICIC0007051";
+    if (document.getElementById("prop-spv-branch")) document.getElementById("prop-spv-branch").value = "ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018";
+    if (document.getElementById("prop-spv-trustee-name")) document.getElementById("prop-spv-trustee-name").value = "Universal Trusteeship Services Limited";
+    if (document.getElementById("prop-spv-trustee-address")) document.getElementById("prop-spv-trustee-address").value = "Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021";
+    if (document.getElementById("prop-spv-liquidity")) document.getElementById("prop-spv-liquidity").value = "";
+    renderSpvEscrowPdfPreview();
+    renderSpvTrusteePdfPreview();
 
     modal.style.display = "flex";
 }
@@ -430,6 +456,126 @@ function removePropertyDocument(index) {
     toast("Document removed", "info");
 }
 
+// ── SPV & Escrow Document Handlers ──────────────────────────────
+function renderSpvEscrowPdfPreview() {
+    const previewBox = document.getElementById("prop-spv-escrow-preview");
+    const badge = document.getElementById("spv-escrow-badge");
+    const link = document.getElementById("prop-spv-escrow-link");
+    const fileInput = document.getElementById("prop-spv-escrow-file");
+
+    if (!previewBox) return;
+
+    if (currentSpvEscrowPdf) {
+        previewBox.style.display = "flex";
+        if (badge) {
+            badge.className = "badge badge-success";
+            badge.textContent = "PDF Uploaded";
+            badge.style.background = "rgba(16,185,129,0.2)";
+            badge.style.color = "#10b981";
+        }
+        if (link) {
+            link.href = currentSpvEscrowPdf;
+            const parts = currentSpvEscrowPdf.split("/");
+            link.textContent = parts[parts.length - 1] || "icici-escrow-certificate.pdf";
+        }
+    } else {
+        previewBox.style.display = "none";
+        if (badge) {
+            badge.className = "badge";
+            badge.textContent = "No PDF Uploaded";
+            badge.style.background = "rgba(148,163,184,0.15)";
+            badge.style.color = "var(--text-muted)";
+        }
+        if (fileInput) fileInput.value = "";
+    }
+}
+
+async function handleSpvEscrowPdfUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+    try {
+        toast("Uploading ICICI Escrow certificate PDF...", "info");
+        const res = await api("/upload/document", { method: "POST", body: formData });
+        if (res.success && res.url) {
+            currentSpvEscrowPdf = res.url;
+            renderSpvEscrowPdfPreview();
+            toast("ICICI Escrow certificate uploaded successfully", "success");
+        } else {
+            toast(res.message || "Failed to upload certificate", "danger");
+        }
+    } catch (err) {
+        toast(err.message || "Error uploading escrow certificate", "danger");
+    }
+}
+
+function removeSpvEscrowPdf() {
+    currentSpvEscrowPdf = "";
+    renderSpvEscrowPdfPreview();
+    toast("ICICI Escrow certificate removed", "info");
+}
+
+function renderSpvTrusteePdfPreview() {
+    const previewBox = document.getElementById("prop-spv-trustee-preview");
+    const badge = document.getElementById("spv-trustee-badge");
+    const link = document.getElementById("prop-spv-trustee-link");
+    const fileInput = document.getElementById("prop-spv-trustee-file");
+
+    if (!previewBox) return;
+
+    if (currentSpvTrusteePdf) {
+        previewBox.style.display = "flex";
+        if (badge) {
+            badge.className = "badge badge-success";
+            badge.textContent = "PDF Uploaded";
+            badge.style.background = "rgba(16,185,129,0.2)";
+            badge.style.color = "#10b981";
+        }
+        if (link) {
+            link.href = currentSpvTrusteePdf;
+            const parts = currentSpvTrusteePdf.split("/");
+            link.textContent = parts[parts.length - 1] || "trustee-certificate.pdf";
+        }
+    } else {
+        previewBox.style.display = "none";
+        if (badge) {
+            badge.className = "badge";
+            badge.textContent = "No PDF Uploaded";
+            badge.style.background = "rgba(148,163,184,0.15)";
+            badge.style.color = "var(--text-muted)";
+        }
+        if (fileInput) fileInput.value = "";
+    }
+}
+
+async function handleSpvTrusteePdfUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+    try {
+        toast("Uploading Trustee certificate PDF...", "info");
+        const res = await api("/upload/document", { method: "POST", body: formData });
+        if (res.success && res.url) {
+            currentSpvTrusteePdf = res.url;
+            renderSpvTrusteePdfPreview();
+            toast("Trustee appointment certificate uploaded successfully", "success");
+        } else {
+            toast(res.message || "Failed to upload trustee certificate", "danger");
+        }
+    } catch (err) {
+        toast(err.message || "Error uploading trustee certificate", "danger");
+    }
+}
+
+function removeSpvTrusteePdf() {
+    currentSpvTrusteePdf = "";
+    renderSpvTrusteePdfPreview();
+    toast("Trustee certificate removed", "info");
+}
 
 async function saveProperty() {
     const title = document.getElementById("prop-title")?.value.trim();
@@ -442,6 +588,24 @@ async function saveProperty() {
     const purchaseMode = document.getElementById("prop-purchase-mode")?.value || "both";
     const youtubeUrl = document.getElementById("prop-youtube-url")?.value.trim() || "";
 
+    const propertyType = document.getElementById("prop-type")?.value || "commercial";
+    const bhk = document.getElementById("prop-bhk")?.value.trim() || "";
+    const area = Number(document.getElementById("prop-area")?.value) || 0;
+    const address = document.getElementById("prop-address")?.value.trim() || "";
+    const pincode = document.getElementById("prop-pincode")?.value.trim() || "";
+    const soldBricks = Number(document.getElementById("prop-sold-bricks")?.value) || 0;
+    const expectedAppreciation = Number(document.getElementById("prop-appreciation")?.value) || 8.5;
+
+    // SPV & Escrow fields
+    const spvName = document.getElementById("prop-spv-name")?.value.trim() || "VIKAONE REALTY SERIES 001 LLP";
+    const spvEscrowBank = document.getElementById("prop-spv-bank")?.value.trim() || "ICICI Bank";
+    const spvEscrowAccountNo = document.getElementById("prop-spv-account-no")?.value.trim() || "705105000036";
+    const spvEscrowIfsc = document.getElementById("prop-spv-ifsc")?.value.trim() || "ICIC0007051";
+    const spvEscrowBranch = document.getElementById("prop-spv-branch")?.value.trim() || "";
+    const spvTrusteeName = document.getElementById("prop-spv-trustee-name")?.value.trim() || "Universal Trusteeship Services Limited";
+    const spvTrusteeAddress = document.getElementById("prop-spv-trustee-address")?.value.trim() || "";
+    const spvLiquidityPolicy = document.getElementById("prop-spv-liquidity")?.value.trim() || "";
+
     if (!title || !totalInvestment || !totalBricks) {
         toast("Please fill in all required property details (Title, Total Investment, Total Bricks)", "warning");
         return;
@@ -452,9 +616,13 @@ async function saveProperty() {
     const payload = {
         title,
         description: description || title,
-        location: { city, state },
+        propertyType,
+        bhk,
+        area,
+        location: { address, city, state, pincode },
         totalInvestmentRequired: totalInvestment,
         totalBricks,
+        soldBricks,
         brickPrice,
         price: {
             amount: totalInvestment,
@@ -462,6 +630,7 @@ async function saveProperty() {
             label: "onwards"
         },
         expectedRentalYield: rentalYield || 3,
+        expectedAppreciation,
         purchaseMode,
         youtubeUrl,
         investmentEnabled: true,
@@ -471,7 +640,17 @@ async function saveProperty() {
         images: uploadedImages.map(img => ({ url: img.url, isCover: !!img.isCover })),
         valuationReportUrl: currentValuationReport.url || "",
         valuationReportTitle: document.getElementById("prop-valuation-title")?.value.trim() || currentValuationReport.title || "Valuation & Audit Report",
-        documents: currentPropertyDocuments
+        documents: currentPropertyDocuments,
+        spvName,
+        spvEscrowBank,
+        spvEscrowAccountNo,
+        spvEscrowIfsc,
+        spvEscrowBranch,
+        spvEscrowCertificateUrl: currentSpvEscrowPdf || "",
+        spvTrusteeName,
+        spvTrusteeAddress,
+        spvTrusteeCertificateUrl: currentSpvTrusteePdf || "",
+        spvLiquidityPolicy
     };
 
     try {
@@ -509,12 +688,23 @@ async function editProperty(id) {
             document.getElementById("prop-modal-title").textContent = "Edit Property Listing";
             document.getElementById("prop-title").value = p.title || "";
             document.getElementById("prop-desc").value = p.description || "";
+
+            // Specifications
+            if (document.getElementById("prop-type")) document.getElementById("prop-type").value = p.propertyType || "commercial";
+            if (document.getElementById("prop-bhk")) document.getElementById("prop-bhk").value = p.bhk || "";
+            if (document.getElementById("prop-area")) document.getElementById("prop-area").value = p.area || "";
+            if (document.getElementById("prop-address")) document.getElementById("prop-address").value = p.location?.address || "";
             document.getElementById("prop-city").value = p.location?.city || "";
             document.getElementById("prop-state").value = p.location?.state || "";
+            if (document.getElementById("prop-pincode")) document.getElementById("prop-pincode").value = p.location?.pincode || "";
+
             const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : "");
             document.getElementById("prop-total-investment").value = totalVal || "";
             document.getElementById("prop-total-bricks").value = p.totalBricks || "";
+            if (document.getElementById("prop-sold-bricks")) document.getElementById("prop-sold-bricks").value = p.soldBricks ?? 0;
             document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
+            if (document.getElementById("prop-appreciation")) document.getElementById("prop-appreciation").value = p.expectedAppreciation ?? 8.5;
+
             const ytInput = document.getElementById("prop-youtube-url");
             if (ytInput) ytInput.value = p.youtubeUrl || (p.videos?.[0]?.url || "");
             const modeSelect = document.getElementById("prop-purchase-mode");
@@ -543,6 +733,22 @@ async function editProperty(id) {
                 uploadedAt: d.uploadedAt
             }));
             renderPropertyDocumentsList();
+
+            // Load SPV & Escrow Protection details
+            if (document.getElementById("prop-spv-name")) document.getElementById("prop-spv-name").value = p.spvName || "VIKAONE REALTY SERIES 001 LLP";
+            if (document.getElementById("prop-spv-bank")) document.getElementById("prop-spv-bank").value = p.spvEscrowBank || "ICICI Bank";
+            if (document.getElementById("prop-spv-account-no")) document.getElementById("prop-spv-account-no").value = p.spvEscrowAccountNo || "705105000036";
+            if (document.getElementById("prop-spv-ifsc")) document.getElementById("prop-spv-ifsc").value = p.spvEscrowIfsc || "ICIC0007051";
+            if (document.getElementById("prop-spv-branch")) document.getElementById("prop-spv-branch").value = p.spvEscrowBranch || "ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018";
+            currentSpvEscrowPdf = p.spvEscrowCertificateUrl || "";
+            renderSpvEscrowPdfPreview();
+
+            if (document.getElementById("prop-spv-trustee-name")) document.getElementById("prop-spv-trustee-name").value = p.spvTrusteeName || "Universal Trusteeship Services Limited";
+            if (document.getElementById("prop-spv-trustee-address")) document.getElementById("prop-spv-trustee-address").value = p.spvTrusteeAddress || "Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021";
+            currentSpvTrusteePdf = p.spvTrusteeCertificateUrl || "";
+            renderSpvTrusteePdfPreview();
+
+            if (document.getElementById("prop-spv-liquidity")) document.getElementById("prop-spv-liquidity").value = p.spvLiquidityPolicy || "";
 
             document.getElementById("prop-modal").style.display = "flex";
         }

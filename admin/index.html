@@ -3545,6 +3545,28 @@
                         <input class="form-control" id="prop-title" placeholder="e.g. Prestige Highline Commercial Hub"
                             required />
                     </div>
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Property Type</label>
+                            <select class="form-control" id="prop-type">
+                                <option value="commercial">Commercial Hub / Office</option>
+                                <option value="apartment">Residential Apartment</option>
+                                <option value="villa">Luxury Villa / House</option>
+                                <option value="penthouse">Penthouse</option>
+                                <option value="plot">Land / Plotted Development</option>
+                                <option value="farmhouse">Farmhouse / Estate</option>
+                                <option value="other">Other Real Estate</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Configuration / BHK</label>
+                            <input class="form-control" id="prop-bhk" placeholder="e.g. Grade-A Office or 3 BHK" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Total Built-Up Area (sqft)</label>
+                            <input class="form-control" type="number" id="prop-area" placeholder="e.g. 12500" />
+                        </div>
+                    </div>
                     <div class="form-grid-2">
                         <div class="form-group">
                             <label class="form-label">City</label>
@@ -3553,6 +3575,16 @@
                         <div class="form-group">
                             <label class="form-label">State</label>
                             <input class="form-control" id="prop-state" placeholder="Maharashtra" required />
+                        </div>
+                    </div>
+                    <div class="form-grid-3">
+                        <div class="form-group" style="grid-column: span 2">
+                            <label class="form-label">Street / Area Address</label>
+                            <input class="form-control" id="prop-address" placeholder="e.g. High Street Phoenix, Senapati Bapat Marg, Lower Parel" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pincode</label>
+                            <input class="form-control" id="prop-pincode" placeholder="e.g. 400013" />
                         </div>
                     </div>
                     <div class="form-grid-3">
@@ -3567,9 +3599,20 @@
                                 required />
                         </div>
                         <div class="form-group">
+                            <label class="form-label">Sold Bricks (Override)</label>
+                            <input class="form-control" type="number" id="prop-sold-bricks" placeholder="0" />
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
                             <label class="form-label">Expected Rental Yield (%)</label>
                             <input class="form-control" type="number" step="0.1" id="prop-rental-yield"
                                 placeholder="8.5" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Expected Capital Appreciation (%)</label>
+                            <input class="form-control" type="number" step="0.1" id="prop-appreciation"
+                                placeholder="10.2" />
                         </div>
                     </div>
                     <div class="form-group" style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
@@ -3700,6 +3743,113 @@
                             <div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px;text-align:center">
                                 No legal documents attached yet. Use the form above to upload PDFs.
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- ── SPV & Escrow Investor Protection (Screenshots 1-4 Feature) ── -->
+                    <div class="form-group" style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.3);border-radius:var(--radius-md);padding:16px;margin-top:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <label class="form-label" style="font-weight:700;color:var(--gold);display:flex;align-items:center;gap:8px;margin:0;font-size:14px">
+                                <i class="fas fa-shield-alt" style="font-size:17px"></i> SPV & Escrow Investor Protection (In-App Modals)
+                            </label>
+                            <span class="badge" style="background:rgba(234,179,8,0.2);color:var(--gold);font-size:11px">Verified Security</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
+                            Manage the dedicated SPV legal entity, ICICI Bank Escrow account details, Universal Trustee appointment, and upload official PDF certificates. In the mobile app, tapping each card under <em>"How is your investment protected"</em> opens the official certificate viewer with downloadable PDFs.
+                        </div>
+
+                        <!-- SPV Entity Name -->
+                        <div class="form-group" style="margin-bottom:14px">
+                            <label style="font-size:11.5px;font-weight:700;color:var(--text-main);margin-bottom:4px;display:block">
+                                <i class="fas fa-landmark" style="color:var(--gold)"></i> Dedicated SPV Entity Name (LLP / Company)
+                            </label>
+                            <input class="form-control" id="prop-spv-name" placeholder="e.g. VIKAONE REALTY SERIES 001 LLP" value="VIKAONE REALTY SERIES 001 LLP" style="font-weight:600" />
+                        </div>
+
+                        <!-- 1. ICICI Escrow Account Details & PDF Certificate -->
+                        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <div style="font-size:12.5px;font-weight:700;color:#f97316;display:flex;align-items:center;gap:6px">
+                                    <i class="fas fa-university"></i> 1. ICICI Bank Escrow Account Certificate
+                                </div>
+                                <span id="spv-escrow-badge" class="badge" style="background:rgba(148,163,184,0.15);color:var(--text-muted);font-size:10.5px">No PDF Uploaded</span>
+                            </div>
+                            <div class="form-grid-3" style="margin-bottom:8px">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Bank Name</label>
+                                    <input class="form-control" id="prop-spv-bank" value="ICICI Bank" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Escrow Account No.</label>
+                                    <input class="form-control" id="prop-spv-account-no" value="705105000036" style="font-size:12px;font-family:var(--font-mono)" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">IFSC Code</label>
+                                    <input class="form-control" id="prop-spv-ifsc" value="ICIC0007051" style="font-size:12px;font-family:var(--font-mono)" />
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Branch Address & Details</label>
+                                <input class="form-control" id="prop-spv-branch" value="ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018" style="font-size:12px" />
+                            </div>
+                            <div class="form-grid-2" style="align-items:center;margin-bottom:6px">
+                                <div>
+                                    <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">Upload ICICI Bank Official Certificate (PDF)</label>
+                                    <input type="file" class="form-control" id="prop-spv-escrow-file" accept=".pdf,application/pdf" onchange="handleSpvEscrowPdfUpload(event)" style="font-size:11.5px" />
+                                </div>
+                                <div id="prop-spv-escrow-preview" style="display:none;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:var(--radius-sm);padding:6px 10px;align-items:center;justify-content:space-between">
+                                    <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                                        <i class="fas fa-file-pdf" style="color:#ef4444;font-size:16px"></i>
+                                        <a id="prop-spv-escrow-link" href="#" target="_blank" style="color:#f97316;font-size:11px;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">icici-escrow-certificate.pdf</a>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSpvEscrowPdf()" style="padding:2px 6px;font-size:10px;margin-left:8px">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Universal Trustee Details & PDF Certificate -->
+                        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <div style="font-size:12.5px;font-weight:700;color:#3b82f6;display:flex;align-items:center;gap:6px">
+                                    <i class="fas fa-user-shield"></i> 2. Universal Trusteeship Services Appointment Certificate
+                                </div>
+                                <span id="spv-trustee-badge" class="badge" style="background:rgba(148,163,184,0.15);color:var(--text-muted);font-size:10.5px">No PDF Uploaded</span>
+                            </div>
+                            <div class="form-grid-2" style="margin-bottom:8px">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Trustee Name</label>
+                                    <input class="form-control" id="prop-spv-trustee-name" value="Universal Trusteeship Services Limited" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Trustee Registered Address</label>
+                                    <input class="form-control" id="prop-spv-trustee-address" value="Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021" style="font-size:12px" />
+                                </div>
+                            </div>
+                            <div class="form-grid-2" style="align-items:center;margin-bottom:6px">
+                                <div>
+                                    <label style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">Upload Official Trustee Certificate (PDF)</label>
+                                    <input type="file" class="form-control" id="prop-spv-trustee-file" accept=".pdf,application/pdf" onchange="handleSpvTrusteePdfUpload(event)" style="font-size:11.5px" />
+                                </div>
+                                <div id="prop-spv-trustee-preview" style="display:none;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:var(--radius-sm);padding:6px 10px;align-items:center;justify-content:space-between">
+                                    <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                                        <i class="fas fa-file-pdf" style="color:#ef4444;font-size:16px"></i>
+                                        <a id="prop-spv-trustee-link" href="#" target="_blank" style="color:#3b82f6;font-size:11px;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">trustee-certificate.pdf</a>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSpvTrusteePdf()" style="padding:2px 6px;font-size:10px;margin-left:8px">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Buy & Sell Anytime Terms / Liquidity Policy -->
+                        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px">
+                            <div style="font-size:12.5px;font-weight:700;color:#10b981;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+                                <i class="fas fa-sync-alt"></i> 3. Buy & Sell Anytime Terms / Liquidity Notes (Optional Override)
+                            </div>
+                            <textarea class="form-control" id="prop-spv-liquidity" rows="2" placeholder="Custom liquidity or secondary market notes (default terms are automatically displayed in app)..." style="font-size:12px"></textarea>
                         </div>
                     </div>
                 </form>
