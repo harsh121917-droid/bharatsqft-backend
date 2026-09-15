@@ -25,10 +25,20 @@ const videoStorage = new CloudinaryStorage({
 /* ── Property Documents (PDF) ── */
 const docStorage = new CloudinaryStorage({
     cloudinary,
-    params: {
-        folder: "bharatsqft/documents",
-        resource_type: "raw",
-        allowed_formats: ["pdf", "doc", "docx"],
+    params: async (req, file) => {
+        const originalName = file.originalname || "document.pdf";
+        const dotIndex = originalName.lastIndexOf(".");
+        const baseName = dotIndex !== -1 ? originalName.substring(0, dotIndex) : originalName;
+        const ext = dotIndex !== -1 ? originalName.substring(dotIndex + 1).toLowerCase() : "pdf";
+        const cleanBase = baseName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) || "document";
+        const uniqueSuffix = Date.now() + "_" + Math.round(Math.random() * 1e4);
+
+        return {
+            folder: "bharatsqft/documents",
+            resource_type: "raw",
+            public_id: `${cleanBase}_${uniqueSuffix}.${ext}`,
+            format: ext,
+        };
     },
 });
 
