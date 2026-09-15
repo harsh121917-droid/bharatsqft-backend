@@ -36,6 +36,8 @@ const docStorage = new CloudinaryStorage({
         return {
             folder: "bharatsqft/documents",
             resource_type: "raw",
+            access_mode: "public",
+            type: "upload",
             public_id: `${cleanBase}_${uniqueSuffix}.${ext}`,
             format: ext,
         };
