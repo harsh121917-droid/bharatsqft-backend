@@ -19,7 +19,7 @@ router.post(
     "/:slug/upload-pdf",
     protect,
     authorize("admin"),
-    uploadDoc.single("document"),
+    uploadDoc,
     adminUploadPolicyPdf
 );
 
