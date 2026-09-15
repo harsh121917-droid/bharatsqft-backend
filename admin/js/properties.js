@@ -6,6 +6,8 @@ let allProperties = [];
 let editingPropertyId = null;
 let currentAmenities = [];
 let uploadedImages = []; // { url, isCover }
+let currentValuationReport = { url: "", title: "" };
+let currentPropertyDocuments = []; // { url, title, type, uploadedAt }
 
 // ── Load Properties ───────────────────────────────────────────
 async function loadProperties() {
@@ -151,6 +153,9 @@ function openPropertyModal() {
     editingPropertyId = null;
     currentAmenities = [];
     uploadedImages = [];
+    currentValuationReport = { url: "", title: "Valuation & Audit Report" };
+    currentPropertyDocuments = [];
+
     const modal = document.getElementById("prop-modal");
     if (!modal) return;
 
@@ -163,6 +168,19 @@ function openPropertyModal() {
     handlePropPurchaseModeChange();
     renderAmenityTags();
     renderImagesGrid();
+
+    // Reset Valuation Report inputs & UI
+    const valTitle = document.getElementById("prop-valuation-title");
+    if (valTitle) valTitle.value = "Valuation & Audit Report";
+    renderValuationReportPreview();
+
+    // Reset Documents list & UI
+    const docTitle = document.getElementById("new-doc-title");
+    if (docTitle) docTitle.value = "";
+    const docFile = document.getElementById("new-doc-file");
+    if (docFile) docFile.value = "";
+    renderPropertyDocumentsList();
+
     modal.style.display = "flex";
 }
 
@@ -242,6 +260,177 @@ async function handleFileSelect(e) {
     }
 }
 
+// ── Valuation Report Handlers ───────────────────────────────────
+function renderValuationReportPreview() {
+    const previewBox = document.getElementById("prop-valuation-preview");
+    const badge = document.getElementById("valuation-status-badge");
+    const link = document.getElementById("prop-valuation-link");
+    const filenameEl = document.getElementById("prop-valuation-filename");
+    const titleInput = document.getElementById("prop-valuation-title");
+
+    if (!previewBox) return;
+
+    if (currentValuationReport && currentValuationReport.url) {
+        previewBox.style.display = "flex";
+        if (badge) {
+            badge.className = "badge badge-success";
+            badge.textContent = "PDF Uploaded";
+            badge.style.background = "rgba(16,185,129,0.2)";
+            badge.style.color = "#10b981";
+        }
+        if (link) {
+            link.href = currentValuationReport.url;
+        }
+        if (filenameEl) {
+            const parts = currentValuationReport.url.split("/");
+            filenameEl.textContent = parts[parts.length - 1] || "valuation-report.pdf";
+        }
+        if (titleInput && currentValuationReport.title) {
+            titleInput.value = currentValuationReport.title;
+        }
+    } else {
+        previewBox.style.display = "none";
+        if (badge) {
+            badge.className = "badge";
+            badge.textContent = "Not Uploaded";
+            badge.style.background = "rgba(148,163,184,0.15)";
+            badge.style.color = "var(--text-muted)";
+        }
+        const fileInput = document.getElementById("prop-valuation-file");
+        if (fileInput) fileInput.value = "";
+    }
+}
+
+async function handleValuationReportUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+    try {
+        toast("Uploading valuation report PDF...", "info");
+        const res = await api("/upload/document", { method: "POST", body: formData });
+        if (res.success && res.url) {
+            const titleInput = document.getElementById("prop-valuation-title");
+            const title = titleInput?.value.trim() || "Valuation & Audit Report";
+            currentValuationReport = {
+                url: res.url,
+                title: title
+            };
+            renderValuationReportPreview();
+            toast("Valuation report uploaded successfully", "success");
+        } else {
+            toast(res.message || "Failed to upload valuation report", "danger");
+        }
+    } catch (err) {
+        toast(err.message || "Error uploading valuation report", "danger");
+    }
+}
+
+function removeValuationReport() {
+    currentValuationReport = { url: "", title: "" };
+    const titleInput = document.getElementById("prop-valuation-title");
+    if (titleInput) titleInput.value = "Valuation & Audit Report";
+    renderValuationReportPreview();
+    toast("Valuation report removed", "info");
+}
+
+// ── Property Documents Handlers ─────────────────────────────────
+function renderPropertyDocumentsList() {
+    const list = document.getElementById("prop-documents-list");
+    const countBadge = document.getElementById("prop-docs-count-badge");
+    if (!list) return;
+
+    if (countBadge) {
+        countBadge.textContent = `${currentPropertyDocuments.length} Document${currentPropertyDocuments.length === 1 ? '' : 's'}`;
+    }
+
+    if (!currentPropertyDocuments || currentPropertyDocuments.length === 0) {
+        list.innerHTML = `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px;text-align:center">No legal documents attached yet. Use the form above to upload PDFs.</div>`;
+        return;
+    }
+
+    list.innerHTML = currentPropertyDocuments.map((doc, idx) => `
+        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                <i class="fas fa-file-pdf" style="color:#ef4444;font-size:20px;flex-shrink:0"></i>
+                <div style="min-width:0">
+                    <div style="font-weight:600;font-size:12.5px;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${doc.title || 'Untitled Document'}</div>
+                    <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:8px">
+                        <span class="badge" style="background:rgba(99,102,241,0.15);color:#818cf8;font-size:10px;padding:1px 6px">${doc.type || 'Legal Document'}</span>
+                        <a href="${doc.url}" target="_blank" style="color:#38bdf8;text-decoration:underline">Preview PDF</a>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removePropertyDocument(${idx})" style="padding:3px 8px;font-size:11px;flex-shrink:0">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        </div>
+    `).join("");
+}
+
+async function handlePropertyDocumentUpload() {
+    const titleInput = document.getElementById("new-doc-title");
+    const typeSelect = document.getElementById("new-doc-type");
+    const fileInput = document.getElementById("new-doc-file");
+
+    const title = titleInput?.value.trim();
+    const type = typeSelect?.value || "Other";
+    const file = fileInput?.files?.[0];
+
+    if (!title) {
+        toast("Please enter a document title (e.g. Title Deed & Search)", "warning");
+        return;
+    }
+    if (!file) {
+        toast("Please select a PDF file to upload", "warning");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("document", file);
+
+    const btn = document.getElementById("btn-upload-doc");
+    const originalText = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Uploading...`;
+    }
+
+    try {
+        toast("Uploading document PDF...", "info");
+        const res = await api("/upload/document", { method: "POST", body: formData });
+        if (res.success && res.url) {
+            currentPropertyDocuments.push({
+                title,
+                type,
+                url: res.url,
+                uploadedAt: new Date().toISOString()
+            });
+            if (titleInput) titleInput.value = "";
+            if (fileInput) fileInput.value = "";
+            renderPropertyDocumentsList();
+            toast("Document attached successfully", "success");
+        } else {
+            toast(res.message || "Failed to upload document", "danger");
+        }
+    } catch (err) {
+        toast(err.message || "Error uploading document", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+
+function removePropertyDocument(index) {
+    currentPropertyDocuments.splice(index, 1);
+    renderPropertyDocumentsList();
+    toast("Document removed", "info");
+}
+
+
 async function saveProperty() {
     const title = document.getElementById("prop-title")?.value.trim();
     const description = document.getElementById("prop-desc")?.value.trim();
@@ -279,7 +468,10 @@ async function saveProperty() {
         featured: true,
         status: "published", // Automatically published so it is visible in app immediately!
         amenities: currentAmenities,
-        images: uploadedImages.map(img => ({ url: img.url, isCover: !!img.isCover }))
+        images: uploadedImages.map(img => ({ url: img.url, isCover: !!img.isCover })),
+        valuationReportUrl: currentValuationReport.url || "",
+        valuationReportTitle: document.getElementById("prop-valuation-title")?.value.trim() || currentValuationReport.title || "Valuation & Audit Report",
+        documents: currentPropertyDocuments
     };
 
     try {
@@ -335,6 +527,23 @@ async function editProperty(id) {
             }
             renderAmenityTags();
             renderImagesGrid();
+
+            // Load Valuation Report
+            currentValuationReport = {
+                url: p.valuationReportUrl || "",
+                title: p.valuationReportTitle || "Valuation & Audit Report"
+            };
+            renderValuationReportPreview();
+
+            // Load Property Documents
+            currentPropertyDocuments = (p.documents || []).map(d => ({
+                title: d.title || "",
+                type: d.type || "Other",
+                url: d.url || "",
+                uploadedAt: d.uploadedAt
+            }));
+            renderPropertyDocumentsList();
+
             document.getElementById("prop-modal").style.display = "flex";
         }
     } catch (e) {

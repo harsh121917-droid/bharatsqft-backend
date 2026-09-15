@@ -180,6 +180,10 @@
                 <div class="nav-item-icon"><i class="fas fa-envelope"></i></div>
                 <span class="nav-item-label">Enquiries</span>
             </div>
+            <div class="nav-item" onclick="showPage('legalpolicies')" id="nav-legalpolicies">
+                <div class="nav-item-icon"><i class="fas fa-file-contract"></i></div>
+                <span class="nav-item-label">Legal Policies & Agreements</span>
+            </div>
         </nav>
 
         <!-- Drawer Footer: Profile & Help -->
@@ -3273,6 +3277,40 @@
                 </div>
             </div>
 
+            <!-- ══════════════════════════════════════════════════
+                 PAGE 20: REAL ESTATE LEGAL POLICIES & AGREEMENTS
+                 ══════════════════════════════════════════════════ -->
+            <div class="page" id="page-legalpolicies">
+                <div class="section-header" style="margin-bottom:16px">
+                    <div>
+                        <div class="section-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i> Legal Policies & Investor Agreements</div>
+                        <div class="section-subtitle">Manage official legal documents, investor agreements, disclosure policies, and support channels for the Vikaone mobile app</div>
+                    </div>
+                </div>
+
+                <!-- Policy Sub-Navigation Tabs -->
+                <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--border-color)">
+                    <button type="button" class="btn btn-sm policy-tab-btn active" data-slug="investor-agreement" onclick="switchPolicyTab('investor-agreement')" style="padding:8px 14px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-handshake"></i> Investor Agreement
+                    </button>
+                    <button type="button" class="btn btn-sm policy-tab-btn" data-slug="privacy-policy" onclick="switchPolicyTab('privacy-policy')" style="padding:8px 14px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-user-shield"></i> Privacy Policy
+                    </button>
+                    <button type="button" class="btn btn-sm policy-tab-btn" data-slug="terms-conditions" onclick="switchPolicyTab('terms-conditions')" style="padding:8px 14px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-gavel"></i> Terms & Conditions
+                    </button>
+                    <button type="button" class="btn btn-sm policy-tab-btn" data-slug="refund-cancellation" onclick="switchPolicyTab('refund-cancellation')" style="padding:8px 14px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-undo-alt"></i> Refund & Cancellation
+                    </button>
+                    <button type="button" class="btn btn-sm policy-tab-btn" data-slug="help-support" onclick="switchPolicyTab('help-support')" style="padding:8px 14px;border-radius:20px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-headset"></i> Help & Support Center
+                    </button>
+                </div>
+
+                <!-- Dynamic Content Container -->
+                <div id="legalpolicies-content-wrap"></div>
+            </div>
+
         </div><!-- /.content -->
     </div><!-- /.main -->
 
@@ -3573,6 +3611,95 @@
                         <input class="form-control" id="prop-youtube-url" placeholder="e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ or https://youtu.be/..." style="font-family:var(--font-mono);font-size:12.5px" />
                         <div style="font-size:11.5px;color:var(--text-muted);margin-top:5px;display:flex;align-items:center;gap:4px">
                             <i class="fas fa-play-circle" style="color:#ef4444"></i> The video will play directly inside the mobile app on the property details screen without redirecting users.
+                        </div>
+                    </div>
+
+                    <!-- ── Property Valuation Report Upload & Management ── -->
+                    <div class="form-group" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.28);border-radius:var(--radius-md);padding:14px;margin-top:14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <label class="form-label" style="font-weight:700;color:#10b981;display:flex;align-items:center;gap:7px;margin:0">
+                                <i class="fas fa-file-invoice-dollar" style="font-size:16px"></i> Official Property Valuation Report (PDF)
+                            </label>
+                            <span id="valuation-status-badge" class="badge" style="background:rgba(148,163,184,0.15);color:var(--text-muted);font-size:11px">Not Uploaded</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px">
+                            Upload official CBRE / JLL or certified valuation appraisal PDF. Mobile users can view and download this official report directly.
+                        </div>
+                        <div class="form-grid-2" style="margin-bottom:8px">
+                            <div>
+                                <label style="font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px;display:block">Report Title / Description</label>
+                                <input class="form-control" id="prop-valuation-title" placeholder="e.g. CBRE & JLL Independent Valuation Report" value="Valuation & Audit Report" style="font-size:12.5px" />
+                            </div>
+                            <div>
+                                <label style="font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px;display:block">Upload PDF File</label>
+                                <input type="file" class="form-control" id="prop-valuation-file" accept=".pdf,application/pdf" onchange="handleValuationReportUpload(event)" style="font-size:12px" />
+                            </div>
+                        </div>
+                        <div id="prop-valuation-preview" style="display:none;background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:8px 12px;align-items:center;justify-content:space-between;margin-top:8px">
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <i class="fas fa-file-pdf" style="color:#ef4444;font-size:18px"></i>
+                                <div>
+                                    <div id="prop-valuation-filename" style="font-weight:600;font-size:12px;color:var(--text-main)">valuation-report.pdf</div>
+                                    <div id="prop-valuation-link-box" style="font-size:11px"><a id="prop-valuation-link" href="#" target="_blank" style="color:#10b981;text-decoration:underline">Preview Uploaded PDF</a></div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeValuationReport()" style="padding:4px 8px;font-size:11px">
+                                <i class="fas fa-trash-alt"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ── Property Legal & Compliance Documents Manager ── -->
+                    <div class="form-group" style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.28);border-radius:var(--radius-md);padding:14px;margin-top:14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <label class="form-label" style="font-weight:700;color:#818cf8;display:flex;align-items:center;gap:7px;margin:0">
+                                <i class="fas fa-folder-open" style="font-size:16px"></i> Property Legal & Due Diligence Documents (PDFs)
+                            </label>
+                            <span id="prop-docs-count-badge" class="badge" style="background:rgba(99,102,241,0.2);color:#818cf8;font-size:11px">0 Documents</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">
+                            Upload title deeds, MahaRERA registrations, encumbrance certificates, layout plans, and legal clearances. Displayed in the app under the Legal tab.
+                        </div>
+
+                        <!-- Add New Document Bar -->
+                        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
+                            <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+                                <i class="fas fa-plus-circle" style="color:#6366f1"></i> Attach New Document / PDF
+                            </div>
+                            <div class="form-grid-3" style="margin-bottom:8px">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Document Title</label>
+                                    <input class="form-control" id="new-doc-title" placeholder="e.g. Title Deed & Search Report" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Document Type</label>
+                                    <select class="form-control" id="new-doc-type" style="font-size:12px">
+                                        <option value="RERA Certificate">RERA Certificate</option>
+                                        <option value="Title Deed">Title Deed & Search</option>
+                                        <option value="Encumbrance Certificate">Encumbrance Certificate</option>
+                                        <option value="Sanctioned Plan">Sanctioned Building Plan</option>
+                                        <option value="NOC & Approvals">NOC & Govt Approvals</option>
+                                        <option value="Valuation Report">Valuation Report</option>
+                                        <option value="Other">Other Document</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Choose PDF File</label>
+                                    <input type="file" class="form-control" id="new-doc-file" accept=".pdf,application/pdf" style="font-size:11px" />
+                                </div>
+                            </div>
+                            <div style="display:flex;justify-content:flex-end">
+                                <button type="button" class="btn btn-sm btn-primary" id="btn-upload-doc" onclick="handlePropertyDocumentUpload()" style="font-size:11.5px;padding:5px 14px">
+                                    <i class="fas fa-cloud-upload-alt"></i> Upload & Attach Document
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Managed Documents List -->
+                        <div id="prop-documents-list" style="display:flex;flex-direction:column;gap:8px">
+                            <div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px;text-align:center">
+                                No legal documents attached yet. Use the form above to upload PDFs.
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -4553,6 +4680,7 @@
     <script src="js/rewards.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/coupons.js"></script>
+    <script src="js/legalpolicies.js?v=1.0"></script>
     <script src="js/app.js?v=2.1"></script>
 </body>
 

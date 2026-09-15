@@ -73,8 +73,15 @@ const PropertySchema = new mongoose.Schema(
             isCover: { type: Boolean, default: false }
         }],
         youtubeUrl: { type: String, trim: true, default: "" },
+        valuationReportUrl: { type: String, trim: true, default: "" },
+        valuationReportTitle: { type: String, trim: true, default: "Valuation & Audit Report" },
         videos: [{ url: String, title: String }],
-        documents: [{ url: String, title: String, type: String }],
+        documents: [{
+            url: { type: String, default: "" },
+            title: { type: String, default: "" },
+            type: { type: String, default: "legal" },
+            uploadedAt: { type: Date, default: Date.now }
+        }],
 
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,

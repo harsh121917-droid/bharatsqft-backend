@@ -54,6 +54,7 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/enquiries", require("./routes/enquiries"));
 app.use("/api/properties", require("./routes/properties"));
+app.use("/api/policies", require("./routes/policies"));
 app.use("/api/upload", require("./routes/upload"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/kyc", require("./routes/kyc"));

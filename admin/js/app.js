@@ -161,7 +161,8 @@ const pageTitles = {
     // 3. Real Estate
     properties: "Property Listings",
     investments: "Real Estate Brick Investments",
-    enquiries: "Customer Enquiries"
+    enquiries: "Customer Enquiries",
+    legalpolicies: "Real Estate Legal Policies & Agreements"
 };
 
 function showPage(pageId) {
@@ -252,6 +253,9 @@ function showPage(pageId) {
             break;
         case "enquiries":
             loadEnquiries();
+            break;
+        case "legalpolicies":
+            loadLegalPolicies();
             break;
     }
 }
