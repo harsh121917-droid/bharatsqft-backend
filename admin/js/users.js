@@ -1698,7 +1698,7 @@ function renderUdDeviceInfo(u) {
     const seg = (u.ecosystemSegment || 'goldvikaone').toLowerCase();
     const segText = seg === 'both'
         ? '🌟 Both (DigiGold Bullion + Real Estate Bricks)'
-        : (seg === 'vikaone' ? '🏢 Vikaone / Bharat SQFT (Real Estate)' : '🪙 GoldVikaone (DigiGold Bullion)');
+        : (seg === 'vikaone' ? '🏢 Vikaone (Vika DRX Real Estate)' : '🪙 GoldVikaone (DigiGold Bullion)');
     udSetText("ud-dev-segment", segText);
 
     const logins = Array.isArray(u.loginPlatforms) && u.loginPlatforms.length > 0
@@ -1968,7 +1968,7 @@ function renderUdPropertyTab(u) {
                 <i class="fas fa-building" style="font-size:24px;color:#c084fc"></i>
             </div>
             <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">No Fractional Bricks Owned</div>
-            <div style="font-size:12px;color:#94a3b8">This customer has not yet invested in any Bharat SQFT real estate properties.</div>
+            <div style="font-size:12px;color:#94a3b8">This customer has not yet invested in any Vika DRX real estate properties.</div>
         </div>`;
         return;
     }

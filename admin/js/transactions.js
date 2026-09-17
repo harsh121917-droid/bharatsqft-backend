@@ -242,7 +242,7 @@ function renderDigiGoldUserInvestmentsTable(users) {
     body.innerHTML = html;
 }
 
-// ── 2. Real Estate: Bharat SQFT Property Investments Hub ───────
+// ── 2. Real Estate: Vika DRX Property Investments Hub ───────
 let allRealEstateInvestments = [];
 let activeReCustomerId = null;
 let reInvestmentFilters = {
@@ -259,7 +259,7 @@ async function loadInvestments() {
     body.innerHTML = `
     <div class="loading-box">
         <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
-        <div>Loading Bharat SQFT real estate investments & customer portfolios...</div>
+        <div>Loading Vika DRX real estate investments & customer portfolios...</div>
     </div>`;
 
     try {
@@ -853,7 +853,7 @@ function exportCustomerRealEstateCSV() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `BharatSQFT_Customer_Portfolio_${String(u.name || 'Investor').replace(/\s+/g, '_')}.csv`);
+    link.setAttribute("download", `VikaDRX_Customer_Portfolio_${String(u.name || 'Investor').replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1035,7 +1035,7 @@ function openInvestmentCertificate(invId) {
     const certRef = `BSQFT-BRK-${(inv._id || '').slice(-6).toUpperCase()}`;
 
     udSetText("cert-ref-id", certRef);
-    udSetText("cert-investor-name", u.name || "Verified Bharat SQFT Investor");
+    udSetText("cert-investor-name", u.name || "Verified Vika DRX Investor");
     udSetText("cert-investor-contact", `${u.phone || u.email || 'On File'} · ID: ${String(u._id || '').slice(-6).toUpperCase()}`);
     udSetText("cert-prop-title", p.title || "Real Estate Project");
     udSetText("cert-prop-location", p.location?.city ? `${p.location.address ? p.location.address + ', ' : ''}${p.location.city}, ${p.location.state || ''}` : 'Prime Hub');
@@ -1104,7 +1104,7 @@ function exportInvestmentsCSV() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `BharatSQFT_Property_Investments_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `VikaDRX_Property_Investments_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
