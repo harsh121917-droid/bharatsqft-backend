@@ -1215,18 +1215,23 @@
                                         <span class="ud-status-pill success" id="ud-bank-status-pill"><i class="fas fa-check-circle"></i> Verified</span>
                                     </div>
                                 </div>
-                                <div class="ud-sub-grid-2">
+                                <div class="ud-sub-grid-2" style="grid-template-columns: 1.25fr 0.75fr; gap: 0.75rem;">
                                     <div>
                                         <div class="ud-sub-label">Account No.</div>
-                                        <div class="ud-sub-val" id="ud-bank-acc-val">—</div>
+                                        <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                                            <div class="ud-sub-val" id="ud-bank-acc-val" style="font-size:12.5px;letter-spacing:0.5px;user-select:all;word-break:break-all">—</div>
+                                            <button type="button" id="btn-copy-bank-acc" title="Copy Full Account Number" style="display:none;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#94a3b8;cursor:pointer;padding:3px 6px;font-size:11px;border-radius:4px;align-items:center;gap:3px;transition:all 0.2s" onmouseover="this.style.color='#38bdf8';this.style.borderColor='#38bdf8'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='rgba(255,255,255,0.12)'">
+                                                <i class="far fa-copy"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <div class="ud-sub-label">IFSC Code</div>
-                                        <div class="ud-sub-val" id="ud-bank-ifsc-val">—</div>
+                                        <div class="ud-sub-val" id="ud-bank-ifsc-val" style="margin-top:2px;user-select:all">—</div>
                                     </div>
                                     <div style="grid-column:1/-1;margin-top:4px">
                                         <div class="ud-sub-label">Account Holder Name</div>
-                                        <div class="ud-sub-val" id="ud-bank-holder-val">—</div>
+                                        <div class="ud-sub-val" id="ud-bank-holder-val" style="margin-top:2px">—</div>
                                     </div>
                                 </div>
                             </div>

@@ -1668,6 +1668,7 @@ function renderUdKycInfo(u) {
 }
 
 function renderUdBankDetails(b) {
+    const copyBtn = document.getElementById("btn-copy-bank-acc");
     if (!b) {
         udSetText("ud-bank-name-val", "No Bank Linked");
         const pill = document.getElementById("ud-bank-status-pill");
@@ -1678,6 +1679,7 @@ function renderUdBankDetails(b) {
         udSetText("ud-bank-acc-val", "—");
         udSetText("ud-bank-ifsc-val", "—");
         udSetText("ud-bank-holder-val", "—");
+        if (copyBtn) copyBtn.style.display = "none";
         return;
     }
     udSetText("ud-bank-name-val", b.bankName || "Linked Bank");
@@ -1686,9 +1688,30 @@ function renderUdBankDetails(b) {
         pill.className = b.isVerified ? "ud-status-pill success" : "ud-status-pill pending";
         pill.innerHTML = b.isVerified ? `<i class="fas fa-check-circle"></i> Verified` : `<i class="fas fa-clock"></i> Pending`;
     }
-    udSetText("ud-bank-acc-val", b.accountNumber ? `${b.accountNumber.slice(0, 4)}••••${b.accountNumber.slice(-4)}` : "—");
-    udSetText("ud-bank-ifsc-val", b.ifsc || "—");
-    udSetText("ud-bank-holder-val", b.accountHolder || "—");
+    const fullAccNo = b.accountNumber ? String(b.accountNumber).trim() : "";
+    udSetText("ud-bank-acc-val", fullAccNo || "—");
+    udSetText("ud-bank-ifsc-val", (b.ifsc || b.ifscCode || "—").toUpperCase());
+    udSetText("ud-bank-holder-val", b.accountHolder || b.accountHolderName || "—");
+
+    if (copyBtn) {
+        if (fullAccNo) {
+            copyBtn.style.display = "inline-flex";
+            copyBtn.onclick = (e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(fullAccNo).then(() => {
+                    if (typeof showToast === "function") {
+                        showToast("Bank account number copied: " + fullAccNo, "success");
+                    }
+                }).catch(() => {
+                    if (typeof showToast === "function") {
+                        showToast("Failed to copy account number", "error");
+                    }
+                });
+            };
+        } else {
+            copyBtn.style.display = "none";
+        }
+    }
 }
 
 function renderUdDeviceInfo(u) {
