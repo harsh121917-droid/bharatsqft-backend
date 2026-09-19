@@ -78,6 +78,8 @@ app.use("/api/notifications", require("./routes/notification"));
 app.use("/api/coupons", require("./routes/coupon"));
 app.use("/api/sip", require("./routes/sip"));
 app.use("/api/mutual-funds", require("./routes/mutualFunds"));
+app.use("/api/home-videos", require("./routes/homeVideos"));
+app.use("/api/admin/home-videos", require("./routes/homeVideos"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");

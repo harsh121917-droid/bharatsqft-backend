@@ -58,6 +58,47 @@ const connectDB = async () => {
         } catch (propErr) {
             console.warn("⚠️ Property sync non-fatal error:", propErr.message);
         }
+
+        // Seed default Home YouTube videos if collection is empty
+        try {
+            const HomeVideo = require("../models/HomeVideo");
+            const videoCount = await HomeVideo.countDocuments();
+            if (videoCount === 0) {
+                console.log("Seeding default Home YouTube videos to DB...");
+                await HomeVideo.insertMany([
+                    {
+                        title: "Vika DRX Luxury Residence Tour",
+                        subtitle: "Experience luxury living & institutional architecture",
+                        youtubeUrl: "https://www.youtube.com/watch?v=xBNULnZNZg0",
+                        youtubeVideoId: "xBNULnZNZg0",
+                        thumbnailUrl: "https://img.youtube.com/vi/xBNULnZNZg0/hqdefault.jpg",
+                        order: 0,
+                        isActive: true,
+                    },
+                    {
+                        title: "Modern Architectural Villa Walkthrough",
+                        subtitle: "Take an in-depth walkthrough of our prime residential assets",
+                        youtubeUrl: "https://www.youtube.com/watch?v=Yw6u6YkTgQ4",
+                        youtubeVideoId: "Yw6u6YkTgQ4",
+                        thumbnailUrl: "https://img.youtube.com/vi/Yw6u6YkTgQ4/hqdefault.jpg",
+                        order: 1,
+                        isActive: true,
+                    },
+                    {
+                        title: "Commercial Hub & Office Suites Tour",
+                        subtitle: "High-yield commercial spaces curated for fractional ownership",
+                        youtubeUrl: "https://www.youtube.com/watch?v=4T7HwL2v_dQ",
+                        youtubeVideoId: "4T7HwL2v_dQ",
+                        thumbnailUrl: "https://img.youtube.com/vi/4T7HwL2v_dQ/hqdefault.jpg",
+                        order: 2,
+                        isActive: true,
+                    },
+                ]);
+                console.log("✅ Default Home YouTube videos seeded successfully!");
+            }
+        } catch (vidErr) {
+            console.warn("⚠️ HomeVideo seed non-fatal error:", vidErr.message);
+        }
     } catch (err) {
         console.error(`❌ MongoDB connection error: ${err.message}`);
         process.exit(1);

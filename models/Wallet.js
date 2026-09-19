@@ -4,11 +4,17 @@ const mongoose = require("mongoose");
 const WalletSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-        balance: { type: Number, default: 0, min: 0 },       // available ₹
+        balance: { type: Number, default: 0, min: 0 },       // available ₹ (Gold/Bullion)
         lockedBalance: { type: Number, default: 0 },         // ₹ already-in-balance, held for pending withdrawal payout
         pendingCredit: { type: Number, default: 0 },         // ₹ NOT yet in balance, from a sell awaiting release
         totalAdded: { type: Number, default: 0 },            // lifetime ₹ added
         totalWithdrawn: { type: Number, default: 0 },        // lifetime ₹ withdrawn
+
+        // ── Vika DRX Wallet Partition (Real Estate & Bricks) ──
+        drxBalance: { type: Number, default: 0, min: 0 },    // available ₹ for Vika DRX
+        drxLockedBalance: { type: Number, default: 0 },      // ₹ locked in DRX
+        drxTotalAdded: { type: Number, default: 0 },         // lifetime ₹ added in DRX
+        drxTotalWithdrawn: { type: Number, default: 0 },     // lifetime ₹ withdrawn in DRX
     },
     { timestamps: true }
 );
@@ -17,6 +23,7 @@ const WalletSchema = new mongoose.Schema(
 const WalletTxnSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        appSource: { type: String, enum: ["goldvikaone", "vikadrx"], default: "goldvikaone" },
         txnId: { type: String, unique: true, sparse: true, uppercase: true }, // e.g. TXN-WAL-84920193-F8A2
         entryType: { type: String, enum: ["credit", "debit"], required: true, default: "credit" }, // Credit (+) or Debit (-)
         type: {
@@ -37,6 +44,10 @@ const WalletTxnSchema = new mongoose.Schema(
                 "coin_redeem",   // coin delivery payment
                 "manual_credit", // manual admin credit
                 "manual_debit",  // manual admin debit
+                "brick_buy",     // deducted for brick investment
+                "brick_yield",   // rental yield / returns credited
+                "drx_deposit",   // deposit to DRX wallet
+                "drx_withdraw",  // withdrawal from DRX wallet
             ],
             required: true
         },

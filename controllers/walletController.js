@@ -89,10 +89,28 @@ async function checkSellHoldPeriod(userId) {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getWallet = async (req, res, next) => {
     try {
-        const [wallet, txns] = await Promise.all([
-            getOrCreateWallet(req.user._id),
-            WalletTxn.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(20),
-        ]);
+        const isDrx = req.headers["x-app-source"] === "vikadrx" || req.query.app === "drx" || req.query.source === "drx";
+        const wallet = await getOrCreateWallet(req.user._id);
+
+        if (isDrx) {
+            const drxTxns = await WalletTxn.find({ user: req.user._id, appSource: "vikadrx" }).sort({ createdAt: -1 }).limit(30);
+            const drxBal = wallet.drxBalance || 0;
+            const drxLocked = wallet.drxLockedBalance || 0;
+            return res.json({
+                success: true,
+                data: {
+                    balance: drxBal,
+                    lockedBalance: drxLocked,
+                    pendingCredit: 0,
+                    availableBalance: Math.max(0, drxBal - drxLocked),
+                    totalAdded: wallet.drxTotalAdded || 0,
+                    totalWithdrawn: wallet.drxTotalWithdrawn || 0,
+                    transactions: drxTxns,
+                },
+            });
+        }
+
+        const txns = await WalletTxn.find({ user: req.user._id, appSource: { $ne: "vikadrx" } }).sort({ createdAt: -1 }).limit(20);
         res.json({
             success: true,
             data: {
@@ -154,15 +172,39 @@ exports.verifyAdd = async (req, res, next) => {
         }
 
         // Credit wallet
+        const isDrx = req.headers["x-app-source"] === "vikadrx" || req.query.app === "drx" || req.body.app === "drx";
         const wallet = await getOrCreateWallet(req.user._id);
+        const parsedAmount = parseFloat(amount);
+
+        if (isDrx) {
+            const balBefore = wallet.drxBalance || 0;
+            wallet.drxBalance = parseFloat(((wallet.drxBalance || 0) + parsedAmount).toFixed(2));
+            wallet.drxTotalAdded = parseFloat(((wallet.drxTotalAdded || 0) + parsedAmount).toFixed(2));
+            await wallet.save();
+
+            await recordTxn(req.user._id, "drx_deposit", parsedAmount, balBefore, wallet.drxBalance, {
+                appSource: "vikadrx",
+                razorpayOrderId, razorpayPaymentId, razorpaySignature,
+                note: `Added ₹${amount} to Vika DRX Wallet`,
+                status: "success",
+            });
+
+            return res.json({
+                success: true,
+                message: `₹${amount} added to your Vika DRX wallet`,
+                data: { balance: wallet.drxBalance },
+            });
+        }
+
         const balBefore = wallet.balance;
-        wallet.balance += parseFloat(amount);
-        wallet.totalAdded += parseFloat(amount);
+        wallet.balance += parsedAmount;
+        wallet.totalAdded += parsedAmount;
         await wallet.save();
 
         await recordTxn(req.user._id, "add", amount, balBefore, wallet.balance, {
+            appSource: "goldvikaone",
             razorpayOrderId, razorpayPaymentId, razorpaySignature,
-            note: `Added ₹${amount} via Razorpay (${config.mode})`,
+            note: `Added ₹${amount} via Razorpay`,
             status: "success",
         });
 
@@ -460,7 +502,39 @@ exports.initiateWithdraw = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Bank account required" });
         }
 
+        const isDrx = req.headers["x-app-source"] === "vikadrx" || req.query.app === "drx" || req.body.app === "drx";
         const wallet = await getOrCreateWallet(req.user._id);
+        const parsedAmount = parseFloat(amount);
+
+        if (isDrx) {
+            const available = (wallet.drxBalance || 0) - (wallet.drxLockedBalance || 0);
+            if (parsedAmount > available) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient DRX balance. Available: ₹${available.toFixed(2)}`,
+                });
+            }
+            const balBefore = wallet.drxBalance || 0;
+            wallet.drxLockedBalance = parseFloat(((wallet.drxLockedBalance || 0) + parsedAmount).toFixed(2));
+            await wallet.save();
+
+            const walletTxn = await recordTxn(
+                req.user._id, "drx_withdraw", parsedAmount, balBefore, wallet.drxBalance,
+                { appSource: "vikadrx", note: `Withdraw ₹${parsedAmount} from Vika DRX to bank`, status: "pending" }
+            );
+
+            return res.json({
+                success: true,
+                message: "Withdrawal initiated. Will reach your bank within 24 hours.",
+                data: {
+                    amount: parsedAmount, bankAccountId,
+                    walletBalance: wallet.drxBalance,
+                    lockedBalance: wallet.drxLockedBalance,
+                    releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                },
+            });
+        }
+
         const available = wallet.balance - wallet.lockedBalance;
         if (amount > available) {
             return res.status(400).json({
@@ -476,7 +550,7 @@ exports.initiateWithdraw = async (req, res, next) => {
 
         const walletTxn = await recordTxn(
             req.user._id, "withdraw", amount, balBefore, wallet.balance,
-            { note: `Withdraw ₹${amount} to bank`, status: "pending" }
+            { appSource: "goldvikaone", note: `Withdraw ₹${amount} to bank`, status: "pending" }
         );
 
         // Cron job handles the 24h bank release — no setTimeout needed

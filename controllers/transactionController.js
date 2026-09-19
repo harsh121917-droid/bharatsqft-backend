@@ -10,6 +10,104 @@ const { Wallet, WalletTxn } = require("../models/Wallet");
 exports.getMyTransactions = async (req, res, next) => {
     try {
         const userId = req.user._id;
+        const isDrx = req.headers["x-app-source"] === "vikadrx" || req.query.app === "drx" || req.query.source === "drx";
+
+        if (isDrx) {
+            // ── Vika DRX: Return ONLY Brick Investments, DRX Savings, and DRX Wallet Transactions ──
+            const [investments, savings, drxWalletRaw] = await Promise.all([
+                Investment.find({ user: userId })
+                    .populate("property", "title location coverImage images propertyType price minInvestment expectedReturn")
+                    .sort({ createdAt: -1 }),
+                Saving.find({ user: userId }),
+                WalletTxn.find({ user: userId, appSource: "vikadrx" }).sort({ createdAt: -1 }),
+            ]);
+
+            // Map Brick Purchases
+            const brickTxns = investments.map((inv) => ({
+                id: inv._id,
+                invoiceNo: `PROP-${String(inv._id).slice(-8).toUpperCase()}`,
+                type: "brick_purchase",
+                transactionType: "Buy",
+                category: "Investment",
+                metal: "property",
+                title: inv.property?.title ?? "Property Brick Investment",
+                subtitle: `${inv.bricks} brick${inv.bricks > 1 ? "s" : ""} × ₹${inv.pricePerBrick || (inv.property?.price?.amount ? inv.property.price.amount : 0)}`,
+                amount: inv.totalAmount,
+                totalAmt: inv.totalAmount,
+                status: inv.status,
+                propertyId: inv.property?._id,
+                city: inv.property?.location?.city ?? null,
+                coverImage: inv.property?.coverImage || inv.property?.images?.[0]?.url || null,
+                razorpayPaymentId: inv.razorpayPaymentId ?? null,
+                razorpayOrderId: inv.razorpayOrderId ?? null,
+                bricks: inv.bricks,
+                quantity: inv.bricks,
+                pricePerBrick: inv.pricePerBrick,
+                createdAt: inv.createdAt,
+            }));
+
+            // Map Savings
+            const savingTxns = [];
+            for (const s of savings) {
+                for (const cycle of (s.cycles || [])) {
+                    savingTxns.push({
+                        id: `${s._id}_${cycle._id ?? cycle.date}`,
+                        invoiceNo: `SAV-${String(s._id).slice(-6).toUpperCase()}`,
+                        type: s.type === "daily" ? "daily_saving" : "monthly_saving",
+                        transactionType: "Deposit",
+                        category: "Savings",
+                        metal: "savings",
+                        title: s.type === "daily" ? "Daily Property Saving" : "Monthly Property Saving",
+                        subtitle: `₹${cycle.amount} deposited towards brick investment`,
+                        amount: cycle.amount,
+                        totalAmt: cycle.amount,
+                        status: "success",
+                        razorpayPaymentId: s.razorpayPaymentId ?? null,
+                        razorpayOrderId: s.razorpayOrderId ?? null,
+                        savingId: s._id,
+                        note: cycle.note ?? null,
+                        createdAt: new Date(cycle.date),
+                    });
+                }
+            }
+
+            // Map DRX Wallet Transactions
+            const drxWalletTxns = drxWalletRaw.map((w) => ({
+                id: w._id,
+                invoiceNo: w.txnId || `DRX-${String(w._id).slice(-8).toUpperCase()}`,
+                type: w.type,
+                transactionType: w.entryType === "credit" ? "Credit" : "Debit",
+                category: "Wallet",
+                metal: "wallet",
+                title: w.type === "drx_deposit" || w.type === "add" ? "DRX Wallet Deposit" : (w.type === "drx_withdraw" || w.type === "withdraw" ? "DRX Bank Withdrawal" : (w.reason || "DRX Wallet Transaction")),
+                subtitle: w.entryType === "credit" ? `+₹${w.amount} Credited` : `-₹${w.amount} Debited`,
+                amount: w.amount,
+                totalAmt: w.amount,
+                status: w.status || "success",
+                note: w.note || w.reason || null,
+                createdAt: w.createdAt,
+            }));
+
+            const drxAll = [...brickTxns, ...savingTxns, ...drxWalletTxns]
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            const totalInvested = brickTxns
+                .filter((t) => t.status === "paid" || t.status === "success")
+                .reduce((s, t) => s + t.amount, 0);
+            const totalSaved = savingTxns.reduce((s, t) => s + t.amount, 0);
+
+            return res.json({
+                success: true,
+                data: drxAll,
+                count: drxAll.length,
+                summary: {
+                    totalTransactions: drxAll.length,
+                    totalInvested,
+                    totalSaved,
+                    totalSpent: totalInvested + totalSaved,
+                },
+            });
+        }
 
         // ── 1. Copper Bullion Transactions ──────────────────────────────────────
         const copperTxnsPromise = CopperTransaction.find({ user: userId }).sort({ createdAt: -1 });

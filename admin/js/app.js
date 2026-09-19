@@ -162,7 +162,8 @@ const pageTitles = {
     properties: "Property Listings",
     investments: "Real Estate Brick Investments",
     enquiries: "Customer Enquiries",
-    legalpolicies: "Real Estate Legal Policies & Agreements"
+    legalpolicies: "Real Estate Legal Policies & Agreements",
+    homevideos: "Home YouTube Videos"
 };
 
 function showPage(pageId) {
@@ -256,6 +257,9 @@ function showPage(pageId) {
             break;
         case "legalpolicies":
             loadLegalPolicies();
+            break;
+        case "homevideos":
+            loadHomeVideos();
             break;
     }
 }
