@@ -77,6 +77,7 @@ app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
 app.use("/api/notifications", require("./routes/notification"));
 app.use("/api/coupons", require("./routes/coupon"));
 app.use("/api/sip", require("./routes/sip"));
+app.use("/api/mutual-funds", require("./routes/mutualFunds"));
 
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
