@@ -93,18 +93,27 @@ exports.getWallet = async (req, res, next) => {
         const wallet = await getOrCreateWallet(req.user._id);
 
         if (isDrx) {
-            const drxTxns = await WalletTxn.find({ user: req.user._id, appSource: "vikadrx" }).sort({ createdAt: -1 }).limit(30);
-            const drxBal = wallet.drxBalance || 0;
-            const drxLocked = wallet.drxLockedBalance || 0;
+            const drxTxns = await WalletTxn.find({
+                user: req.user._id,
+                $or: [
+                    { appSource: "vikadrx" },
+                    { type: { $in: ["add", "drx_deposit", "deposit", "withdraw", "drx_withdraw", "brick_buy", "brick_yield"] } }
+                ]
+            }).sort({ createdAt: -1 }).limit(50);
+
+            const balance = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : (wallet.balance || 0);
+            const locked = (wallet.drxLockedBalance && wallet.drxLockedBalance > 0) ? wallet.drxLockedBalance : (wallet.lockedBalance || 0);
+            const available = Math.max(0, balance - locked);
+
             return res.json({
                 success: true,
                 data: {
-                    balance: drxBal,
-                    lockedBalance: drxLocked,
-                    pendingCredit: 0,
-                    availableBalance: Math.max(0, drxBal - drxLocked),
-                    totalAdded: wallet.drxTotalAdded || 0,
-                    totalWithdrawn: wallet.drxTotalWithdrawn || 0,
+                    balance,
+                    lockedBalance: locked,
+                    pendingCredit: wallet.pendingCredit || 0,
+                    availableBalance: available,
+                    totalAdded: (wallet.drxTotalAdded && wallet.drxTotalAdded > 0) ? wallet.drxTotalAdded : (wallet.totalAdded || 0),
+                    totalWithdrawn: (wallet.drxTotalWithdrawn && wallet.drxTotalWithdrawn > 0) ? wallet.drxTotalWithdrawn : (wallet.totalWithdrawn || 0),
                     transactions: drxTxns,
                 },
             });
@@ -177,12 +186,14 @@ exports.verifyAdd = async (req, res, next) => {
         const parsedAmount = parseFloat(amount);
 
         if (isDrx) {
-            const balBefore = wallet.drxBalance || 0;
-            wallet.drxBalance = parseFloat(((wallet.drxBalance || 0) + parsedAmount).toFixed(2));
+            const balBefore = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : (wallet.balance || 0);
+            wallet.drxBalance = parseFloat((balBefore + parsedAmount).toFixed(2));
+            wallet.balance = parseFloat(((wallet.balance || 0) + parsedAmount).toFixed(2));
             wallet.drxTotalAdded = parseFloat(((wallet.drxTotalAdded || 0) + parsedAmount).toFixed(2));
+            wallet.totalAdded = parseFloat(((wallet.totalAdded || 0) + parsedAmount).toFixed(2));
             await wallet.save();
 
-            await recordTxn(req.user._id, "drx_deposit", parsedAmount, balBefore, wallet.drxBalance, {
+            await recordTxn(req.user._id, "drx_deposit", parsedAmount, balBefore, wallet.balance, {
                 appSource: "vikadrx",
                 razorpayOrderId, razorpayPaymentId, razorpaySignature,
                 note: `Added ₹${amount} to Vika DRX Wallet`,
@@ -192,7 +203,7 @@ exports.verifyAdd = async (req, res, next) => {
             return res.json({
                 success: true,
                 message: `₹${amount} added to your Vika DRX wallet`,
-                data: { balance: wallet.drxBalance },
+                data: { balance: wallet.balance },
             });
         }
 
