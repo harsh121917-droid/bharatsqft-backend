@@ -19,7 +19,13 @@ exports.getMyTransactions = async (req, res, next) => {
                     .populate("property", "title location coverImage images propertyType price minInvestment expectedReturn")
                     .sort({ createdAt: -1 }),
                 Saving.find({ user: userId }),
-                WalletTxn.find({ user: userId, appSource: "vikadrx" }).sort({ createdAt: -1 }),
+                WalletTxn.find({
+                    user: userId,
+                    $or: [
+                        { appSource: "vikadrx" },
+                        { type: { $in: ["add", "drx_deposit", "deposit", "withdraw", "drx_withdraw", "brick_buy", "brick_yield", "manual_credit", "manual_debit"] } }
+                    ]
+                }).sort({ createdAt: -1 }),
             ]);
 
             // Map Brick Purchases
@@ -72,21 +78,33 @@ exports.getMyTransactions = async (req, res, next) => {
             }
 
             // Map DRX Wallet Transactions
-            const drxWalletTxns = drxWalletRaw.map((w) => ({
-                id: w._id,
-                invoiceNo: w.txnId || `DRX-${String(w._id).slice(-8).toUpperCase()}`,
-                type: w.type,
-                transactionType: w.entryType === "credit" ? "Credit" : "Debit",
-                category: "Wallet",
-                metal: "wallet",
-                title: w.type === "drx_deposit" || w.type === "add" ? "DRX Wallet Deposit" : (w.type === "drx_withdraw" || w.type === "withdraw" ? "DRX Bank Withdrawal" : (w.reason || "DRX Wallet Transaction")),
-                subtitle: w.entryType === "credit" ? `+₹${w.amount} Credited` : `-₹${w.amount} Debited`,
-                amount: w.amount,
-                totalAmt: w.amount,
-                status: w.status || "success",
-                note: w.note || w.reason || null,
-                createdAt: w.createdAt,
-            }));
+            const drxWalletTxns = drxWalletRaw.map((w) => {
+                const isCredit = w.entryType === "credit" || ["add", "drx_deposit", "deposit", "brick_yield", "manual_credit"].includes(w.type);
+                const title = (w.type === "drx_deposit" || w.type === "add" || w.type === "deposit")
+                    ? "Wallet Deposit"
+                    : (w.type === "drx_withdraw" || w.type === "withdraw")
+                        ? "Bank Withdrawal"
+                        : (w.type === "brick_buy")
+                            ? "Brick Purchase"
+                            : (w.type === "brick_yield")
+                                ? "Rental Yield Credit"
+                                : (w.reason || w.note || "Wallet Transaction");
+                return {
+                    id: w._id,
+                    invoiceNo: w.txnId || `DRX-${String(w._id).slice(-8).toUpperCase()}`,
+                    type: w.type,
+                    transactionType: isCredit ? "Credit" : "Debit",
+                    category: "Wallet",
+                    metal: "wallet",
+                    title: title,
+                    subtitle: isCredit ? `+₹${w.amount} Credited` : `-₹${w.amount} Debited`,
+                    amount: w.amount,
+                    totalAmt: w.amount,
+                    status: w.status || "success",
+                    note: w.note || w.reason || null,
+                    createdAt: w.createdAt,
+                };
+            });
 
             const drxAll = [...brickTxns, ...savingTxns, ...drxWalletTxns]
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

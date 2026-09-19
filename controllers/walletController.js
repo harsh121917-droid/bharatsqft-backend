@@ -518,19 +518,22 @@ exports.initiateWithdraw = async (req, res, next) => {
         const parsedAmount = parseFloat(amount);
 
         if (isDrx) {
-            const available = (wallet.drxBalance || 0) - (wallet.drxLockedBalance || 0);
+            const drxBal = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : (wallet.balance || 0);
+            const drxLocked = (wallet.drxLockedBalance && wallet.drxLockedBalance > 0) ? wallet.drxLockedBalance : (wallet.lockedBalance || 0);
+            const available = Math.max(0, drxBal - drxLocked);
             if (parsedAmount > available) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient DRX balance. Available: ₹${available.toFixed(2)}`,
+                    message: `Insufficient balance. Available: ₹${available.toFixed(2)}`,
                 });
             }
-            const balBefore = wallet.drxBalance || 0;
-            wallet.drxLockedBalance = parseFloat(((wallet.drxLockedBalance || 0) + parsedAmount).toFixed(2));
+            const balBefore = drxBal;
+            wallet.drxLockedBalance = parseFloat((drxLocked + parsedAmount).toFixed(2));
+            wallet.lockedBalance = parseFloat(((wallet.lockedBalance || 0) + parsedAmount).toFixed(2));
             await wallet.save();
 
             const walletTxn = await recordTxn(
-                req.user._id, "drx_withdraw", parsedAmount, balBefore, wallet.drxBalance,
+                req.user._id, "drx_withdraw", parsedAmount, balBefore, drxBal,
                 { appSource: "vikadrx", note: `Withdraw ₹${parsedAmount} from Vika DRX to bank`, status: "pending" }
             );
 
@@ -539,7 +542,7 @@ exports.initiateWithdraw = async (req, res, next) => {
                 message: "Withdrawal initiated. Will reach your bank within 24 hours.",
                 data: {
                     amount: parsedAmount, bankAccountId,
-                    walletBalance: wallet.drxBalance,
+                    walletBalance: drxBal,
                     lockedBalance: wallet.drxLockedBalance,
                     releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 },
