@@ -2,14 +2,17 @@
    Payvika / Bharat SQFT — Admin Panel Configuration & Utilities
    ══════════════════════════════════════════════════════════════ */
 
-// Auto-resolve API base URL (production onrender backend vs express static serving)
+// Auto-resolve API base URL (AWS production backend vs express static serving)
 function getApiBaseUrl() {
+    const custom = localStorage.getItem("API_BASE_URL");
+    if (custom) return custom;
+
     // If served directly from Express server on port 5000 or same origin
-    if (window.location.port === "5000" || (window.location.hostname.includes("onrender.com") && window.location.pathname.startsWith("/admin"))) {
+    if (window.location.port === "5000" || (window.location.hostname.includes("vikaone.com") && window.location.pathname.startsWith("/admin")) || (window.location.hostname.includes("onrender.com") && window.location.pathname.startsWith("/admin"))) {
         return "/api";
     }
-    // When opened via VS Code Live Server (127.0.0.1:5500 / 5501) or file://
-    return "https://bharatsqft-backend.onrender.com/api";
+    // AWS production backend
+    return "https://api.vikaone.com/api";
 }
 
 const API_BASE = getApiBaseUrl();

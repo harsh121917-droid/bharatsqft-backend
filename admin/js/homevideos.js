@@ -5,6 +5,29 @@
 let allHomeVideos = [];
 let editingHomeVideoId = null;
 
+// ── Multi-Route API Fallback Helper ────────────────────────────
+// Supports /admin/home-videos and /home-videos/admin across different backend setups
+async function hvApi(subpath = "", options = {}) {
+    // 1. Try standard /admin/home-videos (preferred in admin panel)
+    try {
+        const path1 = `/admin/home-videos${subpath}`;
+        const res = await api(path1, options);
+        if (res && res.success !== false) return res;
+        if (res && res.message && !res.message.includes("not found")) return res;
+    } catch (_) {}
+
+    // 2. Fallback to /home-videos/admin
+    try {
+        const path2 = `/home-videos/admin${subpath}`;
+        const res2 = await api(path2, options);
+        if (res2 && res2.success !== false) return res2;
+    } catch (_) {}
+
+    // 3. Fallback to /home-videos
+    const path3 = `/home-videos${subpath}`;
+    return await api(path3, options);
+}
+
 // ── Load Home Videos ───────────────────────────────────────────
 async function loadHomeVideos() {
     const body = document.getElementById("homevideos-body");
@@ -12,9 +35,9 @@ async function loadHomeVideos() {
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading Home YouTube videos...</div></div>`;
 
     try {
-        const res = await api("/home-videos/admin");
-        if (!res.success) {
-            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load home videos"}</div></div>`;
+        const res = await hvApi("");
+        if (!res || !res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${(res && res.message) || "Failed to load home videos"}</div></div>`;
             return;
         }
 
@@ -253,12 +276,12 @@ async function saveHomeVideo(e) {
     try {
         let res;
         if (editingHomeVideoId) {
-            res = await api(`/home-videos/admin/${editingHomeVideoId}`, {
+            res = await hvApi(`/${editingHomeVideoId}`, {
                 method: "PUT",
                 body: JSON.stringify(payload),
             });
         } else {
-            res = await api("/home-videos/admin", {
+            res = await hvApi("", {
                 method: "POST",
                 body: JSON.stringify(payload),
             });
@@ -288,7 +311,7 @@ async function deleteHomeVideo(id, title) {
     }
 
     try {
-        const res = await api(`/home-videos/admin/${id}`, {
+        const res = await hvApi(`/${id}`, {
             method: "DELETE",
         });
 
@@ -306,7 +329,7 @@ async function deleteHomeVideo(id, title) {
 // ── Toggle Active State ───────────────────────────────────────
 async function toggleHomeVideoActive(id, currentActive) {
     try {
-        const res = await api(`/home-videos/admin/${id}`, {
+        const res = await hvApi(`/${id}`, {
             method: "PUT",
             body: JSON.stringify({ isActive: !currentActive }),
         });
@@ -338,7 +361,7 @@ async function moveHomeVideo(id, direction) {
     const orders = allHomeVideos.map((v, i) => ({ id: v._id, order: i }));
 
     try {
-        const res = await api("/home-videos/admin/reorder", {
+        const res = await hvApi("/reorder", {
             method: "PUT",
             body: JSON.stringify({ orders }),
         });

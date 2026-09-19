@@ -40,6 +40,13 @@ const {
 const { getAllInvestments } = require("../controllers/paymentController");
 const { getAllKyc, getKycById, reviewKyc, reviewSoldierKyc } = require("../controllers/kycController");
 const { enrollmentDetail } = require("../controllers/schemeController");
+const {
+  getAllHomeVideos,
+  createHomeVideo,
+  updateHomeVideo,
+  deleteHomeVideo,
+  reorderHomeVideos,
+} = require("../controllers/homeVideosController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 router.use(protect, authorize("admin"));
@@ -83,6 +90,18 @@ router.post("/properties", createProperty);
 router.put("/properties/:id", updateProperty);
 router.delete("/properties/:id", deleteProperty);
 router.patch("/properties/:id/toggle", toggleStatus);
+
+// Home YouTube Videos
+router.get("/home-videos", getAllHomeVideos);
+router.get("/home-videos/admin", getAllHomeVideos);
+router.post("/home-videos", createHomeVideo);
+router.post("/home-videos/admin", createHomeVideo);
+router.put("/home-videos/reorder", reorderHomeVideos);
+router.put("/home-videos/admin/reorder", reorderHomeVideos);
+router.put("/home-videos/:id", updateHomeVideo);
+router.put("/home-videos/admin/:id", updateHomeVideo);
+router.delete("/home-videos/:id", deleteHomeVideo);
+router.delete("/home-videos/admin/:id", deleteHomeVideo);
 
 // Investments
 router.get("/investments", getAllInvestments);

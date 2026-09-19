@@ -482,7 +482,7 @@ async function handleJewelleryModalUpload(files) {
     toast(`Uploading ${files.length} photo(s)...`, "info");
     try {
         const token = localStorage.getItem("token");
-        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://api.vikaone.com/api";
         const response = await fetch(`${base}/jewellery/upload-images`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -589,7 +589,7 @@ async function handleCoinModalUpload(files) {
     toast(`Uploading ${files.length} coin photo(s)...`, "info");
     try {
         const token = localStorage.getItem("token");
-        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://api.vikaone.com/api";
         const response = await fetch(`${base}/jewellery/upload-images`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -622,7 +622,7 @@ async function uploadCoinPhoto(id, file) {
 
     try {
         const token = localStorage.getItem("token");
-        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://api.vikaone.com/api";
         const response = await fetch(`${base}/admin/coins/${id}/upload-image`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -780,7 +780,7 @@ async function uploadJewelleryPhoto(id, file) {
 
     try {
         const token = localStorage.getItem("token");
-        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://bharatsqft-backend.onrender.com/api";
+        const base = typeof API_BASE !== "undefined" ? API_BASE : "https://api.vikaone.com/api";
         const response = await fetch(`${base}/jewellery/products/${id}/upload-image`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
