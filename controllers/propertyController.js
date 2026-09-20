@@ -1,5 +1,22 @@
 const Property = require("../models/Property");
 
+function buildPropertyTypeFilter(typeQuery) {
+    if (!typeQuery) return null;
+    const t = typeQuery.trim().toLowerCase();
+    if (t === "land" || t === "plot") {
+        return { $in: [/^land$/i, /^plot$/i] };
+    } else if (t === "office" || t === "commercial") {
+        return { $in: [/^office$/i, /^commercial$/i] };
+    } else if (t === "apartment" || t === "penthouse") {
+        return { $in: [/^apartment$/i, /^penthouse$/i] };
+    } else if (t === "house" || t === "farmhouse") {
+        return { $in: [/^house$/i, /^villa$/i, /^farmhouse$/i] };
+    } else {
+        return new RegExp(`^${t}$`, "i");
+    }
+}
+
+
 /* ==================== PUBLIC ==================== */
 
 /* @route  GET /api/properties
@@ -15,7 +32,8 @@ exports.getPublicProperties = async (req, res, next) => {
         if (req.query.featured !== undefined) {
             filter.featured = req.query.featured === "true" || req.query.featured === true;
         }
-        if (req.query.type) filter.propertyType = req.query.type;
+        const typeFilter = buildPropertyTypeFilter(req.query.type);
+        if (typeFilter) filter.propertyType = typeFilter;
         if (req.query.city) filter["location.city"] = { $regex: req.query.city, $options: "i" };
         if (req.query.bhk) filter.bhk = req.query.bhk;
         if (req.query.minPrice || req.query.maxPrice) {
@@ -71,7 +89,8 @@ exports.getAllProperties = async (req, res, next) => {
                 filter.status = req.query.status;
             }
         }
-        if (req.query.type) filter.propertyType = req.query.type;
+        const typeFilter = buildPropertyTypeFilter(req.query.type);
+        if (typeFilter) filter.propertyType = typeFilter;
         if (req.query.search) {
             filter.$or = [
                 { title: { $regex: req.query.search, $options: "i" } },

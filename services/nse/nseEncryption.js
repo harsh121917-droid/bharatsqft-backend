@@ -54,85 +54,65 @@ class NseEncryption {
   }
 
   /**
-   * Encrypts the payload according to NSE NNF Authentication Protocol (v1.9.8)
-   * plain_text = API Secret (PWD)|<RANDOM Number>
-   * aes_encrypted_val = AES128(salt, iv, API Member License KEY, plain_text)
-   * Encrypted Password = base64(iv::salt::aes_encrypted_val)
-   * Authorization: Basic base64(Login User ID: Encrypted Password)
+   * Encrypts the payload according to official NSEINVEST Postman Pre-request script:
+   * - PBKDF2 with salt, passPhrase (API Member License KEY), 1000 iterations, 16 bytes key (SHA-1)
+   * - AES-128-CBC encryption of (API Secret | randomNumber) with IV
+   * - aesPassword = (ivHex + "::" + saltHex + "::" + ciphertextBase64)
+   * - encrypted_password = base64(aesPassword)
+   * - Authorization: Basic base64(login_user_id:encrypted_password)
    */
   generateAuthHeaders(overrides = {}) {
     const loginUserId = overrides.loginUserId || this.loginUserId;
     const apiSecret = overrides.apiSecret || this.apiSecret;
     const licenseKey = overrides.licenseKey || this.licenseKey;
-    const memberId = overrides.memberId || this.memberId;
+    const memberCode = overrides.memberCode || this.memberCode || '1031616';
 
     if (!loginUserId || !apiSecret || !licenseKey) {
-      // Return mock/development headers if environment variables not yet populated
-      const devMock = Buffer.from(`${loginUserId || 'DEV_USER'}:MOCK_PASS`).toString('base64');
+      const devMock = Buffer.from(`${loginUserId || 'ADMIN'}:MOCK_PASS`).toString('base64');
       return {
         'Content-Type': 'application/json',
-        'memberId': memberId || '1',
+        'memberId': String(memberCode),
         'Authorization': `Basic ${devMock}`,
-        'User-Agent': 'PostmanRuntime/7.39.0',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'PostmanRuntime/7.43.0',
+        'Accept-Language': 'en-US',
+        'Referer': 'www.google.com',
         'Accept': '',
         'Connection': 'keep-alive',
-        'Reference': 'https://www.nseinvest.com',
       };
     }
 
-    // 1. Generate salt, iv, and random number
-    const salt = overrides.salt || this.generateRandomHex(32);
-    const iv = overrides.iv || this.generateRandomHex(32);
-    const randomNumber = overrides.randomNumber || this.generateRandomNumber(11);
-
-    // 2. Prepare plain text
+    const randomNumber = Math.floor(Math.random() * 10000000000 + 1);
     const plainText = `${apiSecret}|${randomNumber}`;
 
-    // 3. Derive 16-byte key and 16-byte IV for AES-128
-    // Parse key from licenseKey string or PBKDF2/buffer
-    let keyBuffer;
-    if (licenseKey.length === 32 && /^[0-9a-fA-F]+$/.test(licenseKey)) {
-      keyBuffer = Buffer.from(licenseKey, 'hex');
-    } else {
-      keyBuffer = Buffer.from(licenseKey, 'utf8').slice(0, 16);
-      if (keyBuffer.length < 16) {
-        const padded = Buffer.alloc(16);
-        keyBuffer.copy(padded);
-        keyBuffer = padded;
-      }
-    }
+    const ivHex = crypto.randomBytes(16).toString('hex');
+    const saltHex = crypto.randomBytes(16).toString('hex');
 
-    let ivBuffer;
-    if (iv.length === 32 && /^[0-9a-fA-F]+$/.test(iv)) {
-      ivBuffer = Buffer.from(iv, 'hex').slice(0, 16);
-    } else {
-      ivBuffer = Buffer.from(iv, 'utf8').slice(0, 16);
-    }
+    const saltBuf = Buffer.from(saltHex, 'hex');
+    const ivBuf = Buffer.from(ivHex, 'hex');
 
-    // 4. Encrypt using AES-128-CBC with PKCS7 padding
-    const cipher = crypto.createCipheriv('aes-128-cbc', keyBuffer, ivBuffer);
+    // Official Postman CryptoJS PBKDF2 derivation:
+    const key = crypto.pbkdf2Sync(licenseKey, saltBuf, 1000, 16, 'sha1');
+
+    const cipher = crypto.createCipheriv('aes-128-cbc', key, ivBuf);
     cipher.setAutoPadding(true);
-    let encrypted = cipher.update(plainText, 'utf8', 'base64');
-    encrypted += cipher.final('base64');
+    let ciphertext = cipher.update(plainText, 'utf8', 'base64');
+    ciphertext += cipher.final('base64');
 
-    // 5. Package as: base64(iv::salt::aes_encrypted_val)
-    const packagedString = `${iv}::${salt}::${encrypted}`;
-    const encryptedPassword = Buffer.from(packagedString, 'utf8').toString('base64');
+    const aesPassword = `${ivHex}::${saltHex}::${ciphertext}`;
+    const encryptedPassword = Buffer.from(aesPassword, 'utf8').toString('base64');
 
-    // 6. Header value: base64(Login User ID: Encrypted Password)
-    const basicCredential = `${loginUserId}:${encryptedPassword}`;
-    const authorizationHeader = `Basic ${Buffer.from(basicCredential, 'utf8').toString('base64')}`;
+    const basicCred = `${loginUserId}:${encryptedPassword}`;
+    const authorizationHeader = `Basic ${Buffer.from(basicCred, 'utf8').toString('base64')}`;
 
     return {
       'Content-Type': 'application/json',
-      'memberId': String(memberId),
+      'memberId': String(memberCode),
       'Authorization': authorizationHeader,
-      'User-Agent': 'PostmanRuntime/7.39.0',
-      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': 'PostmanRuntime/7.43.0',
+      'Accept-Language': 'en-US',
+      'Referer': 'www.google.com',
       'Accept': '',
       'Connection': 'keep-alive',
-      'Reference': 'https://www.nseinvest.com',
     };
   }
 }
