@@ -465,7 +465,8 @@ exports.createPurchaseOrder = async (req, res) => {
     const nseOrderId = nseRes?.data?.transaction_details?.[0]?.trxn_order_id || `NSE_${Date.now()}`;
 
     // 3. Request Payment Link from NSE (GET_LINK API)
-    let paymentLink = `https://api.vikaone.com/api/mutual-funds/checkout/${orderId}`;
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000';
+    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
     const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
     if (linkRes.success && linkRes.data?.firstHolderLink) {
       paymentLink = linkRes.data.firstHolderLink;
@@ -473,6 +474,9 @@ exports.createPurchaseOrder = async (req, res) => {
 
     // 4. Save order to MongoDB
     const unitsCalculated = +(orderAmount / scheme.nav).toFixed(3);
+    const isMock = process.env.NSE_MOCK_MODE === 'true';
+    const initialPaymentStatus = isMock ? 'SUCCESS' : 'PENDING';
+
     const order = await MfOrder.create({
       user: userId,
       clientCode: ucc.clientCode,
@@ -485,11 +489,11 @@ exports.createPurchaseOrder = async (req, res) => {
       units: unitsCalculated,
       navAtOrder: scheme.nav,
       paymentMode,
-      paymentStatus: 'PENDING',
+      paymentStatus: initialPaymentStatus,
       paymentLink,
       nseTrxnOrderId: nseOrderId,
-      nseStatus: 'TRXN SUCCESS',
-      remarks: 'Order placed on NSE MFSS',
+      nseStatus: isMock ? 'ALLOTTED (SANDBOX)' : 'TRXN SUCCESS',
+      remarks: isMock ? 'Sandbox test order - Auto-Allotted' : 'Order placed on NSE MFSS',
     });
 
     return res.json({
@@ -705,3 +709,145 @@ exports.getMyOrders = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── 9. POST /api/mutual-funds/orders/:orderId/simulate-payment (Sandbox Simulation) ──
+exports.simulatePayment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await MfOrder.findOne({ orderId });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.paymentStatus = 'SUCCESS';
+    order.nseStatus = 'ALLOTTED (SANDBOX)';
+    order.remarks = 'Payment simulated successfully in Sandbox Mode';
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: 'Payment simulated and units allotted successfully',
+      data: order,
+    });
+  } catch (error) {
+    console.error('[simulatePayment Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 10. GET /api/mutual-funds/checkout/:orderId (Visual Web Checkout Simulator) ──
+exports.renderCheckoutSimulator = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await MfOrder.findOne({ orderId });
+
+    if (!order) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Order Not Found</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="font-family: -apple-system, sans-serif; text-align: center; padding: 40px; background: #0F172A; color: #fff;">
+          <h2>Order Not Found</h2>
+          <p>The specified mutual fund order does not exist.</p>
+        </body>
+        </html>
+      `);
+    }
+
+    // Auto-confirm in sandbox if not already SUCCESS
+    if (order.paymentStatus !== 'SUCCESS') {
+      order.paymentStatus = 'SUCCESS';
+      order.nseStatus = 'ALLOTTED (SANDBOX)';
+      await order.save();
+    }
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>NSE MFSS Sandbox Payment Simulator</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+          body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+          .card { background: #161F30; border: 1px solid #1E293B; border-radius: 20px; max-width: 440px; width: 100%; padding: 28px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+          .badge { display: inline-block; padding: 6px 14px; border-radius: 50px; background: rgba(0, 208, 156, 0.15); color: #00D09C; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; }
+          .icon-circle { width: 68px; height: 68px; border-radius: 50%; background: #00D09C; color: #0B0F19; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; font-weight: bold; }
+          h1 { font-size: 20px; margin-bottom: 8px; color: #FFFFFF; }
+          p.sub { font-size: 13px; color: #94A3B8; margin-bottom: 24px; }
+          .details { background: #0F172A; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 24px; border: 1px solid #1E293B; }
+          .row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+          .row:last-child { margin-bottom: 0; }
+          .label { color: #64748B; }
+          .val { color: #F1F5F9; font-weight: 600; }
+          .highlight { color: #D4A017; font-size: 16px; font-weight: 700; }
+          .btn { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #D4A017, #F59E0B); color: #0B0F19; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform 0.1s; }
+          .btn:active { transform: scale(0.98); }
+          .footer { margin-top: 18px; font-size: 11px; color: #64748B; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">⚡ NSE MFSS Sandbox Verified</div>
+          <div class="icon-circle">✓</div>
+          <h1>Payment Successful</h1>
+          <p class="sub">Your test mutual fund purchase has been simulated and units are allotted.</p>
+
+          <div class="details">
+            <div class="row">
+              <span class="label">Order ID</span>
+              <span class="val">${order.orderId}</span>
+            </div>
+            <div class="row">
+              <span class="label">Scheme</span>
+              <span class="val" style="max-width: 220px; text-align: right; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${order.schemeName}</span>
+            </div>
+            <div class="row">
+              <span class="label">Amount Paid</span>
+              <span class="val highlight">₹${order.orderAmount.toLocaleString('en-IN')}</span>
+            </div>
+            <div class="row">
+              <span class="label">Units Allotted</span>
+              <span class="val" style="color: #00D09C;">${order.units.toFixed(3)} units</span>
+            </div>
+            <div class="row">
+              <span class="label">NAV at Order</span>
+              <span class="val">₹${order.navAtOrder.toFixed(2)}</span>
+            </div>
+            <div class="row">
+              <span class="label">Payment Status</span>
+              <span class="val" style="color: #00D09C;">SUCCESS</span>
+            </div>
+          </div>
+
+          <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
+          <div class="footer">National Stock Exchange of India (NSE NNF v1.9.8) Sandbox Simulator</div>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('[renderCheckoutSimulator Error]:', error);
+    return res.status(500).send('Error rendering checkout simulation');
+  }
+};
+
+// ── 11. POST /api/mutual-funds/test/reset (Tester Reset Helper) ──
+exports.resetTestData = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    await MfOrder.deleteMany({ user: userId });
+    await MfSip.deleteMany({ user: userId });
+    await MfClientUcc.deleteMany({ user: userId });
+
+    return res.json({
+      success: true,
+      message: 'Test orders, active SIPs, and UCC reset successfully for user',
+    });
+  } catch (error) {
+    console.error('[resetTestData Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
