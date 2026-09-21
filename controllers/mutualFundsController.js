@@ -1141,6 +1141,7 @@ exports.resetTestData = async (req, res) => {
     await MfOrder.deleteMany({ user: userId });
     await MfSip.deleteMany({ user: userId });
     await MfClientUcc.deleteMany({ user: userId });
+    await MfMandate.deleteMany({ user: userId });
 
     return res.json({
       success: true,

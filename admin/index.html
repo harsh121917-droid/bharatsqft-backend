@@ -867,6 +867,9 @@
                                     <button class="ud-dropdown-item danger" onclick="resetUserRewardsData(activeUserId)">
                                         <i class="fas fa-gift"></i> Reset Rewards & Spins
                                     </button>
+                                    <button class="ud-dropdown-item danger" onclick="cleanActiveUserMutualFunds(activeUserId)">
+                                        <i class="fas fa-broom" style="color:#f87171"></i> Clean Mutual Funds (UCC, SIPs & Orders)
+                                    </button>
                                     <button class="ud-dropdown-item danger" onclick="resetAllUserTestingData(activeUserId)">
                                         <i class="fas fa-bomb"></i> Wipe All Testing Data
                                     </button>
@@ -1382,6 +1385,9 @@
                                     </button>
                                     <button class="btn btn-outline-danger btn-sm" onclick="resetUserRewardsData(activeUserId)">
                                         <i class="fas fa-gift"></i> Reset Rewards & Spins
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="cleanActiveUserMutualFunds(activeUserId)" style="color:#f87171;border-color:rgba(239,68,68,0.4)">
+                                        <i class="fas fa-broom"></i> Clean Mutual Funds (UCC, SIPs & Orders)
                                     </button>
                                     <button class="btn btn-secondary btn-sm" onclick="recalculateUserVault(activeUserId)">
                                         <i class="fas fa-sync-alt"></i> Recalculate Vault

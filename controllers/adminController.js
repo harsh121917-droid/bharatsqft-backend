@@ -1469,6 +1469,16 @@ exports.resetAllUserData = async (req, res, next) => {
         await SchemeEnrollment.deleteMany({ user: userId });
         await Sip.deleteMany({ user: userId });
 
+        // Reset Mutual Funds records (Orders, SIPs, UCC, Mandates)
+        const MfOrder = require("../models/MfOrder");
+        const MfSip = require("../models/MfSip");
+        const MfClientUcc = require("../models/MfClientUcc");
+        const MfMandate = require("../models/MfMandate");
+        await MfOrder.deleteMany({ user: userId });
+        await MfSip.deleteMany({ user: userId });
+        await MfClientUcc.deleteMany({ user: userId });
+        await MfMandate.deleteMany({ user: userId });
+
         // Reset Wallet & Wallet Transactions
         await Wallet.findOneAndUpdate(
             { user: userId },

@@ -858,15 +858,19 @@ async function resetAllUserTestingData(paramId) {
     }
 }
 
-function cleanActiveUserMutualFunds() {
-    const id = activeUserId || document.getElementById("user-id")?.value;
-    const name = document.getElementById("user-name")?.value || "User";
+function cleanActiveUserMutualFunds(paramId) {
+    const id = paramId || activeUserId || document.getElementById("user-id")?.value;
+    const name = document.getElementById("ud-header-name")?.textContent?.trim() || 
+                 document.getElementById("user-name")?.value?.trim() || 
+                 "User";
     if (!id) {
         toast("No user selected to clean Mutual Funds", "warning");
         return;
     }
     if (typeof cleanUserMutualFunds === "function") {
         cleanUserMutualFunds(id, name);
+    } else {
+        toast("cleanUserMutualFunds function not available", "danger");
     }
 }
 

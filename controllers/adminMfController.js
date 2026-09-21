@@ -396,16 +396,23 @@ exports.cleanUserMfData = async (req, res) => {
       return res.status(400).json({ success: false, message: 'userId parameter is required' });
     }
 
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    const clientCode = ucc?.clientCode;
+
+    const userOrClient = clientCode
+      ? { $or: [{ user: userId }, { clientCode: clientCode }] }
+      : { user: userId };
+
     const [ordersDel, sipsDel, uccDel, mandateDel] = await Promise.all([
-      MfOrder.deleteMany({ user: userId }),
-      MfSip.deleteMany({ user: userId }),
+      MfOrder.deleteMany(userOrClient),
+      MfSip.deleteMany(userOrClient),
       MfClientUcc.deleteMany({ user: userId }),
-      MfMandate.deleteMany({ user: userId }),
+      MfMandate.deleteMany(userOrClient),
     ]);
 
     return res.json({
       success: true,
-      message: 'Mutual Funds data (UCC, SIPs, Orders) cleared successfully for user.',
+      message: 'Mutual Funds data (UCC, SIPs, Orders, Mandates) cleared successfully for user.',
       data: {
         ordersDeleted: ordersDel.deletedCount,
         sipsDeleted: sipsDel.deletedCount,
