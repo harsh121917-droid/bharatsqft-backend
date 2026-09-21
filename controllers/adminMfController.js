@@ -242,6 +242,21 @@ exports.getMfSips = async (req, res) => {
       .limit(limit)
       .populate('user', 'name email phone');
 
+    // Reconcile and heal any inflated installmentsPaid with actual confirmed orders
+    for (const sip of sips) {
+      const ordersCount = await MfOrder.countDocuments({
+        user: sip.user?._id || sip.user,
+        schemeCode: sip.schemeCode,
+        paymentStatus: 'SUCCESS',
+        transactionType: 'P',
+      });
+      if (ordersCount > 0 && sip.installmentsPaid > ordersCount) {
+        sip.installmentsPaid = ordersCount;
+        sip.totalAmountPaid = ordersCount * sip.installmentAmount;
+        await sip.save();
+      }
+    }
+
     return res.json({
       success: true,
       data: sips,

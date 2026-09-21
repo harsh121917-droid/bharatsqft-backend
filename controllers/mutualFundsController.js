@@ -769,8 +769,8 @@ exports.registerSipOrder = async (req, res) => {
       startDate: start,
       nextDueDate: start,
       mandateId: ucc.defaultMandateId || '',
-      installmentsPaid: 1,
-      totalAmountPaid: Number(installmentAmount),
+      installmentsPaid: 0,
+      totalAmountPaid: 0,
       status: 'ACTIVE',
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
@@ -867,34 +867,46 @@ exports.verifySipPayment = async (req, res) => {
       }
     }
 
-    sip.status = 'ACTIVE';
-    sip.installmentsPaid = (sip.installmentsPaid || 0) + 1;
-    sip.totalAmountPaid = (sip.totalAmountPaid || 0) + sip.installmentAmount;
-    await sip.save();
-
     const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode });
     const nav = scheme?.nav || 100;
     const units = +(sip.installmentAmount / nav).toFixed(3);
 
-    const initialOrder = await MfOrder.create({
+    // Check if an order already exists for this payment (idempotency)
+    let initialOrder = await MfOrder.findOne({ razorpayPaymentId });
+    if (!initialOrder) {
+      initialOrder = await MfOrder.create({
+        user: userId,
+        clientCode: sip.clientCode,
+        orderId: `MF_SIP_${Date.now()}`,
+        schemeCode: sip.schemeCode,
+        schemeName: sip.schemeName,
+        transactionType: 'P',
+        buySellType: 'FRESH',
+        orderAmount: sip.installmentAmount,
+        units,
+        navAtOrder: nav,
+        paymentMode: 'RAZORPAY',
+        paymentStatus: 'SUCCESS',
+        razorpayOrderId: razorpayOrderId || '',
+        razorpayPaymentId,
+        razorpaySignature: razorpaySignature || '',
+        nseStatus: 'TRXN SUCCESS',
+        remarks: `First installment for SIP ${sip.sipRegNo}`,
+      });
+    }
+
+    // Accurately count confirmed installments for this SIP/scheme
+    const confirmedOrdersCount = await MfOrder.countDocuments({
       user: userId,
-      clientCode: sip.clientCode,
-      orderId: `MF_SIP_${Date.now()}`,
       schemeCode: sip.schemeCode,
-      schemeName: sip.schemeName,
-      transactionType: 'P',
-      buySellType: 'FRESH',
-      orderAmount: sip.installmentAmount,
-      units,
-      navAtOrder: nav,
-      paymentMode: 'RAZORPAY',
       paymentStatus: 'SUCCESS',
-      razorpayOrderId: razorpayOrderId || '',
-      razorpayPaymentId,
-      razorpaySignature: razorpaySignature || '',
-      nseStatus: 'TRXN SUCCESS',
-      remarks: `First installment for SIP ${sip.sipRegNo}`,
+      transactionType: 'P',
     });
+
+    sip.status = 'ACTIVE';
+    sip.installmentsPaid = Math.max(1, confirmedOrdersCount);
+    sip.totalAmountPaid = sip.installmentsPaid * sip.installmentAmount;
+    await sip.save();
 
     return res.json({
       success: true,
@@ -923,6 +935,19 @@ exports.getPortfolio = async (req, res) => {
     }).sort({ createdAt: -1 });
 
     const activeSips = await MfSip.find({ user: userId, status: 'ACTIVE' });
+
+    // Auto-reconcile activeSips installments with actual confirmed orders
+    for (const sip of activeSips) {
+      const confirmedOrdersCount = orders.filter(
+        (o) => o.schemeCode === sip.schemeCode || (o.remarks && o.remarks.includes(sip.sipRegNo))
+      ).length;
+
+      if (confirmedOrdersCount > 0 && sip.installmentsPaid !== confirmedOrdersCount) {
+        sip.installmentsPaid = confirmedOrdersCount;
+        sip.totalAmountPaid = confirmedOrdersCount * sip.installmentAmount;
+        await sip.save();
+      }
+    }
 
     // Aggregate holdings by scheme
     const holdingsMap = {};
