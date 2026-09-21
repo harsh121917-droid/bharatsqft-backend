@@ -52,13 +52,25 @@ const MfOrderSchema = new mongoose.Schema(
     },
     paymentMode: {
       type: String,
-      enum: ['UPI', 'NETBANKING', 'MANDATE', 'NEFT', 'WALLET'],
+      enum: ['UPI', 'NETBANKING', 'MANDATE', 'NEFT', 'WALLET', 'RAZORPAY'],
       default: 'UPI',
     },
     paymentStatus: {
       type: String,
       enum: ['PENDING', 'SUCCESS', 'FAILED'],
       default: 'PENDING',
+    },
+    razorpayOrderId: {
+      type: String,
+      default: '',
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: '',
+    },
+    razorpaySignature: {
+      type: String,
+      default: '',
     },
     paymentLink: {
       type: String,

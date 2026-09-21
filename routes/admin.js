@@ -164,4 +164,13 @@ router.post("/sips/:id/record-installment", sipController.adminRecordInstallment
 router.post("/sips/:id/remind", sipController.sendSipReminder);
 router.post("/sips/remind-all", sipController.sendBulkSipReminders);
 
+// ── Mutual Funds Administration ──
+const adminMfController = require("../controllers/adminMfController");
+router.get("/mutual-funds/overview", adminMfController.getMfOverview);
+router.get("/mutual-funds/users", adminMfController.getMfUsers);
+router.get("/mutual-funds/sips", adminMfController.getMfSips);
+router.get("/mutual-funds/orders", adminMfController.getMfOrders);
+router.post("/mutual-funds/sips/:id/status", adminMfController.updateMfSipStatus);
+router.post("/mutual-funds/orders/:id/verify", adminMfController.reconcileMfOrder);
+
 module.exports = router;

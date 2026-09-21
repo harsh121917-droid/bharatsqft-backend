@@ -75,6 +75,33 @@ async function resolveGateway({ gateway, purpose, mode } = {}) {
         if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isActive: true });
     }
 
+    // 3b. If purpose is "mutual_fund" (Mutual Fund Lumpsum Orders & MF SIPs)
+    if (!config && purpose === "mutual_fund") {
+        // Priority 1: razorpay_mf marked default & active
+        config = await PaymentGateway.findOne({ name: "razorpay_mf", isDefault: true, isActive: true });
+        // Priority 2: any active razorpay_mf
+        if (!config) config = await PaymentGateway.findOne({ name: "razorpay_mf", isActive: true });
+        // Priority 3: any active gateway marked isDefault with purpose: "mutual_fund"
+        if (!config) config = await PaymentGateway.findOne({ purpose: "mutual_fund", isDefault: true, isActive: true });
+        // Priority 4: any active gateway with purpose: "mutual_fund"
+        if (!config) config = await PaymentGateway.findOne({ purpose: "mutual_fund", isActive: true });
+        // Priority 5: separate env variables RAZORPAY_MF_KEY_ID & RAZORPAY_MF_KEY_SECRET
+        if (!config && process.env.RAZORPAY_MF_KEY_ID && process.env.RAZORPAY_MF_KEY_SECRET) {
+            return {
+                name: "razorpay_mf",
+                keyId: process.env.RAZORPAY_MF_KEY_ID,
+                keySecret: process.env.RAZORPAY_MF_KEY_SECRET,
+                mode: process.env.RAZORPAY_MF_KEY_ID.startsWith("rzp_test") ? "demo" : "live",
+                isActive: true,
+                isDefault: true,
+            };
+        }
+        // Priority 6: general razorpay marked isDefault
+        if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isDefault: true, isActive: true });
+        // Priority 7: any active razorpay
+        if (!config) config = await PaymentGateway.findOne({ name: "razorpay", isActive: true });
+    }
+
     // 4. Default active gateway in the system
     if (!config) {
         config = await PaymentGateway.findOne({ isDefault: true, isActive: true });
@@ -113,7 +140,8 @@ async function resolveGateway({ gateway, purpose, mode } = {}) {
 // Razorpay Orders & Subscriptions
 // ══════════════════════════════════════════════════════════════════════════════
 async function createRazorpayOrder({ amount, notes = {}, mode, purpose = "spot", gateway }) {
-    const config = await resolveGateway({ gateway: gateway || (purpose === "sip_scheme" ? "razorpay_standard" : "razorpay_idfc"), purpose, mode });
+    const defaultGw = purpose === "mutual_fund" ? "razorpay_mf" : (purpose === "sip_scheme" ? "razorpay_standard" : "razorpay_idfc");
+    const config = await resolveGateway({ gateway: gateway || defaultGw, purpose, mode });
     const razorpay = new Razorpay({ key_id: config.keyId, key_secret: config.keySecret });
     
     // Sanitize notes so Razorpay never receives metal or sensitive details
@@ -143,12 +171,17 @@ async function verifyRazorpaySignatureWithFallback({ orderId, paymentId, signatu
         return true;
     }
     const configs = await PaymentGateway.find({
-        name: { $in: ["razorpay", "razorpay_idfc", "razorpay_hdfc", "razorpay_standard"] },
+        name: { $in: ["razorpay", "razorpay_idfc", "razorpay_hdfc", "razorpay_standard", "razorpay_mf"] },
         isActive: true,
         keySecret: { $exists: true, $ne: "" }
     });
     for (const cfg of configs) {
         if (verifyRazorpaySignature({ orderId, paymentId, signature, keySecret: cfg.keySecret })) {
+            return true;
+        }
+    }
+    if (process.env.RAZORPAY_MF_KEY_SECRET) {
+        if (verifyRazorpaySignature({ orderId, paymentId, signature, keySecret: process.env.RAZORPAY_MF_KEY_SECRET })) {
             return true;
         }
     }

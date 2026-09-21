@@ -55,6 +55,7 @@ function renderGateways(gateways) {
         const isRzp = rawName.includes("razorpay");
         const isIdfc = rawName === "razorpay_idfc" || rawName === "razorpay_hdfc";
         const isStandard = rawName === "razorpay_standard";
+        const isMf = rawName === "razorpay_mf";
         const isPayout = rawName === "cashfree_payout";
         const keyDisplay = g.keyId || g.clientId || "—";
         const isDef = !!g.isDefault;
@@ -78,6 +79,12 @@ function renderGateways(gateways) {
             iconColor = "#A855F7";
             title = "🔄 Normal Razorpay (Sub Fee)";
             purposeBadge = `<span class="badge badge-purple" style="font-size:11px;font-weight:700"><i class="fas fa-calendar-alt"></i> SIP AutoPay & Savings Schemes</span>`;
+        } else if (isMf) {
+            iconClass = "fas fa-chart-line";
+            iconBg = "rgba(0,208,156,0.18)";
+            iconColor = "#00D09C";
+            title = "📈 Razorpay (Mutual Funds)";
+            purposeBadge = `<span class="badge" style="background:rgba(0,208,156,0.18);color:#00D09C;font-size:11px;font-weight:700"><i class="fas fa-chart-pie"></i> Mutual Funds (SIP & Lumpsum)</span>`;
         } else if (isPayout) {
             iconClass = "fas fa-money-bill-transfer";
             iconBg = "rgba(16,185,129,0.18)";
@@ -116,7 +123,7 @@ function renderGateways(gateways) {
             </td>
             <td>
                 ${isDef ? 
-                    `<button type="button" class="btn btn-sm" style="background:${isIdfc ? 'linear-gradient(135deg,#D4A017,#F59E0B)' : isStandard ? 'linear-gradient(135deg,#A855F7,#7C3AED)' : '#10B981'};color:${isStandard ? '#fff' : '#000'};font-weight:900;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')" title="Active default for this flow. Click to toggle."><i class="fas fa-check-circle"></i> ${isIdfc ? 'DEFAULT (BUY & WALLET)' : isStandard ? 'DEFAULT (SIP & SCHEMES)' : 'ACTIVE DEFAULT'}</button>` : 
+                    `<button type="button" class="btn btn-sm" style="background:${isIdfc ? 'linear-gradient(135deg,#D4A017,#F59E0B)' : isStandard ? 'linear-gradient(135deg,#A855F7,#7C3AED)' : isMf ? 'linear-gradient(135deg,#00D09C,#059669)' : '#10B981'};color:${isStandard || isMf ? '#fff' : '#000'};font-weight:900;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')" title="Active default for this flow. Click to toggle."><i class="fas fa-check-circle"></i> ${isIdfc ? 'DEFAULT (BUY & WALLET)' : isStandard ? 'DEFAULT (SIP & SCHEMES)' : isMf ? 'DEFAULT (MUTUAL FUNDS)' : 'ACTIVE DEFAULT'}</button>` : 
                     `<button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:5px 10px;cursor:pointer;" onclick="setGatewayDefault('${gatewayId}')"><i class="fas fa-star" style="color:var(--gold)"></i> Set as Default</button>`
                 }
             </td>
@@ -233,9 +240,30 @@ async function saveGateway() {
         return;
     }
 
+    let purpose = "all";
+    let label = "";
+    if (name === "razorpay_idfc" || name === "razorpay_hdfc") {
+        purpose = "spot";
+        label = "IDFC Razorpay (0% Fee - Spot / Wallet)";
+    } else if (name === "razorpay_standard") {
+        purpose = "sip_scheme";
+        label = "Standard Razorpay (SIP AutoPay & Schemes)";
+    } else if (name === "razorpay_mf") {
+        purpose = "mutual_fund";
+        label = "Razorpay (Mutual Funds)";
+    } else if (name === "cashfree_payout") {
+        purpose = "payout";
+        label = "Cashfree Payouts (Bank Transfers)";
+    } else if (name === "cashfree") {
+        purpose = "spot";
+        label = "Cashfree Payments (Cards & UPI)";
+    }
+
     const payload = {
         name,
         mode,
+        label,
+        purpose,
         keyId,
         clientId: keyId,
         isActive,

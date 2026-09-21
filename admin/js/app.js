@@ -163,7 +163,13 @@ const pageTitles = {
     investments: "Real Estate Brick Investments",
     enquiries: "Customer Enquiries",
     legalpolicies: "Real Estate Legal Policies & Agreements",
-    homevideos: "Home YouTube Videos"
+    homevideos: "Home YouTube Videos",
+
+    // 4. Mutual Funds
+    mfoverview: "Mutual Funds Executive Dashboard 📈",
+    mfinvestors: "Mutual Funds Investors & UCC Catalog",
+    mfsips: "Mutual Funds Systematic Investment Plans (SIPs)",
+    mforders: "Mutual Funds Investment Orders & Lumpsum"
 };
 
 function showPage(pageId) {
@@ -260,6 +266,18 @@ function showPage(pageId) {
             break;
         case "homevideos":
             loadHomeVideos();
+            break;
+        case "mfoverview":
+            if (typeof loadMfOverview === "function") loadMfOverview();
+            break;
+        case "mfinvestors":
+            if (typeof loadMfInvestors === "function") loadMfInvestors(1);
+            break;
+        case "mfsips":
+            if (typeof loadMfSips === "function") loadMfSips(1);
+            break;
+        case "mforders":
+            if (typeof loadMfOrders === "function") loadMfOrders(1);
             break;
     }
 }

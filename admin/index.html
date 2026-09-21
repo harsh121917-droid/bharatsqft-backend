@@ -188,6 +188,27 @@
                 <div class="nav-item-icon"><i class="fab fa-youtube" style="color:#ef4444"></i></div>
                 <span class="nav-item-label">Home YouTube Videos</span>
             </div>
+
+            <!-- 4. Mutual Funds Management -->
+            <div class="nav-section-label">Mutual Funds</div>
+            <div class="nav-item" onclick="showPage('mfoverview')" id="nav-mfoverview">
+                <div class="nav-item-icon"><i class="fas fa-chart-line" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Overview</span>
+            </div>
+            <div class="nav-item" onclick="showPage('mfinvestors')" id="nav-mfinvestors">
+                <div class="nav-item-icon"><i class="fas fa-user-check" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Investors & UCC</span>
+                <span class="nav-badge badge-green" id="mf-investors-badge" style="display:none">0</span>
+            </div>
+            <div class="nav-item" onclick="showPage('mfsips')" id="nav-mfsips">
+                <div class="nav-item-icon"><i class="fas fa-repeat" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">Active MF SIPs</span>
+                <span class="nav-badge badge-gold" id="mf-sips-badge" style="display:none">0</span>
+            </div>
+            <div class="nav-item" onclick="showPage('mforders')" id="nav-mforders">
+                <div class="nav-item-icon"><i class="fas fa-file-invoice-dollar" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Orders & Lumpsum</span>
+            </div>
         </nav>
 
         <!-- Drawer Footer: Profile & Help -->
@@ -3378,6 +3399,112 @@
                 </div>
             </div>
 
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS OVERVIEW
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfoverview">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-chart-line" style="color:#00D09C;margin-right:10px"></i> Mutual Funds Executive Overview</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Real-time tracking of investors, active monthly SIP volume, AUM, and settlement status</div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-secondary btn-sm" onclick="loadMfOverview()" title="Refresh Overview"><i class="fas fa-sync-alt"></i> Refresh</button>
+                        <button class="btn btn-primary btn-sm" onclick="showPage('mfinvestors')"><i class="fas fa-users"></i> View Investors</button>
+                    </div>
+                </div>
+
+                <div id="mfoverview-body">
+                    <!-- Loaded dynamically by mutualfunds.js -->
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS INVESTORS & UCC
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfinvestors">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-user-check" style="color:#00D09C;margin-right:10px"></i> MF Investors & UCC Catalog</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Users onboarded for mutual funds with registered PAN, Bank Accounts, and NSE Client Codes</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadMfInvestors(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+
+                <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                    <div style="position:relative;flex:1;min-width:240px">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                        <input class="form-control" id="mfinvestors-search" type="text" placeholder="Search by name, phone, email, client code, or PAN..." onkeyup="if(event.key==='Enter') loadMfInvestors(1)" style="padding-left:38px;width:100%" />
+                    </div>
+                    <button class="btn btn-primary" onclick="loadMfInvestors(1)"><i class="fas fa-search"></i> Search</button>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mfinvestors-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS ACTIVE SIPS
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfsips">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-repeat" style="color:#00D09C;margin-right:10px"></i> Active Mutual Fund SIPs</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Systematic investment plans running across Indian direct mutual fund schemes</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadMfSips(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+
+                <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-outline mf-sip-filter-btn active" data-status="ALL" onclick="filterMfSipsByStatus('ALL')">All SIPs</button>
+                        <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="ACTIVE" onclick="filterMfSipsByStatus('ACTIVE')">Active</button>
+                        <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="PAUSED" onclick="filterMfSipsByStatus('PAUSED')">Paused</button>
+                        <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="CANCELLED" onclick="filterMfSipsByStatus('CANCELLED')">Cancelled</button>
+                    </div>
+                    <div style="position:relative;min-width:260px">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                        <input class="form-control" id="mfsips-search" type="text" placeholder="Search by scheme or investor..." onkeyup="if(event.key==='Enter') loadMfSips(1)" style="padding-left:38px;width:100%" />
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mfsips-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS ORDERS & LUMPSUM
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mforders">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-file-invoice-dollar" style="color:#00D09C;margin-right:10px"></i> MF Orders & Lumpsum Purchases</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">All purchase transactions, payment statuses, and unit allotments</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadMfOrders(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+
+                <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-outline mf-order-filter-btn active" data-status="ALL" onclick="filterMfOrdersByStatus('ALL')">All Orders</button>
+                        <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="SUCCESS" onclick="filterMfOrdersByStatus('SUCCESS')">Success</button>
+                        <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="PENDING" onclick="filterMfOrdersByStatus('PENDING')">Pending</button>
+                        <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="FAILED" onclick="filterMfOrdersByStatus('FAILED')">Failed</button>
+                    </div>
+                    <div style="position:relative;min-width:260px">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                        <input class="form-control" id="mforders-search" type="text" placeholder="Search order ID or scheme..." onkeyup="if(event.key==='Enter') loadMfOrders(1)" style="padding-left:38px;width:100%" />
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mforders-body"></div>
+                </div>
+            </div>
+
         </div><!-- /.content -->
     </div><!-- /.main -->
 
@@ -4708,6 +4835,7 @@
                             <option value="razorpay_idfc">🏛️ IDFC Razorpay (0% Charge — Buy Gold, Silver, Copper, Wallet Add, Orders)</option>
                             <option value="razorpay_hdfc" style="display:none">🏛️ IDFC Razorpay (Legacy)</option>
                             <option value="razorpay_standard">🔄 Normal Razorpay (Standard Fee — SIP AutoPay & 11+1 Schemes)</option>
+                            <option value="razorpay_mf">📈 Razorpay Mutual Funds (Separate Creds for MF SIP & Lumpsum)</option>
                             <option value="razorpay">⚡ General Razorpay (Fallback)</option>
                             <option value="cashfree">💳 Cashfree Payments</option>
                             <option value="cashfree_payout">🏦 Cashfree Payouts (Bank Transfers)</option>
@@ -4953,6 +5081,7 @@
     <script src="js/coupons.js"></script>
     <script src="js/legalpolicies.js?v=1.0"></script>
     <script src="js/homevideos.js?v=1.0"></script>
+    <script src="js/mutualfunds.js?v=1.0"></script>
     <script src="js/app.js?v=2.1"></script>
 </body>
 
