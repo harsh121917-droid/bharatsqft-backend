@@ -7,6 +7,7 @@ const User = require('../models/User');
 const BankAccount = require('../models/BankAccount');
 const Kyc = require('../models/Kyc');
 const nseClient = require('../services/nse/nseClient');
+const paymentGatewayService = require('../services/paymentGatewayService');
 
 // ── Default curated Mutual Fund schemes for instant out-of-the-box experience ──
 const DEFAULT_SCHEMES = [
@@ -604,7 +605,27 @@ exports.createPurchaseOrder = async (req, res) => {
       paymentLink = linkRes.data.firstHolderLink;
     }
 
-    // 4. Save order to MongoDB
+    // 4. Create dedicated Mutual Fund Razorpay Order
+    let rzpOrder = null;
+    let rzpKeyId = '';
+    try {
+      const rzpRes = await paymentGatewayService.createRazorpayOrder({
+        amount: Number(orderAmount),
+        purpose: 'mutual_fund',
+        notes: {
+          orderId,
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+          type: 'mf_lumpsum',
+        },
+      });
+      rzpOrder = rzpRes.order;
+      rzpKeyId = rzpRes.keyId;
+    } catch (rzpErr) {
+      console.warn('[createPurchaseOrder] Razorpay order creation warning:', rzpErr.message);
+    }
+
+    // 5. Save order to MongoDB
     const unitsCalculated = +(orderAmount / scheme.nav).toFixed(3);
     const isMock = process.env.NSE_MOCK_MODE === 'true';
     const initialPaymentStatus = isMock ? 'SUCCESS' : 'PENDING';
@@ -620,9 +641,10 @@ exports.createPurchaseOrder = async (req, res) => {
       orderAmount: Number(orderAmount),
       units: unitsCalculated,
       navAtOrder: scheme.nav,
-      paymentMode,
+      paymentMode: paymentMode === 'RAZORPAY' || rzpOrder ? 'RAZORPAY' : paymentMode,
       paymentStatus: initialPaymentStatus,
       paymentLink,
+      razorpayOrderId: rzpOrder ? rzpOrder.id : '',
       nseTrxnOrderId: nseOrderId,
       nseStatus: isMock ? 'ALLOTTED (SANDBOX)' : 'TRXN SUCCESS',
       remarks: isMock ? 'Sandbox test order - Auto-Allotted' : 'Order placed on NSE MFSS',
@@ -634,6 +656,10 @@ exports.createPurchaseOrder = async (req, res) => {
       data: {
         order,
         paymentLink,
+        razorpayOrderId: rzpOrder ? rzpOrder.id : '',
+        key: rzpKeyId,
+        amount: Number(orderAmount),
+        currency: 'INR',
       },
     });
   } catch (error) {
@@ -711,7 +737,27 @@ exports.registerSipOrder = async (req, res) => {
     const nseRes = await nseClient.registerXsip([nseXsipPayload]);
     const sipRegNo = nseRes?.data?.reg_data?.[0]?.reg_id || `XSIP_${Date.now()}`;
 
-    // 3. Save SIP record
+    // 3. Create dedicated Mutual Fund Razorpay Order for 1st installment
+    let rzpOrder = null;
+    let rzpKeyId = '';
+    try {
+      const rzpRes = await paymentGatewayService.createRazorpayOrder({
+        amount: Number(installmentAmount),
+        purpose: 'mutual_fund',
+        notes: {
+          sipRegNo: String(sipRegNo),
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+          type: 'mf_sip_first_installment',
+        },
+      });
+      rzpOrder = rzpRes.order;
+      rzpKeyId = rzpRes.keyId;
+    } catch (rzpErr) {
+      console.warn('[registerSipOrder] Razorpay order creation warning:', rzpErr.message);
+    }
+
+    // 4. Save SIP record
     const sipRecord = await MfSip.create({
       user: userId,
       clientCode: ucc.clientCode,
@@ -733,10 +779,133 @@ exports.registerSipOrder = async (req, res) => {
     return res.json({
       success: true,
       message: 'SIP successfully registered on NSE MFSS',
-      data: sipRecord,
+      data: {
+        sip: sipRecord,
+        sipId: sipRecord._id,
+        razorpayOrderId: rzpOrder ? rzpOrder.id : '',
+        key: rzpKeyId,
+        amount: Number(installmentAmount),
+        currency: 'INR',
+      },
     });
   } catch (error) {
     console.error('[registerSipOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 6a. POST /api/mutual-funds/orders/verify (Verify Razorpay MF Purchase) ──
+exports.verifyPurchasePayment = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    if (!orderId || !razorpayPaymentId) {
+      return res.status(400).json({ success: false, message: 'orderId and razorpayPaymentId are required' });
+    }
+
+    const order = await MfOrder.findOne({ orderId, user: userId });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Mutual fund order not found' });
+    }
+
+    if (razorpaySignature && razorpayOrderId) {
+      const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+      });
+
+      if (!isValid) {
+        return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+      }
+    }
+
+    order.paymentStatus = 'SUCCESS';
+    order.paymentMode = 'RAZORPAY';
+    order.razorpayOrderId = razorpayOrderId || order.razorpayOrderId;
+    order.razorpayPaymentId = razorpayPaymentId;
+    order.razorpaySignature = razorpaySignature || '';
+    order.nseStatus = 'CONFIRMED';
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: 'Mutual fund investment payment verified successfully',
+      data: order,
+    });
+  } catch (error) {
+    console.error('[verifyPurchasePayment Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 6b. POST /api/mutual-funds/sip/verify (Verify Razorpay MF SIP 1st Installment) ──
+exports.verifySipPayment = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { sipId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    if (!sipId || !razorpayPaymentId) {
+      return res.status(400).json({ success: false, message: 'sipId and razorpayPaymentId are required' });
+    }
+
+    const sip = await MfSip.findOne({ _id: sipId, user: userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP record not found' });
+    }
+
+    if (razorpaySignature && razorpayOrderId) {
+      const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+      });
+
+      if (!isValid) {
+        return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+      }
+    }
+
+    sip.status = 'ACTIVE';
+    sip.installmentsPaid = (sip.installmentsPaid || 0) + 1;
+    sip.totalAmountPaid = (sip.totalAmountPaid || 0) + sip.installmentAmount;
+    await sip.save();
+
+    const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode });
+    const nav = scheme?.nav || 100;
+    const units = +(sip.installmentAmount / nav).toFixed(3);
+
+    const initialOrder = await MfOrder.create({
+      user: userId,
+      clientCode: sip.clientCode,
+      orderId: `MF_SIP_${Date.now()}`,
+      schemeCode: sip.schemeCode,
+      schemeName: sip.schemeName,
+      transactionType: 'P',
+      buySellType: 'FRESH',
+      orderAmount: sip.installmentAmount,
+      units,
+      navAtOrder: nav,
+      paymentMode: 'RAZORPAY',
+      paymentStatus: 'SUCCESS',
+      razorpayOrderId: razorpayOrderId || '',
+      razorpayPaymentId,
+      razorpaySignature: razorpaySignature || '',
+      nseStatus: 'CONFIRMED',
+      remarks: `First installment for SIP ${sip.sipRegNo}`,
+    });
+
+    return res.json({
+      success: true,
+      message: 'SIP first installment verified and active',
+      data: {
+        sip,
+        initialOrder,
+      },
+    });
+  } catch (error) {
+    console.error('[verifySipPayment Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

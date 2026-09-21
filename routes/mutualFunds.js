@@ -6,7 +6,9 @@ const {
   getUserUcc,
   registerUserUcc,
   createPurchaseOrder,
+  verifyPurchasePayment,
   registerSipOrder,
+  verifySipPayment,
   getPortfolio,
   getMyOrders,
   simulatePayment,
@@ -29,7 +31,9 @@ router.use(protect);
 router.get('/ucc/me', getUserUcc);
 router.post('/ucc/register', registerUserUcc);
 router.post('/orders/purchase', createPurchaseOrder);
+router.post('/orders/verify', verifyPurchasePayment);
 router.post('/sip/register', registerSipOrder);
+router.post('/sip/verify', verifySipPayment);
 router.get('/portfolio', getPortfolio);
 router.get('/orders/my', getMyOrders);
 router.post('/test/reset', resetTestData);
