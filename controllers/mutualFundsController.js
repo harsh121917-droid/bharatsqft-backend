@@ -15,10 +15,10 @@ const DEFAULT_SCHEMES = [
     schemeName: 'Nippon India Small Cap Fund - Direct Growth',
     amcCode: 'NIPPON_MF',
     amcName: 'Nippon India Mutual Fund',
-    isin: 'INF204K01W08',
+    isin: 'INF204K01K15',
     category: 'Equity',
     subCategory: 'Small Cap',
-    nav: 174.52,
+    nav: 209.35,
     cagr1Y: 38.6,
     cagr3Y: 28.4,
     cagr5Y: 32.1,
@@ -40,7 +40,7 @@ const DEFAULT_SCHEMES = [
     isin: 'INF879O01027',
     category: 'Equity',
     subCategory: 'Flexi Cap',
-    nav: 84.18,
+    nav: 89.85,
     cagr1Y: 27.8,
     cagr3Y: 21.2,
     cagr5Y: 24.6,
@@ -56,13 +56,13 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: 'ICICIGOLD-GR',
-    schemeName: 'ICICI Prudential Regular Gold Savings Fund - Direct Growth',
+    schemeName: 'ICICI Prudential Regular Gold ETF FOF - Direct Growth',
     amcCode: 'ICICI_PRU_MF',
     amcName: 'ICICI Prudential Mutual Fund',
-    isin: 'INF109K01Y83',
+    isin: 'INF109K01U92',
     category: 'Gold & Commodity',
     subCategory: 'Gold ETF FoF',
-    nav: 26.85,
+    nav: 48.51,
     cagr1Y: 29.4,
     cagr3Y: 18.2,
     cagr5Y: 15.6,
@@ -78,13 +78,13 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: 'SBILTF-GR',
-    schemeName: 'SBI Long Term Equity Fund (ELSS) - Direct Growth',
+    schemeName: 'SBI ELSS Tax Saver Fund - Direct Growth',
     amcCode: 'SBI_MF',
     amcName: 'SBI Mutual Fund',
-    isin: 'INF200K01TK4',
+    isin: 'INF200K01UM9',
     category: 'Tax Saver (ELSS)',
     subCategory: 'ELSS Tax Saver (Sec 80C)',
-    nav: 412.30,
+    nav: 458.15,
     cagr1Y: 42.1,
     cagr3Y: 26.8,
     cagr5Y: 23.4,
@@ -103,10 +103,10 @@ const DEFAULT_SCHEMES = [
     schemeName: 'Tata Digital India Fund - Direct Growth',
     amcCode: 'TATA_MF',
     amcName: 'Tata Mutual Fund',
-    isin: 'INF277K01Y40',
+    isin: 'INF277K01Z77',
     category: 'Equity',
     subCategory: 'Sectoral - Tech',
-    nav: 52.64,
+    nav: 47.97,
     cagr1Y: 34.2,
     cagr3Y: 19.5,
     cagr5Y: 26.2,
@@ -125,10 +125,10 @@ const DEFAULT_SCHEMES = [
     schemeName: 'HDFC Balanced Advantage Fund - Direct Growth',
     amcCode: 'HDFC_MF',
     amcName: 'HDFC Mutual Fund',
-    isin: 'INF179K01Y88',
+    isin: 'INF179K01WA6',
     category: 'Hybrid',
     subCategory: 'Dynamic Asset Allocation',
-    nav: 512.90,
+    nav: 561.00,
     cagr1Y: 25.1,
     cagr3Y: 21.0,
     cagr5Y: 19.8,
@@ -147,12 +147,13 @@ const DEFAULT_SCHEMES = [
     schemeName: 'ICICI Prudential Liquid Fund - Direct Growth',
     amcCode: 'ICICI_PRU_MF',
     amcName: 'ICICI Prudential Mutual Fund',
-    isin: 'INF109K01G48',
+    isin: 'INF109K01Q49',
     category: 'Liquid & Overnight',
     subCategory: 'Liquid',
-    nav: 368.12,
+    nav: 420.99,
     cagr1Y: 7.2,
     cagr3Y: 6.8,
+
     cagr5Y: 5.9,
     minPurchaseAmount: 1000,
     minSipAmount: 1000,
@@ -850,4 +851,23 @@ exports.resetTestData = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── 12. POST /api/mutual-funds/sync-nav (Live AMFI & NSE NAV Synchronization) ──
+exports.syncNavsNow = async (req, res) => {
+  try {
+    const { syncMutualFundNavs } = require('../crons/mfNavSyncCron');
+    const result = await syncMutualFundNavs();
+    return res.json({
+      success: result.success,
+      message: result.success
+        ? `Successfully synced NAVs for ${result.updatedCount} schemes`
+        : 'Failed to sync NAVs from AMFI',
+      data: result,
+    });
+  } catch (error) {
+    console.error('[syncNavsNow Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 

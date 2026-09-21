@@ -51,3 +51,6 @@ build/
 # Secret keys & service account files
 config/firebase-service-account.json
 *-service-account.json
+
+# Scratch and temporary scripts
+scratch/

@@ -12,6 +12,7 @@ const {
   simulatePayment,
   renderCheckoutSimulator,
   resetTestData,
+  syncNavsNow,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -20,6 +21,7 @@ router.get('/schemes', getSchemes);
 router.get('/schemes/:code', getSchemeDetail);
 router.get('/checkout/:orderId', renderCheckoutSimulator);
 router.post('/orders/:orderId/simulate-payment', simulatePayment);
+router.post('/sync-nav', syncNavsNow);
 
 // ── Protected Routes (User-specific transactions & portfolio) ──
 router.use(protect);
@@ -33,4 +35,5 @@ router.get('/orders/my', getMyOrders);
 router.post('/test/reset', resetTestData);
 
 module.exports = router;
+
 

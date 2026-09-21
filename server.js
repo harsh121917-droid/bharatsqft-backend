@@ -49,7 +49,12 @@ if (process.env.NODE_ENV === "development") {
 const connectDB = require("./config/db");
 connectDB();
 
+/* ---------- Automated Crons (Gold/Silver, Due Reminders & MF NAV Sync) ---------- */
+require("./crons/goldCron");
+require("./crons/mfNavSyncCron");
+
 /* ---------- Routes ---------- */
+
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/enquiries", require("./routes/enquiries"));
