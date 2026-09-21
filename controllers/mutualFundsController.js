@@ -826,7 +826,7 @@ exports.verifyPurchasePayment = async (req, res) => {
     order.razorpayOrderId = razorpayOrderId || order.razorpayOrderId;
     order.razorpayPaymentId = razorpayPaymentId;
     order.razorpaySignature = razorpaySignature || '';
-    order.nseStatus = 'CONFIRMED';
+    order.nseStatus = 'TRXN SUCCESS';
     await order.save();
 
     return res.json({
@@ -892,7 +892,7 @@ exports.verifySipPayment = async (req, res) => {
       razorpayOrderId: razorpayOrderId || '',
       razorpayPaymentId,
       razorpaySignature: razorpaySignature || '',
-      nseStatus: 'CONFIRMED',
+      nseStatus: 'TRXN SUCCESS',
       remarks: `First installment for SIP ${sip.sipRegNo}`,
     });
 

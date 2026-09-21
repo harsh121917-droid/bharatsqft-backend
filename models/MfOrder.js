@@ -82,7 +82,6 @@ const MfOrderSchema = new mongoose.Schema(
     },
     nseStatus: {
       type: String,
-      enum: ['PENDING', 'VALID', 'TRXN SUCCESS', 'TRXN FAILED', 'ALLOTMENT DONE', 'CANCELLED'],
       default: 'PENDING',
     },
     remarks: {
