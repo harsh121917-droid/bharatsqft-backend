@@ -243,6 +243,7 @@ async function loadMfInvestors(page = 1) {
                         <th>Total Invested</th>
                         <th>Onboarded Date</th>
                         <th>NSE Status</th>
+                        <th style="text-align:right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -289,6 +290,11 @@ async function loadMfInvestors(page = 1) {
                 </td>
                 <td>
                     <span class="badge ${isNseActive ? 'badge-success' : 'badge-warning'}">${u.nseStatus || 'ACTIVE'}</span>
+                </td>
+                <td style="text-align:right">
+                    <button class="btn btn-sm" onclick="cleanUserMutualFunds('${userObj._id}', '${(userObj.name || 'Investor').replace(/'/g, "\\'")}')" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer" title="Clean all MF data, UCC, orders, and SIPs for this user">
+                        <i class="fas fa-broom"></i> Clean MF
+                    </button>
                 </td>
             </tr>`;
         });
@@ -598,4 +604,64 @@ function renderMfPagination(curr, total, funcName) {
             <button class="btn btn-sm btn-outline" ${curr >= total ? 'disabled' : ''} onclick="${funcName}(${curr + 1})">Next <i class="fas fa-chevron-right"></i></button>
         </div>
     </div>`;
+}
+
+// ── 5. Clean & Reset User Mutual Funds Data ──
+async function cleanUserMutualFunds(userId, userName = 'Investor') {
+    if (!userId) {
+        toast('User ID is required to clean MF data', 'warning');
+        return;
+    }
+
+    const confirmMsg = `⚠️ Are you sure you want to clean Mutual Funds data for "${userName}"?\n\nThis will permanently delete:\n• All Mutual Fund Orders\n• All SIP Schedules\n• Registered UCC & Mandates\n\nThe user will be able to test onboarding and investing fresh.`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await api(`/admin/mutual-funds/users/${userId}/clean`, { method: 'POST' });
+        if (res && res.success) {
+            toast(res.message || `Mutual Funds data cleared for ${userName} ✓`, 'success');
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(mfInvestorsCurrentPage || 1);
+            if (typeof loadMfOverview === 'function') loadMfOverview();
+            if (typeof loadMfSips === 'function') loadMfSips(1);
+            if (typeof loadMfOrders === 'function') loadMfOrders(1);
+            if (typeof loadUsers === 'function') loadUsers(usersPage || 1);
+            if (typeof viewUserDetails === 'function' && typeof activeUserId !== 'undefined' && activeUserId === userId) {
+                viewUserDetails(userId);
+            }
+        } else {
+            toast(res?.message || 'Failed to clean user Mutual Funds data', 'danger');
+        }
+    } catch (err) {
+        console.error('cleanUserMutualFunds error:', err);
+        toast('Error cleaning user Mutual Funds data', 'danger');
+    }
+}
+
+// ── 6. Clean & Reset ALL Test Mutual Funds Data Platform-wide ──
+async function cleanAllTestMfData() {
+    const confirmMsg = `🚨 DANGER: Are you sure you want to wipe ALL Mutual Funds data across the entire platform?\n\nThis will permanently delete:\n• ALL Mutual Fund Orders\n• ALL SIP Schedules\n• ALL Registered UCCs & Mandates\n\nThis action cannot be undone!`;
+    if (!confirm(confirmMsg)) return;
+
+    const doubleConfirm = prompt(`Type "RESET" to confirm wiping all Mutual Funds records:`);
+    if (doubleConfirm !== 'RESET') {
+        toast('Reset cancelled', 'info');
+        return;
+    }
+
+    try {
+        const res = await api('/admin/mutual-funds/clean-all', { method: 'POST' });
+        if (res && res.success) {
+            toast(res.message || 'All Mutual Funds records cleared successfully ✓', 'success');
+            if (typeof loadMfOverview === 'function') loadMfOverview();
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
+            if (typeof loadMfSips === 'function') loadMfSips(1);
+            if (typeof loadMfOrders === 'function') loadMfOrders(1);
+            if (typeof loadUsers === 'function') loadUsers(1);
+        } else {
+            toast(res?.message || 'Failed to reset all MF data', 'danger');
+        }
+    } catch (err) {
+        console.error('cleanAllTestMfData error:', err);
+        toast('Error resetting all MF data', 'danger');
+    }
 }

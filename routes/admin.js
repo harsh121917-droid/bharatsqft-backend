@@ -172,5 +172,8 @@ router.get("/mutual-funds/sips", adminMfController.getMfSips);
 router.get("/mutual-funds/orders", adminMfController.getMfOrders);
 router.post("/mutual-funds/sips/:id/status", adminMfController.updateMfSipStatus);
 router.post("/mutual-funds/orders/:id/verify", adminMfController.reconcileMfOrder);
+router.delete("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMfData);
+router.post("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMfData);
+router.post("/mutual-funds/clean-all", adminMfController.cleanAllMfData);
 
 module.exports = router;

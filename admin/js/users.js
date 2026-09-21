@@ -211,6 +211,9 @@ function renderUsersTable(users) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openUserModal('${u._id}')" title="Quick Edit" style="font-size:11px;padding:4px 8px">
                         <i class="fas fa-edit"></i>
                     </button>
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); cleanUserMutualFunds('${u._id}', '${(u.name || 'User').replace(/'/g, "\\'")}')" title="Clean / Reset User Mutual Funds (UCC, Orders, SIPs)" style="font-size:11px;padding:4px 8px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer">
+                        <i class="fas fa-broom"></i> MF
+                    </button>
                     <button class="btn-icon" title="Delete User" onclick="event.stopPropagation(); deleteUser('${u._id}')">
                         <i class="fas fa-trash" style="color:var(--danger)"></i>
                     </button>
@@ -852,6 +855,18 @@ async function resetAllUserTestingData(paramId) {
             btn.disabled = false;
             btn.innerHTML = `<i class="fas fa-bomb"></i> Wipe All User Data (Full Reset)`;
         }
+    }
+}
+
+function cleanActiveUserMutualFunds() {
+    const id = activeUserId || document.getElementById("user-id")?.value;
+    const name = document.getElementById("user-name")?.value || "User";
+    if (!id) {
+        toast("No user selected to clean Mutual Funds", "warning");
+        return;
+    }
+    if (typeof cleanUserMutualFunds === "function") {
+        cleanUserMutualFunds(id, name);
     }
 }
 

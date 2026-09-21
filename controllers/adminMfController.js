@@ -1,6 +1,7 @@
 const MfClientUcc = require('../models/MfClientUcc');
 const MfSip = require('../models/MfSip');
 const MfOrder = require('../models/MfOrder');
+const MfMandate = require('../models/MfMandate');
 const MutualFundScheme = require('../models/MutualFundScheme');
 const User = require('../models/User');
 
@@ -382,6 +383,64 @@ exports.reconcileMfOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('[reconcileMfOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7. POST/DELETE /api/admin/mutual-funds/users/:userId/clean (Clean User MF Data) ──
+exports.cleanUserMfData = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId parameter is required' });
+    }
+
+    const [ordersDel, sipsDel, uccDel, mandateDel] = await Promise.all([
+      MfOrder.deleteMany({ user: userId }),
+      MfSip.deleteMany({ user: userId }),
+      MfClientUcc.deleteMany({ user: userId }),
+      MfMandate.deleteMany({ user: userId }),
+    ]);
+
+    return res.json({
+      success: true,
+      message: 'Mutual Funds data (UCC, SIPs, Orders) cleared successfully for user.',
+      data: {
+        ordersDeleted: ordersDel.deletedCount,
+        sipsDeleted: sipsDel.deletedCount,
+        uccDeleted: uccDel.deletedCount,
+        mandatesDeleted: mandateDel.deletedCount,
+      },
+    });
+  } catch (error) {
+    console.error('[cleanUserMfData Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 8. POST /api/admin/mutual-funds/clean-all (Global Reset All MF Data) ──
+exports.cleanAllMfData = async (req, res) => {
+  try {
+    const [ordersDel, sipsDel, uccDel, mandateDel] = await Promise.all([
+      MfOrder.deleteMany({}),
+      MfSip.deleteMany({}),
+      MfClientUcc.deleteMany({}),
+      MfMandate.deleteMany({}),
+    ]);
+
+    return res.json({
+      success: true,
+      message: 'All Mutual Funds records (UCCs, SIPs, Orders, Mandates) cleared successfully.',
+      data: {
+        ordersDeleted: ordersDel.deletedCount,
+        sipsDeleted: sipsDel.deletedCount,
+        uccDeleted: uccDel.deletedCount,
+        mandatesDeleted: mandateDel.deletedCount,
+      },
+    });
+  } catch (error) {
+    console.error('[cleanAllMfData Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
