@@ -105,6 +105,18 @@ function populateRealTimeDashboard(data, days = 7) {
     setElText("rate-silver-time", `Updated today, ${updatedTime}`);
     setElText("rate-copper-time", `Updated today, ${updatedTime}`);
 
+    // ── Mutual Funds Executive Summary on Dashboard ──────────────
+    try {
+        const mfRes = await api('/admin/mutual-funds/overview');
+        if (mfRes && mfRes.success && mfRes.data?.summary) {
+            const sum = mfRes.data.summary;
+            setElText('kpi-mf-aum', formatINR(sum.totalMfAum || 0));
+            setElText('kpi-mf-sips-sub', `${sum.activeSipsCount || 0} Active SIPs • ${sum.totalInvestors || 0} Investors`);
+        }
+    } catch (e) {
+        console.warn('Dashboard MF overview fetch warning:', e);
+    }
+
     // ── Bottom Financial Metrics from Actual Ledger ────────────────
     const rev = Number(commercials.revenue || 0);
     const gst = Number(commercials.gstCollected || 0);

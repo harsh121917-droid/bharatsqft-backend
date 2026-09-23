@@ -182,12 +182,12 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   };
 
   const chartData = {
-    '1M': extractPeriodSeries(30, 20),
-    '6M': extractPeriodSeries(180, 25),
-    '1Y': extractPeriodSeries(365, 30),
-    '3Y': extractPeriodSeries(1095, 35),
-    '5Y': extractPeriodSeries(1825, 40),
-    'All': extractPeriodSeries(null, 45),
+    '1M': extractPeriodSeries(30, 25),
+    '6M': extractPeriodSeries(180, 60),
+    '1Y': extractPeriodSeries(365, 90),
+    '3Y': extractPeriodSeries(1095, 120),
+    '5Y': extractPeriodSeries(1825, 150),
+    'All': extractPeriodSeries(null, 180),
   };
 
   const result = {

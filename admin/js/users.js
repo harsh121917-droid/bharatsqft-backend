@@ -484,6 +484,9 @@ async function openUserModal(id) {
         </div>`;
 
         breakdownEl.innerHTML = breakHtml;
+
+        // Load customer's mutual funds profile & SIPs
+        loadUserMutualFundsModalSection(u._id, breakdownEl);
     }
 
     // Load customer's wallet audit ledger in modal
@@ -2492,3 +2495,39 @@ async function saveUserDetailsProfile() {
     }
 }
 
+
+async function loadUserMutualFundsModalSection(userId, containerEl) {
+    if (!userId || !containerEl) return;
+    try {
+        const res = await api(`/admin/mutual-funds/users?search=${encodeURIComponent(userId)}`);
+        const mfUser = res?.data?.users?.[0];
+        if (mfUser) {
+            const s = mfUser.stats || {};
+            const b = mfUser.bank || {};
+            const mfHtml = `
+            <div style="margin-top:14px;padding:14px;background:rgba(0,208,156,0.06);border-radius:var(--radius-md);border:1px solid rgba(0,208,156,0.25)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-weight:700;color:#00D09C;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-chart-pie"></i> Mutual Funds Portfolio & NSE UCC
+                    </div>
+                    <span class="badge ${mfUser.nseStatus === 'ACTIVE' ? 'badge-success' : 'badge-warning'}">${mfUser.nseStatus || 'ACTIVE'}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12.5px">
+                    <div>Client Code: <strong style="font-family:var(--font-mono);color:#00D09C">${mfUser.clientCode}</strong></div>
+                    <div>PAN: <strong style="font-family:var(--font-mono);color:#fff">${mfUser.pan || '—'}</strong></div>
+                    <div>Total Invested: <strong style="font-family:var(--font-mono);color:#fff">${formatINR(s.totalInvested || 0)}</strong></div>
+                    <div>Active SIPs: <strong style="font-family:var(--font-mono);color:#00D09C">${s.activeSips || 0} SIPs</strong></div>
+                    <div>Bank A/C: <span style="font-family:var(--font-mono);color:var(--text-dim)">${b.bankName || 'Bank'} (••••${b.accountNo ? b.accountNo.slice(-4) : '—'})</span></div>
+                    <div>Monthly Volume: <strong style="font-family:var(--font-mono);color:#fff">${formatINR(s.monthlySipAmount || 0)}</strong></div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="showPage('mfsips')" style="font-size:11px;padding:3px 8px">View SIPs</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="cleanUserMutualFunds('${userId}')" style="font-size:11px;padding:3px 8px"><i class="fas fa-broom"></i> Clean MF Data</button>
+                </div>
+            </div>`;
+            containerEl.insertAdjacentHTML('beforeend', mfHtml);
+        }
+    } catch (e) {
+        console.warn('Error loading user MF section:', e);
+    }
+}
