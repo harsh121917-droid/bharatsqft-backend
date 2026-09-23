@@ -163,6 +163,29 @@ module.exports = {
             const resp = await messagingInstance.sendEachForMulticast(message);
             totalSuccess += resp.successCount;
             totalFailure += resp.failureCount;
+
+            // Automatically clean dead/unregistered tokens
+            const deadTokens = [];
+            resp.responses.forEach((r, idx) => {
+              if (!r.success && r.error) {
+                const code = r.error.code || "";
+                if (
+                  code.includes("registration-token-not-registered") ||
+                  code.includes("invalid-registration-token") ||
+                  code.includes("invalid-argument")
+                ) {
+                  deadTokens.push(chunk[idx]);
+                }
+              }
+            });
+
+            if (deadTokens.length > 0) {
+              const User = require("../models/User");
+              User.updateMany(
+                { fcmTokens: { $in: deadTokens } },
+                { $pull: { fcmTokens: { $in: deadTokens } } }
+              ).catch((e) => console.warn("Failed to clean dead tokens:", e.message));
+            }
           } catch (chunkErr) {
             console.error("❌ Error sending multicast chunk:", chunkErr.message);
             totalFailure += chunk.length;

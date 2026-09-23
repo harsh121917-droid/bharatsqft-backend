@@ -12,10 +12,13 @@ exports.saveFcmToken = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "fcmToken is required" });
     }
 
-    // Add token to user's fcmTokens array without duplicates
-    await User.findByIdAndUpdate(req.user._id, {
-      $addToSet: { fcmTokens: fcmToken },
-    });
+    // Keep at most 3 latest unique active tokens per user
+    const userDoc = await User.findById(req.user._id).select("fcmTokens");
+    let tokens = (userDoc?.fcmTokens || []).filter((t) => t !== fcmToken);
+    tokens.unshift(fcmToken);
+    if (tokens.length > 3) tokens = tokens.slice(0, 3);
+
+    await User.findByIdAndUpdate(req.user._id, { fcmTokens: tokens });
 
     res.json({
       success: true,
@@ -82,43 +85,25 @@ exports.sendNotification = async (req, res, next) => {
       });
       const allTokens = Array.from(tokenSet);
 
-      let tokenSendResult = null;
       if (allTokens.length > 0) {
-        tokenSendResult = await sendFcmMessage({
+        // Send directly to registered device tokens (EXACTLY ONCE)
+        fcmResult = await sendFcmMessage({
           tokens: allTokens,
           title,
           body,
           imageUrl,
           deepLink: deepLink || "home",
         });
-      }
-
-      // 2. Also broadcast to topic 'all_users' for topic-subscribed devices
-      let topicSendResult = null;
-      try {
-        topicSendResult = await sendFcmMessage({
+      } else {
+        // Fallback to topic broadcast only if no individual device tokens exist
+        fcmResult = await sendFcmMessage({
           topic: "all_users",
           title,
           body,
           imageUrl,
           deepLink: deepLink || "home",
         });
-      } catch (topicErr) {
-        console.warn("Topic broadcast note:", topicErr.message);
       }
-
-      const isSimulated = (tokenSendResult ? tokenSendResult.simulated : true) && (topicSendResult ? topicSendResult.simulated : true);
-      const isSuccess = (tokenSendResult?.success || topicSendResult?.success) || false;
-
-      fcmResult = {
-        success: isSuccess,
-        simulated: isSimulated,
-        sentCount: allTokens.length || (topicSendResult?.sentCount || 1),
-        successCount: tokenSendResult ? tokenSendResult.successCount : (topicSendResult?.successCount || 1),
-        failureCount: tokenSendResult ? tokenSendResult.failureCount : (topicSendResult?.failureCount || 0),
-        topicResult: topicSendResult,
-        tokenResult: tokenSendResult,
-      };
     }
 
     // Create Notification Log entry in database
