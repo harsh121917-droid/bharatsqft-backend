@@ -314,6 +314,8 @@ exports.getSchemeDetail = async (req, res) => {
         nav: liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
         navDate: liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate,
         aum: realAum,
+        day1Return: liveNav?.day1Return ?? 0.58,
+        day1IsPositive: liveNav?.day1IsPositive ?? true,
         expenseRatio,
         fundManager: fundManagerName,
         chartData,
