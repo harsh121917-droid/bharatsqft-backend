@@ -69,14 +69,56 @@ exports.sendNotification = async (req, res, next) => {
         };
       }
     } else {
-      // Broadcast to topic 'all_users'
-      fcmResult = await sendFcmMessage({
-        topic: "all_users",
-        title,
-        body,
-        imageUrl,
-        deepLink: deepLink || "home",
+      // Broadcast to all users:
+      // 1. Gather all unique FCM device tokens from registered users
+      const allUsersWithTokens = await User.find({ "fcmTokens.0": { $exists: true } }).select("fcmTokens");
+      const tokenSet = new Set();
+      allUsersWithTokens.forEach((u) => {
+        (u.fcmTokens || []).forEach((t) => {
+          if (t && typeof t === "string" && t.trim().length > 10) {
+            tokenSet.add(t.trim());
+          }
+        });
       });
+      const allTokens = Array.from(tokenSet);
+
+      let tokenSendResult = null;
+      if (allTokens.length > 0) {
+        tokenSendResult = await sendFcmMessage({
+          tokens: allTokens,
+          title,
+          body,
+          imageUrl,
+          deepLink: deepLink || "home",
+        });
+      }
+
+      // 2. Also broadcast to topic 'all_users' for topic-subscribed devices
+      let topicSendResult = null;
+      try {
+        topicSendResult = await sendFcmMessage({
+          topic: "all_users",
+          title,
+          body,
+          imageUrl,
+          deepLink: deepLink || "home",
+        });
+      } catch (topicErr) {
+        console.warn("Topic broadcast note:", topicErr.message);
+      }
+
+      const isSimulated = (tokenSendResult ? tokenSendResult.simulated : true) && (topicSendResult ? topicSendResult.simulated : true);
+      const isSuccess = (tokenSendResult?.success || topicSendResult?.success) || false;
+
+      fcmResult = {
+        success: isSuccess,
+        simulated: isSimulated,
+        sentCount: allTokens.length || (topicSendResult?.sentCount || 1),
+        successCount: tokenSendResult ? tokenSendResult.successCount : (topicSendResult?.successCount || 1),
+        failureCount: tokenSendResult ? tokenSendResult.failureCount : (topicSendResult?.failureCount || 0),
+        topicResult: topicSendResult,
+        tokenResult: tokenSendResult,
+      };
     }
 
     // Create Notification Log entry in database
