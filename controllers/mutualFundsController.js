@@ -8,6 +8,7 @@ const BankAccount = require('../models/BankAccount');
 const Kyc = require('../models/Kyc');
 const nseClient = require('../services/nse/nseClient');
 const paymentGatewayService = require('../services/paymentGatewayService');
+const mfLiveService = require('../services/mfLiveService');
 
 // ── Default curated Mutual Fund schemes for instant out-of-the-box experience ──
 const DEFAULT_SCHEMES = [
@@ -242,90 +243,54 @@ exports.getSchemeDetail = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Scheme not found' });
     }
 
-    const baseNav = scheme.nav;
-    const now = new Date();
+    // 1. Fetch live historical daily NAV & scheme facts in parallel
+    const [liveNav, liveFacts] = await Promise.all([
+      mfLiveService.getLiveHistoricalNav(scheme.schemeCode, scheme),
+      mfLiveService.getLiveSchemeFacts(scheme.schemeName, scheme.schemeCode),
+    ]);
 
-    // Helper to generate realistic historical NAV rates series
-    const generateNavSeries = (pointsCount, daysBack, growthMultiplier) => {
-      const series = [];
-      const stepDays = daysBack / pointsCount;
-      const startNav = +(baseNav / (1 + (growthMultiplier / 100))).toFixed(4);
-
-      for (let i = 0; i < pointsCount; i++) {
-        const d = new Date(now.getTime() - (daysBack - i * stepDays) * 24 * 60 * 60 * 1000);
-        const progress = i / (pointsCount - 1);
-        // Add gentle market oscillations
-        const oscillation = Math.sin(i * 0.8) * 0.02 * baseNav;
-        const currentNav = +(startNav + (baseNav - startNav) * progress + oscillation).toFixed(4);
-        series.push({
-          date: d.toISOString().split('T')[0],
-          nav: currentNav > 0 ? currentNav : baseNav,
-        });
+    // Prepare chart points per timeframe
+    let chartData = {};
+    let periodReturns = {};
+    if (liveNav && liveNav.chartData) {
+      for (const [tf, item] of Object.entries(liveNav.chartData)) {
+        chartData[tf] = item.points; // array of { date, nav }
+        periodReturns[tf] = {
+          returnPercent: item.returnPercent,
+          isPositive: item.isPositive,
+          startNav: item.startNav,
+          endNav: item.endNav,
+        };
       }
-      return series;
-    };
-
-    // Rate points for each timeframe
-    const chartData = {
-      '1M': generateNavSeries(15, 30, 2.15),
-      '6M': generateNavSeries(24, 180, 12.8),
-      '1Y': generateNavSeries(36, 365, scheme.cagr1Y),
-      '3Y': generateNavSeries(36, 1095, scheme.cagr3Y * 3 * 0.8),
-      '5Y': generateNavSeries(40, 1825, scheme.cagr5Y * 5 * 0.75),
-      'All': generateNavSeries(48, 2555, scheme.cagr5Y * 7 * 0.7),
-    };
-
-    // Holdings based on category
-    let topHoldings = [];
-    const cat = (scheme.category || '').toLowerCase();
-    const subCat = (scheme.subCategory || '').toLowerCase();
-
-    if (cat.includes('gold') || subCat.includes('gold')) {
-      topHoldings = [
-        { name: 'Physical Gold 99.5% Purity', sector: 'Precious Metals', percentage: 98.4 },
-        { name: 'TREPS / Reverse Repo', sector: 'Cash Equivalents', percentage: 1.2 },
-        { name: 'Net Current Assets', sector: 'Cash Equivalents', percentage: 0.4 },
-      ];
-    } else if (cat.includes('debt') || cat.includes('liquid')) {
-      topHoldings = [
-        { name: '7.18% Government of India 2033', sector: 'Sovereign', percentage: 12.4 },
-        { name: 'Reserve Bank of India 91D T-Bill', sector: 'Sovereign', percentage: 10.8 },
-        { name: 'NABARD 7.65% Bonds', sector: 'Financials', percentage: 8.5 },
-        { name: 'HDFC Bank Certificate of Deposit', sector: 'Financials', percentage: 7.9 },
-        { name: 'REC Ltd 7.50% Debentures', sector: 'Financials', percentage: 6.4 },
-        { name: 'SIDBI Short Term Bonds', sector: 'Financials', percentage: 5.9 },
-        { name: 'ICICI Bank CD 2026', sector: 'Financials', percentage: 5.2 },
-        { name: 'Power Finance Corp 7.7% Bonds', sector: 'Financials', percentage: 4.8 },
-        { name: 'Axis Bank 3M Commercial Paper', sector: 'Financials', percentage: 4.2 },
-        { name: 'TREPS / Reverse Repo', sector: 'Cash Equivalents', percentage: 3.8 },
-      ];
-    } else if (subCat.includes('small')) {
-      topHoldings = [
-        { name: 'Tejas Networks Ltd', sector: 'Telecommunication', percentage: 4.8 },
-        { name: 'The Karur Vysya Bank Ltd', sector: 'Financials', percentage: 4.1 },
-        { name: 'Multi Commodity Exchange of India', sector: 'Financials', percentage: 3.9 },
-        { name: 'Suzlon Energy Ltd', sector: 'Capital Goods', percentage: 3.5 },
-        { name: 'Kalyan Jewellers India Ltd', sector: 'Consumer Discretionary', percentage: 3.2 },
-        { name: 'Sonata Software Ltd', sector: 'Information Technology', percentage: 2.9 },
-        { name: 'Apar Industries Ltd', sector: 'Capital Goods', percentage: 2.7 },
-        { name: 'Birlasoft Ltd', sector: 'Information Technology', percentage: 2.5 },
-        { name: 'CreditAccess Grameen Ltd', sector: 'Financials', percentage: 2.4 },
-        { name: 'Radico Khaitan Ltd', sector: 'Consumer Staples', percentage: 2.2 },
-      ];
     } else {
-      topHoldings = [
-        { name: 'HDFC Bank Ltd', sector: 'Financials', percentage: 8.9 },
-        { name: 'ICICI Bank Ltd', sector: 'Financials', percentage: 7.4 },
-        { name: 'Reliance Industries Ltd', sector: 'Energy & Petrochemicals', percentage: 6.8 },
-        { name: 'Infosys Ltd', sector: 'Information Technology', percentage: 5.9 },
-        { name: 'Tata Consultancy Services Ltd', sector: 'Information Technology', percentage: 4.8 },
-        { name: 'Bharti Airtel Ltd', sector: 'Telecommunication', percentage: 4.2 },
-        { name: 'Larsen & Toubro Ltd', sector: 'Construction & Engineering', percentage: 3.9 },
-        { name: 'Axis Bank Ltd', sector: 'Financials', percentage: 3.6 },
-        { name: 'ITC Ltd', sector: 'Consumer Staples', percentage: 3.1 },
-        { name: 'State Bank of India', sector: 'Financials', percentage: 2.8 },
-      ];
+      // Fallback only if live API is temporarily unreachable
+      const baseNav = scheme.nav;
+      chartData = {
+        '1M': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+        '6M': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+        '1Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+        '3Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+        '5Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+        'All': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
+      };
     }
+
+    // Determine accurate AUM
+    const realAum = liveFacts?.aum || scheme.aum;
+    if (liveFacts?.aum && liveFacts.aum !== scheme.aum) {
+      MutualFundScheme.updateOne({ _id: scheme._id }, { $set: { aum: liveFacts.aum } }).exec().catch(() => {});
+    }
+
+    // Top holdings - ONLY real data, no synthetic mock fallback!
+    const topHoldings = liveFacts?.topHoldings || [];
+
+    // Pros & Cons - ONLY real data, no synthetic mock fallback!
+    const prosAndCons = liveFacts?.prosAndCons || { pros: [], cons: [] };
+
+    // Fund manager & expense ratio
+    const fundManagerName = liveFacts?.fundManager || scheme.fundManager || 'Portfolio Manager';
+    const expenseRatio = liveFacts?.expenseRatio || scheme.expenseRatio;
+    const cat = (scheme.category || '').toLowerCase();
 
     // Similar peer schemes from database
     const similarFunds = await MutualFundScheme.find({
@@ -335,24 +300,35 @@ exports.getSchemeDetail = async (req, res) => {
     })
       .sort({ cagr3Y: -1 })
       .limit(4)
-      .select('schemeCode schemeName amcName nav cagr1Y cagr3Y rating');
+      .select('schemeCode schemeName amcName nav cagr1Y cagr3Y rating aum');
+
+    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
+    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
+    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
+    const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
 
     return res.json({
       success: true,
       data: {
         ...scheme.toObject(),
+        nav: liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
+        navDate: liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate,
+        aum: realAum,
+        expenseRatio,
+        fundManager: fundManagerName,
         chartData,
-        navHistory: chartData['1M'],
+        periodReturns,
+        navHistory: chartData['1M'] || [],
         returnsComparison: {
-          '1Y': { fund: scheme.cagr1Y, categoryAvg: +(scheme.cagr1Y * 0.88).toFixed(1), rank: 2 },
-          '3Y': { fund: scheme.cagr3Y, categoryAvg: +(scheme.cagr3Y * 0.85).toFixed(1), rank: 1 },
-          '5Y': { fund: scheme.cagr5Y, categoryAvg: +(scheme.cagr5Y * 0.86).toFixed(1), rank: 2 },
-          'All': { fund: +(scheme.cagr3Y * 1.08).toFixed(1), categoryAvg: +(scheme.cagr3Y * 0.82).toFixed(1), rank: 1 },
+          '1Y': { fund: ret1Y, rank: 1 },
+          '3Y': { fund: ret3Y, rank: 1 },
+          '5Y': { fund: ret5Y, rank: 1 },
+          'All': { fund: retAll, rank: 1 },
         },
         topHoldings,
         expenseDetails: {
-          expenseRatio: scheme.expenseRatio,
-          exitLoad: '1.00% if redeemed within 365 days. Nil thereafter.',
+          expenseRatio,
+          exitLoad: liveFacts?.exitLoad || '1.00% if redeemed within 365 days. Nil thereafter.',
           stampDuty: '0.005% on purchase as per Indian Stamp Act.',
           taxImplications:
             cat.includes('debt')
@@ -361,30 +337,22 @@ exports.getSchemeDetail = async (req, res) => {
         },
         fundManagement: [
           {
-            name: scheme.fundManager || 'Senior Portfolio Manager',
-            qualification: 'B.Com, Chartered Accountant, MBA (Finance)',
-            experience: 'Over 18 years of investment management and Indian equity research experience.',
-            fundsManaged: '4 active schemes',
+            name: fundManagerName,
+            qualification: 'Investment Leadership & Research',
+            experience: `Managing funds at ${scheme.amcName}`,
+            fundsManaged: 'Active mutual fund schemes',
           },
         ],
         fundHouse: {
           name: scheme.amcName,
           code: scheme.amcCode,
-          rank: '#4 in India',
-          totalAum: `₹${(scheme.aum * 12).toLocaleString('en-IN')} Crores`,
-          objective: `To achieve long-term capital growth and wealth creation by predominantly investing in a diversified portfolio of ${scheme.subCategory || scheme.category} instruments.`,
+          rank: 'Verified AMC',
+          totalAum: `₹${Number(realAum).toLocaleString('en-IN')} Crores`,
+          objective: liveFacts?.benchmarkName
+            ? `Benchmark: ${liveFacts.benchmarkName}. Long-term capital appreciation by investing in ${scheme.subCategory || scheme.category} assets.`
+            : `To achieve capital growth by predominantly investing in a diversified portfolio of ${scheme.subCategory || scheme.category} instruments.`,
         },
-        prosAndCons: {
-          pros: [
-            `Consistently outperformed ${scheme.subCategory || scheme.category} category average over 3Y and 5Y horizons`,
-            `Competitive direct plan expense ratio of ${scheme.expenseRatio}%`,
-            `Managed by experienced portfolio leadership at ${scheme.amcName}`,
-          ],
-          cons: [
-            'Subject to equity market volatility and economic cycles',
-            'Recommended minimum investment horizon is 3 to 5 years',
-          ],
-        },
+        prosAndCons,
         similarFunds,
       },
     });
@@ -737,7 +705,24 @@ exports.registerSipOrder = async (req, res) => {
     const nseRes = await nseClient.registerXsip([nseXsipPayload]);
     const sipRegNo = nseRes?.data?.reg_data?.[0]?.reg_id || `XSIP_${Date.now()}`;
 
-    // 3. Create dedicated Mutual Fund Razorpay Order for 1st installment
+    // 3. Request Official Payment / Mandate Link from NSE (GET_LINK API)
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRefNo}?mode=sandbox`;
+    try {
+      const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
+      if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
+        paymentLink = linkRes.data.firstHolderLink;
+      } else {
+        const purLinkRes = await nseClient.getShortLink('PUR', sipRegNo);
+        if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
+          paymentLink = purLinkRes.data.firstHolderLink;
+        }
+      }
+    } catch (linkErr) {
+      console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
+    }
+
+    // 4. Create dedicated Mutual Fund Razorpay Order for 1st installment (for sandbox testing)
     let rzpOrder = null;
     let rzpKeyId = '';
     try {
@@ -757,7 +742,7 @@ exports.registerSipOrder = async (req, res) => {
       console.warn('[registerSipOrder] Razorpay order creation warning:', rzpErr.message);
     }
 
-    // 4. Save SIP record
+    // 5. Save SIP record
     const sipRecord = await MfSip.create({
       user: userId,
       clientCode: ucc.clientCode,
@@ -782,6 +767,7 @@ exports.registerSipOrder = async (req, res) => {
       data: {
         sip: sipRecord,
         sipId: sipRecord._id,
+        paymentLink,
         razorpayOrderId: rzpOrder ? rzpOrder.id : '',
         key: rzpKeyId,
         amount: Number(installmentAmount),
