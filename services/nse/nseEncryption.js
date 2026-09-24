@@ -15,6 +15,13 @@ class NseEncryption {
     this.licenseKey = process.env.NSE_MEMBER_LICENSE_KEY || '';
   }
 
+  syncConfig(config = {}) {
+    if (config.memberCode) this.memberCode = config.memberCode;
+    if (config.loginUserId) this.loginUserId = config.loginUserId;
+    if (config.apiSecret) this.apiSecret = config.apiSecret;
+    if (config.licenseKey) this.licenseKey = config.licenseKey;
+  }
+
   /**
    * Generates a custom HTTPS Agent enforcing strict TLS v1.3 with NSE required ciphers
    * Required as per NSE Connection Level Pre-requisite document:

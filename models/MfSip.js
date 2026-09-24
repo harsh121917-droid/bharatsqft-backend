@@ -60,8 +60,8 @@ const MfSipSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'PAUSED', 'CANCELLED'],
-      default: 'ACTIVE',
+      enum: ['PENDING_PAYMENT', 'ACTIVE', 'PAUSED', 'CANCELLED'],
+      default: 'PENDING_PAYMENT',
     },
     stepUpRequired: {
       type: Boolean,

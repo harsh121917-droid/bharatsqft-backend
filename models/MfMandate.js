@@ -46,8 +46,8 @@ const MfMandateSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['PENDING', 'APPROVED', 'REJECTED'],
-      default: 'APPROVED',
+      enum: ['PENDING_AUTH', 'ACCEPTED_BY_BANK', 'APPROVED', 'PENDING', 'REJECTED', 'EXPIRED'],
+      default: 'PENDING_AUTH',
     },
     authLink: {
       type: String,

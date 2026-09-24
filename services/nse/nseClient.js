@@ -12,6 +12,16 @@ class NseClient {
     this.uatUrl = 'https://nseinvestuat.nseindia.com';
     this.prodUrl = 'https://www.nseinvest.com';
     this.memberCode = process.env.NSE_MEMBER_CODE || '';
+    this.mockModeOverride = undefined;
+  }
+
+  syncConfig(config = {}) {
+    if (config.env) this.env = config.env;
+    if (config.memberCode) this.memberCode = config.memberCode;
+    if (typeof config.mockMode === 'boolean') {
+      this.mockModeOverride = config.mockMode;
+    }
+    nseEncryption.syncConfig(config);
   }
 
   getBaseUrl() {
@@ -19,6 +29,9 @@ class NseClient {
   }
 
   isMockMode() {
+    if (typeof this.mockModeOverride === 'boolean') {
+      return this.mockModeOverride;
+    }
     return process.env.NSE_MOCK_MODE === 'true';
   }
 

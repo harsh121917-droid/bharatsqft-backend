@@ -758,7 +758,7 @@ exports.registerSipOrder = async (req, res) => {
       mandateId: ucc.defaultMandateId || '',
       installmentsPaid: 0,
       totalAmountPaid: 0,
-      status: 'ACTIVE',
+      status: 'PENDING_PAYMENT',
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
     });
@@ -906,6 +906,32 @@ exports.verifySipPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('[verifySipPayment Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 6c. POST /api/mutual-funds/sip/:id/abandon (User Dismissed Payment / Cancel Pending) ──
+exports.abandonSipOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const sip = await MfSip.findOne({ _id: id, user: userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP record not found' });
+    }
+
+    if (sip.status === 'PENDING_PAYMENT') {
+      sip.status = 'CANCELLED';
+      await sip.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Pending SIP cancelled successfully',
+      data: sip,
+    });
+  } catch (error) {
+    console.error('[abandonSipOrder Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

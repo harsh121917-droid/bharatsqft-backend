@@ -176,4 +176,18 @@ router.delete("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMf
 router.post("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMfData);
 router.post("/mutual-funds/clean-all", adminMfController.cleanAllMfData);
 
+// NSE MFSS Gateway Credentials & Health-Check
+router.get("/mutual-funds/nse-config", adminMfController.getNseConfig);
+router.post("/mutual-funds/nse-config", adminMfController.updateNseConfig);
+router.post("/mutual-funds/nse-health-check", adminMfController.testNseConnection);
+
+// Mandate (eNACH / AutoPay) Management
+router.get("/mutual-funds/mandates", adminMfController.getMfMandates);
+router.post("/mutual-funds/mandates/:id/status", adminMfController.updateMfMandateStatus);
+router.post("/mutual-funds/mandates/:id/resend-link", adminMfController.resendMandateAuthLink);
+
+// Live NSE Exchange Re-Query & Status Sync
+router.post("/mutual-funds/orders/:id/sync-nse", adminMfController.syncOrderWithNse);
+router.post("/mutual-funds/sips/:id/sync-nse", adminMfController.syncSipWithNse);
+
 module.exports = router;

@@ -9,6 +9,7 @@ const {
   verifyPurchasePayment,
   registerSipOrder,
   verifySipPayment,
+  abandonSipOrder,
   getPortfolio,
   getMyOrders,
   simulatePayment,
@@ -34,6 +35,7 @@ router.post('/orders/purchase', createPurchaseOrder);
 router.post('/orders/verify', verifyPurchasePayment);
 router.post('/sip/register', registerSipOrder);
 router.post('/sip/verify', verifySipPayment);
+router.post('/sip/:id/abandon', abandonSipOrder);
 router.get('/portfolio', getPortfolio);
 router.get('/orders/my', getMyOrders);
 router.post('/test/reset', resetTestData);

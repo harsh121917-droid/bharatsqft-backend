@@ -5,9 +5,11 @@
 let mfInvestorsCurrentPage = 1;
 let mfSipsCurrentPage = 1;
 let mfOrdersCurrentPage = 1;
+let mfMandatesCurrentPage = 1;
 
 let currentSipStatusFilter = 'ALL';
 let currentOrderStatusFilter = 'ALL';
+let currentMandateStatusFilter = 'ALL';
 
 // ── Format Currency helper ──
 function formatMfInr(val) {
@@ -62,7 +64,7 @@ async function loadMfOverview() {
 
         // Render KPI summary and recent tables
         let html = `
-        <div class="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:24px">
+        <div class="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px">
             <div class="kpi-stat-card" onclick="showPage('mfinvestors')" style="cursor:pointer">
                 <div class="kpi-stat-icon" style="background:rgba(0,208,156,0.15);color:#00D09C"><i class="fas fa-users"></i></div>
                 <div class="kpi-stat-content">
@@ -77,7 +79,7 @@ async function loadMfOverview() {
                 <div class="kpi-stat-content">
                     <div class="kpi-stat-label">Active MF SIPs</div>
                     <div class="kpi-stat-value">${sum.activeSipsCount || 0}</div>
-                    <div class="kpi-stat-subtext">Monthly Volume: <b style="color:#fff">${formatMfInr(sum.monthlyVolume)}</b></div>
+                    <div class="kpi-stat-subtext">Monthly: <b style="color:#fff">${formatMfInr(sum.monthlyVolume)}</b> ${sum.pendingPaymentSipsCount ? `(${sum.pendingPaymentSipsCount} Pending)` : ''}</div>
                 </div>
             </div>
 
@@ -96,6 +98,26 @@ async function loadMfOverview() {
                     <div class="kpi-stat-label">Total Orders</div>
                     <div class="kpi-stat-value">${sum.totalOrdersCount || 0}</div>
                     <div class="kpi-stat-subtext">Success: ${sum.successfulOrdersCount || 0} | Pending: ${sum.pendingOrdersCount || 0}</div>
+                </div>
+            </div>
+
+            <div class="kpi-stat-card" onclick="showPage('mfmandates')" style="cursor:pointer">
+                <div class="kpi-stat-icon" style="background:rgba(16,185,129,0.15);color:#10B981"><i class="fas fa-file-signature"></i></div>
+                <div class="kpi-stat-content">
+                    <div class="kpi-stat-label">eNACH Mandates</div>
+                    <div class="kpi-stat-value">${sum.mandatesCount || 0}</div>
+                    <div class="kpi-stat-subtext">Accepted: <b style="color:#00D09C">${sum.acceptedMandatesCount || 0}</b></div>
+                </div>
+            </div>
+
+            <div class="kpi-stat-card" onclick="showPage('mfsettings')" style="cursor:pointer">
+                <div class="kpi-stat-icon" style="background:rgba(99,102,241,0.15);color:#6366F1"><i class="fas fa-server"></i></div>
+                <div class="kpi-stat-content">
+                    <div class="kpi-stat-label">NSE Gateway (${sum.nseHealth?.env || 'UAT'})</div>
+                    <div class="kpi-stat-value" style="font-size:17px;color:${sum.nseHealth?.status === 'ONLINE' ? '#00D09C' : sum.nseHealth?.status === 'SANDBOX_MOCKED' ? '#3B82F6' : '#f59e0b'}">
+                        ${sum.nseHealth?.status === 'ONLINE' ? 'ONLINE' : sum.nseHealth?.status === 'SANDBOX_MOCKED' ? 'SANDBOX' : (sum.nseHealth?.status || 'READY')}
+                    </div>
+                    <div class="kpi-stat-subtext">Latency: ${sum.nseHealth?.latencyMs || 0}ms · Health Test</div>
                 </div>
             </div>
         </div>
@@ -364,6 +386,8 @@ async function loadMfSips(page = 1) {
             const u = s.user || {};
             const isAct = s.status === 'ACTIVE';
             const isPaused = s.status === 'PAUSED';
+            const isPendingPay = s.status === 'PENDING_PAYMENT';
+            const badgeClass = isAct ? 'badge-success' : isPaused ? 'badge-warning' : isPendingPay ? 'badge-amber' : 'badge-danger';
 
             html += `
             <tr>
@@ -394,18 +418,23 @@ async function loadMfSips(page = 1) {
                     <div style="font-size:11px;color:var(--text-dim)">${s.installmentsPaid || 0} installments</div>
                 </td>
                 <td>
-                    <span class="badge ${isAct ? 'badge-success' : isPaused ? 'badge-warning' : 'badge-danger'}">${s.status}</span>
+                    <span class="badge ${badgeClass}">${s.status}</span>
                 </td>
                 <td style="text-align:right">
-                    <div style="display:inline-flex;gap:6px">
+                    <div style="display:inline-flex;gap:6px;align-items:center">
+                        <button class="btn btn-sm btn-outline" onclick="syncMfSipWithNse('${s._id}')" title="Sync installment counts and registration status with NSE" style="font-size:11px;padding:3px 7px">
+                            <i class="fas fa-satellite-dish" style="color:#3B82F6"></i> Sync
+                        </button>
                         ${isAct ? 
-                            `<button class="btn btn-sm btn-outline" onclick="changeMfSipStatus('${s._id}', 'PAUSED')" title="Pause SIP"><i class="fas fa-pause"></i> Pause</button>` :
+                            `<button class="btn btn-sm btn-outline" onclick="changeMfSipStatus('${s._id}', 'PAUSED')" title="Pause SIP" style="font-size:11px;padding:3px 7px"><i class="fas fa-pause"></i> Pause</button>` :
                           isPaused ?
-                            `<button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C" onclick="changeMfSipStatus('${s._id}', 'ACTIVE')" title="Resume SIP"><i class="fas fa-play"></i> Resume</button>` :
+                            `<button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C;font-size:11px;padding:3px 7px" onclick="changeMfSipStatus('${s._id}', 'ACTIVE')" title="Resume SIP"><i class="fas fa-play"></i> Resume</button>` :
+                          isPendingPay ?
+                            `<button class="btn btn-sm btn-outline" style="color:#D4A017;border-color:#D4A017;font-size:11px;padding:3px 7px" onclick="changeMfSipStatus('${s._id}', 'ACTIVE')" title="Activate SIP Manually"><i class="fas fa-check"></i> Activate</button>` :
                             `<span style="color:var(--text-dim);font-size:11px">Cancelled</span>`
                         }
                         ${s.status !== 'CANCELLED' ?
-                            `<button class="btn btn-sm btn-danger" onclick="changeMfSipStatus('${s._id}', 'CANCELLED')" title="Cancel SIP"><i class="fas fa-times"></i></button>` : ''
+                            `<button class="btn btn-sm btn-danger" onclick="changeMfSipStatus('${s._id}', 'CANCELLED')" title="Cancel SIP" style="font-size:11px;padding:3px 7px"><i class="fas fa-times"></i></button>` : ''
                         }
                     </div>
                 </td>
@@ -509,7 +538,8 @@ async function loadMfOrders(page = 1) {
             <tr>
                 <td>
                     <code style="font-family:monospace;font-size:12px;color:#fff">${o.orderId}</code>
-                    ${o.nseTrxnOrderId ? `<div style="font-size:10px;color:var(--text-dim)">NSE: ${o.nseTrxnOrderId}</div>` : ''}
+                    ${o.nseTrxnOrderId ? `<div style="font-size:10px;color:var(--text-dim)">NSE Ref: ${o.nseTrxnOrderId}</div>` : ''}
+                    <div style="font-size:10px;margin-top:2px"><span class="badge ${o.nseStatus?.includes('SUCCESS') || o.nseStatus?.includes('ALLOTTED') ? 'badge-success' : o.nseStatus?.includes('REJECTED') ? 'badge-danger' : 'badge-purple'}" style="font-size:9.5px;padding:2px 6px">${o.nseStatus || 'PENDING'}</span></div>
                 </td>
                 <td>
                     <div style="font-weight:700;color:#fff;font-size:13px">${u.name || 'Investor'}</div>
@@ -544,12 +574,17 @@ async function loadMfOrders(page = 1) {
                     ${formatMfDate(o.createdAt)}
                 </td>
                 <td style="text-align:right">
-                    ${isPend ? `
-                        <button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C;font-size:11px" onclick="reconcileMfOrder('${o._id}', 'SUCCESS')">
-                            <i class="fas fa-check"></i> Mark Success
-                        </button>` : 
-                        `<span style="color:var(--text-dim);font-size:11px">Reconciled</span>`
-                    }
+                    <div style="display:inline-flex;gap:5px;align-items:center">
+                        <button class="btn btn-sm btn-outline" style="color:#3B82F6;border-color:#3B82F6;font-size:11px;padding:3px 7px" onclick="syncMfOrderWithNse('${o._id}')" title="Call NSE GET_ORDER_STATUS and reconcile settlement">
+                            <i class="fas fa-satellite-dish"></i> Sync NSE
+                        </button>
+                        ${isPend ? `
+                            <button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C;font-size:11px;padding:3px 7px" onclick="reconcileMfOrder('${o._id}', 'SUCCESS')">
+                                <i class="fas fa-check"></i> Mark Success
+                            </button>` : 
+                            `<span style="color:var(--text-dim);font-size:11px">Reconciled</span>`
+                        }
+                    </div>
                 </td>
             </tr>`;
         });
@@ -665,3 +700,480 @@ async function cleanAllTestMfData() {
         toast('Error resetting all MF data', 'danger');
     }
 }
+
+// ══════════════════════════════════════════════════════════════
+// 7. LIVE NSE ORDER & SIP RE-QUERY / SYNCHRONIZATION
+// ══════════════════════════════════════════════════════════════
+async function syncMfOrderWithNse(orderId) {
+    if (!orderId) return;
+    try {
+        toast('Syncing order with NSE MFSS Exchange...', 'info');
+        const res = await api(`/admin/mutual-funds/orders/${orderId}/sync-nse`, { method: 'POST' });
+        if (res.success) {
+            toast(res.message || 'Order status synced with NSE ✓', 'success');
+            loadMfOrders(mfOrdersCurrentPage);
+        } else {
+            toast(res.message || 'Failed to sync with NSE', 'danger');
+        }
+    } catch (e) {
+        console.error('syncMfOrderWithNse error:', e);
+        toast('Error communicating with NSE exchange', 'danger');
+    }
+}
+
+async function syncMfSipWithNse(sipId) {
+    if (!sipId) return;
+    try {
+        toast('Syncing SIP with NSE exchange...', 'info');
+        const res = await api(`/admin/mutual-funds/sips/${sipId}/sync-nse`, { method: 'POST' });
+        if (res.success) {
+            toast(res.message || 'SIP synced with NSE ✓', 'success');
+            loadMfSips(mfSipsCurrentPage);
+        } else {
+            toast(res.message || 'Failed to sync SIP with NSE', 'danger');
+        }
+    } catch (e) {
+        console.error('syncMfSipWithNse error:', e);
+        toast('Error syncing SIP with NSE', 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 8. MUTUAL FUNDS MANDATES (eNACH / AutoPay)
+// ══════════════════════════════════════════════════════════════
+async function loadMfMandates(page = 1) {
+    mfMandatesCurrentPage = page;
+    const body = document.getElementById('mfmandates-body');
+    if (!body) return;
+
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading bank mandates...</div></div>`;
+
+    const search = document.getElementById('mfmandates-search')?.value.trim() || '';
+    const status = currentMandateStatusFilter;
+
+    try {
+        const res = await api(`/admin/mutual-funds/mandates?page=${page}&limit=20&status=${status}&search=${encodeURIComponent(search)}`);
+        if (!res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || 'Failed to load mandates'}</div></div>`;
+            return;
+        }
+
+        const mandates = res.data || [];
+        const total = res.total || 0;
+        const pages = res.pages || 1;
+
+        if (mandates.length === 0) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-file-signature" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No bank mandates found</div><div style="font-size:12px;color:var(--text-dim)">eNACH and physical SIP mandates registered by investors will appear here.</div></div>`;
+            return;
+        }
+
+        let html = `
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Investor</th>
+                        <th>Mandate ID & UMRN</th>
+                        <th>Bank & Account</th>
+                        <th>Debit Limit</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Registered On</th>
+                        <th style="text-align:right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        mandates.forEach(m => {
+            const u = m.user || {};
+            const isAccepted = m.status === 'ACCEPTED_BY_BANK' || m.status === 'APPROVED';
+            const isPending = m.status === 'PENDING_AUTH' || m.status === 'PENDING';
+            const statusClass = isAccepted ? 'badge-success' : isPending ? 'badge-warning' : 'badge-danger';
+            const maskedAcc = m.accountNo ? `•••• ${m.accountNo.slice(-4)}` : '—';
+
+            html += `
+            <tr>
+                <td>
+                    <div style="font-weight:700;color:#fff;font-size:13.5px">${u.name || 'Investor'}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">UCC: <code style="color:#00D09C">${m.clientCode}</code></div>
+                    ${u.phone ? `<div style="font-size:11px;color:var(--text-dim)"><i class="fas fa-phone-alt" style="font-size:9.5px"></i> ${u.phone}</div>` : ''}
+                </td>
+                <td>
+                    <div style="font-weight:700;color:var(--gold,#D4A017);font-family:monospace;font-size:12px">${m.mandateId}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">UMRN: <code>${m.umrn || 'Pending Bank Allocation'}</code></div>
+                </td>
+                <td>
+                    <div style="font-weight:600;color:#fff;font-size:13px">${m.bankName || 'Bank Account'}</div>
+                    <div style="font-size:11.5px;color:var(--text-dim)">Acc: ${maskedAcc} · IFSC: ${m.ifsc || '—'}</div>
+                </td>
+                <td>
+                    <div style="font-weight:800;color:#00D09C;font-size:14px">${formatMfInr(m.amount || 50000)}</div>
+                    <div style="font-size:10px;color:var(--text-dim)">Max Debit Limit</div>
+                </td>
+                <td>
+                    <span class="badge ${m.mandateType === 'E' ? 'badge-blue' : 'badge-purple'}" style="font-size:10.5px">
+                        ${m.mandateType === 'E' ? 'eNACH (NetBanking/Debit)' : 'Physical (X)'}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge ${statusClass}">
+                        ${m.status === 'ACCEPTED_BY_BANK' ? 'Accepted by Bank' : m.status === 'PENDING_AUTH' ? 'Pending Auth' : m.status}
+                    </span>
+                </td>
+                <td style="font-size:12px;color:var(--text-dim)">
+                    ${formatMfDate(m.createdAt)}
+                </td>
+                <td style="text-align:right">
+                    <div style="display:inline-flex;gap:6px;align-items:center">
+                        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C" onclick="resendMandateAuthLink('${m._id}')" title="Re-generate and copy Mandate Auth Link">
+                            <i class="fas fa-link"></i> Auth Link
+                        </button>
+                        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px" onclick="promptUpdateMandateStatus('${m._id}', '${m.status}')" title="Change status or set UMRN">
+                            <i class="fas fa-edit"></i> Status
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+
+        if (pages > 1) {
+            html += renderMfPagination(page, pages, 'loadMfMandates');
+        }
+
+        body.innerHTML = html;
+    } catch (e) {
+        console.error('Error loading MF mandates:', e);
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Error loading mandates list</div></div>`;
+    }
+}
+
+function filterMfMandatesByStatus(status) {
+    currentMandateStatusFilter = status;
+    document.querySelectorAll('.mf-mandate-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-status') === status);
+    });
+    loadMfMandates(1);
+}
+
+async function resendMandateAuthLink(mandateId) {
+    try {
+        toast('Generating mandate authorization link...', 'info');
+        const res = await api(`/admin/mutual-funds/mandates/${mandateId}/resend-link`, { method: 'POST' });
+        if (res && res.success && res.data?.authLink) {
+            const link = res.data.authLink;
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(link);
+                toast(`Auth Link copied to clipboard! ✓ Share with investor: ${res.data.investorPhone || ''}`, 'success');
+            } else {
+                prompt('Mandate Auth Link (Copy and send to investor):', link);
+            }
+        } else {
+            toast(res?.message || 'Failed to generate mandate link', 'danger');
+        }
+    } catch (err) {
+        console.error('resendMandateAuthLink error:', err);
+        toast('Error generating mandate authorization link', 'danger');
+    }
+}
+
+async function promptUpdateMandateStatus(mandateId, currentStatus) {
+    const newStatus = prompt(
+        `Update Mandate Status:\nOptions: ACCEPTED_BY_BANK, PENDING_AUTH, REJECTED, APPROVED\n\nCurrent status is: ${currentStatus}`,
+        currentStatus
+    );
+    if (!newStatus || newStatus === currentStatus) return;
+
+    const valid = ['ACCEPTED_BY_BANK', 'PENDING_AUTH', 'REJECTED', 'APPROVED'].includes(newStatus.toUpperCase());
+    if (!valid) {
+        toast('Invalid status entered. Must be ACCEPTED_BY_BANK, PENDING_AUTH, REJECTED, or APPROVED', 'warning');
+        return;
+    }
+
+    let umrn = '';
+    if (newStatus.toUpperCase() === 'ACCEPTED_BY_BANK' || newStatus.toUpperCase() === 'APPROVED') {
+        umrn = prompt('Enter Bank UMRN (Unique Mandate Reference Number):', '') || '';
+    }
+
+    try {
+        const res = await api(`/admin/mutual-funds/mandates/${mandateId}/status`, {
+            method: 'POST',
+            body: JSON.stringify({ status: newStatus.toUpperCase(), umrn }),
+        });
+        if (res && res.success) {
+            toast(`Mandate updated to ${newStatus.toUpperCase()} ✓`, 'success');
+            loadMfMandates(mfMandatesCurrentPage);
+        } else {
+            toast(res?.message || 'Failed to update mandate status', 'danger');
+        }
+    } catch (err) {
+        toast('Error updating mandate status', 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 9. NSE MFSS GATEWAY CREDENTIALS & HEALTH-CHECK PANEL
+// ══════════════════════════════════════════════════════════════
+async function loadNseConfig() {
+    const body = document.getElementById('mfsettings-body');
+    if (!body) return;
+
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading NSE MFSS configuration...</div></div>`;
+
+    try {
+        const res = await api('/admin/mutual-funds/nse-config');
+        if (!res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || 'Failed to load NSE configuration'}</div></div>`;
+            return;
+        }
+
+        const cfg = res.data || {};
+        const isOnline = cfg.lastStatus === 'ONLINE';
+        const isMocked = cfg.lastStatus === 'SANDBOX_MOCKED' || cfg.mockMode;
+        const statusBadge = isOnline
+            ? '<span class="badge badge-success" style="font-size:12px;padding:5px 12px"><i class="fas fa-check-circle"></i> Connected / Live</span>'
+            : isMocked
+            ? '<span class="badge badge-blue" style="font-size:12px;padding:5px 12px"><i class="fas fa-vial"></i> Sandbox Mock Active</span>'
+            : '<span class="badge badge-danger" style="font-size:12px;padding:5px 12px"><i class="fas fa-exclamation-circle"></i> Offline / Unverified</span>';
+
+        let html = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+            <!-- Active Connection Status Card -->
+            <div class="card" style="padding:22px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div>
+                        <div style="font-size:16px;font-weight:700;color:#fff"><i class="fas fa-heartbeat" style="color:#00D09C;margin-right:8px"></i> Gateway Diagnostics</div>
+                        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Real-time status of exchange network socket & TLS 1.3 handshake</div>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>
+
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:16px;margin-bottom:18px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px">
+                        <span style="color:var(--text-dim)">Environment:</span>
+                        <span style="font-weight:700;color:${cfg.env === 'PROD' ? '#ef4444' : '#00D09C'}">${cfg.env === 'PROD' ? 'PROD (Live Exchange)' : 'UAT (Sandbox)'}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px">
+                        <span style="color:var(--text-dim)">Target Gateway URL:</span>
+                        <code style="color:#fff;font-size:12px">${cfg.baseUrl}</code>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px">
+                        <span style="color:var(--text-dim)">Exchange Member Code:</span>
+                        <span style="font-weight:700;color:#fff">${cfg.memberCode || '—'}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px">
+                        <span style="color:var(--text-dim)">Network Latency:</span>
+                        <span style="color:#00D09C;font-weight:700">${cfg.lastLatencyMs || 0} ms</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px">
+                        <span style="color:var(--text-dim)">Mock Simulation Mode:</span>
+                        <span style="color:${cfg.mockMode ? '#3B82F6' : '#10B981'};font-weight:700">${cfg.mockMode ? 'ENABLED (Safe Sandbox)' : 'DISABLED (Real Exchange Calls)'}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <span style="color:var(--text-dim)">Last Diagnostic Check:</span>
+                        <span style="color:var(--text-dim)">${cfg.lastTestedAt ? new Date(cfg.lastTestedAt).toLocaleString('en-IN') : 'Never'}</span>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px">
+                    <button class="btn btn-primary" onclick="testNseConnection()" id="btn-test-nse" style="flex:1">
+                        <i class="fas fa-satellite-dish"></i> Test NSE Connection Now
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pre-requisites & Exchange Guidelines Card -->
+            <div class="card" style="padding:22px">
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px">
+                    <i class="fas fa-shield-alt" style="color:#D4A017;margin-right:8px"></i> NSE INVEST (NNF v1.9.8) Specifications
+                </div>
+                <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px">
+                    Official technical requirements from NSE India Mutual Fund Service System:
+                </div>
+
+                <ul style="color:#cbd5e1;font-size:12.5px;line-height:1.7;padding-left:18px;margin-bottom:16px">
+                    <li><b>TLS Version:</b> Mandatory strict <code>TLS v1.3</code> with <code>TLS_AES_256_GCM_SHA384</code> and <code>TLS_CHACHA20_POLY1305_SHA256</code> ciphers.</li>
+                    <li><b>Encryption:</b> PBKDF2 with SHA-1 key derivation and AES-128-CBC encryption of dynamic API Secret + Random Salt.</li>
+                    <li><b>IP Whitelisting:</b> For live production, ensure your hosting server's public outgoing IP is whitelisted by NSE.</li>
+                    <li><b>Sandbox Mode:</b> Keep <i>Mock Simulation</i> checked to test end-to-end client registration, orders, and mandates without incurring real AMC debits.</li>
+                </ul>
+
+                <div style="background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:10px;padding:12px;font-size:12px;color:#D4A017">
+                    <i class="fas fa-info-circle"></i> <b>Safe Testing:</b> In Sandbox mode, mock transactions generate valid order numbers and short links to test the mobile app seamlessly.
+                </div>
+            </div>
+        </div>
+
+        <!-- Credentials Form Card -->
+        <div class="card" style="padding:24px">
+            <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">
+                <i class="fas fa-key" style="color:#00D09C;margin-right:8px"></i> NSE Member Credentials & Environment
+            </div>
+            <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:20px">
+                Configure your NSE member code, login credentials, and encryption secrets. Values are securely stored in MongoDB and override .env settings.
+            </div>
+
+            <form onsubmit="saveNseConfig(event)">
+                <div class="form-grid-2" style="margin-bottom:16px">
+                    <div class="form-group">
+                        <label class="form-label">NSE Environment</label>
+                        <select class="form-control" id="nse-env">
+                            <option value="UAT" ${cfg.env === 'UAT' ? 'selected' : ''}>UAT (Sandbox Gateway — https://nseinvestuat.nseindia.com)</option>
+                            <option value="PROD" ${cfg.env === 'PROD' ? 'selected' : ''}>PROD (Production Gateway — https://www.nseinvest.com)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mock Simulation Mode</label>
+                        <select class="form-control" id="nse-mock-mode">
+                            <option value="true" ${cfg.mockMode ? 'selected' : ''}>Enabled (Respond locally with test payloads — Recommended for dev)</option>
+                            <option value="false" ${!cfg.mockMode ? 'selected' : ''}>Disabled (Send real HTTP calls to NSE servers)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-bottom:16px">
+                    <div class="form-group">
+                        <label class="form-label">Member Code</label>
+                        <input class="form-control" id="nse-member-code" type="text" value="${cfg.memberCode || ''}" placeholder="e.g. 1031616" required />
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:3px">NSE Member ID or Broker Code</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Login User ID</label>
+                        <input class="form-control" id="nse-user-id" type="text" value="${cfg.loginUserId || ''}" placeholder="e.g. ADMIN or your NSE User ID" required />
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:3px">User ID registered with NSEINVEST portal</div>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-bottom:22px">
+                    <div class="form-group">
+                        <label class="form-label">API Secret / Password</label>
+                        <div style="position:relative">
+                            <input class="form-control" id="nse-api-secret" type="password" placeholder="${cfg.hasApiSecret ? '•••••••••••• (Leave blank to keep existing)' : 'Enter NSE API Secret'}" style="padding-right:40px" />
+                            <i class="fas fa-eye" onclick="togglePasswordVisibility('nse-api-secret')" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim)"></i>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:3px">Encrypted dynamically with dynamic salt before every request</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Member License Key (Passkey)</label>
+                        <div style="position:relative">
+                            <input class="form-control" id="nse-license-key" type="password" placeholder="${cfg.hasLicenseKey ? '•••••••••••• (Leave blank to keep existing)' : 'Enter NSE Member License Key'}" style="padding-right:40px" />
+                            <i class="fas fa-eye" onclick="togglePasswordVisibility('nse-license-key')" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-dim)"></i>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:3px">PBKDF2 passphrase key provided in official NSE Welcome Kit</div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:12px;align-items:center">
+                    <button class="btn btn-primary" type="submit" id="btn-save-nse" style="padding:10px 24px">
+                        <i class="fas fa-save"></i> Save NSE Configuration
+                    </button>
+                    <button class="btn btn-secondary" type="button" onclick="loadNseConfig()">
+                        Reset Changes
+                    </button>
+                </div>
+            </form>
+        </div>`;
+
+        body.innerHTML = html;
+    } catch (err) {
+        console.error('loadNseConfig error:', err);
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Error loading NSE settings</div></div>`;
+    }
+}
+
+function togglePasswordVisibility(fieldId) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function saveNseConfig(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btn-save-nse');
+
+    const env = document.getElementById('nse-env')?.value;
+    const mockMode = document.getElementById('nse-mock-mode')?.value === 'true';
+    const memberCode = document.getElementById('nse-member-code')?.value.trim();
+    const loginUserId = document.getElementById('nse-user-id')?.value.trim();
+    const apiSecret = document.getElementById('nse-api-secret')?.value.trim();
+    const licenseKey = document.getElementById('nse-license-key')?.value.trim();
+
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+        }
+
+        const res = await api('/admin/mutual-funds/nse-config', {
+            method: 'POST',
+            body: JSON.stringify({
+                env,
+                mockMode,
+                memberCode,
+                loginUserId,
+                apiSecret,
+                licenseKey,
+            }),
+        });
+
+        if (res && res.success) {
+            toast('NSE MFSS configuration saved successfully ✓', 'success');
+            loadNseConfig();
+        } else {
+            toast(res?.message || 'Failed to save NSE config', 'danger');
+        }
+    } catch (err) {
+        console.error('saveNseConfig error:', err);
+        toast('Error saving NSE configuration', 'danger');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-save"></i> Save NSE Configuration`;
+        }
+    }
+}
+
+async function testNseConnection() {
+    const btnHeader = document.getElementById('btn-test-nse-header');
+    const btnCard = document.getElementById('btn-test-nse');
+
+    try {
+        if (btnHeader) {
+            btnHeader.disabled = true;
+            btnHeader.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Probing...`;
+        }
+        if (btnCard) {
+            btnCard.disabled = true;
+            btnCard.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Testing Connection...`;
+        }
+
+        toast('Dispatching TLS 1.3 handshake and exchange ping...', 'info');
+
+        const res = await api('/admin/mutual-funds/nse-health-check', { method: 'POST' });
+        if (res && res.success) {
+            const d = res.data || {};
+            toast(`NSE Connection: ${d.status} (${d.latencyMs} ms) ✓`, 'success');
+            loadNseConfig();
+        } else {
+            toast(res?.message || 'NSE Connection test encountered errors', 'danger');
+            loadNseConfig();
+        }
+    } catch (err) {
+        console.error('testNseConnection error:', err);
+        toast('Error testing NSE connection', 'danger');
+    } finally {
+        if (btnHeader) {
+            btnHeader.disabled = false;
+            btnHeader.innerHTML = `<i class="fas fa-satellite-dish"></i> Test NSE Connection`;
+        }
+        if (btnCard) {
+            btnCard.disabled = false;
+            btnCard.innerHTML = `<i class="fas fa-satellite-dish"></i> Test NSE Connection Now`;
+        }
+    }
+}
+

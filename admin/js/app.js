@@ -169,7 +169,9 @@ const pageTitles = {
     mfoverview: "Mutual Funds Executive Dashboard 📈",
     mfinvestors: "Mutual Funds Investors & UCC Catalog",
     mfsips: "Mutual Funds Systematic Investment Plans (SIPs)",
-    mforders: "Mutual Funds Investment Orders & Lumpsum"
+    mforders: "Mutual Funds Investment Orders & Lumpsum",
+    mfmandates: "Mutual Funds Mandates (eNACH / AutoPay)",
+    mfsettings: "NSE MFSS Gateway Credentials & Health-Check"
 };
 
 function showPage(pageId) {
@@ -278,6 +280,12 @@ function showPage(pageId) {
             break;
         case "mforders":
             if (typeof loadMfOrders === "function") loadMfOrders(1);
+            break;
+        case "mfmandates":
+            if (typeof loadMfMandates === "function") loadMfMandates(1);
+            break;
+        case "mfsettings":
+            if (typeof loadNseConfig === "function") loadNseConfig();
             break;
     }
 }

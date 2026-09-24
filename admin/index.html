@@ -209,6 +209,14 @@
                 <div class="nav-item-icon"><i class="fas fa-file-invoice-dollar" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">MF Orders & Lumpsum</span>
             </div>
+            <div class="nav-item" onclick="showPage('mfmandates')" id="nav-mfmandates">
+                <div class="nav-item-icon"><i class="fas fa-file-signature" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Mandates (eNACH)</span>
+            </div>
+            <div class="nav-item" onclick="showPage('mfsettings')" id="nav-mfsettings">
+                <div class="nav-item-icon"><i class="fas fa-server" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">NSE Credentials & Health</span>
+            </div>
         </nav>
 
         <!-- Drawer Footer: Profile & Help -->
@@ -3484,6 +3492,7 @@
                         <button class="btn btn-sm btn-outline mf-sip-filter-btn active" data-status="ALL" onclick="filterMfSipsByStatus('ALL')">All SIPs</button>
                         <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="ACTIVE" onclick="filterMfSipsByStatus('ACTIVE')">Active</button>
                         <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="PAUSED" onclick="filterMfSipsByStatus('PAUSED')">Paused</button>
+                        <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="PENDING_PAYMENT" onclick="filterMfSipsByStatus('PENDING_PAYMENT')">Pending Payment</button>
                         <button class="btn btn-sm btn-outline mf-sip-filter-btn" data-status="CANCELLED" onclick="filterMfSipsByStatus('CANCELLED')">Cancelled</button>
                     </div>
                     <div style="position:relative;min-width:260px">
@@ -3524,6 +3533,58 @@
 
                 <div class="card" style="padding:0;overflow:hidden">
                     <div id="mforders-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS MANDATES (eNACH / AutoPay)
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfmandates">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-file-signature" style="color:#00D09C;margin-right:10px"></i> MF Mandates (eNACH / AutoPay)</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Bank debit mandates for automated SIP deductions authorized via NetBanking or Debit Card</div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-secondary btn-sm" onclick="loadMfMandates(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-outline mf-mandate-filter-btn active" data-status="ALL" onclick="filterMfMandatesByStatus('ALL')">All Mandates</button>
+                        <button class="btn btn-sm btn-outline mf-mandate-filter-btn" data-status="ACCEPTED_BY_BANK" onclick="filterMfMandatesByStatus('ACCEPTED_BY_BANK')">Accepted by Bank</button>
+                        <button class="btn btn-sm btn-outline mf-mandate-filter-btn" data-status="PENDING_AUTH" onclick="filterMfMandatesByStatus('PENDING_AUTH')">Pending Auth</button>
+                        <button class="btn btn-sm btn-outline mf-mandate-filter-btn" data-status="REJECTED" onclick="filterMfMandatesByStatus('REJECTED')">Rejected</button>
+                    </div>
+                    <div style="position:relative;min-width:260px">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                        <input class="form-control" id="mfmandates-search" type="text" placeholder="Search investor, UCC, mandate ID, UMRN..." onkeyup="if(event.key==='Enter') loadMfMandates(1)" style="padding-left:38px;width:100%" />
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mfmandates-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: NSE MFSS CREDENTIALS & HEALTH-CHECK
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfsettings">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-server" style="color:#00D09C;margin-right:10px"></i> NSE MFSS Gateway Credentials & Health</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Exchange member authentication, sandbox/live switching, and real-time connectivity diagnostics</div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-primary btn-sm" onclick="testNseConnection()" id="btn-test-nse-header"><i class="fas fa-satellite-dish"></i> Test NSE Connection</button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadNseConfig()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                </div>
+
+                <div id="mfsettings-body">
+                    <!-- Rendered by mutualfunds.js -->
                 </div>
             </div>
 
