@@ -209,6 +209,10 @@
                 <div class="nav-item-icon"><i class="fas fa-file-invoice-dollar" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">MF Orders & Lumpsum</span>
             </div>
+            <div class="nav-item" onclick="showPage('mfschemes')" id="nav-mfschemes">
+                <div class="nav-item-icon"><i class="fas fa-sliders-h" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Scheme Curation</span>
+            </div>
             <div class="nav-item" onclick="showPage('mfmandates')" id="nav-mfmandates">
                 <div class="nav-item-icon"><i class="fas fa-file-signature" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">MF Mandates (eNACH)</span>
@@ -3533,6 +3537,53 @@
 
                 <div class="card" style="padding:0;overflow:hidden">
                     <div id="mforders-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS SCHEME CURATION (Featured & Recommended)
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfschemes">
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-sliders-h" style="color:#00D09C;margin-right:10px"></i> MF Scheme Curation & Recommendations</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">Curate schemes: toggle Featured / Trending for home carousel, Recommended badges, or disable/hide funds</div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-secondary btn-sm" onclick="loadMfCurationSchemes(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                </div>
+
+                <div id="mfschemes-stats-bar" style="margin-bottom:18px"></div>
+
+                <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-outline mf-scheme-filter-btn active" data-filter="ALL" onclick="filterMfCurationSchemes('ALL')">All Schemes</button>
+                        <button class="btn btn-sm btn-outline mf-scheme-filter-btn" data-filter="FEATURED" onclick="filterMfCurationSchemes('FEATURED')"><i class="fas fa-star" style="color:#D4A017"></i> Featured / Trending</button>
+                        <button class="btn btn-sm btn-outline mf-scheme-filter-btn" data-filter="RECOMMENDED" onclick="filterMfCurationSchemes('RECOMMENDED')"><i class="fas fa-thumbs-up" style="color:#00D09C"></i> Recommended</button>
+                        <button class="btn btn-sm btn-outline mf-scheme-filter-btn" data-filter="ACTIVE" onclick="filterMfCurationSchemes('ACTIVE')">Active Only</button>
+                        <button class="btn btn-sm btn-outline mf-scheme-filter-btn" data-filter="HIDDEN" onclick="filterMfCurationSchemes('HIDDEN')"><i class="fas fa-eye-slash" style="color:#ef4444"></i> Hidden / Disabled</button>
+                    </div>
+                    <div style="display:flex;gap:8px;flex:1;max-width:440px">
+                        <select class="form-control" id="mfschemes-category" onchange="loadMfCurationSchemes(1)" style="max-width:150px;font-size:12.5px">
+                            <option value="ALL">All Categories</option>
+                            <option value="Equity">Equity</option>
+                            <option value="Debt">Debt</option>
+                            <option value="Hybrid">Hybrid</option>
+                            <option value="Gold & Commodity">Gold & Commodity</option>
+                            <option value="Tax Saver (ELSS)">Tax Saver (ELSS)</option>
+                            <option value="Liquid & Overnight">Liquid & Overnight</option>
+                            <option value="Index">Index</option>
+                        </select>
+                        <div style="position:relative;flex:1">
+                            <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                            <input class="form-control" id="mfschemes-search" type="text" placeholder="Search fund or AMC..." onkeyup="if(event.key==='Enter') loadMfCurationSchemes(1)" style="padding-left:38px;width:100%" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mfschemes-body"></div>
                 </div>
             </div>
 

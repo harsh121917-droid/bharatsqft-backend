@@ -190,6 +190,13 @@ exports.getSchemes = async (req, res) => {
       query.category = category;
     }
 
+    if (req.query.featured === 'true' || req.query.isFeatured === 'true') {
+      query.isFeatured = true;
+    }
+    if (req.query.recommended === 'true' || req.query.isRecommended === 'true') {
+      query.isRecommended = true;
+    }
+
     if (search) {
       query.$or = [
         { schemeName: { $regex: search, $options: 'i' } },

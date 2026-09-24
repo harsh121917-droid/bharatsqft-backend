@@ -6,10 +6,12 @@ let mfInvestorsCurrentPage = 1;
 let mfSipsCurrentPage = 1;
 let mfOrdersCurrentPage = 1;
 let mfMandatesCurrentPage = 1;
+let mfCurationCurrentPage = 1;
 
 let currentSipStatusFilter = 'ALL';
 let currentOrderStatusFilter = 'ALL';
 let currentMandateStatusFilter = 'ALL';
+let currentSchemeCurationFilter = 'ALL';
 
 // ── Format Currency helper ──
 function formatMfInr(val) {
@@ -1176,4 +1178,170 @@ async function testNseConnection() {
         }
     }
 }
+
+// ══════════════════════════════════════════════════════════════
+// 10. MUTUAL FUNDS SCHEME CURATION & RECOMMENDATION PANEL
+// ══════════════════════════════════════════════════════════════
+async function loadMfCurationSchemes(page = 1) {
+    mfCurationCurrentPage = page;
+    const body = document.getElementById('mfschemes-body');
+    const statsBar = document.getElementById('mfschemes-stats-bar');
+    if (!body) return;
+
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading mutual fund schemes catalog...</div></div>`;
+
+    const search = document.getElementById('mfschemes-search')?.value.trim() || '';
+    const category = document.getElementById('mfschemes-category')?.value || 'ALL';
+    const filter = currentSchemeCurationFilter;
+
+    try {
+        const res = await api(`/admin/mutual-funds/schemes?page=${page}&limit=20&filter=${filter}&category=${encodeURIComponent(category)}&search=${encodeURIComponent(search)}`);
+        if (!res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || 'Failed to load schemes'}</div></div>`;
+            return;
+        }
+
+        const schemes = res.data || [];
+        const total = res.total || 0;
+        const pages = res.pages || 1;
+        const stats = res.stats || {};
+
+        // Render Stats Bar
+        if (statsBar) {
+            statsBar.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px">
+                <div class="kpi-stat-card" style="padding:14px 18px" onclick="filterMfCurationSchemes('ALL')">
+                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total In Database</div>
+                    <div style="font-size:22px;font-weight:800;color:#fff">${stats.totalSchemes || total}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Indian Direct Schemes</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(212,160,23,0.3)" onclick="filterMfCurationSchemes('FEATURED')">
+                    <div style="font-size:11.5px;color:#D4A017;font-weight:600"><i class="fas fa-star"></i> Featured / Carousel</div>
+                    <div style="font-size:22px;font-weight:800;color:#D4A017">${stats.featuredCount || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Shown in App Home</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.3)" onclick="filterMfCurationSchemes('RECOMMENDED')">
+                    <div style="font-size:11.5px;color:#00D09C;font-weight:600"><i class="fas fa-thumbs-up"></i> Recommended</div>
+                    <div style="font-size:22px;font-weight:800;color:#00D09C">${stats.recommendedCount || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">With Trust Badge</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.3)" onclick="filterMfCurationSchemes('HIDDEN')">
+                    <div style="font-size:11.5px;color:#ef4444;font-weight:600"><i class="fas fa-eye-slash"></i> Hidden / Disabled</div>
+                    <div style="font-size:22px;font-weight:800;color:#ef4444">${stats.hiddenCount || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Invisible to Users</div>
+                </div>
+            </div>`;
+        }
+
+        if (schemes.length === 0) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-search" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No mutual fund schemes matched your filter</div><div style="font-size:12px;color:var(--text-dim)">Try adjusting search keywords or selecting another category.</div></div>`;
+            return;
+        }
+
+        let html = `
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Scheme & AMC</th>
+                        <th>Category</th>
+                        <th>NAV & 3Y Return</th>
+                        <th>AUM</th>
+                        <th>Min SIP</th>
+                        <th style="text-align:center">Featured (App Carousel)</th>
+                        <th style="text-align:center">Recommended Badge</th>
+                        <th style="text-align:center">Status / Visibility</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        schemes.forEach(s => {
+            const isFeat = Boolean(s.isFeatured);
+            const isRec = Boolean(s.isRecommended);
+            const isAct = s.isActive !== false;
+
+            html += `
+            <tr style="${!isAct ? 'opacity:0.6;background:rgba(239,68,68,0.04)' : ''}">
+                <td>
+                    <div style="font-weight:700;color:#fff;font-size:13.5px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.schemeName}">
+                        ${s.schemeName}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-dim)">
+                        <span style="color:#00D09C">${s.amcName || s.amcCode || 'AMC'}</span> · Code: <code>${s.schemeCode}</code>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge badge-secondary" style="font-size:11px">${s.category || 'Equity'}</span>
+                    ${s.subCategory ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px">${s.subCategory}</div>` : ''}
+                </td>
+                <td>
+                    <div style="font-weight:700;color:#fff;font-size:13px">₹${(s.nav || 0).toFixed(2)}</div>
+                    <div style="font-size:11px;color:${(s.cagr3Y || 0) >= 0 ? '#00D09C' : '#ef4444'};font-weight:600">
+                        3Y: ${(s.cagr3Y || 0) > 0 ? '+' : ''}${(s.cagr3Y || 0).toFixed(1)}%
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight:600;color:#cbd5e1;font-size:12.5px">${s.aum ? '₹' + s.aum.toLocaleString('en-IN') + ' Cr' : '—'}</div>
+                </td>
+                <td>
+                    <div style="font-weight:700;color:#00D09C;font-size:13px">${formatMfInr(s.minSipAmount || 500)}</div>
+                </td>
+                <td style="text-align:center">
+                    <button class="btn btn-sm" onclick="toggleSchemeCurationField('${s._id}', 'isFeatured', ${!isFeat})" style="${isFeat ? 'background:rgba(212,160,23,0.22);color:#D4A017;border:1px solid rgba(212,160,23,0.6);font-weight:700;' : 'background:transparent;color:var(--text-dim);border:1px solid rgba(255,255,255,0.15);'}font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer" title="${isFeat ? 'Featured in Home Carousel. Click to Remove' : 'Click to Feature in Home Carousel'}">
+                        <i class="${isFeat ? 'fas fa-star' : 'far fa-star'}"></i> ${isFeat ? 'Featured' : 'Add to Carousel'}
+                    </button>
+                </td>
+                <td style="text-align:center">
+                    <button class="btn btn-sm" onclick="toggleSchemeCurationField('${s._id}', 'isRecommended', ${!isRec})" style="${isRec ? 'background:rgba(0,208,156,0.22);color:#00D09C;border:1px solid rgba(0,208,156,0.6);font-weight:700;' : 'background:transparent;color:var(--text-dim);border:1px solid rgba(255,255,255,0.15);'}font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer" title="${isRec ? 'Recommended Badge Active. Click to Remove' : 'Click to Set Recommended Badge'}">
+                        <i class="${isRec ? 'fas fa-thumbs-up' : 'far fa-thumbs-up'}"></i> ${isRec ? 'Recommended' : 'Set Rec'}
+                    </button>
+                </td>
+                <td style="text-align:center">
+                    <button class="btn btn-sm" onclick="toggleSchemeCurationField('${s._id}', 'isActive', ${!isAct})" style="${isAct ? 'background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3);' : 'background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);'}font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer" title="${isAct ? 'Scheme is Active and purchasable. Click to Hide.' : 'Scheme is Hidden from users. Click to Enable.'}">
+                        <i class="${isAct ? 'fas fa-eye' : 'fas fa-eye-slash'}"></i> ${isAct ? 'Active' : 'Hidden'}
+                    </button>
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+
+        if (pages > 1) {
+            html += renderMfPagination(page, pages, 'loadMfCurationSchemes');
+        }
+
+        body.innerHTML = html;
+    } catch (err) {
+        console.error('loadMfCurationSchemes error:', err);
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Error loading schemes list</div></div>`;
+    }
+}
+
+function filterMfCurationSchemes(filter) {
+    currentSchemeCurationFilter = filter;
+    document.querySelectorAll('.mf-scheme-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-filter') === filter);
+    });
+    loadMfCurationSchemes(1);
+}
+
+async function toggleSchemeCurationField(schemeId, field, newValue) {
+    try {
+        const res = await api(`/admin/mutual-funds/schemes/${schemeId}/toggle`, {
+            method: 'POST',
+            body: JSON.stringify({ field, value: newValue }),
+        });
+
+        if (res && res.success) {
+            toast(res.message || 'Scheme updated successfully ✓', 'success');
+            loadMfCurationSchemes(mfCurationCurrentPage);
+        } else {
+            toast(res?.message || 'Failed to update scheme', 'danger');
+        }
+    } catch (err) {
+        console.error('toggleSchemeCurationField error:', err);
+        toast('Error updating scheme curation', 'danger');
+    }
+}
+
 

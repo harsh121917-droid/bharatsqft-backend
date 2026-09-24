@@ -874,3 +874,115 @@ exports.syncSipWithNse = async (req, res) => {
   }
 };
 
+// ── 17. GET /api/admin/mutual-funds/schemes (Scheme Curation & Recommendation List) ──
+exports.getAdminMfSchemes = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search?.trim() || '';
+    const category = req.query.category?.trim() || '';
+    const filter = req.query.filter?.toUpperCase() || 'ALL'; // ALL, FEATURED, RECOMMENDED, ACTIVE, HIDDEN
+    const skip = (page - 1) * limit;
+
+    const query = {};
+
+    if (category && category !== 'ALL') {
+      query.category = category;
+    }
+
+    if (filter === 'FEATURED') {
+      query.isFeatured = true;
+    } else if (filter === 'RECOMMENDED') {
+      query.isRecommended = true;
+    } else if (filter === 'ACTIVE') {
+      query.isActive = true;
+    } else if (filter === 'HIDDEN') {
+      query.isActive = false;
+    }
+
+    if (search) {
+      query.$or = [
+        { schemeName: { $regex: search, $options: 'i' } },
+        { schemeCode: { $regex: search, $options: 'i' } },
+        { amcName: { $regex: search, $options: 'i' } },
+        { subCategory: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [
+      total,
+      schemes,
+      featuredCount,
+      recommendedCount,
+      hiddenCount,
+    ] = await Promise.all([
+      MutualFundScheme.countDocuments(query),
+      MutualFundScheme.find(query)
+        .sort({ isFeatured: -1, isRecommended: -1, rating: -1, aum: -1 })
+        .skip(skip)
+        .limit(limit),
+      MutualFundScheme.countDocuments({ isFeatured: true }),
+      MutualFundScheme.countDocuments({ isRecommended: true }),
+      MutualFundScheme.countDocuments({ isActive: false }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: schemes,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      stats: {
+        featuredCount,
+        recommendedCount,
+        hiddenCount,
+        totalSchemes: await MutualFundScheme.countDocuments(),
+      },
+    });
+  } catch (error) {
+    console.error('[getAdminMfSchemes Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 18. POST /api/admin/mutual-funds/schemes/:id/toggle (Toggle Featured/Recommended/Active) ──
+exports.toggleAdminMfScheme = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { field, value } = req.body;
+
+    if (!['isFeatured', 'isRecommended', 'isActive'].includes(field)) {
+      return res.status(400).json({ success: false, message: 'Invalid field. Must be isFeatured, isRecommended, or isActive' });
+    }
+
+    const scheme = await MutualFundScheme.findOne({
+      $or: [
+        { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null },
+        { schemeCode: id },
+      ],
+    });
+
+    if (!scheme) {
+      return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
+    }
+
+    if (typeof value === 'boolean') {
+      scheme[field] = value;
+    } else {
+      scheme[field] = !scheme[field];
+    }
+
+    await scheme.save();
+
+    return res.json({
+      success: true,
+      message: `${scheme.schemeName} updated: ${field} is now ${scheme[field]}`,
+      data: scheme,
+    });
+  } catch (error) {
+    console.error('[toggleAdminMfScheme Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+

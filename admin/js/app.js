@@ -170,6 +170,7 @@ const pageTitles = {
     mfinvestors: "Mutual Funds Investors & UCC Catalog",
     mfsips: "Mutual Funds Systematic Investment Plans (SIPs)",
     mforders: "Mutual Funds Investment Orders & Lumpsum",
+    mfschemes: "Mutual Funds Scheme Curation (Featured & Recommended)",
     mfmandates: "Mutual Funds Mandates (eNACH / AutoPay)",
     mfsettings: "NSE MFSS Gateway Credentials & Health-Check"
 };
@@ -280,6 +281,9 @@ function showPage(pageId) {
             break;
         case "mforders":
             if (typeof loadMfOrders === "function") loadMfOrders(1);
+            break;
+        case "mfschemes":
+            if (typeof loadMfCurationSchemes === "function") loadMfCurationSchemes(1);
             break;
         case "mfmandates":
             if (typeof loadMfMandates === "function") loadMfMandates(1);

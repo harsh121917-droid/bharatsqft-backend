@@ -190,4 +190,8 @@ router.post("/mutual-funds/mandates/:id/resend-link", adminMfController.resendMa
 router.post("/mutual-funds/orders/:id/sync-nse", adminMfController.syncOrderWithNse);
 router.post("/mutual-funds/sips/:id/sync-nse", adminMfController.syncSipWithNse);
 
+// Scheme Management & Curation (Featured, Recommended, Active/Hidden)
+router.get("/mutual-funds/schemes", adminMfController.getAdminMfSchemes);
+router.post("/mutual-funds/schemes/:id/toggle", adminMfController.toggleAdminMfScheme);
+
 module.exports = router;

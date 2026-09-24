@@ -108,6 +108,10 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isRecommended: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
