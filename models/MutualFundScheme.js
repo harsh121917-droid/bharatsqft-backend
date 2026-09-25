@@ -27,6 +27,12 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    planType: {
+      type: String,
+      enum: ['REGULAR', 'DIRECT'],
+      default: 'REGULAR',
+      index: true,
+    },
     category: {
       type: String,
       enum: ['Equity', 'Debt', 'Hybrid', 'Gold & Commodity', 'Tax Saver (ELSS)', 'Liquid & Overnight', 'Index'],

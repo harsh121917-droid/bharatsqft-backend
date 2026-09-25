@@ -884,7 +884,10 @@ exports.getAdminMfSchemes = async (req, res) => {
     const filter = req.query.filter?.toUpperCase() || 'ALL'; // ALL, FEATURED, RECOMMENDED, ACTIVE, HIDDEN
     const skip = (page - 1) * limit;
 
-    const query = {};
+    const query = {
+      planType: 'REGULAR',
+      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+    };
 
     if (category && category !== 'ALL') {
       query.category = category;
@@ -921,9 +924,9 @@ exports.getAdminMfSchemes = async (req, res) => {
         .sort({ isFeatured: -1, isRecommended: -1, rating: -1, aum: -1 })
         .skip(skip)
         .limit(limit),
-      MutualFundScheme.countDocuments({ isFeatured: true }),
-      MutualFundScheme.countDocuments({ isRecommended: true }),
-      MutualFundScheme.countDocuments({ isActive: false }),
+      MutualFundScheme.countDocuments({ planType: 'REGULAR', isFeatured: true }),
+      MutualFundScheme.countDocuments({ planType: 'REGULAR', isRecommended: true }),
+      MutualFundScheme.countDocuments({ planType: 'REGULAR', isActive: false }),
     ]);
 
     return res.json({
@@ -936,7 +939,7 @@ exports.getAdminMfSchemes = async (req, res) => {
         featuredCount,
         recommendedCount,
         hiddenCount,
-        totalSchemes: await MutualFundScheme.countDocuments(),
+        totalSchemes: await MutualFundScheme.countDocuments({ planType: 'REGULAR' }),
       },
     });
   } catch (error) {

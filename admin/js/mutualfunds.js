@@ -1267,7 +1267,7 @@ async function loadMfCurationSchemes(page = 1) {
                         ${s.schemeName}
                     </div>
                     <div style="font-size:11px;color:var(--text-dim)">
-                        <span style="color:#00D09C">${s.amcName || s.amcCode || 'AMC'}</span> · Code: <code>${s.schemeCode}</code>
+                        <span style="color:#00D09C">${s.amcName || s.amcCode || 'AMC'}</span> · Code: <code>${s.schemeCode}</code> · <span class="badge" style="background:rgba(0,208,156,0.15);color:#00D09C;font-size:10px;padding:2px 6px">Regular Plan</span>
                     </div>
                 </td>
                 <td>
