@@ -629,7 +629,8 @@ exports.createPurchaseOrder = async (req, res) => {
 
     // 2. Dispatch to NSE Gateway
     const nseRes = await nseClient.createNormalOrder([nseOrderPayload]);
-    const nseOrderId = nseRes?.data?.transaction_details?.[0]?.trxn_order_id || `NSE_${Date.now()}`;
+    const rawNseOrderId = nseRes?.data?.transaction_details?.[0]?.trxn_order_id;
+    const nseOrderId = (rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0) ? String(rawNseOrderId) : `NSE_${Date.now()}`;
 
     // 3. Request Payment Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000';
@@ -753,6 +754,8 @@ exports.registerSipOrder = async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const dateFormatted = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`;
 
+    const effectiveMandateId = req.body.mandateId || ucc.defaultMandateId || '';
+
     // 1. Prepare NSE XSIP payload
     const nseXsipPayload = {
       amc_code: scheme.amcCode || 'NSE_MF',
@@ -772,11 +775,55 @@ exports.registerSipOrder = async (req, res) => {
       step_up_required: stepUpRequired ? 'Y' : 'N',
       step_up_amount: stepUpAmount ? String(stepUpAmount) : '0',
       member_unique_id: sipRefNo,
+      mandate_id: effectiveMandateId,
     };
 
-    // 2. Register with NSE
-    const nseRes = await nseClient.registerXsip([nseXsipPayload]);
-    const sipRegNo = nseRes?.data?.reg_data?.[0]?.reg_id || `XSIP_${Date.now()}`;
+    // 2. Register with NSE Gateway
+    let nseRes;
+    if (effectiveMandateId) {
+      nseRes = await nseClient.registerXsip([nseXsipPayload]);
+    } else {
+      nseRes = await nseClient.registerXsip([nseXsipPayload]);
+      const checkItem = nseRes?.data?.reg_data?.[0];
+      if (!nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0) {
+        // Fallback to standard broker SIP if no mandate ID is linked
+        const standardSipPayload = { ...nseXsipPayload };
+        delete standardSipPayload.mandate_id;
+        const stdRes = await nseClient.registerSip([standardSipPayload]);
+        if (stdRes?.success && stdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && stdRes?.data?.reg_data?.[0]?.reg_id !== '0') {
+          nseRes = stdRes;
+        }
+      }
+    }
+
+    const regItem = nseRes?.data?.reg_data?.[0];
+    const rawRegId = regItem?.reg_id;
+    const isSuccess = nseRes?.success && regItem?.status === 'SUCCESS' && rawRegId && rawRegId !== '0' && rawRegId !== 0;
+
+    // Critical: sipRegNo must NEVER be "0" or empty, otherwise MongoDB unique index crashes
+    let sipRegNo = isSuccess ? String(rawRegId) : '';
+    if (!sipRegNo || sipRegNo === '0') {
+      sipRegNo = `XSIP_${Date.now()}`;
+    }
+
+    // If live NSE explicitly rejected the registration, surface the reason to the user/admin
+    if (nseRes && nseRes.data && regItem && (regItem.status === 'FAILURE' || regItem.status === 'REJECTED' || rawRegId === '0')) {
+      const nseMsg = regItem.message || nseRes.data.message || 'NSE Exchange rejected SIP registration';
+      console.warn(`[registerSipOrder] NSE rejected SIP registration: ${nseMsg}`);
+
+      if (!nseClient.isMockMode()) {
+        return res.status(400).json({
+          success: false,
+          message: `NSE MFSS Exchange: ${nseMsg}. Please verify investor UCC approval or eNACH mandate authorization.`,
+          data: {
+            exchangeStatus: regItem.status || 'REJECTED',
+            exchangeMessage: nseMsg,
+            clientCode: ucc.clientCode,
+            schemeCode: scheme.schemeCode,
+          },
+        });
+      }
+    }
 
     // 3. Request Official Payment / Mandate Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
@@ -826,7 +873,7 @@ exports.registerSipOrder = async (req, res) => {
       installmentAmount: Number(installmentAmount),
       startDate: start,
       nextDueDate: start,
-      mandateId: ucc.defaultMandateId || '',
+      mandateId: effectiveMandateId,
       installmentsPaid: 0,
       totalAmountPaid: 0,
       status: 'PENDING_PAYMENT',
