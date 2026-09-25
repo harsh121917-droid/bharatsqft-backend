@@ -633,7 +633,7 @@ exports.createPurchaseOrder = async (req, res) => {
     const nseOrderId = (rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0) ? String(rawNseOrderId) : `NSE_${Date.now()}`;
 
     // 3. Request Payment Link from NSE (GET_LINK API)
-    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000';
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
     const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
     if (linkRes.success && linkRes.data?.firstHolderLink) {

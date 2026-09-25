@@ -151,7 +151,7 @@ class NseClient {
 
     if (endpoint.includes('GET_LINK')) {
       const refId = payload.productRefId || `REF_${timestamp}`;
-      const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'http://localhost:5000';
+      const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
       return {
         success: true,
         status: 200,
