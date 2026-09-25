@@ -30,8 +30,34 @@ const MfOrderSchema = new mongoose.Schema(
     },
     transactionType: {
       type: String,
-      enum: ['P', 'R'], // P: Purchase, R: Redemption
+      enum: ['P', 'R', 'S'], // P: Purchase, R: Redemption, S: Switch
       default: 'P',
+    },
+    redemptionUnits: {
+      type: Number,
+      default: 0,
+    },
+    allUnits: {
+      type: Boolean,
+      default: false,
+    },
+    targetSchemeCode: {
+      type: String,
+      default: '',
+    },
+    targetSchemeName: {
+      type: String,
+      default: '',
+    },
+    payoutStatus: {
+      type: String,
+      enum: ['NOT_APPLICABLE', 'PENDING_AMC', 'PROCESSED', 'FAILED'],
+      default: 'NOT_APPLICABLE',
+    },
+    payoutBank: {
+      bankName: { type: String, default: '' },
+      accountNo: { type: String, default: '' },
+      ifscCode: { type: String, default: '' },
     },
     buySellType: {
       type: String,

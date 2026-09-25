@@ -194,4 +194,10 @@ router.post("/mutual-funds/sips/:id/sync-nse", adminMfController.syncSipWithNse)
 router.get("/mutual-funds/schemes", adminMfController.getAdminMfSchemes);
 router.post("/mutual-funds/schemes/:id/toggle", adminMfController.toggleAdminMfScheme);
 
+// Daily Automated Reconciliation Reports & Alerts (Section 22)
+router.get("/mutual-funds/reconciliation", adminMfController.getReconciliationReport);
+router.post("/mutual-funds/reconciliation/run", adminMfController.triggerReconciliationRun);
+router.post("/mutual-funds/reconciliation/resolve/:discrepancyId", adminMfController.resolveDiscrepancy);
+router.post("/mutual-funds/orders/:id/payout-status", adminMfController.updateMfOrderPayoutStatus);
+
 module.exports = router;

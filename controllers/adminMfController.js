@@ -5,6 +5,8 @@ const MfMandate = require('../models/MfMandate');
 const MutualFundScheme = require('../models/MutualFundScheme');
 const User = require('../models/User');
 const NseConfig = require('../models/NseConfig');
+const MfReconciliation = require('../models/MfReconciliation');
+const mfReconciliationEngine = require('../services/mfReconciliationEngine');
 const nseClient = require('../services/nse/nseClient');
 const nseEncryption = require('../services/nse/nseEncryption');
 const axios = require('axios');
@@ -26,9 +28,14 @@ exports.getMfOverview = async (req, res) => {
       activeSipVolumeAgg,
       totalSipPaidAgg,
       totalOrderPaidAgg,
+      totalRedeemedAgg,
+      purchasesCount,
+      redemptionsCount,
+      switchesCount,
       recentSips,
       recentOrders,
       nseConfig,
+      reconciliationStatus,
     ] = await Promise.all([
       MfClientUcc.countDocuments(),
       MfSip.countDocuments({ status: 'ACTIVE' }),
@@ -58,6 +65,17 @@ exports.getMfOverview = async (req, res) => {
         { $group: { _id: null, totalLumpsumPaid: { $sum: '$orderAmount' } } },
       ]),
 
+      // Total money redeemed
+      MfOrder.aggregate([
+        { $match: { transactionType: 'R', paymentStatus: 'SUCCESS' } },
+        { $group: { _id: null, totalRedeemed: { $sum: '$orderAmount' } } },
+      ]),
+
+      // Order counts by type
+      MfOrder.countDocuments({ transactionType: 'P' }),
+      MfOrder.countDocuments({ transactionType: 'R' }),
+      MfOrder.countDocuments({ transactionType: 'S' }),
+
       // Recent 5 SIPs
       MfSip.find()
         .sort({ createdAt: -1 })
@@ -71,12 +89,14 @@ exports.getMfOverview = async (req, res) => {
         .populate('user', 'name email phone'),
 
       NseConfig.getEffectiveConfig(),
+      mfReconciliationEngine.getLatestStatus(),
     ]);
 
     const monthlyVolume = activeSipVolumeAgg[0]?.totalMonthlyVolume || 0;
     const totalSipPaid = totalSipPaidAgg[0]?.totalSipPaid || 0;
     const totalLumpsumPaid = totalOrderPaidAgg[0]?.totalLumpsumPaid || 0;
-    const totalMfAum = totalSipPaid + totalLumpsumPaid;
+    const totalRedeemed = totalRedeemedAgg[0]?.totalRedeemed || 0;
+    const totalMfAum = Math.max(0, totalSipPaid + totalLumpsumPaid - totalRedeemed);
 
     return res.json({
       success: true,
@@ -91,12 +111,22 @@ exports.getMfOverview = async (req, res) => {
           totalOrdersCount,
           successfulOrdersCount,
           pendingOrdersCount,
+          purchasesCount,
+          redemptionsCount,
+          switchesCount,
           mandatesCount,
           acceptedMandatesCount,
           monthlyVolume,
           totalSipPaid,
           totalLumpsumPaid,
+          totalRedeemed,
           totalMfAum,
+          reconciliation: {
+            status: reconciliationStatus?.lastRun?.status || 'CLEAN',
+            unresolvedCount: reconciliationStatus?.unresolvedCount || 0,
+            lastRunAt: reconciliationStatus?.lastRun?.executedAt || null,
+            lastRunSummary: reconciliationStatus?.lastRun?.summary || 'No runs yet',
+          },
           nseHealth: {
             env: nseConfig?.env || 'UAT',
             status: nseConfig?.lastStatus || 'ONLINE',
@@ -330,12 +360,17 @@ exports.getMfOrders = async (req, res) => {
       ];
     }
 
-    const total = await MfOrder.countDocuments(query);
-    const orders = await MfOrder.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('user', 'name email phone');
+    const [total, orders, purchasesCount, redemptionsCount, switchesCount] = await Promise.all([
+      MfOrder.countDocuments(query),
+      MfOrder.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('user', 'name email phone'),
+      MfOrder.countDocuments({ transactionType: 'P' }),
+      MfOrder.countDocuments({ transactionType: 'R' }),
+      MfOrder.countDocuments({ transactionType: 'S' }),
+    ]);
 
     return res.json({
       success: true,
@@ -343,6 +378,12 @@ exports.getMfOrders = async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / limit),
+      counts: {
+        totalOrders: await MfOrder.countDocuments(),
+        purchasesCount,
+        redemptionsCount,
+        switchesCount,
+      },
     });
   } catch (error) {
     console.error('[getMfOrders Error]:', error);
@@ -987,5 +1028,100 @@ exports.toggleAdminMfScheme = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── 19. GET /api/admin/mutual-funds/reconciliation (Daily Reconciliation Reports & Alerts) ──
+exports.getReconciliationReport = async (req, res) => {
+  try {
+    const runs = await MfReconciliation.find()
+      .sort({ executedAt: -1 })
+      .limit(10)
+      .lean();
+
+    const latest = runs[0] || null;
+    const unresolvedAlerts = await MfReconciliation.aggregate([
+      { $unwind: '$discrepancies' },
+      { $match: { 'discrepancies.resolved': false } },
+      { $project: { runId: 1, executedAt: 1, discrepancy: '$discrepancies' } },
+      { $sort: { executedAt: -1 } },
+      { $limit: 50 },
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        latestRun: latest,
+        recentRuns: runs,
+        unresolvedAlerts: unresolvedAlerts.map(a => ({
+          runId: a.runId,
+          executedAt: a.executedAt,
+          ...a.discrepancy,
+        })),
+        unresolvedCount: unresolvedAlerts.length,
+      },
+    });
+  } catch (error) {
+    console.error('[getReconciliationReport Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 20. POST /api/admin/mutual-funds/reconciliation/run (Trigger Manual Reconciliation) ──
+exports.triggerReconciliationRun = async (req, res) => {
+  try {
+    const result = await mfReconciliationEngine.runReconciliation('ADMIN_MANUAL');
+    return res.json({
+      success: result.success,
+      message: result.data?.summary || 'Reconciliation completed',
+      data: result.data,
+    });
+  } catch (error) {
+    console.error('[triggerReconciliationRun Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 21. POST /api/admin/mutual-funds/reconciliation/resolve/:discrepancyId (Resolve Alert) ──
+exports.resolveDiscrepancy = async (req, res) => {
+  try {
+    const { discrepancyId } = req.params;
+    const run = await MfReconciliation.findOne({ 'discrepancies._id': discrepancyId });
+    if (!run) {
+      return res.status(404).json({ success: false, message: 'Discrepancy alert record not found' });
+    }
+
+    const disc = run.discrepancies.id(discrepancyId);
+    if (disc) {
+      disc.resolved = true;
+      disc.resolvedAt = new Date();
+      await run.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Discrepancy alert marked as resolved',
+      data: disc,
+    });
+  } catch (error) {
+    console.error('[resolveDiscrepancy Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 22. POST /api/admin/mutual-funds/orders/:id/payout-status (Redemption Bank Payout Update) ──
+exports.updateMfOrderPayoutStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { payoutStatus } = req.body;
+    const order = await MfOrder.findById(id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    order.payoutStatus = payoutStatus || 'PROCESSED';
+    if (payoutStatus === 'PROCESSED') order.payoutProcessedAt = new Date();
+    await order.save();
+    return res.json({ success: true, message: `Payout status updated to ${order.payoutStatus}`, data: order });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 

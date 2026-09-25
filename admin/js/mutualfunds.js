@@ -10,6 +10,7 @@ let mfCurationCurrentPage = 1;
 
 let currentSipStatusFilter = 'ALL';
 let currentOrderStatusFilter = 'ALL';
+let currentOrderTypeFilter = 'ALL';
 let currentMandateStatusFilter = 'ALL';
 let currentSchemeCurationFilter = 'ALL';
 
@@ -491,13 +492,21 @@ async function loadMfOrders(page = 1) {
     const body = document.getElementById('mforders-body');
     if (!body) return;
 
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading mutual fund orders...</div></div>`;
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading mutual fund transactions...</div></div>`;
 
     const search = document.getElementById('mforders-search')?.value.trim() || '';
     const status = currentOrderStatusFilter;
+    const trxnType = currentOrderTypeFilter;
+
+    // Concurrently load the latest reconciliation report banner
+    loadMfReconciliationBar();
 
     try {
-        const res = await api(`/admin/mutual-funds/orders?page=${page}&limit=20&paymentStatus=${status}&search=${encodeURIComponent(search)}`);
+        let url = `/admin/mutual-funds/orders?page=${page}&limit=20&search=${encodeURIComponent(search)}`;
+        if (status && status !== 'ALL') url += `&paymentStatus=${status}`;
+        if (trxnType && trxnType !== 'ALL') url += `&transactionType=${trxnType}`;
+
+        const res = await api(url);
         if (!res.success) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || 'Failed to load orders'}</div></div>`;
             return;
@@ -508,7 +517,7 @@ async function loadMfOrders(page = 1) {
         const pages = res.pages || 1;
 
         if (orders.length === 0) {
-            body.innerHTML = `<div class="loading-box"><i class="fas fa-file-invoice" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No mutual fund orders found</div><div style="font-size:12px;color:var(--text-dim)">Lumpsum purchases and redemptions will appear here.</div></div>`;
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-file-invoice" style="font-size:36px;color:var(--text-dim)"></i><div style="margin-top:10px;font-weight:600">No mutual fund orders found</div><div style="font-size:12px;color:var(--text-dim)">Purchases, redemptions (sell), and fund switches will appear here.</div></div>`;
             return;
         }
 
@@ -521,10 +530,10 @@ async function loadMfOrders(page = 1) {
                         <th>Investor</th>
                         <th>Scheme</th>
                         <th>Type</th>
-                        <th>Amount</th>
+                        <th>Amount / Value</th>
                         <th>Units & NAV</th>
-                        <th>Payment Mode</th>
-                        <th>Payment Status</th>
+                        <th>Payment / Payout</th>
+                        <th>Order Status</th>
                         <th>Date</th>
                         <th style="text-align:right">Actions</th>
                     </tr>
@@ -535,6 +544,53 @@ async function loadMfOrders(page = 1) {
             const u = o.user || {};
             const isSucc = o.paymentStatus === 'SUCCESS';
             const isPend = o.paymentStatus === 'PENDING';
+            const isRedeem = o.transactionType === 'R';
+            const isSwitch = o.transactionType === 'S';
+
+            let typeBadge = '';
+            if (isRedeem) {
+                typeBadge = `<span class="badge" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);font-weight:700"><i class="fas fa-arrow-up"></i> REDEEM</span>`;
+            } else if (isSwitch) {
+                typeBadge = `<span class="badge" style="background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700"><i class="fas fa-random"></i> SWITCH</span>`;
+            } else {
+                typeBadge = `<span class="badge" style="background:rgba(0,208,156,0.18);color:#00D09C;border:1px solid rgba(0,208,156,0.4);font-weight:700"><i class="fas fa-arrow-down"></i> PURCHASE</span>`;
+            }
+
+            let paymentCol = '';
+            if (isRedeem) {
+                const payoutProcessed = o.payoutStatus === 'PROCESSED';
+                paymentCol = `
+                    <div>
+                        <span class="badge ${payoutProcessed ? 'badge-success' : 'badge-warning'}" style="font-size:10px">
+                            ${payoutProcessed ? 'PAYOUT SENT' : 'PENDING AMC'}
+                        </span>
+                        ${o.payoutBank?.bankName ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px">${o.payoutBank.bankName} ····${(o.payoutBank.accountNumber || '').slice(-4)}</div>` : ''}
+                    </div>`;
+            } else {
+                paymentCol = `<span class="badge badge-secondary">${o.paymentMode || 'UPI'}</span>`;
+            }
+
+            let schemeDisplay = `
+                <div style="font-weight:600;color:#fff;font-size:13px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.schemeName}">
+                    ${o.schemeName}
+                </div>`;
+            if (isSwitch && (o.targetSchemeName || o.targetSchemeCode)) {
+                schemeDisplay += `
+                    <div style="font-size:11px;color:#38bdf8;margin-top:2px">
+                        <i class="fas fa-arrow-right"></i> ${o.targetSchemeName || o.targetSchemeCode}
+                    </div>`;
+            }
+
+            let unitsDisplay = '';
+            if (isRedeem) {
+                unitsDisplay = `
+                    <div style="color:#f59e0b;font-weight:700;font-size:12.5px">${o.redemptionUnits || o.units || 0} units ${o.allUnits ? '<span style="font-size:10px">(ALL)</span>' : ''}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">NAV: ₹${o.navAtOrder || '—'}</div>`;
+            } else {
+                unitsDisplay = `
+                    <div style="color:#fff;font-size:12.5px">${o.units || 0} units</div>
+                    <div style="font-size:11px;color:var(--text-dim)">NAV: ₹${o.navAtOrder || '—'}</div>`;
+            }
 
             html += `
             <tr>
@@ -547,26 +603,16 @@ async function loadMfOrders(page = 1) {
                     <div style="font-weight:700;color:#fff;font-size:13px">${u.name || 'Investor'}</div>
                     <div style="font-size:11px;color:var(--text-dim)">${o.clientCode}</div>
                 </td>
+                <td>${schemeDisplay}</td>
+                <td>${typeBadge}</td>
                 <td>
-                    <div style="font-weight:600;color:#fff;font-size:13px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.schemeName}">
-                        ${o.schemeName}
+                    <div style="font-weight:800;color:${isRedeem ? '#f59e0b' : '#00D09C'};font-size:14px">
+                        ${formatMfInr(o.orderAmount)}
                     </div>
+                    ${isRedeem ? '<div style="font-size:10px;color:var(--text-dim)">Est. AMC Payout</div>' : ''}
                 </td>
-                <td>
-                    <span class="badge ${o.transactionType === 'P' ? 'badge-blue' : 'badge-orange'}">
-                        ${o.transactionType === 'P' ? 'PURCHASE' : 'REDEMPTION'}
-                    </span>
-                </td>
-                <td>
-                    <div style="font-weight:800;color:#00D09C;font-size:14px">${formatMfInr(o.orderAmount)}</div>
-                </td>
-                <td>
-                    <div style="color:#fff;font-size:12.5px">${o.units || 0} units</div>
-                    <div style="font-size:11px;color:var(--text-dim)">NAV: ₹${o.navAtOrder || '—'}</div>
-                </td>
-                <td>
-                    <span class="badge badge-secondary">${o.paymentMode || 'UPI'}</span>
-                </td>
+                <td>${unitsDisplay}</td>
+                <td>${paymentCol}</td>
                 <td>
                     <span class="badge ${isSucc ? 'badge-success' : isPend ? 'badge-warning' : 'badge-danger'}">
                         ${o.paymentStatus}
@@ -576,15 +622,19 @@ async function loadMfOrders(page = 1) {
                     ${formatMfDate(o.createdAt)}
                 </td>
                 <td style="text-align:right">
-                    <div style="display:inline-flex;gap:5px;align-items:center">
+                    <div style="display:inline-flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
                         <button class="btn btn-sm btn-outline" style="color:#3B82F6;border-color:#3B82F6;font-size:11px;padding:3px 7px" onclick="syncMfOrderWithNse('${o._id}')" title="Call NSE GET_ORDER_STATUS and reconcile settlement">
                             <i class="fas fa-satellite-dish"></i> Sync NSE
                         </button>
                         ${isPend ? `
                             <button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C;font-size:11px;padding:3px 7px" onclick="reconcileMfOrder('${o._id}', 'SUCCESS')">
                                 <i class="fas fa-check"></i> Mark Success
-                            </button>` : 
-                            `<span style="color:var(--text-dim);font-size:11px">Reconciled</span>`
+                            </button>` : ''
+                        }
+                        ${isRedeem && o.payoutStatus !== 'PROCESSED' ? `
+                            <button class="btn btn-sm btn-outline" style="color:#f59e0b;border-color:#f59e0b;font-size:11px;padding:3px 7px" onclick="updateMfPayoutStatus('${o._id}', 'PROCESSED')" title="Mark AMC bank payout processed">
+                                <i class="fas fa-check-double"></i> Payout Sent
+                            </button>` : ''
                         }
                     </div>
                 </td>
@@ -623,12 +673,176 @@ async function reconcileMfOrder(orderId, newStatus) {
     }
 }
 
+async function updateMfPayoutStatus(orderId, payoutStatus) {
+    if (!confirm(`Mark redemption bank payout as ${payoutStatus}?`)) return;
+
+    try {
+        const res = await api(`/admin/mutual-funds/orders/${orderId}/payout-status`, {
+            method: 'POST',
+            body: JSON.stringify({ payoutStatus }),
+        });
+        if (res.success) {
+            toast('Redemption payout status updated ✓', 'success');
+            loadMfOrders(mfOrdersCurrentPage);
+        } else {
+            toast(res.message || 'Failed to update payout status', 'danger');
+        }
+    } catch (e) {
+        toast('Network error updating payout status', 'danger');
+    }
+}
+
 function filterMfOrdersByStatus(status) {
     currentOrderStatusFilter = status;
     document.querySelectorAll('.mf-order-filter-btn').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-status') === status);
     });
     loadMfOrders(1);
+}
+
+function filterMfOrdersByType(type) {
+    currentOrderTypeFilter = type;
+    document.querySelectorAll('.mf-order-type-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-type') === type);
+    });
+    loadMfOrders(1);
+}
+
+// ── Daily Automated Reconciliation Banner & Alert Handler ──
+async function loadMfReconciliationBar() {
+    const bar = document.getElementById('mforders-reconciliation-bar');
+    if (!bar) return;
+
+    try {
+        const res = await api('/admin/mutual-funds/reconciliation');
+        if (!res.success || !res.data) {
+            bar.innerHTML = '';
+            return;
+        }
+
+        const { latestRun, unresolvedAlerts, unresolvedCount } = res.data;
+        if (!latestRun) {
+            bar.innerHTML = `
+            <div style="background:rgba(30,41,59,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <i class="fas fa-satellite-dish" style="color:#3B82F6;font-size:18px"></i>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13px">Daily Automated NSE Exchange Reconciliation</div>
+                        <div style="font-size:11.5px;color:var(--text-dim)">Nightly cron scheduled at 01:00 AM IST. No reconciliation runs recorded yet.</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="triggerReconciliationManual()"><i class="fas fa-play"></i> Run Now</button>
+            </div>`;
+            return;
+        }
+
+        const hasAlerts = (unresolvedCount || 0) > 0;
+        let html = '';
+
+        if (hasAlerts) {
+            html = `
+            <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);border-radius:10px;padding:14px 18px;margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span class="badge badge-danger" style="font-size:11px;padding:4px 8px"><i class="fas fa-exclamation-triangle"></i> RECONCILIATION ALERT</span>
+                        <div style="font-weight:800;color:#fff;font-size:14px">${unresolvedCount} Exchange Discrepanc${unresolvedCount === 1 ? 'y' : 'ies'} Detected</div>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-dim)">Last Run: ${formatMfDate(latestRun.executedAt)} (${latestRun.trigger})</div>
+                </div>
+                <div style="font-size:12px;color:#fca5a5;margin-bottom:10px">
+                    Differences were detected between Payvika internal order records and live NSE MFSS settlement status.
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">`;
+
+            unresolvedAlerts.slice(0, 5).forEach(alert => {
+                html += `
+                <div style="background:rgba(0,0,0,0.25);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:8px">
+                    <div>
+                        <b style="color:#fff">${alert.orderId || alert.sipRegNo || 'Order'}</b> · 
+                        <span style="color:var(--text-dim)">NSE Status:</span> <code style="color:#f87171">${alert.nseStatus || 'MISMATCH'}</code> · 
+                        <span style="color:var(--text-dim)">Local:</span> <code style="color:#cbd5e1">${alert.localStatus}</code>
+                        <div style="font-size:11px;color:#fca5a5;margin-top:2px">${alert.reason || ''}</div>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline" style="font-size:10.5px;padding:2px 8px;color:#00D09C;border-color:#00D09C" onclick="resolveReconciliationAlert('${alert._id}')">
+                            <i class="fas fa-check"></i> Mark Resolved
+                        </button>
+                    </div>
+                </div>`;
+            });
+
+            html += `</div></div>`;
+        } else {
+            html = `
+            <div style="background:rgba(0,208,156,0.08);border:1px solid rgba(0,208,156,0.25);border-radius:10px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:34px;height:34px;border-radius:50%;background:rgba(0,208,156,0.18);display:flex;align-items:center;justify-content:center;color:#00D09C">
+                        <i class="fas fa-check-circle" style="font-size:16px"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:8px">
+                            Daily Exchange Reconciliation Clean
+                            <span class="badge" style="background:rgba(0,208,156,0.2);color:#00D09C;font-size:10px;padding:2px 6px">100% Synced</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">
+                            Scanned ${latestRun.stats?.totalScanned || 0} transactions (Auto-healed: ${latestRun.stats?.autoHealed || 0}, 0 Discrepancies) · Last run: ${formatMfDate(latestRun.executedAt)}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:11px;color:var(--text-dim)">Nightly Cron: 01:00 AM IST</span>
+                </div>
+            </div>`;
+        }
+
+        bar.innerHTML = html;
+    } catch (e) {
+        console.error('loadMfReconciliationBar error:', e);
+    }
+}
+
+async function triggerReconciliationManual() {
+    const btn = document.getElementById('btn-reconcile-now');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reconciling with NSE...';
+    }
+    toast('Running daily exchange reconciliation engine against NSE MFSS...', 'info');
+
+    try {
+        const res = await api('/admin/mutual-funds/reconciliation/run', { method: 'POST' });
+        if (res.success) {
+            toast(res.message || 'Reconciliation completed successfully ✓', 'success');
+            loadMfReconciliationBar();
+            loadMfOrders(mfOrdersCurrentPage);
+            if (typeof loadMfOverview === 'function') loadMfOverview();
+        } else {
+            toast(res.message || 'Reconciliation run completed with warnings', 'warning');
+            loadMfReconciliationBar();
+        }
+    } catch (e) {
+        toast('Network error during reconciliation run', 'danger');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync"></i> Run Reconciliation Engine';
+        }
+    }
+}
+
+async function resolveReconciliationAlert(discrepancyId) {
+    if (!discrepancyId) return;
+    try {
+        const res = await api(`/admin/mutual-funds/reconciliation/resolve/${discrepancyId}`, { method: 'POST' });
+        if (res.success) {
+            toast('Discrepancy alert marked as resolved ✓', 'success');
+            loadMfReconciliationBar();
+        } else {
+            toast(res.message || 'Failed to resolve discrepancy', 'danger');
+        }
+    } catch (e) {
+        toast('Error resolving discrepancy alert', 'danger');
+    }
 }
 
 // ── Generic pagination renderer ──

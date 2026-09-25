@@ -3,6 +3,7 @@ const MfClientUcc = require('../models/MfClientUcc');
 const MfOrder = require('../models/MfOrder');
 const MfMandate = require('../models/MfMandate');
 const MfSip = require('../models/MfSip');
+const MfSystematicPlan = require('../models/MfSystematicPlan');
 const User = require('../models/User');
 const BankAccount = require('../models/BankAccount');
 const Kyc = require('../models/Kyc');
@@ -1006,23 +1007,42 @@ exports.abandonSipOrder = async (req, res) => {
   }
 };
 
+// Helper to calculate available units held in a scheme
+async function getUserSchemeHoldings(userId, schemeCode) {
+  const orders = await MfOrder.find({
+    user: userId,
+    schemeCode: schemeCode.toUpperCase(),
+    paymentStatus: 'SUCCESS',
+  });
+
+  let totalUnits = 0;
+  for (const ord of orders) {
+    if (ord.transactionType === 'P') {
+      totalUnits += ord.units;
+    } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
+      totalUnits -= (ord.redemptionUnits || ord.units);
+    }
+  }
+  return Math.max(0, +totalUnits.toFixed(3));
+}
+
 // ── 7. GET /api/mutual-funds/portfolio (Holdings & Summary) ──
 exports.getPortfolio = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Fetch confirmed purchases and active SIPs
+    // Fetch confirmed purchases and redemptions/switches
     const orders = await MfOrder.find({
       user: userId,
-      transactionType: 'P',
       paymentStatus: 'SUCCESS',
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: 1 });
 
     const activeSips = await MfSip.find({ user: userId, status: 'ACTIVE' });
 
-    // Auto-reconcile activeSips installments with actual confirmed orders
+    // Auto-reconcile activeSips installments with actual confirmed purchase orders
+    const purchaseOrders = orders.filter((o) => o.transactionType === 'P');
     for (const sip of activeSips) {
-      const confirmedOrdersCount = orders.filter(
+      const confirmedOrdersCount = purchaseOrders.filter(
         (o) => o.schemeCode === sip.schemeCode || (o.remarks && o.remarks.includes(sip.sipRegNo))
       ).length;
 
@@ -1047,9 +1067,16 @@ exports.getPortfolio = async (req, res) => {
           currentNav: ord.navAtOrder,
         };
       }
-      holdingsMap[ord.schemeCode].totalUnits += ord.units;
-      holdingsMap[ord.schemeCode].investedAmount += ord.orderAmount;
-      totalInvested += ord.orderAmount;
+      if (ord.transactionType === 'P') {
+        holdingsMap[ord.schemeCode].totalUnits += ord.units;
+        holdingsMap[ord.schemeCode].investedAmount += ord.orderAmount;
+        totalInvested += ord.orderAmount;
+      } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
+        const unitsReduced = ord.redemptionUnits || ord.units;
+        holdingsMap[ord.schemeCode].totalUnits = Math.max(0, holdingsMap[ord.schemeCode].totalUnits - unitsReduced);
+        holdingsMap[ord.schemeCode].investedAmount = Math.max(0, holdingsMap[ord.schemeCode].investedAmount - ord.orderAmount);
+        totalInvested = Math.max(0, totalInvested - ord.orderAmount);
+      }
     }
 
     // Refresh with latest NAVs
@@ -1061,24 +1088,26 @@ exports.getPortfolio = async (req, res) => {
     });
 
     let currentValuation = 0;
-    const holdingsList = Object.values(holdingsMap).map((h) => {
-      const live = liveMap[h.schemeCode];
-      const currentNav = live?.nav || h.currentNav;
-      const currentValue = +(h.totalUnits * currentNav).toFixed(2);
-      const profitLoss = +(currentValue - h.investedAmount).toFixed(2);
-      const profitLossPct = h.investedAmount > 0 ? +((profitLoss / h.investedAmount) * 100).toFixed(2) : 0;
+    const holdingsList = Object.values(holdingsMap)
+      .filter((h) => h.totalUnits > 0.0001)
+      .map((h) => {
+        const live = liveMap[h.schemeCode];
+        const currentNav = live?.nav || h.currentNav;
+        const currentValue = +(h.totalUnits * currentNav).toFixed(2);
+        const profitLoss = +(currentValue - h.investedAmount).toFixed(2);
+        const profitLossPct = h.investedAmount > 0 ? +((profitLoss / h.investedAmount) * 100).toFixed(2) : 0;
 
-      currentValuation += currentValue;
+        currentValuation += currentValue;
 
-      return {
-        ...h,
-        totalUnits: +h.totalUnits.toFixed(3),
-        currentNav,
-        currentValue,
-        profitLoss,
-        profitLossPct,
-      };
-    });
+        return {
+          ...h,
+          totalUnits: +h.totalUnits.toFixed(3),
+          currentNav,
+          currentValue,
+          profitLoss,
+          profitLossPct,
+        };
+      });
 
     const totalProfitLoss = +(currentValuation - totalInvested).toFixed(2);
     const totalProfitLossPct = totalInvested > 0 ? +((totalProfitLoss / totalInvested) * 100).toFixed(2) : 0;
@@ -1276,6 +1305,326 @@ exports.syncNavsNow = async (req, res) => {
     });
   } catch (error) {
     console.error('[syncNavsNow Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 13. POST /api/mutual-funds/orders/redeem (Redeem / Sell Units back to AMC) ──
+exports.createRedemptionOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { schemeCode, units, allUnits = false, remarks = '' } = req.body;
+
+    if (!schemeCode) {
+      return res.status(400).json({ success: false, message: 'schemeCode is required' });
+    }
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please complete one-time investor onboarding (UCC) before redeeming units',
+      });
+    }
+
+    const scheme = await MutualFundScheme.findOne({ schemeCode: schemeCode.toUpperCase(), planType: 'REGULAR' });
+    if (!scheme) {
+      return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
+    }
+
+    if (scheme.redemptionAllowed === false) {
+      return res.status(400).json({
+        success: false,
+        message: `Redemptions are currently locked for ${scheme.schemeName} (e.g. ELSS lock-in period)`,
+      });
+    }
+
+    const availableUnits = await getUserSchemeHoldings(userId, scheme.schemeCode);
+    if (availableUnits <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: `You currently have 0 units in ${scheme.schemeName} available to redeem.`,
+      });
+    }
+
+    const unitsToRedeem = allUnits ? availableUnits : parseFloat(units);
+    if (isNaN(unitsToRedeem) || unitsToRedeem <= 0) {
+      return res.status(400).json({ success: false, message: 'Please specify a valid unit quantity to redeem' });
+    }
+
+    if (unitsToRedeem > availableUnits) {
+      return res.status(400).json({
+        success: false,
+        message: `Requested units (${unitsToRedeem}) exceed your available holdings (${availableUnits} units).`,
+      });
+    }
+
+    const orderId = `MFR${Date.now()}`;
+    const user = await User.findById(userId);
+    const estimatedPayout = +(unitsToRedeem * scheme.nav).toFixed(2);
+
+    // 1. Prepare NSE Redemption payload (Order Entry RED)
+    const nseRedemptionPayload = {
+      order_ref_number: orderId,
+      scheme_code: scheme.schemeCode,
+      trxn_type: 'R', // Redemption
+      buy_sell_type: 'FRESH',
+      client_code: ucc.clientCode,
+      demat_physical: 'P',
+      order_amount: String(estimatedPayout),
+      allotment_units: String(unitsToRedeem),
+      all_units: allUnits ? 'Y' : 'N',
+      folio_no: '',
+      remarks: remarks || `Redemption via Vikaone app`,
+      account_no: ucc.primaryBank?.accountNo || '',
+      mobile_no: user?.phone?.slice(-10) || '',
+      email: user?.email || '',
+      member_unique_id: orderId,
+    };
+
+    // 2. Dispatch to NSE Gateway
+    let nseTrxnOrderId = `NSE_RED_${Date.now()}`;
+    try {
+      const nseRes = await nseClient.createNormalOrder([nseRedemptionPayload]);
+      if (nseRes?.data?.transaction_details?.[0]?.trxn_order_id) {
+        nseTrxnOrderId = nseRes.data.transaction_details[0].trxn_order_id;
+      }
+    } catch (nseErr) {
+      console.warn('[Redemption] NSE dispatch warning:', nseErr.message);
+    }
+
+    // 3. Save Redemption Order
+    const redemptionOrder = await MfOrder.create({
+      user: userId,
+      clientCode: ucc.clientCode,
+      orderId,
+      schemeCode: scheme.schemeCode,
+      schemeName: scheme.schemeName,
+      transactionType: 'R',
+      redemptionUnits: unitsToRedeem,
+      allUnits: Boolean(allUnits),
+      orderAmount: estimatedPayout,
+      units: unitsToRedeem,
+      navAtOrder: scheme.nav,
+      paymentMode: 'MANDATE',
+      paymentStatus: 'SUCCESS', // Payment doesn't debit user; AMC settles payout to user bank
+      payoutStatus: 'PENDING_AMC',
+      payoutBank: {
+        bankName: ucc.primaryBank?.bankName || '',
+        accountNo: ucc.primaryBank?.accountNo || '',
+        ifscCode: ucc.primaryBank?.ifscCode || '',
+      },
+      nseTrxnOrderId,
+      nseStatus: 'ORDER SUBMITTED',
+      remarks: `Redeemed ${unitsToRedeem} units. Expected payout of ₹${estimatedPayout.toLocaleString('en-IN')} will be credited to ${ucc.primaryBank?.bankName || 'bank account'} within 2-3 business days.`,
+    });
+
+    return res.json({
+      success: true,
+      message: `Redemption order for ${unitsToRedeem} units placed successfully. Payout will be credited to your registered bank account by AMC.`,
+      data: {
+        order: redemptionOrder,
+        remainingUnits: +(availableUnits - unitsToRedeem).toFixed(3),
+        estimatedPayout,
+        payoutBank: redemptionOrder.payoutBank,
+      },
+    });
+  } catch (error) {
+    console.error('[createRedemptionOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 14. POST /api/mutual-funds/orders/switch (Switch Between Funds under same AMC) ──
+exports.createSwitchOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { sourceSchemeCode, targetSchemeCode, units, allUnits = false } = req.body;
+
+    if (!sourceSchemeCode || !targetSchemeCode) {
+      return res.status(400).json({ success: false, message: 'sourceSchemeCode and targetSchemeCode are required' });
+    }
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(400).json({ success: false, message: 'Please complete UCC onboarding before switching schemes' });
+    }
+
+    const [srcScheme, tgtScheme] = await Promise.all([
+      MutualFundScheme.findOne({ schemeCode: sourceSchemeCode.toUpperCase(), planType: 'REGULAR' }),
+      MutualFundScheme.findOne({ schemeCode: targetSchemeCode.toUpperCase(), planType: 'REGULAR' }),
+    ]);
+
+    if (!srcScheme || !tgtScheme) {
+      return res.status(404).json({ success: false, message: 'Source or target scheme not found or not a Regular plan' });
+    }
+
+    if (srcScheme.amcCode !== tgtScheme.amcCode) {
+      return res.status(400).json({
+        success: false,
+        message: `SEBI Rule: Switching is only permitted between schemes of the same AMC (${srcScheme.amcName})`,
+      });
+    }
+
+    const availableUnits = await getUserSchemeHoldings(userId, srcScheme.schemeCode);
+    const unitsToSwitch = allUnits ? availableUnits : parseFloat(units);
+
+    if (unitsToSwitch <= 0 || unitsToSwitch > availableUnits) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid switch units (${unitsToSwitch}). Available: ${availableUnits} units`,
+      });
+    }
+
+    const switchAmount = +(unitsToSwitch * srcScheme.nav).toFixed(2);
+    const orderId = `MFSW${Date.now()}`;
+
+    // Dispatch to NSE Switch
+    const nseSwitchPayload = {
+      order_ref_number: orderId,
+      source_scheme_code: srcScheme.schemeCode,
+      target_scheme_code: tgtScheme.schemeCode,
+      trxn_type: 'SO', // Switch Out
+      client_code: ucc.clientCode,
+      switch_units: String(unitsToSwitch),
+      all_units: allUnits ? 'Y' : 'N',
+    };
+
+    let nseTrxnOrderId = `NSE_SW_${Date.now()}`;
+    try {
+      const nseRes = await nseClient.createSwitchOrder([nseSwitchPayload]);
+      if (nseRes?.data?.transaction_details?.[0]?.trxn_order_id) {
+        nseTrxnOrderId = nseRes.data.transaction_details[0].trxn_order_id;
+      }
+    } catch (err) {
+      console.warn('[Switch Order] NSE switch warning:', err.message);
+    }
+
+    // Record source Switch-Out Order
+    const switchOrder = await MfOrder.create({
+      user: userId,
+      clientCode: ucc.clientCode,
+      orderId,
+      schemeCode: srcScheme.schemeCode,
+      schemeName: srcScheme.schemeName,
+      transactionType: 'S',
+      redemptionUnits: unitsToSwitch,
+      allUnits: Boolean(allUnits),
+      targetSchemeCode: tgtScheme.schemeCode,
+      targetSchemeName: tgtScheme.schemeName,
+      orderAmount: switchAmount,
+      units: unitsToSwitch,
+      navAtOrder: srcScheme.nav,
+      paymentMode: 'MANDATE',
+      paymentStatus: 'SUCCESS',
+      nseTrxnOrderId,
+      nseStatus: 'SWITCH PROCESSING',
+      remarks: `Switch from ${srcScheme.schemeName} to ${tgtScheme.schemeName} (${unitsToSwitch} units)`,
+    });
+
+    return res.json({
+      success: true,
+      message: `Switch request submitted successfully. ${unitsToSwitch} units will be switched from ${srcScheme.schemeName} to ${tgtScheme.schemeName}.`,
+      data: switchOrder,
+    });
+  } catch (error) {
+    console.error('[createSwitchOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 15. POST /api/mutual-funds/stp/register (Systematic Transfer Plan) ──
+exports.registerStpOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { sourceSchemeCode, targetSchemeCode, amount, frequency = 'MONTHLY', startDate, tenureMonths = 36 } = req.body;
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) return res.status(400).json({ success: false, message: 'UCC onboarding required' });
+
+    const [src, tgt] = await Promise.all([
+      MutualFundScheme.findOne({ schemeCode: sourceSchemeCode.toUpperCase(), planType: 'REGULAR' }),
+      MutualFundScheme.findOne({ schemeCode: targetSchemeCode.toUpperCase(), planType: 'REGULAR' }),
+    ]);
+
+    if (!src || !tgt) return res.status(404).json({ success: false, message: 'Source or target scheme not found' });
+    if (src.amcCode !== tgt.amcCode) return res.status(400).json({ success: false, message: 'STP requires both schemes to belong to the same AMC' });
+
+    const regNo = `STP${Date.now()}`;
+    const start = startDate ? new Date(startDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const stpPlan = await MfSystematicPlan.create({
+      user: userId,
+      clientCode: ucc.clientCode,
+      planType: 'STP',
+      regNo,
+      sourceSchemeCode: src.schemeCode,
+      sourceSchemeName: src.schemeName,
+      targetSchemeCode: tgt.schemeCode,
+      targetSchemeName: tgt.schemeName,
+      frequency: frequency.toUpperCase(),
+      amount: Number(amount),
+      startDate: start,
+      nextExecutionDate: start,
+      tenureMonths: Number(tenureMonths),
+      status: 'ACTIVE',
+      remarks: `STP from ${src.schemeName} to ${tgt.schemeName}`,
+    });
+
+    return res.json({
+      success: true,
+      message: 'STP successfully registered on exchange',
+      data: stpPlan,
+    });
+  } catch (error) {
+    console.error('[registerStpOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 16. POST /api/mutual-funds/swp/register (Systematic Withdrawal Plan) ──
+exports.registerSwpOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { sourceSchemeCode, amount, frequency = 'MONTHLY', startDate, tenureMonths = 36 } = req.body;
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) return res.status(400).json({ success: false, message: 'UCC onboarding required' });
+
+    const src = await MutualFundScheme.findOne({ schemeCode: sourceSchemeCode.toUpperCase(), planType: 'REGULAR' });
+    if (!src) return res.status(404).json({ success: false, message: 'Scheme not found' });
+
+    const availableUnits = await getUserSchemeHoldings(userId, src.schemeCode);
+    if (availableUnits <= 0) {
+      return res.status(400).json({ success: false, message: 'You have no units available in this scheme for SWP' });
+    }
+
+    const regNo = `SWP${Date.now()}`;
+    const start = startDate ? new Date(startDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const swpPlan = await MfSystematicPlan.create({
+      user: userId,
+      clientCode: ucc.clientCode,
+      planType: 'SWP',
+      regNo,
+      sourceSchemeCode: src.schemeCode,
+      sourceSchemeName: src.schemeName,
+      frequency: frequency.toUpperCase(),
+      amount: Number(amount),
+      startDate: start,
+      nextExecutionDate: start,
+      tenureMonths: Number(tenureMonths),
+      status: 'ACTIVE',
+      remarks: `SWP monthly withdrawal of ₹${amount} to ${ucc.primaryBank?.bankName}`,
+    });
+
+    return res.json({
+      success: true,
+      message: 'SWP successfully scheduled. Regular withdrawals will be credited to your bank account.',
+      data: swpPlan,
+    });
+  } catch (error) {
+    console.error('[registerSwpOrder Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

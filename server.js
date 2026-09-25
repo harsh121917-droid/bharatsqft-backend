@@ -52,6 +52,7 @@ connectDB();
 /* ---------- Automated Crons (Gold/Silver, Due Reminders & MF NAV Sync) ---------- */
 require("./crons/goldCron");
 require("./crons/mfNavSyncCron");
+require("./crons/mfReconciliationCron").startReconciliationCron();
 
 /* ---------- Routes ---------- */
 

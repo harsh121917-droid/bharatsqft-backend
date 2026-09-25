@@ -3511,27 +3511,38 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════════════
-                 PAGE: MUTUAL FUNDS ORDERS & LUMPSUM
+                 PAGE: MUTUAL FUNDS ORDERS & REDEMPTIONS (Reconciliation)
                  ══════════════════════════════════════════════════════════ -->
             <div class="page" id="page-mforders">
                 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
                     <div>
-                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-file-invoice-dollar" style="color:#00D09C;margin-right:10px"></i> MF Orders & Lumpsum Purchases</h2>
-                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">All purchase transactions, payment statuses, and unit allotments</div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i class="fas fa-file-invoice-dollar" style="color:#00D09C;margin-right:10px"></i> MF Orders, Redemptions & Reconciliation</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">All purchase transactions, redemptions (sell), switches, unit allotments, and daily exchange reconciliation</div>
                     </div>
-                    <button class="btn btn-secondary btn-sm" onclick="loadMfOrders(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-primary btn-sm" onclick="triggerReconciliationManual()" id="btn-reconcile-now"><i class="fas fa-sync"></i> Run Reconciliation Engine</button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadMfOrders(1)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
                 </div>
+
+                <!-- Daily Automated Reconciliation Alert Banner -->
+                <div id="mforders-reconciliation-bar" style="margin-bottom:18px"></div>
 
                 <div class="card" style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
                     <div style="display:flex;gap:6px;flex-wrap:wrap">
-                        <button class="btn btn-sm btn-outline mf-order-filter-btn active" data-status="ALL" onclick="filterMfOrdersByStatus('ALL')">All Orders</button>
+                        <button class="btn btn-sm btn-outline mf-order-type-btn active" data-type="ALL" onclick="filterMfOrdersByType('ALL')">All Transactions</button>
+                        <button class="btn btn-sm btn-outline mf-order-type-btn" data-type="P" onclick="filterMfOrdersByType('P')"><i class="fas fa-arrow-down" style="color:#00D09C"></i> Purchases</button>
+                        <button class="btn btn-sm btn-outline mf-order-type-btn" data-type="R" onclick="filterMfOrdersByType('R')"><i class="fas fa-arrow-up" style="color:#f59e0b"></i> Redemptions (Sell)</button>
+                        <button class="btn btn-sm btn-outline mf-order-type-btn" data-type="S" onclick="filterMfOrdersByType('S')"><i class="fas fa-random" style="color:#38bdf8"></i> Switches</button>
+                        <span style="border-right:1px solid rgba(255,255,255,0.1);margin:0 4px"></span>
+                        <button class="btn btn-sm btn-outline mf-order-filter-btn active" data-status="ALL" onclick="filterMfOrdersByStatus('ALL')">All Status</button>
                         <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="SUCCESS" onclick="filterMfOrdersByStatus('SUCCESS')">Success</button>
                         <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="PENDING" onclick="filterMfOrdersByStatus('PENDING')">Pending</button>
                         <button class="btn btn-sm btn-outline mf-order-filter-btn" data-status="FAILED" onclick="filterMfOrdersByStatus('FAILED')">Failed</button>
                     </div>
                     <div style="position:relative;min-width:260px">
                         <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
-                        <input class="form-control" id="mforders-search" type="text" placeholder="Search order ID or scheme..." onkeyup="if(event.key==='Enter') loadMfOrders(1)" style="padding-left:38px;width:100%" />
+                        <input class="form-control" id="mforders-search" type="text" placeholder="Search order ID, user, or scheme..." onkeyup="if(event.key==='Enter') loadMfOrders(1)" style="padding-left:38px;width:100%" />
                     </div>
                 </div>
 

@@ -16,6 +16,10 @@ const {
   renderCheckoutSimulator,
   resetTestData,
   syncNavsNow,
+  createRedemptionOrder,
+  createSwitchOrder,
+  registerStpOrder,
+  registerSwpOrder,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -33,6 +37,10 @@ router.get('/ucc/me', getUserUcc);
 router.post('/ucc/register', registerUserUcc);
 router.post('/orders/purchase', createPurchaseOrder);
 router.post('/orders/verify', verifyPurchasePayment);
+router.post('/orders/redeem', createRedemptionOrder);
+router.post('/orders/switch', createSwitchOrder);
+router.post('/stp/register', registerStpOrder);
+router.post('/swp/register', registerSwpOrder);
 router.post('/sip/register', registerSipOrder);
 router.post('/sip/verify', verifySipPayment);
 router.post('/sip/:id/abandon', abandonSipOrder);

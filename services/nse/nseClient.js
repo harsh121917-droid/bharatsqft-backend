@@ -108,6 +108,30 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('STP')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          status: '100',
+          message: 'STP registered successfully in Sandbox Mode',
+          reg_data: [{ reg_id: `STP_TEST_${timestamp}`, status: 'SUCCESS' }],
+        },
+      };
+    }
+
+    if (endpoint.includes('SWP')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          status: '100',
+          message: 'SWP registered successfully in Sandbox Mode',
+          reg_data: [{ reg_id: `SWP_TEST_${timestamp}`, status: 'SUCCESS' }],
+        },
+      };
+    }
+
     if (endpoint.includes('MANDATE')) {
       return {
         success: true,
@@ -292,6 +316,22 @@ class NseClient {
   async registerSipTopup(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
     return this.post('/nsemfdesk/api/v2/registration/product/SIP_TOPUP', {
+      reg_data: list,
+    });
+  }
+
+  // ── 6b. STP (Systematic Transfer Plan) Registration ──
+  async registerStp(regData) {
+    const list = Array.isArray(regData) ? regData : [regData];
+    return this.post('/nsemfdesk/api/v2/registration/product/STP', {
+      reg_data: list,
+    });
+  }
+
+  // ── 6c. SWP (Systematic Withdrawal Plan) Registration ──
+  async registerSwp(regData) {
+    const list = Array.isArray(regData) ? regData : [regData];
+    return this.post('/nsemfdesk/api/v2/registration/product/SWP', {
       reg_data: list,
     });
   }
