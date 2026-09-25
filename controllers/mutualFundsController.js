@@ -827,7 +827,7 @@ exports.registerSipOrder = async (req, res) => {
 
     // 3. Request Official Payment / Mandate Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
-    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRefNo}?mode=sandbox`;
+    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
     try {
       const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
       if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
@@ -851,6 +851,7 @@ exports.registerSipOrder = async (req, res) => {
         purpose: 'mutual_fund',
         notes: {
           sipRegNo: String(sipRegNo),
+          sipRefNo: String(sipRefNo),
           clientCode: ucc.clientCode,
           schemeCode: scheme.schemeCode,
           type: 'mf_sip_first_installment',
@@ -867,6 +868,7 @@ exports.registerSipOrder = async (req, res) => {
       user: userId,
       clientCode: ucc.clientCode,
       sipRegNo: String(sipRegNo),
+      sipRefNo: String(sipRefNo),
       schemeCode: scheme.schemeCode,
       schemeName: scheme.schemeName,
       frequency: frequency.toUpperCase(),
@@ -1225,22 +1227,258 @@ exports.simulatePayment = async (req, res) => {
 exports.renderCheckoutSimulator = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const order = await MfOrder.findOne({ orderId });
+    const mongoose = require('mongoose');
 
+    // 1. Try finding an MfOrder (Purchase / Lump-sum)
+    let order = await MfOrder.findOne({
+      $or: [
+        { orderId },
+        { nseTrxnOrderId: orderId },
+        ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
+      ],
+    });
+
+    // 2. Try finding an MfSip (SIP Registration)
+    let sip = null;
     if (!order) {
+      sip = await MfSip.findOne({
+        $or: [
+          { sipRegNo: orderId },
+          { sipRefNo: orderId },
+          ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
+        ],
+      });
+    }
+
+    // 3. Try finding an MfMandate (Bank Mandate / eNACH)
+    let mandate = null;
+    if (!order && !sip) {
+      mandate = await MfMandate.findOne({
+        $or: [
+          { mandateId: orderId },
+          ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
+        ],
+      });
+    }
+
+    // 4. Fallback: If orderId is a generic simulator token (e.g. REF_...) or not found, match most recent item
+    if (!order && !sip && !mandate) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      sip = await MfSip.findOne({ createdAt: { $gte: oneHourAgo } }).sort({ createdAt: -1 });
+      if (!sip) {
+        order = await MfOrder.findOne({ createdAt: { $gte: oneHourAgo } }).sort({ createdAt: -1 });
+      }
+    }
+
+    if (!order && !sip && !mandate) {
       return res.status(404).send(`
         <!DOCTYPE html>
         <html>
-        <head><title>Order Not Found</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-        <body style="font-family: -apple-system, sans-serif; text-align: center; padding: 40px; background: #0F172A; color: #fff;">
-          <h2>Order Not Found</h2>
-          <p>The specified mutual fund order does not exist.</p>
+        <head>
+          <title>Order Not Found - GoldVikaone</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+            .card { background: #161F30; border: 1px solid #1E293B; border-radius: 20px; max-width: 440px; width: 100%; padding: 32px 24px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+            .icon-circle { width: 68px; height: 68px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); color: #EF4444; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; font-weight: bold; }
+            h2 { font-size: 20px; margin-bottom: 8px; color: #FFFFFF; }
+            p { font-size: 13px; color: #94A3B8; margin-bottom: 24px; line-height: 1.5; }
+            .btn { display: block; width: 100%; padding: 14px; background: #334155; color: #FFFFFF; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon-circle">✕</div>
+            <h2>Order Not Found</h2>
+            <p>The transaction reference (<code>${orderId}</code>) could not be located or has expired.</p>
+            <button class="btn" onclick="window.close();">Return to App</button>
+          </div>
         </body>
         </html>
       `);
     }
 
-    // Auto-confirm in sandbox if not already SUCCESS
+    // ── SCENARIO A: SIP REGISTRATION SIMULATION ──
+    if (sip) {
+      if (sip.status !== 'ACTIVE') {
+        sip.status = 'ACTIVE';
+        sip.installmentsPaid = Math.max(sip.installmentsPaid || 0, 1);
+        sip.totalAmountPaid = Math.max(sip.totalAmountPaid || 0, sip.installmentAmount);
+        await sip.save();
+
+        try {
+          const existingFirstOrder = await MfOrder.findOne({
+            user: sip.user,
+            schemeCode: sip.schemeCode,
+            remarks: { $regex: sip.sipRegNo },
+          });
+
+          if (!existingFirstOrder) {
+            const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode });
+            const nav = scheme?.nav || 100;
+            const units = Number((sip.installmentAmount / nav).toFixed(3));
+            await MfOrder.create({
+              user: sip.user,
+              clientCode: sip.clientCode,
+              orderId: `MF_SIP_${Date.now()}`,
+              schemeCode: sip.schemeCode,
+              schemeName: sip.schemeName,
+              transactionType: 'P',
+              orderAmount: sip.installmentAmount,
+              units,
+              navAtOrder: nav,
+              paymentMode: 'MANDATE',
+              paymentStatus: 'SUCCESS',
+              nseStatus: 'ALLOTTED (SANDBOX)',
+              remarks: `SIP First Installment for RegNo: ${sip.sipRegNo}`,
+            });
+          }
+        } catch (orderErr) {
+          console.warn('[renderCheckoutSimulator] SIP 1st installment creation warning:', orderErr.message);
+        }
+      }
+
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>NSE MFSS SIP Confirmation</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+            .card { background: #161F30; border: 1px solid #1E293B; border-radius: 20px; max-width: 440px; width: 100%; padding: 28px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+            .badge { display: inline-block; padding: 6px 14px; border-radius: 50px; background: rgba(0, 208, 156, 0.15); color: #00D09C; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; }
+            .icon-circle { width: 68px; height: 68px; border-radius: 50%; background: #00D09C; color: #0B0F19; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; font-weight: bold; }
+            h1 { font-size: 20px; margin-bottom: 8px; color: #FFFFFF; }
+            p.sub { font-size: 13px; color: #94A3B8; margin-bottom: 24px; }
+            .details { background: #0F172A; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 24px; border: 1px solid #1E293B; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+            .row:last-child { margin-bottom: 0; }
+            .label { color: #64748B; }
+            .val { color: #F1F5F9; font-weight: 600; }
+            .highlight { color: #D4A017; font-size: 16px; font-weight: 700; }
+            .btn { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #D4A017, #F59E0B); color: #0B0F19; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform 0.1s; }
+            .btn:active { transform: scale(0.98); }
+            .footer { margin-top: 18px; font-size: 11px; color: #64748B; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="badge">⚡ NSE MFSS SIP Mandate Verified</div>
+            <div class="icon-circle">✓</div>
+            <h1>SIP Setup Successful</h1>
+            <p class="sub">Your SIP has been registered with NSE and the 1st installment is paid.</p>
+
+            <div class="details">
+              <div class="row">
+                <span class="label">SIP Reg No</span>
+                <span class="val">${sip.sipRegNo}</span>
+              </div>
+              <div class="row">
+                <span class="label">Scheme</span>
+                <span class="val" style="max-width: 220px; text-align: right; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${sip.schemeName}</span>
+              </div>
+              <div class="row">
+                <span class="label">Installment Amount</span>
+                <span class="val highlight">₹${sip.installmentAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div class="row">
+                <span class="label">Frequency</span>
+                <span class="val">${sip.frequency}</span>
+              </div>
+              <div class="row">
+                <span class="label">Start Date</span>
+                <span class="val">${new Date(sip.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div class="row">
+                <span class="label">SIP Status</span>
+                <span class="val" style="color: #00D09C;">ACTIVE (VERIFIED)</span>
+              </div>
+            </div>
+
+            <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
+            <div class="footer">National Stock Exchange of India (NSE NMF II) Sandbox Simulator</div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // ── SCENARIO B: MANDATE AUTHORIZATION SIMULATION ──
+    if (mandate) {
+      if (mandate.status !== 'APPROVED') {
+        mandate.status = 'APPROVED';
+        await mandate.save();
+      }
+
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>NSE eNACH Mandate Authorization</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+            body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+            .card { background: #161F30; border: 1px solid #1E293B; border-radius: 20px; max-width: 440px; width: 100%; padding: 28px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+            .badge { display: inline-block; padding: 6px 14px; border-radius: 50px; background: rgba(0, 208, 156, 0.15); color: #00D09C; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; }
+            .icon-circle { width: 68px; height: 68px; border-radius: 50%; background: #00D09C; color: #0B0F19; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; font-weight: bold; }
+            h1 { font-size: 20px; margin-bottom: 8px; color: #FFFFFF; }
+            p.sub { font-size: 13px; color: #94A3B8; margin-bottom: 24px; }
+            .details { background: #0F172A; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 24px; border: 1px solid #1E293B; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+            .row:last-child { margin-bottom: 0; }
+            .label { color: #64748B; }
+            .val { color: #F1F5F9; font-weight: 600; }
+            .highlight { color: #D4A017; font-size: 16px; font-weight: 700; }
+            .btn { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #D4A017, #F59E0B); color: #0B0F19; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform 0.1s; }
+            .btn:active { transform: scale(0.98); }
+            .footer { margin-top: 18px; font-size: 11px; color: #64748B; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="badge">🏦 NSE eNACH Mandate Approved</div>
+            <div class="icon-circle">✓</div>
+            <h1>Mandate Authorized</h1>
+            <p class="sub">Your auto-debit bank mandate for Mutual Fund investments is verified.</p>
+
+            <div class="details">
+              <div class="row">
+                <span class="label">Mandate ID</span>
+                <span class="val">${mandate.mandateId}</span>
+              </div>
+              <div class="row">
+                <span class="label">Bank Account</span>
+                <span class="val">${mandate.accountNo ? mandate.accountNo.replace(/\\d(?=\\d{4})/g, '*') : 'Verified Account'}</span>
+              </div>
+              <div class="row">
+                <span class="label">IFSC</span>
+                <span class="val">${mandate.ifsc || 'Verified'}</span>
+              </div>
+              <div class="row">
+                <span class="label">Maximum Limit</span>
+                <span class="val highlight">₹${(mandate.amount || 50000).toLocaleString('en-IN')}</span>
+              </div>
+              <div class="row">
+                <span class="label">Status</span>
+                <span class="val" style="color: #00D09C;">APPROVED (ACTIVE)</span>
+              </div>
+            </div>
+
+            <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
+            <div class="footer">National Payments Corporation of India (NPCI eNACH) Sandbox</div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // ── SCENARIO C: ONE-TIME PURCHASE (LUMP-SUM) SIMULATION ──
     if (order.paymentStatus !== 'SUCCESS') {
       order.paymentStatus = 'SUCCESS';
       order.nseStatus = 'ALLOTTED (SANDBOX)';
@@ -1295,11 +1533,11 @@ exports.renderCheckoutSimulator = async (req, res) => {
             </div>
             <div class="row">
               <span class="label">Units Allotted</span>
-              <span class="val" style="color: #00D09C;">${order.units.toFixed(3)} units</span>
+              <span class="val" style="color: #00D09C;">${(order.units || 0).toFixed(3)} units</span>
             </div>
             <div class="row">
               <span class="label">NAV at Order</span>
-              <span class="val">₹${order.navAtOrder.toFixed(2)}</span>
+              <span class="val">₹${(order.navAtOrder || 0).toFixed(2)}</span>
             </div>
             <div class="row">
               <span class="label">Payment Status</span>

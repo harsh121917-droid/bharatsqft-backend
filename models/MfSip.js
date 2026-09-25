@@ -19,6 +19,11 @@ const MfSipSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    sipRefNo: {
+      type: String,
+      default: '',
+      index: true,
+    },
     schemeCode: {
       type: String,
       required: true,
