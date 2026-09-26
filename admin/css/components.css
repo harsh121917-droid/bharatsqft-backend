@@ -109,11 +109,11 @@
 .form-control,
 .search-bar {
     width: 100%;
-    background: var(--surface2);
+    background: var(--surface2, #181d29) !important;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 0.7rem 1rem;
-    color: var(--text);
+    color: var(--text, #f8fafc) !important;
     font-family: var(--font);
     font-size: 14px;
     outline: none;
@@ -123,13 +123,14 @@
 .form-control:focus,
 .search-bar:focus {
     border-color: var(--gold);
-    background: var(--surface3);
+    background: var(--surface3, #1f2536) !important;
+    color: #ffffff !important;
     box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.15);
 }
 
 .form-control::placeholder,
 .search-bar::placeholder {
-    color: var(--text-dim);
+    color: var(--text-dim, #64748b) !important;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
