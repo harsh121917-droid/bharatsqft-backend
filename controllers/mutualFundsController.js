@@ -310,9 +310,10 @@ exports.getSchemes = async (req, res) => {
     }
 
     // ── Multi-word Tokenized Fuzzy Search ──
-    // e.g. "uti health" will match "UTI - Healthcare Fund" or "UTI Health Care"
+    // e.g. "uti health" or "UTI - He" will cleanly split and match "UTI - Healthcare Fund"
     if (search && search.trim()) {
-      const tokens = search.trim().split(/\s+/).filter(Boolean);
+      const cleanSearch = search.replace(/[^a-zA-Z0-9\s]/g, ' ');
+      const tokens = cleanSearch.trim().split(/\s+/).filter(Boolean);
       if (tokens.length === 1) {
         const safe = tokens[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const tokenQuery = [
