@@ -221,7 +221,22 @@ exports.getSchemes = async (req, res) => {
   try {
     await seedDefaultSchemesIfEmpty();
 
-    const { category, search, sort = 'rating', page = 1, limit = 20 } = req.query;
+    const {
+      category,
+      categories,
+      subCategory,
+      subCategories,
+      riskLevel,
+      risks,
+      rating,
+      minRating,
+      ratings,
+      search,
+      sort = 'rating',
+      page = 1,
+      limit = 20,
+    } = req.query;
+
     // STRICT FISDOM MODEL: Only active Regular plans, never Direct plans
     const query = {
       isActive: true,
@@ -229,8 +244,59 @@ exports.getSchemes = async (req, res) => {
       schemeName: { $not: { $regex: 'direct', $options: 'i' } },
     };
 
-    if (category && category !== 'All') {
-      query.category = category;
+    // Category filtering (single or multiple)
+    const rawCategories = categories || category;
+    if (rawCategories && rawCategories !== 'All') {
+      const catList = Array.isArray(rawCategories)
+        ? rawCategories
+        : rawCategories.split(',').map((c) => c.trim()).filter(Boolean);
+      if (catList.length === 1 && catList[0] !== 'All') {
+        query.category = catList[0];
+      } else if (catList.length > 1) {
+        query.category = { $in: catList };
+      }
+    }
+
+    // Sub-Category filtering (e.g. Flexi Cap, Large Cap, Small Cap, etc.)
+    const rawSubCategories = subCategories || subCategory;
+    if (rawSubCategories && rawSubCategories !== 'All') {
+      const subCatList = Array.isArray(rawSubCategories)
+        ? rawSubCategories
+        : rawSubCategories.split(',').map((s) => s.trim()).filter(Boolean);
+      if (subCatList.length === 1) {
+        query.subCategory = { $regex: subCatList[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+      } else if (subCatList.length > 1) {
+        query.$or = subCatList.map((sc) => ({
+          subCategory: { $regex: sc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
+        }));
+      }
+    }
+
+    // Risk level filtering (e.g. Low, Moderate, High, Very High)
+    const rawRisks = risks || riskLevel;
+    if (rawRisks && rawRisks !== 'All') {
+      const riskList = Array.isArray(rawRisks)
+        ? rawRisks
+        : rawRisks.split(',').map((r) => r.trim()).filter(Boolean);
+      if (riskList.length === 1) {
+        query.riskLevel = { $regex: riskList[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+      } else if (riskList.length > 1) {
+        query.riskLevel = { $in: riskList };
+      }
+    }
+
+    // Rating filtering
+    if (minRating) {
+      query.rating = { $gte: Number(minRating) };
+    } else if (ratings) {
+      const ratingList = (Array.isArray(ratings) ? ratings : ratings.split(','))
+        .map((r) => Number(r.trim()))
+        .filter((n) => !isNaN(n));
+      if (ratingList.length > 0) {
+        query.rating = { $in: ratingList };
+      }
+    } else if (rating) {
+      query.rating = Number(rating);
     }
 
     if (req.query.featured === 'true' || req.query.isFeatured === 'true') {
@@ -239,22 +305,66 @@ exports.getSchemes = async (req, res) => {
     if (req.query.recommended === 'true' || req.query.isRecommended === 'true') {
       query.isRecommended = true;
     }
-
-    if (search) {
-      query.$or = [
-        { schemeName: { $regex: search, $options: 'i' } },
-        { amcName: { $regex: search, $options: 'i' } },
-        { schemeCode: { $regex: search, $options: 'i' } },
-        { subCategory: { $regex: search, $options: 'i' } },
-      ];
+    if (req.query.popular === 'true' || req.query.isPopular === 'true') {
+      query.isPopular = true;
     }
 
+    // ── Multi-word Tokenized Fuzzy Search ──
+    // e.g. "uti health" will match "UTI - Healthcare Fund" or "UTI Health Care"
+    if (search && search.trim()) {
+      const tokens = search.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length === 1) {
+        const safe = tokens[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const tokenQuery = [
+          { schemeName: { $regex: safe, $options: 'i' } },
+          { amcName: { $regex: safe, $options: 'i' } },
+          { schemeCode: { $regex: safe, $options: 'i' } },
+          { subCategory: { $regex: safe, $options: 'i' } },
+        ];
+        if (query.$or) {
+          query.$and = [{ $or: tokenQuery }, { $or: query.$or }];
+          delete query.$or;
+        } else {
+          query.$or = tokenQuery;
+        }
+      } else if (tokens.length > 1) {
+        const tokenAndConditions = tokens.map((token) => {
+          const safe = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return {
+            $or: [
+              { schemeName: { $regex: safe, $options: 'i' } },
+              { amcName: { $regex: safe, $options: 'i' } },
+              { schemeCode: { $regex: safe, $options: 'i' } },
+              { subCategory: { $regex: safe, $options: 'i' } },
+            ],
+          };
+        });
+
+        if (query.$or) {
+          tokenAndConditions.push({ $or: query.$or });
+          delete query.$or;
+        }
+        query.$and = (query.$and || []).concat(tokenAndConditions);
+      }
+    }
+
+    // ── Sorting ──
     let sortOption = { rating: -1, cagr3Y: -1 };
-    if (sort === 'returns1y') sortOption = { cagr1Y: -1 };
-    if (sort === 'returns3y') sortOption = { cagr3Y: -1 };
-    if (sort === 'returns5y') sortOption = { cagr5Y: -1 };
-    if (sort === 'nav') sortOption = { nav: 1 };
-    if (sort === 'aum') sortOption = { aum: -1 };
+    if (sort === 'popularity' || sort === 'popular') {
+      sortOption = { isPopular: -1, aum: -1, rating: -1, cagr3Y: -1 };
+    } else if (sort === 'returns1y' || sort === '1Y Returns') {
+      sortOption = { cagr1Y: -1 };
+    } else if (sort === 'returns3y' || sort === '3Y Returns' || sort === '3Y Re') {
+      sortOption = { cagr3Y: -1 };
+    } else if (sort === 'returns5y' || sort === '5Y Returns' || sort === '5Y') {
+      sortOption = { cagr5Y: -1 };
+    } else if (sort === 'rating' || sort === 'Rating') {
+      sortOption = { rating: -1, cagr3Y: -1 };
+    } else if (sort === 'nav') {
+      sortOption = { nav: 1 };
+    } else if (sort === 'aum') {
+      sortOption = { aum: -1 };
+    }
 
     const schemes = await MutualFundScheme.find(query)
       .sort(sortOption)
