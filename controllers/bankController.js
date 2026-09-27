@@ -1,4 +1,45 @@
 const BankAccount = require("../models/BankAccount");
+const Kyc = require("../models/Kyc");
+const MfClientUcc = require("../models/MfClientUcc");
+
+// Helper to sync bank details to KYC and MF UCC
+async function syncUserBank(userId, bankAccount) {
+    if (!userId) return;
+    try {
+        if (bankAccount) {
+            await Kyc.findOneAndUpdate(
+                { user: userId },
+                {
+                    $set: {
+                        bankDetails: {
+                            accountHolderName: bankAccount.accountHolder,
+                            accountNumber: bankAccount.accountNumber,
+                            ifscCode: bankAccount.ifsc,
+                            bankName: bankAccount.bankName,
+                        }
+                    }
+                }
+            );
+            await MfClientUcc.findOneAndUpdate(
+                { user: userId },
+                {
+                    $set: {
+                        primaryBank: {
+                            accountNo: bankAccount.accountNumber,
+                            ifsc: bankAccount.ifsc,
+                            bankName: bankAccount.bankName,
+                            accountType: bankAccount.accountType || "SB",
+                        }
+                    }
+                }
+            );
+        } else {
+            await Kyc.findOneAndUpdate({ user: userId }, { $unset: { bankDetails: 1 } });
+        }
+    } catch (err) {
+        console.warn("[syncUserBank warning]:", err.message);
+    }
+}
 
 // ── GET /api/bank  — list user's bank accounts ────────────────────────────────
 exports.getAccounts = async (req, res, next) => {
@@ -26,12 +67,17 @@ exports.addAccount = async (req, res, next) => {
         }
         // If first account — make default
         const count = await BankAccount.countDocuments({ user: req.user._id });
+        const isDefault = count === 0;
         const account = await BankAccount.create({
             user: req.user._id, accountHolder,
             accountNumber, ifsc: ifsc.toUpperCase(),
             bankName, accountType: accountType || "savings",
-            isDefault: count === 0,
+            isDefault,
         });
+
+        // Sync to KYC & Mutual Funds profile
+        await syncUserBank(req.user._id, account);
+
         res.status(201).json({ success: true, message: "Bank account added", data: account });
     } catch (err) { next(err); }
 };
@@ -44,6 +90,10 @@ exports.setDefault = async (req, res, next) => {
         await BankAccount.updateMany({ user: req.user._id }, { isDefault: false });
         account.isDefault = true;
         await account.save();
+
+        // Sync new default to KYC & Mutual Funds profile
+        await syncUserBank(req.user._id, account);
+
         res.json({ success: true, message: "Default account updated", data: account });
     } catch (err) { next(err); }
 };
@@ -53,11 +103,17 @@ exports.deleteAccount = async (req, res, next) => {
     try {
         const account = await BankAccount.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         if (!account) return res.status(404).json({ success: false, message: "Account not found" });
-        // If deleted was default, set next one as default
-        if (account.isDefault) {
-            const next = await BankAccount.findOne({ user: req.user._id });
-            if (next) { next.isDefault = true; await next.save(); }
+
+        // If deleted was default or active, pick the next available bank account
+        const next = await BankAccount.findOne({ user: req.user._id }).sort({ isDefault: -1, createdAt: -1 });
+        if (next) {
+            next.isDefault = true;
+            await next.save();
+            await syncUserBank(req.user._id, next);
+        } else {
+            await syncUserBank(req.user._id, null);
         }
+
         res.json({ success: true, message: "Bank account removed" });
     } catch (err) { next(err); }
 };

@@ -400,7 +400,7 @@ exports.getUserById = async (req, res, next) => {
             CopperBalance.findOne({ user: user._id }),
             Investment.find({ user: user._id }).populate("property").sort({ createdAt: -1 }),
             Kyc.findOne({ user: user._id }),
-            BankAccount.findOne({ user: user._id }),
+            BankAccount.findOne({ user: user._id }).sort({ isDefault: -1, updatedAt: -1, createdAt: -1 }),
             Sip.find({ user: user._id }).sort({ createdAt: -1 }),
             SchemeEnrollment.find({ user: user._id }).sort({ createdAt: -1 }),
             GoldRate.findOne({ isActive: true }).sort({ createdAt: -1 }),
@@ -595,7 +595,15 @@ exports.getUserById = async (req, res, next) => {
                     walletBalance
                 },
                 kyc: kycDoc || null,
-                bank: bankDoc || (kycDoc?.bankDetails ? {
+                bank: bankDoc ? {
+                    bankName: bankDoc.bankName || "Linked Bank",
+                    accountHolder: bankDoc.accountHolder || user.name,
+                    accountNumber: bankDoc.accountNumber || "",
+                    ifsc: bankDoc.ifsc || "",
+                    accountType: bankDoc.accountType || "savings",
+                    isDefault: bankDoc.isDefault,
+                    isVerified: bankDoc.isVerified || (kycDoc?.status === "approved")
+                } : (kycDoc?.bankDetails ? {
                     bankName: kycDoc.bankDetails.bankName || "Linked Bank",
                     accountHolder: kycDoc.bankDetails.accountHolderName || user.name,
                     accountNumber: kycDoc.bankDetails.accountNumber || "",
