@@ -944,3 +944,82 @@ exports.verifyCashfreePan = async (req, res, next) => {
         next(err);
     }
 };
+
+/* ─────────────────────────────────────────
+   PATCH /api/admin/kyc/:id/bank
+   Admin: update or add bank details for a KYC submission
+───────────────────────────────────────── */
+exports.updateKycBank = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { bankName, accountNumber, ifscCode, accountHolderName, accountType } = req.body;
+
+        if (!accountNumber || !ifscCode) {
+            return res.status(400).json({ success: false, message: "Account number and IFSC code are required" });
+        }
+
+        const kyc = await Kyc.findById(id).populate("user", "name email phone");
+        if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
+
+        const userId = kyc.user?._id || kyc.user;
+        const holder = accountHolderName || kyc.fullName || kyc.user?.name || "Account Holder";
+
+        kyc.bankDetails = {
+            bankName: bankName || "Linked Bank",
+            accountHolderName: holder,
+            accountNumber: accountNumber.trim(),
+            ifscCode: ifscCode.trim().toUpperCase(),
+        };
+        await kyc.save();
+
+        // Also sync to BankAccount model
+        const BankAccount = require("../models/BankAccount");
+        let bank = await BankAccount.findOne({ user: userId, accountNumber: accountNumber.trim() });
+        if (!bank) {
+            bank = await BankAccount.create({
+                user: userId,
+                accountHolder: holder,
+                accountNumber: accountNumber.trim(),
+                ifsc: ifscCode.trim().toUpperCase(),
+                bankName: bankName || "Linked Bank",
+                accountType: accountType || "savings",
+                isDefault: true,
+                isVerified: true,
+            });
+            await BankAccount.updateMany({ user: userId, _id: { $ne: bank._id } }, { isDefault: false });
+        } else {
+            bank.accountHolder = holder;
+            bank.ifsc = ifscCode.trim().toUpperCase();
+            bank.bankName = bankName || bank.bankName;
+            bank.isDefault = true;
+            bank.isVerified = true;
+            await bank.save();
+        }
+
+        // Also sync to MfClientUcc if user has one
+        try {
+            const MfClientUcc = require("../models/MfClientUcc");
+            await MfClientUcc.findOneAndUpdate(
+                { user: userId },
+                {
+                    $set: {
+                        primaryBank: {
+                            accountNo: accountNumber.trim(),
+                            ifsc: ifscCode.trim().toUpperCase(),
+                            bankName: bankName || "Linked Bank",
+                            accountType: accountType || "SB",
+                        }
+                    }
+                }
+            );
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: "Bank details updated successfully",
+            data: kyc.bankDetails,
+        });
+    } catch (err) {
+        next(err);
+    }
+};

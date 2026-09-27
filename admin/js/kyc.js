@@ -233,12 +233,47 @@ async function openKycModal(id) {
 
             <!-- Bank Details -->
             <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
-                <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Bank Account for Payouts</div>
-                <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-top:8px;font-size:13px">
-                    <div><strong>Bank:</strong> ${bank.bankName || '—'}</div>
-                    <div><strong>Account Holder:</strong> ${bank.accountHolderName || '—'}</div>
-                    <div><strong>A/C No:</strong> <span style="font-family:var(--font-mono)">${bank.accountNumber || '—'}</span></div>
-                    <div><strong>IFSC:</strong> <span style="font-family:var(--font-mono)">${bank.ifscCode || '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">Bank Account for Payouts</div>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEditBankForm()" style="font-size:11px;padding:3px 8px;cursor:pointer">
+                        <i class="fas fa-edit"></i> Edit / Add Bank
+                    </button>
+                </div>
+                <div id="kyc-bank-display" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-top:8px;font-size:13px">
+                    <div><strong>Bank:</strong> <span id="kyc-bank-name">${bank.bankName || '—'}</span></div>
+                    <div><strong>Account Holder:</strong> <span id="kyc-bank-holder">${bank.accountHolderName || '—'}</span></div>
+                    <div><strong>A/C No:</strong> <span id="kyc-bank-acc" style="font-family:var(--font-mono)">${bank.accountNumber || '—'}</span></div>
+                    <div><strong>IFSC:</strong> <span id="kyc-bank-ifsc" style="font-family:var(--font-mono)">${bank.ifscCode || '—'}</span></div>
+                </div>
+
+                <!-- Hidden Inline Form to Edit / Add Bank -->
+                <div id="kyc-bank-edit-form" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)">
+                    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px">
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Bank Name</label>
+                            <input type="text" id="edit-bank-name" class="form-control form-control-sm" value="${bank.bankName || ''}" placeholder="e.g. State Bank of India" style="font-size:12px" />
+                        </div>
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Account Holder Name</label>
+                            <input type="text" id="edit-bank-holder" class="form-control form-control-sm" value="${bank.accountHolderName || k.fullName || u.name || ''}" placeholder="Full Name" style="font-size:12px" />
+                        </div>
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Account Number</label>
+                            <input type="text" id="edit-bank-acc" class="form-control form-control-sm" value="${bank.accountNumber || ''}" placeholder="e.g. 123456789012" style="font-size:12px;font-family:var(--font-mono)" />
+                        </div>
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">IFSC Code</label>
+                            <input type="text" id="edit-bank-ifsc" class="form-control form-control-sm" value="${bank.ifscCode || ''}" placeholder="e.g. SBIN0001234" style="font-size:12px;font-family:var(--font-mono);text-transform:uppercase" />
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:10px">
+                        <button type="button" class="btn btn-sm btn-success" onclick="saveKycBankDetails('${k._id}')" style="font-size:12px;padding:5px 14px">
+                            <i class="fas fa-save"></i> Save Bank Details
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditBankForm()" style="font-size:12px;padding:5px 10px">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -419,3 +454,48 @@ async function reviewSoldierKyc(decision) {
     }
 }
 
+
+
+function toggleEditBankForm() {
+    const form = document.getElementById("kyc-bank-edit-form");
+    if (form) {
+        form.style.display = form.style.display === "none" ? "block" : "none";
+    }
+}
+
+async function saveKycBankDetails(kycId) {
+    const bankName = document.getElementById("edit-bank-name")?.value.trim();
+    const accountHolderName = document.getElementById("edit-bank-holder")?.value.trim();
+    const accountNumber = document.getElementById("edit-bank-acc")?.value.trim();
+    const ifscCode = document.getElementById("edit-bank-ifsc")?.value.trim().toUpperCase();
+
+    if (!accountNumber || !ifscCode) {
+        showToast("Account number and IFSC code are required", "error");
+        return;
+    }
+
+    try {
+        const res = await apiFetch(`/api/admin/kyc/${kycId}/bank`, {
+            method: "PATCH",
+            body: JSON.stringify({ bankName, accountHolderName, accountNumber, ifscCode }),
+        });
+
+        if (res && res.success) {
+            showToast("Bank details updated successfully!", "success");
+            const bankNameEl = document.getElementById("kyc-bank-name");
+            const bankHolderEl = document.getElementById("kyc-bank-holder");
+            const bankAccEl = document.getElementById("kyc-bank-acc");
+            const bankIfscEl = document.getElementById("kyc-bank-ifsc");
+            if (bankNameEl) bankNameEl.textContent = bankName || "Linked Bank";
+            if (bankHolderEl) bankHolderEl.textContent = accountHolderName || "—";
+            if (bankAccEl) bankAccEl.textContent = accountNumber;
+            if (bankIfscEl) bankIfscEl.textContent = ifscCode;
+            toggleEditBankForm();
+            loadKycList();
+        } else {
+            showToast(res?.message || "Failed to update bank details", "error");
+        }
+    } catch (e) {
+        showToast("Error updating bank details: " + e.message, "error");
+    }
+}

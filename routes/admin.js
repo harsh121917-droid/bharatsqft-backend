@@ -38,7 +38,7 @@ const {
   deleteProperty, toggleStatus,
 } = require("../controllers/propertyController");
 const { getAllInvestments } = require("../controllers/paymentController");
-const { getAllKyc, getKycById, reviewKyc, reviewSoldierKyc } = require("../controllers/kycController");
+const { getAllKyc, getKycById, reviewKyc, reviewSoldierKyc, updateKycBank } = require("../controllers/kycController");
 const { enrollmentDetail } = require("../controllers/schemeController");
 const {
   getAllHomeVideos,
@@ -111,6 +111,7 @@ router.get("/kyc", getAllKyc);
 router.get("/kyc/:id", getKycById);
 router.patch("/kyc/:id", reviewKyc);
 router.patch("/kyc/:id/soldier-status", reviewSoldierKyc);
+router.patch("/kyc/:id/bank", updateKycBank);
 
 // Withdrawals
 router.get("/withdrawals", getWithdrawals);
