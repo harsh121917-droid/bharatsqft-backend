@@ -2426,9 +2426,13 @@ exports.verifyPanDetails = async (req, res) => {
           ? 'https://api.cashfree.com/verification/pan'
           : 'https://sandbox.cashfree.com/verification/pan';
 
+        const verificationId = `pan_ver_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const cfRes = await axios.post(
           cfUrl,
-          { pan: panClean },
+          {
+            verification_id: verificationId,
+            pan: panClean,
+          },
           {
             headers: {
               'x-client-id': cfClientId,
@@ -2436,13 +2440,17 @@ exports.verifyPanDetails = async (req, res) => {
               'x-api-version': '2023-08-01',
               'Content-Type': 'application/json',
             },
-            timeout: 6000,
+            timeout: 7000,
           }
         );
 
-        const cfData = cfRes.data || {};
-        const cfStatus = String(cfData.status || '').toUpperCase();
-        const isValidPan = cfData.valid === true || cfStatus === 'VALID' || cfStatus === 'SUCCESS';
+        const cfData = cfRes.data?.data || cfRes.data || {};
+        const cfStatus = String(cfData.status || cfData.pan_status || '').toUpperCase();
+        const isValidPan = cfData.valid === true ||
+          cfStatus === 'VALID' ||
+          cfStatus === 'SUCCESS' ||
+          cfStatus === 'E' ||
+          cfStatus === 'EXISTING AND VALID';
 
         if (isValidPan) {
           isKraVerified = true;
@@ -2473,10 +2481,17 @@ exports.verifyPanDetails = async (req, res) => {
     // 6. Cross-check existing approved KYC in DB for this user
     try {
       const existingKyc = userId ? await Kyc.findOne({ user: userId, status: 'approved' }).catch(() => null) : null;
-      if (existingKyc && existingKyc.panNumber === panClean && existingKyc.fullName) {
-        if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
-        isKraVerified = true;
-        verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
+      if (existingKyc && existingKyc.fullName) {
+        const panMatches = existingKyc.panNumber === panClean || existingKyc.panNumber === 'PHOTO_SUBMITTED';
+        if (panMatches) {
+          if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
+          isKraVerified = true;
+          verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
+          if (existingKyc.panNumber === 'PHOTO_SUBMITTED') {
+            existingKyc.panNumber = panClean;
+            await existingKyc.save().catch(() => null);
+          }
+        }
       }
     } catch (_) {}
 
@@ -2495,13 +2510,15 @@ exports.verifyPanDetails = async (req, res) => {
       });
     }
 
-    // Fallback name only if verified on NSE/KRA but name was redacted or omitted
     if (!registeredName) {
-      if (user && user.name && user.name !== 'Investor') {
-        registeredName = user.name.toUpperCase();
-      } else {
-        registeredName = 'INVESTOR';
-      }
+      return res.status(400).json({
+        success: false,
+        message: 'Could not fetch registered name for this PAN from exchange or Income Tax records. Please verify the PAN.',
+        data: {
+          pan: panClean,
+          isValid: false,
+        },
+      });
     }
 
     return res.json({
