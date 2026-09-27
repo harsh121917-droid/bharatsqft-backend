@@ -2104,3 +2104,197 @@ exports.registerSwpOrder = async (req, res) => {
 };
 
 
+
+
+// ── 17. GET /api/mutual-funds/onboarding-status (Step 1: UCC, Step 2: Mandate) ──
+exports.getOnboardingStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const ucc = await MfClientUcc.findOne({ user: userId });
+
+    if (!ucc) {
+      return res.json({
+        success: true,
+        data: {
+          step: 1,
+          title: 'Complete Investor Account (Step 1 of 2)',
+          subtitle: 'SEBI requires a one-time profile (PAN, Bank, Nominee) before investing on NSE MFSS.',
+          clientCode: null,
+          hasUcc: false,
+          uccStatus: 'NOT_REGISTERED',
+          hasMandate: false,
+          mandateStatus: 'NONE',
+          isSipReady: false,
+          isLumpSumReady: false,
+        },
+      });
+    }
+
+    const mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
+    const isMandateApproved = !!(
+      mandate &&
+      (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE')
+    );
+
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    const authUrl = mandate?.authLink || (mandate ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox` : null);
+
+    if (!isMandateApproved) {
+      return res.json({
+        success: true,
+        data: {
+          step: 2,
+          title: 'Set Up Bank AutoPay (Step 2 of 2)',
+          subtitle: `Client Code: ${ucc.clientCode}. Authorize your one-time bank mandate to automate monthly SIP investments on NSE.`,
+          clientCode: ucc.clientCode,
+          hasUcc: true,
+          uccStatus: ucc.nseStatus || 'ACTIVE',
+          hasMandate: !!mandate,
+          mandateStatus: mandate ? mandate.status : 'NONE',
+          mandateId: mandate ? mandate.mandateId : null,
+          authUrl,
+          bankName: ucc.primaryBank?.bankName || '',
+          accountNo: ucc.primaryBank?.accountNo || '',
+          isSipReady: false,
+          isLumpSumReady: true, // Lump sum CAN be invested via UPI/Netbanking right now!
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        step: 3,
+        title: 'Investor Account Active & AutoPay Ready',
+        subtitle: 'Your profile and bank mandate are verified for real-time investments.',
+        clientCode: ucc.clientCode,
+        hasUcc: true,
+        uccStatus: ucc.nseStatus || 'ACTIVE',
+        hasMandate: true,
+        mandateStatus: mandate.status,
+        mandateId: mandate.mandateId,
+        bankName: mandate.bankName || ucc.primaryBank?.bankName || '',
+        accountNo: mandate.accountNo || ucc.primaryBank?.accountNo || '',
+        isSipReady: true,
+        isLumpSumReady: true,
+      },
+    });
+  } catch (error) {
+    console.error('[getOnboardingStatus Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 18. POST /api/mutual-funds/mandates/setup (Generate or Fetch Mandate Link) ──
+exports.setupUserMandate = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(400).json({ success: false, message: 'Please complete your investor profile (UCC) first.' });
+    }
+
+    const { amount = 50000 } = req.body;
+    let mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
+
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+
+    if (!mandate) {
+      const mandateId = `MND_${Date.now()}`;
+      let authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
+
+      try {
+        if (!nseClient.isMockMode()) {
+          const nseRes = await nseClient.registerMandate([
+            {
+              client_code: ucc.clientCode,
+              mandate_type: 'E',
+              amount: String(amount),
+              acc_no: ucc.primaryBank?.accountNo,
+              ifsc_code: ucc.primaryBank?.ifsc,
+            },
+          ]);
+          if (nseRes?.success && nseRes?.data?.reg_data?.[0]?.mandate_id) {
+            const liveMandateId = nseRes.data.reg_data[0].mandate_id;
+            const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
+            if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
+              authLink = shortLinkRes.data.firstHolderLink;
+            }
+          }
+        }
+      } catch (nseErr) {
+        console.warn('[setupUserMandate NSE Warning]:', nseErr.message);
+      }
+
+      mandate = await MfMandate.create({
+        user: userId,
+        clientCode: ucc.clientCode,
+        mandateId,
+        amount: Number(amount),
+        mandateType: 'E',
+        accountNo: ucc.primaryBank?.accountNo || '',
+        ifsc: ucc.primaryBank?.ifsc || '',
+        bankName: ucc.primaryBank?.bankName || '',
+        status: 'PENDING_AUTH',
+        authLink,
+      });
+
+      ucc.defaultMandateId = mandate.mandateId;
+      await ucc.save();
+    } else if (!mandate.authLink) {
+      mandate.authLink = `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox`;
+      await mandate.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Mandate setup link generated successfully',
+      data: {
+        mandateId: mandate.mandateId,
+        status: mandate.status,
+        authUrl: mandate.authLink,
+        amount: mandate.amount,
+        bankName: mandate.bankName,
+        accountNo: mandate.accountNo,
+      },
+    });
+  } catch (error) {
+    console.error('[setupUserMandate Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 19. POST /api/mutual-funds/mandates/:id/verify (Verify / Approve Mandate) ──
+exports.verifyUserMandate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const mandate = await MfMandate.findOne({
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { mandateId: id }],
+      user: userId,
+    });
+
+    if (!mandate) {
+      return res.status(404).json({ success: false, message: 'Mandate record not found' });
+    }
+
+    mandate.status = 'APPROVED';
+    await mandate.save();
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (ucc) {
+      ucc.defaultMandateId = mandate.mandateId;
+      await ucc.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Bank AutoPay Mandate authorized and approved successfully!',
+      data: mandate,
+    });
+  } catch (error) {
+    console.error('[verifyUserMandate Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

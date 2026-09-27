@@ -20,6 +20,9 @@ const {
   createSwitchOrder,
   registerStpOrder,
   registerSwpOrder,
+  getOnboardingStatus,
+  setupUserMandate,
+  verifyUserMandate,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -33,6 +36,9 @@ router.post('/sync-nav', syncNavsNow);
 // ── Protected Routes (User-specific transactions & portfolio) ──
 router.use(protect);
 
+router.get('/onboarding-status', getOnboardingStatus);
+router.post('/mandates/setup', setupUserMandate);
+router.post('/mandates/:id/verify', verifyUserMandate);
 router.get('/ucc/me', getUserUcc);
 router.post('/ucc/register', registerUserUcc);
 router.post('/orders/purchase', createPurchaseOrder);
