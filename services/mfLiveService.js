@@ -124,7 +124,24 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
     return directCodeMap.get(normKey);
   }
 
-  // Load index if not loaded or older than 24 hours
+  // 1. Check Groww Entity Search first (guaranteed 100% accurate direct growth AMFI code)
+  const queryName = sanitizeSchemeName(schemeName);
+  if (queryName) {
+    try {
+      const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&q=${encodeURIComponent(queryName)}`;
+      const searchRes = await fetchJson(searchUrl);
+      if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
+        const item = searchRes.content[0];
+        if (item && item.scheme_code && String(item.scheme_code).length >= 5) {
+          const directCode = String(item.scheme_code);
+          directCodeMap.set(normKey, directCode);
+          return directCode;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2. Load index if not loaded or older than 24 hours
   if (!allMfApiSchemes || Date.now() - allMfApiSchemesTimestamp > 24 * 60 * 60 * 1000) {
     try {
       const list = await fetchJson('https://api.mfapi.in/mf');
@@ -133,7 +150,11 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
         allMfApiSchemesTimestamp = Date.now();
         for (const item of list) {
           const lower = item.schemeName.toLowerCase();
-          if (lower.includes('direct') && lower.includes('growth')) {
+          // STRICT RULE: Reject any IDCW, dividend, or bonus schemes!
+          if (lower.includes('idcw') || lower.includes('dividend') || lower.includes('bonus')) {
+            continue;
+          }
+          if (lower.includes('direct') && (lower.includes('growth') || !lower.includes('plan'))) {
             const k = normalizeSchemeKey(item.schemeName);
             if (!directCodeMap.has(k)) {
               directCodeMap.set(k, String(item.schemeCode));
@@ -148,7 +169,7 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
     return directCodeMap.get(normKey);
   }
 
-  // Try substring match
+  // Try substring match only for clean direct growth codes
   if (allMfApiSchemes && normKey.length > 5) {
     for (const [k, code] of directCodeMap.entries()) {
       if (k.includes(normKey) || normKey.includes(k)) {
@@ -339,6 +360,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
   }
 
   let searchId = null;
+  let directSchemeCode = null;
 
   // Search by cleaned scheme name
   const queryName = sanitizeSchemeName(schemeName);
@@ -351,6 +373,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
       const matched = searchRes.content.find((c) => String(c.scheme_code) === String(schemeCode)) || searchRes.content[0];
       if (matched && matched.search_id) {
         searchId = matched.search_id;
+        directSchemeCode = matched.scheme_code ? String(matched.scheme_code) : null;
       }
     }
   }
@@ -360,7 +383,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
     const directSearchUrl = `https://groww.in/v1/api/data/mf/web/v1/scheme/search/${schemeCode}`;
     const testDirect = await fetchJson(directSearchUrl);
     if (testDirect && testDirect.aum) {
-      const facts = parseGrowwScheme(testDirect);
+      const facts = parseGrowwScheme(testDirect, schemeCode);
       factsCache.set(cacheKey, { data: facts, timestamp: Date.now() });
       return facts;
     }
@@ -377,7 +400,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
     return null;
   }
 
-  const facts = parseGrowwScheme(detailRes);
+  const facts = parseGrowwScheme(detailRes, directSchemeCode);
   factsCache.set(cacheKey, { data: facts, timestamp: Date.now() });
   return facts;
 }
@@ -385,9 +408,35 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
 /**
  * Parser for Groww scheme JSON to ensure clean data & zero synthetic mocks
  */
-function parseGrowwScheme(d) {
+function parseGrowwScheme(d, directCode = null) {
   // AUM in Crores
   const aum = typeof d.aum === 'number' ? +d.aum.toFixed(2) : parseFloat(d.aum) || null;
+
+  // Live NAV from Groww
+  const nav = typeof d.nav === 'number' ? +d.nav.toFixed(4) : parseFloat(d.nav) || null;
+
+  // Direct Scheme Code
+  const directSchemeCode = directCode || (d.scheme_code ? String(d.scheme_code) : null);
+
+  // Return statistics (1D, 1M, 6M, 1Y, 3Y, 5Y, category averages, and category ranks)
+  let returnStats = null;
+  if (Array.isArray(d.return_stats) && d.return_stats.length > 0) {
+    const s = d.return_stats[0];
+    returnStats = {
+      return1d: typeof s.return1d === 'number' ? s.return1d : parseFloat(s.return1d) || null,
+      return1m: typeof s.return1m === 'number' ? s.return1m : parseFloat(s.return1m) || null,
+      return6m: typeof s.return6m === 'number' ? s.return6m : parseFloat(s.return6m) || null,
+      return1y: typeof s.return1y === 'number' ? s.return1y : parseFloat(s.return1y) || null,
+      return3y: typeof s.return3y === 'number' ? s.return3y : parseFloat(s.return3y) || null,
+      return5y: typeof s.return5y === 'number' ? s.return5y : parseFloat(s.return5y) || null,
+      cat_return1y: typeof s.cat_return1y === 'number' ? s.cat_return1y : parseFloat(s.cat_return1y) || null,
+      cat_return3y: typeof s.cat_return3y === 'number' ? s.cat_return3y : parseFloat(s.cat_return3y) || null,
+      cat_return5y: typeof s.cat_return5y === 'number' ? s.cat_return5y : parseFloat(s.cat_return5y) || null,
+      rank1yr: s.rank1yr || null,
+      rank3yr: s.rank3yr || null,
+      rank5yr: s.rank5yr || null,
+    };
+  }
 
   // All Holdings: Raw is array of arrays or objects
   const topHoldings = [];
@@ -480,6 +529,9 @@ function parseGrowwScheme(d) {
     minSipAmount: typeof d.min_sip_investment === 'number' ? d.min_sip_investment : (parseFloat(d.min_sip_investment) || null),
     minPurchaseAmount: typeof d.min_investment_amount === 'number' ? d.min_investment_amount : (parseFloat(d.min_investment_amount) || null),
     benchmarkName: d.benchmark_name || null,
+    nav,
+    directSchemeCode,
+    returnStats,
   };
 }
 

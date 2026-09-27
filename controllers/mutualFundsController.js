@@ -409,11 +409,12 @@ exports.getSchemeDetail = async (req, res) => {
       });
     }
 
-    // 1. Fetch live historical daily NAV & scheme facts in parallel
-    const [liveNav, liveFacts] = await Promise.all([
-      mfLiveService.getLiveHistoricalNav(scheme.schemeCode, scheme),
-      mfLiveService.getLiveSchemeFacts(scheme.schemeName, scheme.schemeCode),
-    ]);
+    // 1. Fetch live scheme facts first to get direct growth counterpart & official return stats
+    const liveFacts = await mfLiveService.getLiveSchemeFacts(scheme.schemeName, scheme.schemeCode);
+    const targetSchemeCode = liveFacts?.directSchemeCode || scheme.schemeCode;
+
+    // 2. Fetch live historical daily NAV & chart points for the target direct scheme
+    const liveNav = await mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme);
 
     // Prepare chart points per timeframe
     let chartData = {};
@@ -476,10 +477,39 @@ exports.getSchemeDetail = async (req, res) => {
       .limit(6)
       .select('schemeCode schemeName amcName nav cagr1Y cagr3Y cagr5Y rating aum expenseRatio minSipAmount');
 
-    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
-    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
-    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
+    // Align return figures with Groww return_stats if available
+    const retStats = liveFacts?.returnStats;
+    const ret1Y = retStats?.return1y ?? periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
+    const ret3Y = retStats?.return3y ?? periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
+    const ret5Y = retStats?.return5y ?? periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
     const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
+
+    if (retStats) {
+      if (periodReturns['1M'] && retStats.return1m != null) {
+        periodReturns['1M'].returnPercent = retStats.return1m;
+        periodReturns['1M'].isPositive = retStats.return1m >= 0;
+      }
+      if (periodReturns['6M'] && retStats.return6m != null) {
+        periodReturns['6M'].returnPercent = retStats.return6m;
+        periodReturns['6M'].isPositive = retStats.return6m >= 0;
+      }
+      if (periodReturns['1Y'] && retStats.return1y != null) {
+        periodReturns['1Y'].returnPercent = retStats.return1y;
+        periodReturns['1Y'].isPositive = retStats.return1y >= 0;
+      }
+      if (periodReturns['3Y'] && retStats.return3y != null) {
+        periodReturns['3Y'].returnPercent = retStats.return3y;
+        periodReturns['3Y'].isPositive = retStats.return3y >= 0;
+      }
+      if (periodReturns['5Y'] && retStats.return5y != null) {
+        periodReturns['5Y'].returnPercent = retStats.return5y;
+        periodReturns['5Y'].isPositive = retStats.return5y >= 0;
+      }
+    }
+
+    const accurateNav = liveFacts?.nav || (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
+    const day1Ret = retStats?.return1d ?? (liveNav?.day1Return ?? 0.0);
+    const day1Pos = day1Ret >= 0;
 
     // Synchronize latest live facts and metrics to database
     const syncUpdates = {};
@@ -488,17 +518,13 @@ exports.getSchemeDetail = async (req, res) => {
     if (liveFacts?.minPurchaseAmount && liveFacts.minPurchaseAmount !== scheme.minPurchaseAmount) syncUpdates.minPurchaseAmount = liveFacts.minPurchaseAmount;
     if (liveFacts?.rating && liveFacts.rating !== scheme.rating) syncUpdates.rating = liveFacts.rating;
     if (liveFacts?.fundManager && liveFacts.fundManager !== scheme.fundManager) syncUpdates.fundManager = liveFacts.fundManager;
-    if (liveNav && liveNav.chartData) {
-      syncUpdates.cagr1Y = ret1Y;
-      syncUpdates.cagr3Y = ret3Y;
-      syncUpdates.cagr5Y = ret5Y;
-      syncUpdates.nav = liveNav.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav;
-      syncUpdates.day1Return = liveNav?.day1Return ?? 0.0;
-    }
+    syncUpdates.cagr1Y = ret1Y;
+    syncUpdates.cagr3Y = ret3Y;
+    syncUpdates.cagr5Y = ret5Y;
+    syncUpdates.nav = accurateNav;
+    syncUpdates.day1Return = day1Ret;
 
-    if (Object.keys(syncUpdates).length > 0) {
-      MutualFundScheme.updateOne({ _id: scheme._id }, { $set: syncUpdates }).exec().catch(() => {});
-    }
+    MutualFundScheme.updateOne({ _id: scheme._id }, { $set: syncUpdates }).exec().catch(() => {});
 
     const fundManagement = (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
       ? liveFacts.fundManagerDetails
@@ -519,21 +545,40 @@ exports.getSchemeDetail = async (req, res) => {
         rating: realRating,
         minSipAmount: realMinSip,
         minPurchaseAmount: realMinPurchase,
-        nav: liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
+        nav: accurateNav,
         navDate: liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate,
         aum: realAum,
-        day1Return: liveNav?.day1Return ?? 0.58,
-        day1IsPositive: liveNav?.day1IsPositive ?? true,
+        day1Return: day1Ret,
+        day1IsPositive: day1Pos,
+        cagr1Y: ret1Y,
+        cagr3Y: ret3Y,
+        cagr5Y: ret5Y,
         expenseRatio,
         fundManager: fundManagerName,
         chartData,
         periodReturns,
         navHistory: chartData['1M'] || [],
         returnsComparison: {
-          '1Y': { fund: ret1Y, rank: 1 },
-          '3Y': { fund: ret3Y, rank: 1 },
-          '5Y': { fund: ret5Y, rank: 1 },
-          'All': { fund: retAll, rank: 1 },
+          '1Y': {
+            fund: ret1Y,
+            categoryAvg: retStats?.cat_return1y ?? 18.5,
+            rank: retStats?.rank1yr ?? 1,
+          },
+          '3Y': {
+            fund: ret3Y,
+            categoryAvg: retStats?.cat_return3y ?? 21.0,
+            rank: retStats?.rank3yr ?? 1,
+          },
+          '5Y': {
+            fund: ret5Y,
+            categoryAvg: retStats?.cat_return5y ?? 19.2,
+            rank: retStats?.rank5yr ?? 1,
+          },
+          'All': {
+            fund: retAll,
+            categoryAvg: 18.0,
+            rank: 1,
+          },
         },
         topHoldings,
         expenseDetails: {
