@@ -441,11 +441,11 @@ exports.getSchemeDetail = async (req, res) => {
       };
     }
 
-    // Determine accurate AUM
+    // Determine accurate AUM, min SIP, min purchase, and rating
     const realAum = liveFacts?.aum || scheme.aum;
-    if (liveFacts?.aum && liveFacts.aum !== scheme.aum) {
-      MutualFundScheme.updateOne({ _id: scheme._id }, { $set: { aum: liveFacts.aum } }).exec().catch(() => {});
-    }
+    const realMinSip = liveFacts?.minSipAmount || scheme.minSipAmount || 500;
+    const realMinPurchase = liveFacts?.minPurchaseAmount || scheme.minPurchaseAmount || 1000;
+    const realRating = liveFacts?.rating || scheme.rating || 4;
 
     // Top holdings - ONLY real data, no synthetic mock fallback!
     const topHoldings = liveFacts?.topHoldings || [];
@@ -475,25 +475,31 @@ exports.getSchemeDetail = async (req, res) => {
     const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
     const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
 
+    // Synchronize latest live facts and metrics to database
+    const syncUpdates = {};
+    if (liveFacts?.aum && liveFacts.aum !== scheme.aum) syncUpdates.aum = liveFacts.aum;
+    if (liveFacts?.minSipAmount && liveFacts.minSipAmount !== scheme.minSipAmount) syncUpdates.minSipAmount = liveFacts.minSipAmount;
+    if (liveFacts?.minPurchaseAmount && liveFacts.minPurchaseAmount !== scheme.minPurchaseAmount) syncUpdates.minPurchaseAmount = liveFacts.minPurchaseAmount;
+    if (liveFacts?.rating && liveFacts.rating !== scheme.rating) syncUpdates.rating = liveFacts.rating;
     if (liveNav && liveNav.chartData) {
-      MutualFundScheme.updateOne(
-        { _id: scheme._id },
-        {
-          $set: {
-            cagr1Y: ret1Y,
-            cagr3Y: ret3Y,
-            cagr5Y: ret5Y,
-            nav: liveNav.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
-            day1Return: liveNav?.day1Return ?? 0.0,
-          }
-        }
-      ).exec().catch(() => {});
+      syncUpdates.cagr1Y = ret1Y;
+      syncUpdates.cagr3Y = ret3Y;
+      syncUpdates.cagr5Y = ret5Y;
+      syncUpdates.nav = liveNav.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav;
+      syncUpdates.day1Return = liveNav?.day1Return ?? 0.0;
+    }
+
+    if (Object.keys(syncUpdates).length > 0) {
+      MutualFundScheme.updateOne({ _id: scheme._id }, { $set: syncUpdates }).exec().catch(() => {});
     }
 
     return res.json({
       success: true,
       data: {
         ...scheme.toObject(),
+        rating: realRating,
+        minSipAmount: realMinSip,
+        minPurchaseAmount: realMinPurchase,
         nav: liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
         navDate: liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate,
         aum: realAum,

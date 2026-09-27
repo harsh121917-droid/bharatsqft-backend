@@ -444,6 +444,9 @@ function parseGrowwScheme(d) {
     fundManager: d.fund_manager || null,
     exitLoad: d.exit_load || null,
     crisilRating: d.crisil_rating || d.groww_rating || null,
+    rating: typeof d.groww_rating === 'number' ? d.groww_rating : (typeof d.crisil_rating === 'number' ? d.crisil_rating : (parseInt(d.groww_rating || d.crisil_rating, 10) || null)),
+    minSipAmount: typeof d.min_sip_investment === 'number' ? d.min_sip_investment : (parseFloat(d.min_sip_investment) || null),
+    minPurchaseAmount: typeof d.min_investment_amount === 'number' ? d.min_investment_amount : (parseFloat(d.min_investment_amount) || null),
     benchmarkName: d.benchmark_name || null,
   };
 }
