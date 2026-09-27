@@ -163,7 +163,7 @@ class NseClient {
       };
     }
 
-    if (endpoint.includes('CLIENT_KYC_REPORT')) {
+    if (endpoint.includes('KYC_CHECK') || endpoint.includes('CLIENT_KYC_REPORT')) {
       const pan = String(payload.pan_no || '').trim().toUpperCase();
       const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'ABCDE0000A', 'ZZZZZ9999Z', '0000000000', '1234567890'];
       const isDummy = dummyPans.includes(pan) || pan.startsWith('ABCDE') || pan.endsWith('1234F') || pan.length !== 10;
@@ -173,10 +173,10 @@ class NseClient {
           success: false,
           status: 400,
           data: {
-            status: '101',
-            pan_no: pan,
-            kyc_status: 'N',
-            status_desc: 'PAN not registered with KRA or NSE MFSS',
+            pan: pan,
+            kyc_status: 'F',
+            kyc_status_remark: 'NOT AVAILABLE / INVALID PAN',
+            kra_name: 'NONE',
           },
         };
       }
@@ -185,10 +185,10 @@ class NseClient {
         success: true,
         status: 200,
         data: {
-          status: '100',
-          pan_no: pan,
-          kyc_status: 'Y',
-          status_desc: 'KYC Verified (NSE MFSS / KRA Active)',
+          pan: pan,
+          kyc_status: 'S',
+          kyc_status_remark: 'KYC REGISTERED',
+          kra_name: 'cvlkra',
         },
       };
     }
@@ -395,7 +395,14 @@ class NseClient {
     });
   }
 
-  // ── 13. Client KYC Status Report ──
+  // ── 13. Official NSE MFSS Utility KYC Check ──
+  async checkKycStatus(panNo) {
+    return this.post('/nsemfdesk/api/v2/utility/KYC_CHECK', {
+      pan_no: String(panNo || '').trim().toUpperCase(),
+    });
+  }
+
+  // ── 13b. Client KYC Status Report ──
   async checkClientKycStatus(panNo, clientCode = '') {
     const payload = { pan_no: panNo };
     if (clientCode && !panNo) {

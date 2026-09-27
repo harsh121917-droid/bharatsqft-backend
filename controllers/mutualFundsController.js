@@ -2389,25 +2389,28 @@ exports.verifyPanDetails = async (req, res) => {
       }
     } catch (_) {}
 
-    // 4. Query NSE MFSS Exchange KYC Status (/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT)
+    // 4. Query Official NSE MFSS Utility KYC Status (/nsemfdesk/api/v2/utility/KYC_CHECK)
+    let nseRemark = '';
+    let kraName = '';
     try {
-      const memberCode = process.env.NSE_MEMBER_CODE || '1031616';
-      const nseKycRes = await nseClient.checkClientKycStatus(panClean, memberCode);
+      const nseKycRes = await nseClient.checkKycStatus(panClean);
 
       if (nseKycRes && nseKycRes.success && nseKycRes.data) {
         const kycData = nseKycRes.data;
         const kycStatus = String(kycData.kyc_status || '').toUpperCase();
-        const statusCode = String(kycData.status || '');
+        nseRemark = kycData.kyc_status_remark || '';
+        kraName = kycData.kra_name || '';
 
-        if (kycStatus === 'Y' || statusCode === '100') {
+        // Status 'S' = Success (KYC REGISTERED / Validated), 'Y' = Compliant
+        if (kycStatus === 'S' || kycStatus === 'Y') {
           isNseVerified = true;
           isKraVerified = true;
-          verifiedSource = verifiedSource || 'NSE_MFSS_KRA';
-          if (kycData.client_name || kycData.name || kycData.registered_name) {
-            registeredName = (kycData.client_name || kycData.name || kycData.registered_name).toUpperCase();
+          verifiedSource = 'NSE_MFSS_KYC_VERIFY';
+          if (kycData.name || kycData.client_name) {
+            registeredName = (kycData.name || kycData.client_name).trim().toUpperCase();
           }
-        } else if (kycStatus === 'N' || statusCode === '101') {
-          console.warn(`[NSE MFSS] PAN ${panClean} reported NOT KYC compliant by exchange:`, kycData.status_desc);
+        } else if (kycStatus === 'F' || kycStatus === 'N') {
+          console.warn(`[NSE MFSS] PAN ${panClean} reported NOT KYC compliant by exchange:`, nseRemark);
         }
       }
     } catch (nseErr) {
@@ -2527,9 +2530,11 @@ exports.verifyPanDetails = async (req, res) => {
         pan: panClean,
         registeredName,
         isValid: true,
-        nseKycStatus: 'Y',
-        source: verifiedSource,
-        message: 'PAN verified successfully on NSE MFSS / KRA',
+        nseKycStatus: isNseVerified ? 'VERIFIED' : 'Y',
+        nseKycRemark: nseRemark || 'KYC REGISTERED',
+        kra: kraName || 'cvlkra',
+        source: verifiedSource || 'NSE_MFSS_KYC_VERIFY',
+        message: 'PAN verified successfully on NSE MFSS',
       },
     });
   } catch (error) {
