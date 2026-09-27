@@ -95,6 +95,72 @@ function generateFallbackNavData(scheme) {
  * 1. Fetch Real Daily NAV History & Return Real Timeframe Chart Points
  * Source: https://api.mfapi.in/mf/{schemeCode}
  */
+
+/**
+ * Direct Plan resolution: Maps Regular Plan schemes to their Direct Growth counterpart
+ * on mfapi.in so charts, returns, daily changes, and NAV match Groww (the Direct market benchmark).
+ */
+let allMfApiSchemes = null;
+let allMfApiSchemesTimestamp = 0;
+const directCodeMap = new Map();
+
+function normalizeSchemeKey(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/\s*-\s*(direct|regular)\s*(plan)?\s*-?\s*(growth|idcw)?(\s+option)?/gi, '')
+    .replace(/\s*-\s*(direct|regular)\s*growth/gi, '')
+    .replace(/\s*(direct|regular)\s*plan/gi, '')
+    .replace(/\s*(direct|regular)/gi, '')
+    .replace(/\s*\(erstwhile[^\)]*\)/gi, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+async function resolveDirectCounterpart(schemeCode, schemeName = '') {
+  if (!schemeName && !schemeCode) return schemeCode;
+
+  const normKey = normalizeSchemeKey(schemeName);
+
+  if (directCodeMap.has(normKey)) {
+    return directCodeMap.get(normKey);
+  }
+
+  // Load index if not loaded or older than 24 hours
+  if (!allMfApiSchemes || Date.now() - allMfApiSchemesTimestamp > 24 * 60 * 60 * 1000) {
+    try {
+      const list = await fetchJson('https://api.mfapi.in/mf');
+      if (Array.isArray(list)) {
+        allMfApiSchemes = list;
+        allMfApiSchemesTimestamp = Date.now();
+        for (const item of list) {
+          const lower = item.schemeName.toLowerCase();
+          if (lower.includes('direct') && lower.includes('growth')) {
+            const k = normalizeSchemeKey(item.schemeName);
+            if (!directCodeMap.has(k)) {
+              directCodeMap.set(k, String(item.schemeCode));
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (directCodeMap.has(normKey)) {
+    return directCodeMap.get(normKey);
+  }
+
+  // Try substring match
+  if (allMfApiSchemes && normKey.length > 5) {
+    for (const [k, code] of directCodeMap.entries()) {
+      if (k.includes(normKey) || normKey.includes(k)) {
+        directCodeMap.set(normKey, code);
+        return code;
+      }
+    }
+  }
+
+  return schemeCode;
+}
+
 async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   if (!schemeCode) return fallbackScheme ? generateFallbackNavData(fallbackScheme) : null;
 
@@ -103,8 +169,19 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     return cached.data;
   }
 
-  const url = `https://api.mfapi.in/mf/${schemeCode}`;
-  const response = await fetchJson(url);
+  // Resolve Direct Plan benchmark counterpart so NAV, returns, and chart match Groww
+  let targetCode = schemeCode;
+  try {
+    const directCode = await resolveDirectCounterpart(schemeCode, fallbackScheme?.schemeName || '');
+    if (directCode) targetCode = directCode;
+  } catch (_) {}
+
+  const url = `https://api.mfapi.in/mf/${targetCode}`;
+  let response = await fetchJson(url);
+  if (!response && targetCode !== schemeCode) {
+    // Fallback to original code if direct resolution failed
+    response = await fetchJson(`https://api.mfapi.in/mf/${schemeCode}`);
+  }
 
   if (!response || !Array.isArray(response.data) || response.data.length === 0) {
     if (fallbackScheme) {
@@ -166,8 +243,14 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     const years = actualDays / 365.25;
 
     let returnPercent = 0;
-    // For horizons > 1 year (3Y, 5Y, All where years > 1.0): calculate CAGR (Annualised Return) matching Groww
-    if ((periodKey === '3Y' || periodKey === '5Y' || periodKey === 'All' || daysBack > 365) && years > 1.0 && startNav > 0 && endNav > 0) {
+    // Standardized SEBI & Groww formulas: exact 3.0 and 5.0 exponents for CAGR
+    if (periodKey === '3Y' && startNav > 0 && endNav > 0) {
+      const cagr = (Math.pow(endNav / startNav, 1 / 3.0) - 1) * 100;
+      returnPercent = +cagr.toFixed(2);
+    } else if (periodKey === '5Y' && startNav > 0 && endNav > 0) {
+      const cagr = (Math.pow(endNav / startNav, 1 / 5.0) - 1) * 100;
+      returnPercent = +cagr.toFixed(2);
+    } else if (periodKey === 'All' && years > 1.0 && startNav > 0 && endNav > 0) {
       const cagr = (Math.pow(endNav / startNav, 1 / years) - 1) * 100;
       returnPercent = +cagr.toFixed(2);
     } else if (startNav > 0) {

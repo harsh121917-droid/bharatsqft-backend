@@ -475,6 +475,21 @@ exports.getSchemeDetail = async (req, res) => {
     const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
     const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
 
+    if (liveNav && liveNav.chartData) {
+      MutualFundScheme.updateOne(
+        { _id: scheme._id },
+        {
+          $set: {
+            cagr1Y: ret1Y,
+            cagr3Y: ret3Y,
+            cagr5Y: ret5Y,
+            nav: liveNav.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav,
+            day1Return: liveNav?.day1Return ?? 0.0,
+          }
+        }
+      ).exec().catch(() => {});
+    }
+
     return res.json({
       success: true,
       data: {
