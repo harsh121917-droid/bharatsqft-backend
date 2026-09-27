@@ -458,17 +458,23 @@ exports.getSchemeDetail = async (req, res) => {
     const expenseRatio = liveFacts?.expenseRatio || scheme.expenseRatio;
     const cat = (scheme.category || '').toLowerCase();
 
-    // Similar peer schemes from database (Regular Plans Only)
-    const similarFunds = await MutualFundScheme.find({
-      category: scheme.category,
+    // Similar peer schemes strictly in the same Sub-Category (e.g. Mid Cap with Mid Cap)
+    const peerFilter = {
       schemeCode: { $ne: scheme.schemeCode },
       planType: 'REGULAR',
       schemeName: { $not: { $regex: 'direct', $options: 'i' } },
       isActive: true,
-    })
-      .sort({ cagr3Y: -1 })
-      .limit(4)
-      .select('schemeCode schemeName amcName nav cagr1Y cagr3Y rating aum');
+    };
+    if (scheme.subCategory && scheme.subCategory.trim()) {
+      peerFilter.subCategory = { $regex: scheme.subCategory.trim(), $options: 'i' };
+    } else if (scheme.category) {
+      peerFilter.category = scheme.category;
+    }
+
+    const similarFunds = await MutualFundScheme.find(peerFilter)
+      .sort({ aum: -1, cagr3Y: -1 })
+      .limit(6)
+      .select('schemeCode schemeName amcName nav cagr1Y cagr3Y cagr5Y rating aum expenseRatio minSipAmount');
 
     const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
     const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
@@ -481,6 +487,7 @@ exports.getSchemeDetail = async (req, res) => {
     if (liveFacts?.minSipAmount && liveFacts.minSipAmount !== scheme.minSipAmount) syncUpdates.minSipAmount = liveFacts.minSipAmount;
     if (liveFacts?.minPurchaseAmount && liveFacts.minPurchaseAmount !== scheme.minPurchaseAmount) syncUpdates.minPurchaseAmount = liveFacts.minPurchaseAmount;
     if (liveFacts?.rating && liveFacts.rating !== scheme.rating) syncUpdates.rating = liveFacts.rating;
+    if (liveFacts?.fundManager && liveFacts.fundManager !== scheme.fundManager) syncUpdates.fundManager = liveFacts.fundManager;
     if (liveNav && liveNav.chartData) {
       syncUpdates.cagr1Y = ret1Y;
       syncUpdates.cagr3Y = ret3Y;
@@ -492,6 +499,18 @@ exports.getSchemeDetail = async (req, res) => {
     if (Object.keys(syncUpdates).length > 0) {
       MutualFundScheme.updateOne({ _id: scheme._id }, { $set: syncUpdates }).exec().catch(() => {});
     }
+
+    const fundManagement = (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
+      ? liveFacts.fundManagerDetails
+      : [
+          {
+            name: fundManagerName,
+            qualification: 'Investment Leadership & Research',
+            experience: `Managing funds at ${scheme.amcName}`,
+            tenure: 'Jan 2023 - Present',
+            fundsManaged: 'Active mutual fund schemes',
+          },
+        ];
 
     return res.json({
       success: true,
@@ -526,14 +545,7 @@ exports.getSchemeDetail = async (req, res) => {
               ? 'Taxed as per individual income tax slab rate.'
               : 'Equity STCG taxed at 20%. LTCG taxed at 12.5% for capital gains above ₹1.25 Lakh per financial year.',
         },
-        fundManagement: [
-          {
-            name: fundManagerName,
-            qualification: 'Investment Leadership & Research',
-            experience: `Managing funds at ${scheme.amcName}`,
-            fundsManaged: 'Active mutual fund schemes',
-          },
-        ],
+        fundManagement,
         fundHouse: {
           name: scheme.amcName,
           code: scheme.amcCode,

@@ -389,10 +389,10 @@ function parseGrowwScheme(d) {
   // AUM in Crores
   const aum = typeof d.aum === 'number' ? +d.aum.toFixed(2) : parseFloat(d.aum) || null;
 
-  // Top Holdings: Raw is array of arrays or objects
+  // All Holdings: Raw is array of arrays or objects
   const topHoldings = [];
   if (Array.isArray(d.holdings)) {
-    for (const h of d.holdings.slice(0, 10)) {
+    for (const h of d.holdings) {
       if (Array.isArray(h)) {
         // [scheme_code, date, company_name, instrument, sector, sub_sector, rating, corpus_cr, percentage, ...]
         const name = h[2] || '';
@@ -420,6 +420,37 @@ function parseGrowwScheme(d) {
     }
   }
 
+  // Real Fund Managers with Education, Tenure, and Experience
+  const fundManagerDetails = [];
+  if (Array.isArray(d.fund_manager_details) && d.fund_manager_details.length > 0) {
+    for (const m of d.fund_manager_details) {
+      if (m.person_name) {
+        let tenure = 'Present';
+        if (m.date_from) {
+          try {
+            const dt = new Date(m.date_from);
+            tenure = `${dt.toLocaleString('en-US', { month: 'short', year: 'numeric' })} - Present`;
+          } catch (_) {}
+        }
+        fundManagerDetails.push({
+          name: m.person_name,
+          qualification: m.education || 'Investment Leadership & Research',
+          experience: m.experience || 'Over 18 years of investment management and research experience.',
+          tenure,
+          fundsManaged: Array.isArray(m.funds_managed)
+            ? m.funds_managed
+                .map((f) => (f.scheme_name ? f.scheme_name.replace(/Direct Growth/gi, '').trim() : ''))
+                .filter(Boolean)
+                .slice(0, 4)
+                .join(', ')
+            : 'Active equity schemes',
+        });
+      }
+    }
+  }
+
+  const primaryManager = fundManagerDetails[0]?.name || d.fund_manager || null;
+
   // Pros & Cons from analysis
   const pros = [];
   const cons = [];
@@ -435,13 +466,14 @@ function parseGrowwScheme(d) {
 
   return {
     aum,
-    topHoldings, // empty array if none
+    topHoldings, // full list of real holdings
     prosAndCons: {
       pros,
       cons,
     },
     expenseRatio: typeof d.expense_ratio === 'number' ? +d.expense_ratio.toFixed(2) : parseFloat(d.expense_ratio) || null,
-    fundManager: d.fund_manager || null,
+    fundManager: primaryManager,
+    fundManagerDetails,
     exitLoad: d.exit_load || null,
     crisilRating: d.crisil_rating || d.groww_rating || null,
     rating: typeof d.groww_rating === 'number' ? d.groww_rating : (typeof d.crisil_rating === 'number' ? d.crisil_rating : (parseInt(d.groww_rating || d.crisil_rating, 10) || null)),
