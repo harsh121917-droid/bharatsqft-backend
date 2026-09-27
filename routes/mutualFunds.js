@@ -21,6 +21,7 @@ const {
   registerStpOrder,
   registerSwpOrder,
   getOnboardingStatus,
+  verifyPanDetails,
   setupUserMandate,
   verifyUserMandate,
 } = require('../controllers/mutualFundsController');
@@ -36,6 +37,7 @@ router.post('/sync-nav', syncNavsNow);
 // ── Protected Routes (User-specific transactions & portfolio) ──
 router.use(protect);
 
+router.post('/pan/verify', verifyPanDetails);
 router.get('/onboarding-status', getOnboardingStatus);
 router.post('/mandates/setup', setupUserMandate);
 router.post('/mandates/:id/verify', verifyUserMandate);
