@@ -164,14 +164,32 @@ class NseClient {
     }
 
     if (endpoint.includes('CLIENT_KYC_REPORT')) {
+      const pan = String(payload.pan_no || '').trim().toUpperCase();
+      const validTestPans = ['AAAPA1234A', (process.env.NSE_TEST_PAN || '').toUpperCase()].filter(Boolean);
+      const isKnownTestPan = validTestPans.includes(pan);
+
+      if (!isKnownTestPan) {
+        return {
+          success: false,
+          status: 400,
+          data: {
+            status: '101',
+            pan_no: pan,
+            kyc_status: 'N',
+            status_desc: 'PAN not registered with KRA or NSE MFSS',
+          },
+        };
+      }
+
       return {
         success: true,
         status: 200,
         data: {
           status: '100',
-          pan_no: payload.pan_no,
+          pan_no: pan,
           kyc_status: 'Y',
-          status_desc: 'KYC Verified (CVL/KRA Sandbox)',
+          client_name: 'TEST INVESTOR',
+          status_desc: 'KYC Verified (NSE Sandbox Test Account)',
         },
       };
     }
@@ -382,7 +400,7 @@ class NseClient {
   async checkClientKycStatus(panNo, clientCode = '') {
     return this.post('/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT', {
       pan_no: panNo,
-      client_code: clientCode,
+      client_code: clientCode || this.memberCode || '',
     });
   }
 

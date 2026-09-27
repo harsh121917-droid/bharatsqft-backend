@@ -2322,12 +2322,13 @@ exports.verifyUserMandate = async (req, res) => {
 };
 
 
-// ── 20. POST /api/mutual-funds/pan/verify (Groww-style PAN Verification & Name Lookup) ──
+// ── 20. POST /api/mutual-funds/pan/verify (Groww-style PAN Verification via NSE MFSS & KRA) ──
 exports.verifyPanDetails = async (req, res) => {
   try {
     const { pan } = req.body;
-    const panClean = (pan || '').trim().toUpperCase();
+    const panClean = String(pan || '').trim().toUpperCase();
 
+    // 1. Strict PAN format check (10 characters: 5 uppercase letters + 4 digits + 1 uppercase letter)
     if (!panClean || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panClean)) {
       return res.status(400).json({
         success: false,
@@ -2335,52 +2336,171 @@ exports.verifyPanDetails = async (req, res) => {
       });
     }
 
-    const userId = req.user?._id;
-    const user = userId ? await User.findById(userId) : null;
-    let registeredName = '';
+    // 2. Reject obvious dummy test PAN patterns
+    const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'ABCDE0000A', 'ZZZZZ9999Z', '0000000000', '1234567890'];
+    const isObviousDummy = dummyPans.includes(panClean) || 
+      panClean.startsWith('ABCDE') || 
+      panClean.endsWith('1234F') ||
+      /^(.)\1{4}/.test(panClean) || // AAAAA, BBBBB, etc.
+      /0000/.test(panClean); // 0000 digits
 
+    if (isObviousDummy) {
+      return res.status(400).json({
+        success: false,
+        message: `PAN ${panClean} is not registered or valid on NSE MFSS / KRA. Please enter your valid registered PAN.`,
+        data: {
+          pan: panClean,
+          isValid: false,
+          nseKycStatus: 'N',
+          message: 'Dummy or invalid test PAN rejected.',
+        },
+      });
+    }
+
+    // Check holder type (4th character: 'P' = Individual, 'C' = Company, 'H' = HUF, 'F' = Firm, etc.)
+    const holderType = panClean.charAt(3);
+    const validHolderTypes = ['P', 'C', 'H', 'A', 'B', 'G', 'J', 'L', 'F', 'T'];
+    if (!validHolderTypes.includes(holderType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid PAN structure. 4th character must indicate a valid PAN holder type.',
+        data: { pan: panClean, isValid: false },
+      });
+    }
+
+    const userId = req.user?._id;
+    const user = userId ? await User.findById(userId).catch(() => null) : null;
+    let registeredName = '';
+    let isNseVerified = false;
+    let isKraVerified = false;
+    let verifiedSource = '';
+
+    // 3. Check existing NSE UCC in Database
     try {
-      const Kyc = require('../models/Kyc');
-      const existingKyc = userId ? await Kyc.findOne({ user: userId }) : null;
-      if (existingKyc && existingKyc.fullName && existingKyc.fullName !== 'Account Holder') {
-        registeredName = existingKyc.fullName.toUpperCase();
+      const existingUcc = await MfClientUcc.findOne({ 
+        $or: [
+          { pan: panClean },
+          ...(userId ? [{ user: userId, pan: panClean }] : [])
+        ]
+      }).catch(() => null);
+      if (existingUcc && existingUcc.nseStatus === 'ACTIVE') {
+        isNseVerified = true;
+        verifiedSource = 'NSE_UCC_ACTIVE';
       }
     } catch (_) {}
 
-    if (!registeredName) {
-      if (user && user.name && user.name !== 'Investor') {
-        registeredName = user.name.toUpperCase();
-      } else {
-        registeredName = 'ASHISH PORWAL';
+    // 4. Query NSE MFSS Exchange KYC Status (/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT)
+    try {
+      const memberCode = process.env.NSE_MEMBER_CODE || '1031616';
+      const nseKycRes = await nseClient.checkClientKycStatus(panClean, memberCode);
+
+      if (nseKycRes && nseKycRes.success && nseKycRes.data) {
+        const kycData = nseKycRes.data;
+        const kycStatus = String(kycData.kyc_status || '').toUpperCase();
+        const statusCode = String(kycData.status || '');
+
+        if (kycStatus === 'Y' || statusCode === '100') {
+          isNseVerified = true;
+          isKraVerified = true;
+          verifiedSource = verifiedSource || 'NSE_MFSS_KRA';
+          if (kycData.client_name || kycData.name || kycData.registered_name) {
+            registeredName = (kycData.client_name || kycData.name || kycData.registered_name).toUpperCase();
+          }
+        } else if (kycStatus === 'N' || statusCode === '101') {
+          console.warn(`[NSE MFSS] PAN ${panClean} reported NOT KYC compliant by exchange:`, kycData.status_desc);
+        }
       }
+    } catch (nseErr) {
+      console.warn('[verifyPanDetails NSE warning]:', nseErr.message);
     }
 
-    // Try Cashfree verification if keys are set
-    const { CASHFREE_VERIFICATION_CLIENT_ID, CASHFREE_VERIFICATION_CLIENT_SECRET } = process.env;
-    if (CASHFREE_VERIFICATION_CLIENT_ID && CASHFREE_VERIFICATION_CLIENT_SECRET && CASHFREE_VERIFICATION_CLIENT_ID !== 'your_cashfree_client_id') {
+    // 5. Query Government NSDL/ITD PAN Registry via Cashfree Verification API
+    const cfClientId = process.env.CASHFREE_VERIFICATION_CLIENT_ID;
+    const cfClientSecret = process.env.CASHFREE_VERIFICATION_CLIENT_SECRET;
+    const cfEnv = process.env.CASHFREE_VERIFICATION_ENV || process.env.CASHFREE_ENV;
+
+    if (cfClientId && cfClientSecret && cfClientId !== 'your_cashfree_client_id') {
       try {
         const axios = require('axios');
-        const cfUrl = process.env.CASHFREE_ENV === 'production' 
+        const cfUrl = (cfEnv === 'production')
           ? 'https://api.cashfree.com/verification/pan'
           : 'https://sandbox.cashfree.com/verification/pan';
+
         const cfRes = await axios.post(
           cfUrl,
           { pan: panClean },
           {
             headers: {
-              'x-client-id': CASHFREE_VERIFICATION_CLIENT_ID,
-              'x-client-secret': CASHFREE_VERIFICATION_CLIENT_SECRET,
+              'x-client-id': cfClientId,
+              'x-client-secret': cfClientSecret,
               'x-api-version': '2023-08-01',
               'Content-Type': 'application/json',
             },
-            timeout: 5000,
+            timeout: 6000,
           }
         );
-        if (cfRes?.data?.registered_name || cfRes?.data?.name_pan_card) {
-          registeredName = (cfRes.data.registered_name || cfRes.data.name_pan_card).toUpperCase();
+
+        const cfData = cfRes.data || {};
+        const cfStatus = String(cfData.status || '').toUpperCase();
+        const isValidPan = cfData.valid === true || cfStatus === 'VALID' || cfStatus === 'SUCCESS';
+
+        if (isValidPan) {
+          isKraVerified = true;
+          verifiedSource = verifiedSource || 'CASHFREE_GOVT_NSDL';
+          const nameFromCf = cfData.registered_name || cfData.name_pan_card || cfData.name;
+          if (nameFromCf) {
+            registeredName = nameFromCf.trim().toUpperCase();
+          }
+        } else if (cfData.valid === false || cfStatus === 'INVALID') {
+          return res.status(400).json({
+            success: false,
+            message: `PAN ${panClean} is invalid or does not exist in the Government PAN registry.`,
+            data: { pan: panClean, isValid: false },
+          });
         }
       } catch (cfErr) {
-        console.warn('[verifyPanDetails Cashfree warning]:', cfErr.message);
+        console.warn('[verifyPanDetails Cashfree warning]:', cfErr.response?.data?.message || cfErr.message);
+        if (cfErr.response?.data?.code === 'pan_invalid' || cfErr.response?.data?.message?.includes('Invalid')) {
+          return res.status(400).json({
+            success: false,
+            message: `PAN ${panClean} is not a valid PAN according to the Income Tax Department.`,
+            data: { pan: panClean, isValid: false },
+          });
+        }
+      }
+    }
+
+    // 6. Cross-check existing approved KYC in DB for this user
+    try {
+      const existingKyc = userId ? await Kyc.findOne({ user: userId, status: 'approved' }).catch(() => null) : null;
+      if (existingKyc && existingKyc.panNumber === panClean && existingKyc.fullName) {
+        if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
+        isKraVerified = true;
+        verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
+      }
+    } catch (_) {}
+
+    // 7. Strict Verification Decision Gate:
+    // If not verified by any authoritative source (NSE MFSS, Cashfree NSDL, Active UCC, or matching Approved KYC):
+    if (!isNseVerified && !isKraVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'PAN verification failed on NSE MFSS. No active KRA KYC record found for this PAN. Please enter your valid registered PAN.',
+        data: {
+          pan: panClean,
+          isValid: false,
+          nseKycStatus: 'N',
+          message: 'PAN record not found on NSE MFSS / KRA database.',
+        },
+      });
+    }
+
+    // Fallback name only if verified on NSE/KRA but name was redacted or omitted
+    if (!registeredName) {
+      if (user && user.name && user.name !== 'Investor') {
+        registeredName = user.name.toUpperCase();
+      } else {
+        registeredName = 'INVESTOR';
       }
     }
 
@@ -2390,7 +2510,9 @@ exports.verifyPanDetails = async (req, res) => {
         pan: panClean,
         registeredName,
         isValid: true,
-        message: 'PAN verified successfully',
+        nseKycStatus: 'Y',
+        source: verifiedSource,
+        message: 'PAN verified successfully on NSE MFSS / KRA',
       },
     });
   } catch (error) {
