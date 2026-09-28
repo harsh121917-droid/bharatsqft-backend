@@ -694,9 +694,27 @@ exports.registerUserUcc = async (req, res) => {
     }
 
     // Groww-Style Auto-Resolution: Bank details are auto-resolved from linked accounts
-    let effAccountNo = accountNo;
-    let effIfsc = ifsc;
+    let effAccountNo = accountNo ? String(accountNo).trim() : '';
+    let effIfsc = ifsc ? String(ifsc).trim().toUpperCase() : '';
     let effBankName = bankName;
+
+    // Strict validation if user provided account details in payload
+    if (effAccountNo) {
+      if (effAccountNo.length < 9 || effAccountNo.length > 18 || !/^\d+$/.test(effAccountNo)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid bank account number. Account number must be between 9 and 18 numeric digits.',
+        });
+      }
+    }
+    if (effIfsc) {
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(effIfsc)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid IFSC code format (must be 11 characters e.g. SBIN0001234).',
+        });
+      }
+    }
 
     if (!effAccountNo || !effIfsc) {
       // 1. Try default BankAccount model
