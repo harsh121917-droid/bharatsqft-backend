@@ -623,6 +623,11 @@ exports.getUserUcc = async (req, res) => {
       const kyc = await Kyc.findOne({ user: userId });
       const bank = await BankAccount.findOne({ user: userId, isDefault: true });
 
+      // Filter out dummy/stale test PANs from prefill
+      const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'TYJPS0689R', 'PHOTO_SUBMITTED'];
+      const rawPan = kyc?.panNumber || user?.panNumber || '';
+      const cleanPan = dummyPans.includes(rawPan) ? '' : rawPan;
+
       return res.json({
         success: true,
         exists: false,
@@ -630,8 +635,8 @@ exports.getUserUcc = async (req, res) => {
           name: user?.name || '',
           email: user?.email || '',
           phone: user?.phone || '',
-          pan: kyc?.panNumber || '',
-          isKycVerified: kyc?.status === 'approved',
+          pan: cleanPan,
+          isKycVerified: kyc?.status === 'approved' && cleanPan.length === 10,
           bankAccount: bank
             ? {
                 accountNo: bank.accountNumber,
@@ -2546,16 +2551,13 @@ exports.verifyPanDetails = async (req, res) => {
       }
     }
 
-    // 6. Cross-check existing approved KYC in DB for this user
+    // 6. Cross-check existing approved KYC in DB ONLY IF PAN strictly matches
     try {
       const existingKyc = userId ? await Kyc.findOne({ user: userId, status: 'approved' }).catch(() => null) : null;
-      if (existingKyc && existingKyc.fullName) {
-        const panMatches = existingKyc.panNumber === panClean || existingKyc.panNumber === 'PHOTO_SUBMITTED';
-        if (panMatches) {
-          if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
-          isKraVerified = true;
-          verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
-        }
+      if (existingKyc && existingKyc.fullName && existingKyc.panNumber === panClean) {
+        if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
+        isKraVerified = true;
+        verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
       }
     } catch (_) {}
 
@@ -2563,12 +2565,14 @@ exports.verifyPanDetails = async (req, res) => {
     const isFreshInvestor = !isNseVerified && !isKraVerified;
     if (isFreshInvestor) {
       // Fresh/first-time investor (valid PAN format, no prior mutual fund KRA history)
-      const candidateName = (req.body.name || req.body.fullName || user?.name || '').trim().toUpperCase();
+      // DO NOT fallback to user.name (which might be an account owner nickname like "Harsh")!
+      // Only use registeredName if verified with NSDL/Cashfree or passed explicitly in body.
+      const freshName = registeredName || (req.body.name || req.body.fullName || '').trim().toUpperCase();
       return res.json({
         success: true,
         data: {
           pan: panClean,
-          registeredName: candidateName,
+          registeredName: freshName, // Cleanly empty string if first-time investor
           isValid: true,
           isFreshInvestor: true,
           nseKycStatus: 'NEW',
@@ -2581,7 +2585,7 @@ exports.verifyPanDetails = async (req, res) => {
     }
 
     if (!registeredName) {
-      registeredName = (req.body.name || req.body.fullName || user?.name || 'INVESTOR').trim().toUpperCase();
+      registeredName = (req.body.name || req.body.fullName || 'INVESTOR').trim().toUpperCase();
     }
 
     return res.json({
