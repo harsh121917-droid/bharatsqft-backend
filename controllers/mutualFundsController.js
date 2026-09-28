@@ -818,12 +818,14 @@ exports.registerUserUcc = async (req, res) => {
       ).catch(() => {});
     } catch (_) {}
 
-    // Fetch official NSE direct authorization link if available
+    // Fetch official NSE direct authorization link if nominee opt-in
     let nseAuthUrl = null;
     try {
-      const shortLinkRes = await nseClient.getShortLink('UCC_AUTH', clientCode);
-      if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
-        nseAuthUrl = shortLinkRes.data.firstHolderLink;
+      if (nomineeName) {
+        const shortLinkRes = await nseClient.getShortLink('NOMINEE_AUTH', clientCode);
+        if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
+          nseAuthUrl = shortLinkRes.data.firstHolderLink;
+        }
       }
     } catch (_) {}
 
@@ -2557,30 +2559,29 @@ exports.verifyPanDetails = async (req, res) => {
       }
     } catch (_) {}
 
-    // 7. Strict Verification Decision Gate:
-    // If not verified by any authoritative source (NSE MFSS, Cashfree NSDL, Active UCC, or matching Approved KYC):
-    if (!isNseVerified && !isKraVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'PAN verification failed on NSE MFSS. No active KRA KYC record found for this PAN. Please enter your valid registered PAN.',
+    // 7. Decision Gate: Existing KRA Investor vs Fresh First-Time Investor
+    const isFreshInvestor = !isNseVerified && !isKraVerified;
+    if (isFreshInvestor) {
+      // Fresh/first-time investor (valid PAN format, no prior mutual fund KRA history)
+      const candidateName = (req.body.name || req.body.fullName || user?.name || '').trim().toUpperCase();
+      return res.json({
+        success: true,
         data: {
           pan: panClean,
-          isValid: false,
-          nseKycStatus: 'N',
-          message: 'PAN record not found on NSE MFSS / KRA database.',
+          registeredName: candidateName,
+          isValid: true,
+          isFreshInvestor: true,
+          nseKycStatus: 'NEW',
+          nseKycRemark: 'First-time Mutual Fund Investor (Fresh e-KYC)',
+          kra: 'NONE',
+          source: 'FRESH_INVESTOR',
+          message: 'Valid PAN. First-time mutual fund investor detected.',
         },
       });
     }
 
     if (!registeredName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Could not fetch registered name for this PAN from exchange or Income Tax records. Please verify the PAN.',
-        data: {
-          pan: panClean,
-          isValid: false,
-        },
-      });
+      registeredName = (req.body.name || req.body.fullName || user?.name || 'INVESTOR').trim().toUpperCase();
     }
 
     return res.json({
