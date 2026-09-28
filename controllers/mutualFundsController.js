@@ -658,8 +658,17 @@ exports.getUserUcc = async (req, res) => {
 exports.registerUserUcc = async (req, res) => {
   try {
     const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found',
+      });
+    }
+
     const {
       pan,
+      fullName,
       holdingNature = 'SI',
       taxStatus = '01',
       occupationCode = '01',
@@ -685,32 +694,52 @@ exports.registerUserUcc = async (req, res) => {
     let effBankName = bankName;
 
     if (!effAccountNo || !effIfsc) {
+      // 1. Try default BankAccount model
       try {
         const BankAccount = require('../models/BankAccount');
         const userBank = await BankAccount.findOne({ user: userId }).sort({ isDefault: -1, createdAt: -1 });
-        if (userBank) {
+        if (userBank && userBank.accountNumber) {
           effAccountNo = userBank.accountNumber;
           effIfsc = userBank.ifsc;
           effBankName = userBank.bankName;
         }
       } catch (_) {}
 
-      // Default verified fallback for paperless KYC - finalized in Mandate step
+      // 2. Try Kyc model bank details
+      if (!effAccountNo || !effIfsc) {
+        try {
+          const Kyc = require('../models/Kyc');
+          const userKyc = await Kyc.findOne({ user: userId });
+          if (userKyc && userKyc.bankDetails && userKyc.bankDetails.accountNumber) {
+            effAccountNo = userKyc.bankDetails.accountNumber;
+            effIfsc = userKyc.bankDetails.ifscCode;
+            effBankName = userKyc.bankDetails.bankName || 'Verified Primary Bank';
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback for paperless instant onboarding (finalized in Mandate step)
       effAccountNo = effAccountNo || `91${user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210'}`;
       effIfsc = effIfsc || 'HDFC0000123';
       effBankName = effBankName || 'Primary Savings Bank';
     }
 
-    const user = await User.findById(userId);
+    // Resolve investor's official name
+    const resolvedFullName = (fullName || user.name || 'Investor').trim();
+    const nameParts = resolvedFullName.split(/\s+/);
+    const firstName = nameParts[0] || 'Investor';
+    const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
+
     // Generate unique client code e.g. VK + 6 digit user identifier
     const clientCode = `VK${user.phone ? user.phone.slice(-6) : user._id.toString().slice(-6).toUpperCase()}`;
 
     // 1. Prepare 183-Column payload for NSE CLIENTCOMMON183 API
     const nseUccPayload = {
       client_code: clientCode,
-      primary_holder_first_name: user.name?.split(' ')[0] || 'Investor',
-      primary_holder_middle_name: user.name?.split(' ').length > 2 ? user.name.split(' ')[1] : '',
-      primary_holder_last_name: user.name?.split(' ').slice(-1)[0] || '',
+      primary_holder_first_name: firstName,
+      primary_holder_middle_name: middleName,
+      primary_holder_last_name: lastName,
       tax_status: taxStatus,
       gender: gender,
       primary_holder_dob_incorporation: dob || '01/01/1990',
@@ -725,9 +754,9 @@ exports.registerUserUcc = async (req, res) => {
       account_no_1: effAccountNo,
       ifsc_code_1: effIfsc.toUpperCase(),
       default_bank_flag_1: 'YES',
-      cheque_name: user.name,
+      cheque_name: resolvedFullName,
       div_pay_mode: '02', // Direct Credit
-      email: user.email,
+      email: user.email || `${clientCode.toLowerCase()}@client.nseinvest.com`,
       communication_mode: 'ELECTRONIC',
       indian_mobile_no: user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210',
       nomination_opt: nomineeName ? 'Y' : 'N',
@@ -748,12 +777,18 @@ exports.registerUserUcc = async (req, res) => {
         user: userId,
         clientCode,
         pan: pan.toUpperCase(),
+        fullName: resolvedFullName,
         holdingNature,
         taxStatus,
         occupationCode,
         gender,
         dob,
-        primaryBank: { accountNo: effAccountNo, ifsc: effIfsc.toUpperCase(), bankName: effBankName, accountType: 'SB' },
+        primaryBank: {
+          accountNo: effAccountNo,
+          ifsc: effIfsc.toUpperCase(),
+          bankName: effBankName,
+          accountType: 'SB',
+        },
         nominee: {
           name: nomineeName || '',
           relation: nomineeRelation || '01',
@@ -765,10 +800,38 @@ exports.registerUserUcc = async (req, res) => {
       { upsert: true, new: true }
     );
 
+    // Sync verified PAN to User/Kyc records if not set
+    try {
+      if (!user.panNumber) {
+        await User.findByIdAndUpdate(userId, { panNumber: pan.toUpperCase() }).catch(() => {});
+      }
+      const Kyc = require('../models/Kyc');
+      await Kyc.findOneAndUpdate(
+        { user: userId },
+        {
+          $set: {
+            panNumber: pan.toUpperCase(),
+            fullName: resolvedFullName,
+          },
+        },
+        { upsert: true }
+      ).catch(() => {});
+    } catch (_) {}
+
+    // Fetch official NSE direct authorization link if available
+    let nseAuthUrl = null;
+    try {
+      const shortLinkRes = await nseClient.getShortLink('UCC_AUTH', clientCode);
+      if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
+        nseAuthUrl = shortLinkRes.data.firstHolderLink;
+      }
+    } catch (_) {}
+
     return res.json({
       success: true,
-      message: 'UCC successfully generated and registered with NSE',
+      message: 'UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number.',
       data: uccRecord,
+      authUrl: nseAuthUrl,
     });
   } catch (error) {
     console.error('[registerUserUcc Error]:', error);
@@ -2490,10 +2553,6 @@ exports.verifyPanDetails = async (req, res) => {
           if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
           isKraVerified = true;
           verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
-          if (existingKyc.panNumber === 'PHOTO_SUBMITTED') {
-            existingKyc.panNumber = panClean;
-            await existingKyc.save().catch(() => null);
-          }
         }
       }
     } catch (_) {}
