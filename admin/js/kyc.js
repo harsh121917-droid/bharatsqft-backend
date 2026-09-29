@@ -243,6 +243,9 @@ async function openKycModal(id) {
                 </div>
 
                 <div id="kyc-doc-upload-form" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)">
+                    <div style="font-size:11px;color:#34D399;margin-bottom:10px;background:rgba(16,185,129,0.1);padding:6px 10px;border-radius:6px;border:1px solid rgba(16,185,129,0.25)">
+                        <i class="fas fa-shield-alt"></i> <strong>Safe Preservation:</strong> Only the files you select will be updated. Previously uploaded PAN & Aadhaar photos will NEVER be deleted or overwritten.
+                    </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;font-size:12px">
                         <div>
                             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">PAN Card Photo</label>
@@ -255,6 +258,31 @@ async function openKycModal(id) {
                         <div>
                             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Aadhaar Back Photo</label>
                             <input type="file" id="replace-aadhaar-back-file" accept="image/*,.pdf" class="form-control form-control-sm" style="font-size:11px" />
+                        </div>
+                        <div>
+                            <label style="font-size:11px;color:#34D399;display:block;margin-bottom:3px;font-weight:700"><i class="fas fa-shield-alt"></i> Police / Armed Forces ID</label>
+                            <input type="file" id="replace-soldier-file" accept="image/*,.pdf" class="form-control form-control-sm" style="font-size:11px;border-color:rgba(16,185,129,0.5)" />
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Police / Service Branch</label>
+                            <select id="replace-soldier-branch" class="form-control form-control-sm" style="font-size:11px">
+                                <option value="Police" ${k.soldierDetails?.serviceBranch === 'Police' ? 'selected' : ''}>State Police / City Police</option>
+                                <option value="Traffic Police" ${k.soldierDetails?.serviceBranch === 'Traffic Police' ? 'selected' : ''}>Traffic Police</option>
+                                <option value="Crime Branch" ${k.soldierDetails?.serviceBranch === 'Crime Branch' ? 'selected' : ''}>Crime Branch / Special Cell</option>
+                                <option value="CRPF" ${k.soldierDetails?.serviceBranch === 'CRPF' ? 'selected' : ''}>CRPF / Paramilitary</option>
+                                <option value="Army" ${k.soldierDetails?.serviceBranch === 'Army' ? 'selected' : ''}>Indian Army</option>
+                                <option value="Navy" ${k.soldierDetails?.serviceBranch === 'Navy' ? 'selected' : ''}>Indian Navy</option>
+                                <option value="Air Force" ${k.soldierDetails?.serviceBranch === 'Air Force' ? 'selected' : ''}>Indian Air Force</option>
+                                <option value="BSF" ${k.soldierDetails?.serviceBranch === 'BSF' ? 'selected' : ''}>BSF</option>
+                                <option value="CISF" ${k.soldierDetails?.serviceBranch === 'CISF' ? 'selected' : ''}>CISF</option>
+                                <option value="Other">Other Security Forces</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Police Badge / Service ID No.</label>
+                            <input type="text" id="replace-soldier-id" class="form-control form-control-sm" value="${k.soldierDetails?.soldierIdNumber || ''}" placeholder="e.g. POL-84920" style="font-size:11px;text-transform:uppercase" />
                         </div>
                     </div>
                     <div style="display:flex;gap:8px;margin-top:10px">
@@ -515,29 +543,35 @@ async function saveKycBankDetails(kycId) {
     const ifscCode = document.getElementById("edit-bank-ifsc")?.value.trim().toUpperCase();
     const accountType = document.getElementById("edit-bank-type")?.value || "savings";
 
-    if (!accountNumber || !ifscCode) {
-        toast("Account number and IFSC code are required", "warning");
+    if (!bankName && !accountNumber) {
+        toast("Please provide at least a Bank Name or Account Number", "warning");
         return;
     }
 
     try {
+        const payload = { accountType };
+        if (bankName) payload.bankName = bankName;
+        if (accountHolderName) payload.accountHolderName = accountHolderName;
+        if (accountNumber) payload.accountNumber = accountNumber;
+        if (ifscCode) payload.ifscCode = ifscCode;
+
         const res = await api(`/admin/kyc/${kycId}/bank`, {
             method: "PATCH",
-            body: JSON.stringify({ bankName, accountHolderName, accountNumber, ifscCode, accountType }),
+            body: JSON.stringify(payload),
         });
 
         if (res && res.success) {
-            toast("Bank details updated successfully!", "success");
+            toast(res.message || "Bank details updated successfully! (Existing documents preserved)", "success");
             const bankNameEl = document.getElementById("kyc-bank-name");
             const bankHolderEl = document.getElementById("kyc-bank-holder");
             const bankAccEl = document.getElementById("kyc-bank-acc");
             const bankIfscEl = document.getElementById("kyc-bank-ifsc");
             const bankTypeEl = document.getElementById("kyc-bank-type");
 
-            if (bankNameEl) bankNameEl.textContent = bankName || "Linked Bank";
-            if (bankHolderEl) bankHolderEl.textContent = accountHolderName || "—";
-            if (bankAccEl) bankAccEl.textContent = accountNumber;
-            if (bankIfscEl) bankIfscEl.textContent = ifscCode;
+            if (bankNameEl && bankName) bankNameEl.textContent = bankName;
+            if (bankHolderEl && accountHolderName) bankHolderEl.textContent = accountHolderName;
+            if (bankAccEl && accountNumber) bankAccEl.textContent = accountNumber;
+            if (bankIfscEl && ifscCode) bankIfscEl.textContent = ifscCode;
             if (bankTypeEl) bankTypeEl.textContent = accountType === "current" ? "Current" : "Savings";
 
             toggleEditBankForm();
@@ -563,9 +597,12 @@ async function uploadExistingKycDocs(kycId) {
     const panFile = document.getElementById("replace-pan-file")?.files[0];
     const frontFile = document.getElementById("replace-aadhaar-front-file")?.files[0];
     const backFile = document.getElementById("replace-aadhaar-back-file")?.files[0];
+    const soldierFile = document.getElementById("replace-soldier-file")?.files[0];
+    const soldierBranch = document.getElementById("replace-soldier-branch")?.value;
+    const soldierId = document.getElementById("replace-soldier-id")?.value.trim();
 
-    if (!panFile && !frontFile && !backFile) {
-        toast("Please select at least one document photo to upload", "warning");
+    if (!panFile && !frontFile && !backFile && !soldierFile) {
+        toast("Please select at least one document photo to upload (e.g. Police ID)", "warning");
         return;
     }
 
@@ -581,6 +618,11 @@ async function uploadExistingKycDocs(kycId) {
         if (panFile) formData.append("panImage", panFile);
         if (frontFile) formData.append("aadhaarFront", frontFile);
         if (backFile) formData.append("aadhaarBack", backFile);
+        if (soldierFile) {
+            formData.append("soldierIdCard", soldierFile);
+            if (soldierBranch) formData.append("serviceBranch", soldierBranch);
+            if (soldierId) formData.append("soldierIdNumber", soldierId);
+        }
 
         const res = await api(`/admin/kyc/${kycId}/upload-docs`, {
             method: "POST",
@@ -588,7 +630,7 @@ async function uploadExistingKycDocs(kycId) {
         });
 
         if (res && res.success) {
-            toast(res.message || "Document photos updated successfully!", "success");
+            toast(res.message || "Document photos updated successfully! Existing documents preserved.", "success");
             openKycModal(kycId);
             loadKyc(currentKycFilter);
         } else {
@@ -716,11 +758,59 @@ function selectUserForManualKyc(u) {
     const dropdown = document.getElementById("manual-kyc-user-dropdown");
     if (dropdown) dropdown.style.display = "none";
 
+    window.selectedManualKycUser = u;
+
     document.getElementById("manual-kyc-user-id").value = u._id || "";
     document.getElementById("manual-kyc-selected-user-name").textContent = u.name || "Customer";
     document.getElementById("manual-kyc-selected-user-contact").textContent = `${u.phone || 'No phone'} • ${u.email || 'No email'}`;
     document.getElementById("manual-kyc-selected-user-card").style.display = "block";
     document.getElementById("manual-kyc-user-search").style.display = "none";
+
+    const statusEl = document.getElementById("manual-kyc-selected-user-docs-status");
+    const kd = u.kycDoc || {};
+
+    let badges = [];
+    if (kd.panNumber && kd.panNumber !== "PHOTO_SUBMITTED" && kd.panNumber !== "MANUAL_VERIFIED") {
+        badges.push(`<span class="badge badge-success" style="font-size:11px"><i class="fas fa-check-circle"></i> PAN: ${kd.panNumber}</span>`);
+    } else if (kd.panImage?.url) {
+        badges.push(`<span class="badge badge-info" style="font-size:11px"><i class="fas fa-image"></i> PAN Photo on file</span>`);
+    }
+
+    if (kd.aadhaarFront?.url || kd.aadhaarBack?.url || kd.aadhaarNumber) {
+        badges.push(`<span class="badge badge-info" style="font-size:11px"><i class="fas fa-id-card"></i> Aadhaar Docs on file</span>`);
+    }
+
+    if (kd.bankDetails?.bankName) {
+        badges.push(`<span class="badge badge-warning" style="font-size:11px"><i class="fas fa-university"></i> Bank: ${kd.bankDetails.bankName}</span>`);
+    }
+
+    if (kd.soldierDetails?.isSoldier) {
+        badges.push(`<span class="badge badge-success" style="font-size:11px"><i class="fas fa-medal"></i> Police / Force: ${kd.soldierDetails.serviceBranch || 'Verified'}</span>`);
+    }
+
+    if (statusEl) {
+        if (badges.length > 0) {
+            statusEl.innerHTML = `
+                <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:8px 10px;margin-top:8px">
+                    <div style="font-size:11px;font-weight:700;color:#34D399;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-shield-alt"></i> Existing Documents On File (Preserved):
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px">
+                        ${badges.join('')}
+                    </div>
+                    <div style="font-size:11px;color:#a7f3d0;margin-top:6px;line-height:1.4">
+                        🔒 <strong>Safe Preservation Active:</strong> Existing Aadhaar, PAN, and document photos will <u>NEVER be deleted</u>. You can leave Aadhaar/PAN empty and just enter the Bank Name or upload Police ID below.
+                    </div>
+                </div>
+            `;
+        } else {
+            statusEl.innerHTML = `
+                <div style="background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.3);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:var(--gold)">
+                    ℹ️ New customer with no prior KYC documents submitted yet.
+                </div>
+            `;
+        }
+    }
 
     if (!document.getElementById("manual-kyc-fullname").value && u.name) {
         document.getElementById("manual-kyc-fullname").value = u.name;
@@ -730,7 +820,6 @@ function selectUserForManualKyc(u) {
     }
 
     if (u.kycDoc) {
-        const kd = u.kycDoc;
         if (kd.panNumber && kd.panNumber !== "PHOTO_SUBMITTED" && kd.panNumber !== "MANUAL_VERIFIED") {
             document.getElementById("manual-kyc-pan").value = kd.panNumber;
         }
@@ -749,12 +838,30 @@ function selectUserForManualKyc(u) {
             if (kd.bankDetails.accountNumber) document.getElementById("manual-kyc-bank-acc").value = kd.bankDetails.accountNumber;
             if (kd.bankDetails.ifscCode) document.getElementById("manual-kyc-bank-ifsc").value = kd.bankDetails.ifscCode;
         }
+        if (kd.soldierDetails?.isSoldier) {
+            const soldierCheck = document.getElementById("manual-kyc-is-soldier");
+            if (soldierCheck) {
+                soldierCheck.checked = true;
+                toggleManualSoldierSection(true);
+            }
+            if (kd.soldierDetails.serviceBranch) {
+                const branchEl = document.getElementById("manual-kyc-soldier-branch");
+                if (branchEl) branchEl.value = kd.soldierDetails.serviceBranch;
+            }
+            if (kd.soldierDetails.soldierIdNumber) {
+                const idEl = document.getElementById("manual-kyc-soldier-id");
+                if (idEl) idEl.value = kd.soldierDetails.soldierIdNumber;
+            }
+        }
     }
 }
 
 function clearSelectedUserForKyc() {
+    window.selectedManualKycUser = null;
     document.getElementById("manual-kyc-user-id").value = "";
     document.getElementById("manual-kyc-selected-user-card").style.display = "none";
+    const statusEl = document.getElementById("manual-kyc-selected-user-docs-status");
+    if (statusEl) statusEl.innerHTML = "";
     const searchInput = document.getElementById("manual-kyc-user-search");
     if (searchInput) {
         searchInput.style.display = "block";
@@ -807,7 +914,7 @@ function resetManualKycPreview(key) {
     } else if (key === "soldier") {
         container.innerHTML = `
             <i class="fas fa-id-badge" style="font-size:22px;color:#34D399;margin-bottom:4px"></i>
-            <div style="font-size:11px;color:#6ee7b7">Click to upload Soldier ID Card photo</div>
+            <div style="font-size:11px;color:#6ee7b7">Click to upload Police / Service ID photo</div>
         `;
     } else {
         container.innerHTML = `
@@ -836,8 +943,18 @@ async function submitManualKyc() {
         toast("Customer Full Name is required", "warning");
         return;
     }
-    if (!panNumber) {
-        toast("PAN Number is required", "warning");
+
+    const kd = window.selectedManualKycUser?.kycDoc;
+    const hasPanOnFile = !!(kd?.panNumber || kd?.panImage?.url);
+
+    // If customer has no PAN on file and none entered, check if admin is updating Bank or Police
+    const isSoldier = document.getElementById("manual-kyc-is-soldier")?.checked;
+    const soldierFile = document.getElementById("manual-kyc-soldier-file")?.files[0];
+    const soldierId = document.getElementById("manual-kyc-soldier-id")?.value.trim();
+    const bankName = document.getElementById("manual-kyc-bank-name")?.value.trim();
+
+    if (!panNumber && !hasPanOnFile && !isSoldier && !soldierFile && !bankName) {
+        toast("Please enter PAN Number or select/upload documents", "warning");
         return;
     }
 
@@ -857,7 +974,7 @@ async function submitManualKyc() {
         }
 
         formData.append("fullName", fullName);
-        formData.append("panNumber", panNumber);
+        if (panNumber) formData.append("panNumber", panNumber);
 
         const dob = document.getElementById("manual-kyc-dob")?.value;
         if (dob) formData.append("dob", dob);
@@ -874,22 +991,27 @@ async function submitManualKyc() {
         if (state) formData.append("address.state", state);
         if (pincode) formData.append("address.pincode", pincode);
 
-        // Bank details
-        const bankName = document.getElementById("manual-kyc-bank-name")?.value.trim();
+        // Bank details: support updating just Bank Name
         const bankHolder = document.getElementById("manual-kyc-bank-holder")?.value.trim();
         const bankAcc = document.getElementById("manual-kyc-bank-acc")?.value.trim();
         const bankIfsc = document.getElementById("manual-kyc-bank-ifsc")?.value.trim().toUpperCase();
         const bankType = document.getElementById("manual-kyc-bank-type")?.value || "savings";
 
-        if (bankAcc && bankIfsc) {
+        if (bankName) formData.append("bankName", bankName);
+        if (bankHolder) formData.append("accountHolderName", bankHolder);
+        if (bankAcc) formData.append("accountNumber", bankAcc);
+        if (bankIfsc) formData.append("ifscCode", bankIfsc);
+        if (bankType) formData.append("accountType", bankType);
+
+        if (bankName || bankAcc || bankIfsc) {
             formData.append("bankDetails.bankName", bankName || "Linked Bank");
             formData.append("bankDetails.accountHolderName", bankHolder || fullName);
-            formData.append("bankDetails.accountNumber", bankAcc);
-            formData.append("bankDetails.ifscCode", bankIfsc);
+            if (bankAcc) formData.append("bankDetails.accountNumber", bankAcc);
+            if (bankIfsc) formData.append("bankDetails.ifscCode", bankIfsc);
             formData.append("bankDetails.accountType", bankType);
         }
 
-        // File uploads
+        // File uploads (only append if newly chosen, preserving existing)
         const panFile = document.getElementById("manual-kyc-pan-file")?.files[0];
         const frontFile = document.getElementById("manual-kyc-aadhaar-front-file")?.files[0];
         const backFile = document.getElementById("manual-kyc-aadhaar-back-file")?.files[0];
@@ -897,14 +1019,11 @@ async function submitManualKyc() {
         if (frontFile) formData.append("aadhaarFront", frontFile);
         if (backFile) formData.append("aadhaarBack", backFile);
 
-        // Soldier details
-        const isSoldier = document.getElementById("manual-kyc-is-soldier")?.checked;
-        if (isSoldier) {
+        // Police / Soldier details
+        const branch = document.getElementById("manual-kyc-soldier-branch")?.value;
+        if (isSoldier || soldierFile || soldierId) {
             formData.append("isSoldier", "true");
-            const branch = document.getElementById("manual-kyc-soldier-branch")?.value;
-            const soldierId = document.getElementById("manual-kyc-soldier-id")?.value.trim();
-            const soldierFile = document.getElementById("manual-kyc-soldier-file")?.files[0];
-            if (branch) formData.append("serviceBranch", branch);
+            formData.append("serviceBranch", branch || "Police");
             if (soldierId) formData.append("soldierIdNumber", soldierId);
             if (soldierFile) formData.append("soldierIdCard", soldierFile);
         }

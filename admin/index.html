@@ -3923,6 +3923,7 @@
                                 <i class="fas fa-times"></i> Change
                             </button>
                         </div>
+                        <div id="manual-kyc-selected-user-docs-status" style="margin-top:8px"></div>
                     </div>
                 </div>
 
@@ -3941,11 +3942,11 @@
                             <input type="date" id="manual-kyc-dob" class="form-control" />
                         </div>
                         <div>
-                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">PAN Number (10 characters) <span style="color:var(--danger)">*</span></label>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">PAN Number (10 characters) <span style="font-size:11px;color:var(--text-muted);font-weight:normal">(Optional if already on file)</span></label>
                             <input type="text" id="manual-kyc-pan" class="form-control" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase;font-family:var(--font-mono)" />
                         </div>
                         <div>
-                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Aadhaar Number (12 digits)</label>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Aadhaar Number (12 digits) <span style="font-size:11px;color:var(--text-muted);font-weight:normal">(Optional if already on file)</span></label>
                             <input type="text" id="manual-kyc-aadhaar" class="form-control" placeholder="e.g. 123456789012" maxlength="14" style="font-family:var(--font-mono)" />
                         </div>
                     </div>
@@ -3978,11 +3979,14 @@
 
                 <!-- 4. Document Photos Upload -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                         <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
-                            <i class="fas fa-camera"></i> Step 4: Upload Customer Document Photos
+                            <i class="fas fa-camera"></i> Step 4: Upload Customer Document Photos (Optional if already on file)
                         </div>
-                        <span style="font-size:11px;color:var(--text-dim)">Supported formats: JPG, PNG, WEBP, PDF</span>
+                        <span style="font-size:11px;color:var(--text-dim)">Supported: JPG, PNG, WEBP, PDF</span>
+                    </div>
+                    <div style="font-size:11px;color:#34D399;margin-bottom:10px;background:rgba(16,185,129,0.1);padding:6px 10px;border-radius:6px;border:1px solid rgba(16,185,129,0.25)">
+                        <i class="fas fa-shield-alt"></i> <strong>Safe Preservation:</strong> Any previously uploaded PAN/Aadhaar photos will remain untouched. Only upload here if you want to add or replace photos.
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px">
@@ -4024,12 +4028,12 @@
                         <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
                             <i class="fas fa-university"></i> Step 5: Bank Account for Payouts & Redemptions
                         </div>
-                        <span style="font-size:11px;color:var(--text-dim)">Synced to Customer Bank & MF Records</span>
+                        <span style="font-size:11px;color:#6ee7b7">💡 You can update just the Bank without re-entering PAN/Aadhaar</span>
                     </div>
                     <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px">
                         <div>
                             <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Bank Name</label>
-                            <input type="text" id="manual-kyc-bank-name" class="form-control" placeholder="e.g. State Bank of India, HDFC" />
+                            <input type="text" id="manual-kyc-bank-name" class="form-control" placeholder="e.g. State Bank of India, HDFC Bank" />
                         </div>
                         <div>
                             <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Account Holder Name</label>
@@ -4053,44 +4057,45 @@
                     </div>
                 </div>
 
-                <!-- 6. Armed Forces / Soldier Verification (Optional) -->
+                <!-- 6. Police / Armed Forces Verification (Optional) -->
                 <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
                     <div style="display:flex;align-items:center;gap:10px">
                         <input type="checkbox" id="manual-kyc-is-soldier" onchange="toggleManualSoldierSection(this.checked)" style="width:16px;height:16px;cursor:pointer" />
                         <label for="manual-kyc-is-soldier" style="font-size:13px;font-weight:700;color:#34D399;cursor:pointer;margin:0">
-                            🎖️ Customer is Armed Forces / Police Personnel (Veer Jawan 5% Extra Benefit)
+                            🎖️ Customer is Police / Armed Forces Personnel (Veer Jawan / Police Verification)
                         </label>
                     </div>
 
                     <div id="manual-kyc-soldier-details-wrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(16,185,129,0.3)">
                         <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px">
                             <div>
-                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Service Branch</label>
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Force / Service Branch</label>
                                 <select id="manual-kyc-soldier-branch" class="form-control">
+                                    <option value="Police" selected>State Police / City Police (Inspector/Constable/Officer)</option>
+                                    <option value="Traffic Police">Traffic Police</option>
+                                    <option value="Crime Branch">Crime Branch / Special Cell</option>
+                                    <option value="CRPF">CRPF / Paramilitary</option>
                                     <option value="Army">Indian Army</option>
                                     <option value="Navy">Indian Navy</option>
                                     <option value="Air Force">Indian Air Force</option>
-                                    <option value="Police">State Police</option>
-                                    <option value="CRPF">CRPF / Paramilitary</option>
-                                    <option value="BSF">BSF</option>
-                                    <option value="CISF">CISF</option>
-                                    <option value="Other">Other Armed Forces</option>
+                                    <option value="BSF">BSF (Border Security Force)</option>
+                                    <option value="CISF">CISF / ITBP / SSB</option>
+                                    <option value="Other">Other Armed / Security Forces</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Soldier / Service ID Number</label>
-                                <input type="text" id="manual-kyc-soldier-id" class="form-control" placeholder="e.g. JC-123456K" style="text-transform:uppercase;font-family:var(--font-mono)" />
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Police Badge / Service ID Number</label>
+                                <input type="text" id="manual-kyc-soldier-id" class="form-control" placeholder="e.g. POL-84920 or JC-123456" style="text-transform:uppercase;font-family:var(--font-mono)" />
                             </div>
                         </div>
                         <div style="margin-top:10px">
-                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Soldier ID Card Photo</label>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Police / Service ID Card Photo</label>
                             <input type="file" id="manual-kyc-soldier-file" accept="image/*,.pdf" style="display:none" onchange="previewManualKycPhoto(this, 'preview-soldier')" />
                             <div id="preview-soldier" style="cursor:pointer;padding:12px;text-align:center;border:1px dashed #10B981;border-radius:6px;background:rgba(6,78,59,0.2)" onclick="document.getElementById('manual-kyc-soldier-file').click()">
                                 <i class="fas fa-id-badge" style="font-size:22px;color:#34D399;margin-bottom:4px"></i>
-                                <div style="font-size:11px;color:#6ee7b7">Click to upload Soldier ID Card photo</div>
+                                <div style="font-size:11px;color:#6ee7b7">Click to upload Police / Service ID Card photo</div>
                             </div>
                         </div>
-                    </div>
                 </div>
 
                 <!-- 7. Status & Admin Remarks -->

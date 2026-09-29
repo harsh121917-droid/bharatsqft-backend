@@ -954,46 +954,61 @@ exports.updateKycBank = async (req, res, next) => {
         const { id } = req.params;
         const { bankName, accountNumber, ifscCode, accountHolderName, accountType } = req.body;
 
-        if (!accountNumber || !ifscCode) {
-            return res.status(400).json({ success: false, message: "Account number and IFSC code are required" });
-        }
-
         const kyc = await Kyc.findById(id).populate("user", "name email phone");
         if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
 
+        const existingBank = kyc.bankDetails || {};
+        const finalBankName = (bankName && bankName.trim()) ? bankName.trim() : (existingBank.bankName || "Linked Bank");
+        const finalAccNum = (accountNumber !== undefined && accountNumber !== null && accountNumber.toString().trim() !== "")
+            ? accountNumber.toString().trim()
+            : (existingBank.accountNumber || "");
+        const finalIfsc = (ifscCode !== undefined && ifscCode !== null && ifscCode.toString().trim() !== "")
+            ? ifscCode.toString().trim().toUpperCase()
+            : (existingBank.ifscCode || "");
+        const finalAccType = accountType || existingBank.accountType || "savings";
         const userId = kyc.user?._id || kyc.user;
-        const holder = accountHolderName || kyc.fullName || kyc.user?.name || "Account Holder";
+        const holder = (accountHolderName && accountHolderName.trim()) 
+            ? accountHolderName.trim() 
+            : (existingBank.accountHolderName || kyc.fullName || kyc.user?.name || "Account Holder");
+
+        if (!finalBankName && !finalAccNum) {
+            return res.status(400).json({ success: false, message: "Please provide a Bank Name or Account Number" });
+        }
 
         kyc.bankDetails = {
-            bankName: bankName || "Linked Bank",
+            bankName: finalBankName,
             accountHolderName: holder,
-            accountNumber: accountNumber.trim(),
-            ifscCode: ifscCode.trim().toUpperCase(),
+            accountNumber: finalAccNum,
+            ifscCode: finalIfsc,
+            accountType: finalAccType,
         };
         await kyc.save();
 
-        // Also sync to BankAccount model
-        const BankAccount = require("../models/BankAccount");
-        let bank = await BankAccount.findOne({ user: userId, accountNumber: accountNumber.trim() });
-        if (!bank) {
-            bank = await BankAccount.create({
-                user: userId,
-                accountHolder: holder,
-                accountNumber: accountNumber.trim(),
-                ifsc: ifscCode.trim().toUpperCase(),
-                bankName: bankName || "Linked Bank",
-                accountType: accountType || "savings",
-                isDefault: true,
-                isVerified: true,
-            });
-            await BankAccount.updateMany({ user: userId, _id: { $ne: bank._id } }, { isDefault: false });
-        } else {
-            bank.accountHolder = holder;
-            bank.ifsc = ifscCode.trim().toUpperCase();
-            bank.bankName = bankName || bank.bankName;
-            bank.isDefault = true;
-            bank.isVerified = true;
-            await bank.save();
+        // Also sync to BankAccount model if accountNumber is present
+        if (finalAccNum) {
+            const BankAccount = require("../models/BankAccount");
+            let bank = await BankAccount.findOne({ user: userId, accountNumber: finalAccNum });
+            if (!bank) {
+                bank = await BankAccount.create({
+                    user: userId,
+                    accountHolder: holder,
+                    accountNumber: finalAccNum,
+                    ifsc: finalIfsc || "N/A",
+                    bankName: finalBankName,
+                    accountType: finalAccType,
+                    isDefault: true,
+                    isVerified: true,
+                });
+                await BankAccount.updateMany({ user: userId, _id: { $ne: bank._id } }, { isDefault: false });
+            } else {
+                bank.accountHolder = holder;
+                if (finalIfsc) bank.ifsc = finalIfsc;
+                bank.bankName = finalBankName;
+                bank.accountType = finalAccType;
+                bank.isDefault = true;
+                bank.isVerified = true;
+                await bank.save();
+            }
         }
 
         // Also sync to MfClientUcc if user has one
@@ -1027,7 +1042,7 @@ exports.updateKycBank = async (req, res, next) => {
 /* ─────────────────────────────────────────
    POST /api/admin/kyc/manual-entry
    Admin: Manually enter & submit customer KYC (bypassing automated vendor checks)
-   Supports multipart/form-data with file uploads or JSON payload
+   Supports non-destructive partial updates: preserves existing PAN, Aadhaar, photos, address, bank
 ───────────────────────────────────────── */
 exports.manualKycEntry = async (req, res, next) => {
     try {
@@ -1067,9 +1082,12 @@ exports.manualKycEntry = async (req, res, next) => {
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: "Target customer not found. Please provide a valid customer User ID, Phone number, or Email."
+                message: "Target customer not found. Please select a customer or provide their phone/email."
             });
         }
+
+        // Fetch existing KYC record for user to preserve already uploaded documents & details
+        let kyc = await Kyc.findOne({ user: user._id });
 
         // Parse nested objects if passed as JSON string
         if (typeof address === "string") {
@@ -1079,16 +1097,11 @@ exports.manualKycEntry = async (req, res, next) => {
             try { bankDetails = JSON.parse(bankDetails); } catch(e){}
         }
 
-        const resolvedLine1 = line1 || address?.line1 || "Manually Verified Address";
-        const resolvedCity = city || address?.city || "";
-        const resolvedState = state || address?.state || "";
-        const resolvedPincode = pincode || address?.pincode || "";
-
-        const resolvedBankName = bankName || bankDetails?.bankName || "";
-        const resolvedHolder = accountHolderName || bankDetails?.accountHolderName || fullName || user.name || "Account Holder";
-        const resolvedAccNum = (accountNumber || bankDetails?.accountNumber || "").toString().trim();
-        const resolvedIfsc = (ifscCode || bankDetails?.ifscCode || "").toString().trim().toUpperCase();
-        const resolvedAccType = accountType || bankDetails?.accountType || "savings";
+        // Address resolution: keep existing if not provided
+        const resolvedLine1 = line1 || address?.line1 || kyc?.address?.line1 || "Manually Verified Address";
+        const resolvedCity = city || address?.city || kyc?.address?.city || "";
+        const resolvedState = state || address?.state || kyc?.address?.state || "";
+        const resolvedPincode = pincode || address?.pincode || kyc?.address?.pincode || "";
 
         // File uploads
         const files = req.files || {};
@@ -1114,20 +1127,28 @@ exports.manualKycEntry = async (req, res, next) => {
             status = "approved";
         }
 
-        let kyc = await Kyc.findOne({ user: user._id });
+        // Non-destructive PAN & Aadhaar: PRESERVE EXISTING if empty
+        const resolvedFullName = (fullName && fullName.trim()) ? fullName.trim() : (kyc?.fullName || user.name || "Customer");
+        const resolvedDob = dob ? new Date(dob) : (kyc?.dob || new Date("1995-01-01"));
+        const resolvedPan = (panNumber && panNumber.trim()) 
+            ? panNumber.trim().toUpperCase() 
+            : (kyc?.panNumber || "MANUAL_VERIFIED");
+        const resolvedAadhaar = (aadhaarNumber && aadhaarNumber.trim()) 
+            ? aadhaarNumber.trim() 
+            : (kyc?.aadhaarNumber || "");
 
         const kycData = {
             user: user._id,
-            fullName: (fullName && fullName.trim()) ? fullName.trim() : (user.name || "Customer"),
-            dob: dob ? new Date(dob) : (kyc?.dob || new Date("1995-01-01")),
+            fullName: resolvedFullName,
+            dob: resolvedDob,
             address: {
                 line1: resolvedLine1,
-                city: resolvedCity || kyc?.address?.city || "",
-                state: resolvedState || kyc?.address?.state || "",
-                pincode: resolvedPincode || kyc?.address?.pincode || "",
+                city: resolvedCity,
+                state: resolvedState,
+                pincode: resolvedPincode,
             },
-            panNumber: (panNumber && panNumber.trim()) ? panNumber.trim().toUpperCase() : (kyc?.panNumber || "MANUAL_VERIFIED"),
-            aadhaarNumber: (aadhaarNumber && aadhaarNumber.trim()) ? aadhaarNumber.trim() : (kyc?.aadhaarNumber || ""),
+            panNumber: resolvedPan,
+            aadhaarNumber: resolvedAadhaar,
             status: status,
             reviewedBy: req.user._id,
             reviewedAt: new Date(),
@@ -1141,40 +1162,79 @@ exports.manualKycEntry = async (req, res, next) => {
             kycData.revokedReason = undefined;
         }
 
+        // Preserve existing photos if no new photo was uploaded in this request
         if (finalPanUrl) {
             kycData.panImage = { url: finalPanUrl, uploadedAt: new Date() };
-        } else if (!kyc?.panImage?.url) {
+        } else if (kyc?.panImage?.url) {
+            kycData.panImage = kyc.panImage;
+        } else {
             kycData.panImage = { url: "manual_admin_entry", uploadedAt: new Date() };
         }
 
         if (finalAadhaarFrontUrl) {
             kycData.aadhaarFront = { url: finalAadhaarFrontUrl, uploadedAt: new Date() };
+        } else if (kyc?.aadhaarFront?.url) {
+            kycData.aadhaarFront = kyc.aadhaarFront;
         }
+
         if (finalAadhaarBackUrl) {
             kycData.aadhaarBack = { url: finalAadhaarBackUrl, uploadedAt: new Date() };
+        } else if (kyc?.aadhaarBack?.url) {
+            kycData.aadhaarBack = kyc.aadhaarBack;
         }
 
-        if (resolvedAccNum && resolvedIfsc) {
+        // Bank details resolution: non-destructive merge
+        const existingBank = kyc?.bankDetails || {};
+        const inputBankName = (bankName && bankName.trim()) || (bankDetails?.bankName && bankDetails.bankName.trim());
+        const inputHolder = (accountHolderName && accountHolderName.trim()) || (bankDetails?.accountHolderName && bankDetails.accountHolderName.trim());
+        const inputAccNum = (accountNumber !== undefined && accountNumber !== null && accountNumber.toString().trim() !== "") 
+            ? accountNumber.toString().trim() 
+            : (bankDetails?.accountNumber ? bankDetails.accountNumber.toString().trim() : "");
+        const inputIfsc = (ifscCode !== undefined && ifscCode !== null && ifscCode.toString().trim() !== "") 
+            ? ifscCode.toString().trim().toUpperCase() 
+            : (bankDetails?.ifscCode ? bankDetails.ifscCode.toString().trim().toUpperCase() : "");
+        const inputAccType = accountType || bankDetails?.accountType || "savings";
+
+        const finalBankName = inputBankName || existingBank.bankName || "";
+        const finalHolder = inputHolder || existingBank.accountHolderName || resolvedFullName;
+        const finalAccNum = inputAccNum || existingBank.accountNumber || "";
+        const finalIfsc = inputIfsc || existingBank.ifscCode || "";
+
+        if (finalBankName || finalAccNum || finalIfsc) {
             kycData.bankDetails = {
-                accountHolderName: resolvedHolder,
-                accountNumber: resolvedAccNum,
-                ifscCode: resolvedIfsc,
-                bankName: resolvedBankName || "Linked Bank",
+                bankName: finalBankName || "Linked Bank",
+                accountHolderName: finalHolder,
+                accountNumber: finalAccNum,
+                ifscCode: finalIfsc,
             };
+        } else if (existingBank.accountNumber) {
+            kycData.bankDetails = existingBank;
         }
 
-        const isSoldierBool = isSoldier === "true" || isSoldier === true;
+        // Police / Armed Forces details resolution (Veer Jawan)
+        const isSoldierBool = isSoldier === "true" || isSoldier === true || !!finalSoldierIdUrl || (soldierIdNumber && soldierIdNumber.trim());
+        const existingSoldier = kyc?.soldierDetails || {};
+
         if (isSoldierBool) {
+            const finalBranch = (serviceBranch && serviceBranch.trim()) || existingSoldier.serviceBranch || "Police";
+            const finalSoldierId = (soldierIdNumber && soldierIdNumber.trim()) 
+                ? soldierIdNumber.trim().toUpperCase() 
+                : (existingSoldier.soldierIdNumber || "POLICE_VERIFIED");
+            const finalSoldierCard = finalSoldierIdUrl || existingSoldier.soldierIdCardUrl || "";
+            const finalSoldierStatus = soldierStatus || (status === "approved" ? "approved" : (existingSoldier.status || "pending"));
+
             kycData.soldierDetails = {
                 isSoldier: true,
-                soldierIdNumber: (soldierIdNumber || kyc?.soldierDetails?.soldierIdNumber || "").trim().toUpperCase(),
-                serviceBranch: (serviceBranch || kyc?.soldierDetails?.serviceBranch || "Armed Forces").trim(),
-                soldierIdCardUrl: finalSoldierIdUrl || kyc?.soldierDetails?.soldierIdCardUrl || "",
-                status: soldierStatus || (status === "approved" ? "approved" : "pending"),
-                submittedAt: new Date(),
+                soldierIdNumber: finalSoldierId,
+                serviceBranch: finalBranch,
+                soldierIdCardUrl: finalSoldierCard,
+                status: finalSoldierStatus,
+                submittedAt: existingSoldier.submittedAt || new Date(),
                 reviewedAt: new Date(),
                 reviewedBy: req.user._id,
             };
+        } else if (existingSoldier.isSoldier) {
+            kycData.soldierDetails = existingSoldier;
         }
 
         if (kyc) {
@@ -1184,36 +1244,38 @@ exports.manualKycEntry = async (req, res, next) => {
             kyc = await Kyc.create(kycData);
         }
 
+        // Update User status in sync
         const userUpdate = {
             kycStatus: status === "approved" ? "approved" : (status === "rejected" ? "rejected" : "pending"),
         };
-        if (fullName && (!user.name || user.name === "Account Holder")) {
-            userUpdate.name = fullName.trim();
+        if (resolvedFullName && (!user.name || user.name === "Account Holder")) {
+            userUpdate.name = resolvedFullName;
         }
-        if (isSoldierBool) {
+        if (kycData.soldierDetails?.isSoldier) {
             userUpdate.isSoldierVerified = kycData.soldierDetails.status === "approved";
             userUpdate.soldierKycStatus = kycData.soldierDetails.status;
         }
         await User.findByIdAndUpdate(user._id, userUpdate);
 
-        if (resolvedAccNum && resolvedIfsc) {
-            let bank = await BankAccount.findOne({ user: user._id, accountNumber: resolvedAccNum });
+        // Sync bank account to BankAccount model if account number provided
+        if (finalAccNum) {
+            let bank = await BankAccount.findOne({ user: user._id, accountNumber: finalAccNum });
             if (!bank) {
                 bank = await BankAccount.create({
                     user: user._id,
-                    accountHolder: resolvedHolder,
-                    accountNumber: resolvedAccNum,
-                    ifsc: resolvedIfsc,
-                    bankName: resolvedBankName || "Linked Bank",
-                    accountType: resolvedAccType || "savings",
+                    accountHolder: finalHolder,
+                    accountNumber: finalAccNum,
+                    ifsc: finalIfsc || "N/A",
+                    bankName: finalBankName || "Linked Bank",
+                    accountType: inputAccType,
                     isDefault: true,
                     isVerified: true,
                 });
                 await BankAccount.updateMany({ user: user._id, _id: { $ne: bank._id } }, { isDefault: false });
             } else {
-                bank.accountHolder = resolvedHolder;
-                bank.ifsc = resolvedIfsc;
-                bank.bankName = resolvedBankName || bank.bankName;
+                bank.accountHolder = finalHolder;
+                if (finalIfsc) bank.ifsc = finalIfsc;
+                if (finalBankName) bank.bankName = finalBankName;
                 bank.isDefault = true;
                 bank.isVerified = true;
                 await bank.save();
@@ -1222,7 +1284,7 @@ exports.manualKycEntry = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: `Customer KYC manually ${status === "approved" ? "approved & verified" : "saved"} successfully!`,
+            message: `Customer KYC manually ${status === "approved" ? "approved & verified" : "saved"} successfully! (Existing documents preserved)`,
             data: kyc,
         });
     } catch (err) {
@@ -1232,7 +1294,7 @@ exports.manualKycEntry = async (req, res, next) => {
 
 /* ─────────────────────────────────────────
    POST /api/admin/kyc/:id/upload-docs
-   Admin: Upload or replace KYC document photos (PAN, Aadhaar Front/Back, Soldier ID)
+   Admin: Upload or replace KYC document photos (PAN, Aadhaar Front/Back, Police/Soldier ID)
 ───────────────────────────────────────── */
 exports.adminUploadKycDocs = async (req, res, next) => {
     try {
@@ -1257,8 +1319,24 @@ exports.adminUploadKycDocs = async (req, res, next) => {
         }
         if (files.soldierIdCard && files.soldierIdCard[0]) {
             if (!kyc.soldierDetails) kyc.soldierDetails = { isSoldier: true };
+            kyc.soldierDetails.isSoldier = true;
             kyc.soldierDetails.soldierIdCardUrl = files.soldierIdCard[0].path;
+            if (req.body.serviceBranch) kyc.soldierDetails.serviceBranch = req.body.serviceBranch.trim();
+            if (req.body.soldierIdNumber) kyc.soldierDetails.soldierIdNumber = req.body.soldierIdNumber.trim().toUpperCase();
+            if (!kyc.soldierDetails.status || kyc.soldierDetails.status === "not_submitted") {
+                kyc.soldierDetails.status = "approved";
+            }
+            kyc.soldierDetails.reviewedAt = new Date();
+            kyc.soldierDetails.reviewedBy = req.user._id;
             updatedCount++;
+
+            if (kyc.user) {
+                const User = require("../models/User");
+                await User.findByIdAndUpdate(kyc.user._id || kyc.user, {
+                    isSoldierVerified: kyc.soldierDetails.status === "approved",
+                    soldierKycStatus: kyc.soldierDetails.status,
+                });
+            }
         }
 
         if (updatedCount === 0) {
