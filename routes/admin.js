@@ -38,7 +38,11 @@ const {
   deleteProperty, toggleStatus,
 } = require("../controllers/propertyController");
 const { getAllInvestments } = require("../controllers/paymentController");
-const { getAllKyc, getKycById, reviewKyc, reviewSoldierKyc, updateKycBank } = require("../controllers/kycController");
+const {
+  getAllKyc, getKycById, reviewKyc, reviewSoldierKyc, updateKycBank,
+  manualKycEntry, adminUploadKycDocs,
+} = require("../controllers/kycController");
+const { uploadKycDocs } = require("../middleware/uploadMiddleware");
 const { enrollmentDetail } = require("../controllers/schemeController");
 const {
   getAllHomeVideos,
@@ -109,6 +113,18 @@ router.get("/investments", getAllInvestments);
 // KYC
 router.get("/kyc", getAllKyc);
 router.get("/kyc/:id", getKycById);
+router.post("/kyc/manual-entry", (req, res, next) => {
+  uploadKycDocs(req, res, (err) => {
+    if (err) return next(err);
+    manualKycEntry(req, res, next);
+  });
+});
+router.post("/kyc/:id/upload-docs", (req, res, next) => {
+  uploadKycDocs(req, res, (err) => {
+    if (err) return next(err);
+    adminUploadKycDocs(req, res, next);
+  });
+});
 router.patch("/kyc/:id", reviewKyc);
 router.patch("/kyc/:id/soldier-status", reviewSoldierKyc);
 router.patch("/kyc/:id/bank", updateKycBank);

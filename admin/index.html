@@ -1554,6 +1554,9 @@
                         <button class="btn btn-secondary btn-sm" onclick="loadKyc()" title="Refresh KYC List">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
+                        <button class="btn btn-primary btn-sm" onclick="openManualKycModal()" title="Manually Enter & Verify Customer KYC" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:700">
+                            <i class="fas fa-user-plus"></i> Manual KYC Entry
+                        </button>
                     </div>
                 </div>
                 <div class="table-wrap">
@@ -3874,6 +3877,250 @@
             </div>
             <div class="modal-body" id="kyc-modal-body"></div>
             <div class="modal-footer" id="kyc-modal-footer"></div>
+        </div>
+    </div>
+
+    <!-- Manual KYC Entry Modal -->
+    <div class="modal-overlay" id="manual-kyc-modal" style="display:none">
+        <div class="modal modal-lg" style="max-width:850px;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+            <div class="modal-header" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+                <div class="modal-title" style="display:flex;align-items:center;gap:10px">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:rgba(212,160,23,0.15);color:var(--gold)">
+                        <i class="fas fa-id-card-alt"></i>
+                    </span>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#fff">Manual Customer KYC Entry</div>
+                        <div style="font-size:11.5px;color:var(--text-dim);font-weight:normal">Enter identification, upload document photos, and bypass automated vendor checks</div>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeManualKycModal()">×</button>
+            </div>
+
+            <div class="modal-body" style="padding:1.25rem;overflow-y:auto;flex:1">
+                <!-- 1. Customer Selection / Association -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <label style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-search"></i> Step 1: Select Customer
+                        </label>
+                        <span style="font-size:11px;color:var(--text-dim)">Search by Name, Phone, or Email</span>
+                    </div>
+
+                    <div style="position:relative">
+                        <input type="text" id="manual-kyc-user-search" class="form-control" placeholder="Type customer name, phone number, or email..." oninput="debouncedSearchUsersForKyc(this.value)" autocomplete="off" />
+                        <div id="manual-kyc-user-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:50;margin-top:4px"></div>
+                    </div>
+
+                    <!-- Hidden Selected User Data -->
+                    <input type="hidden" id="manual-kyc-user-id" />
+                    <div id="manual-kyc-selected-user-card" style="display:none;margin-top:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:10px 14px;border-radius:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <div>
+                                <div style="font-weight:700;color:#6ee7b7;font-size:14px" id="manual-kyc-selected-user-name">—</div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="manual-kyc-selected-user-contact">—</div>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelectedUserForKyc()" style="font-size:11px;padding:3px 8px">
+                                <i class="fas fa-times"></i> Change
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Personal & Identity Details -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">
+                        <i class="fas fa-address-card"></i> Step 2: Personal & Identity Numbers
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px">
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Full Name (as per Govt ID) <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="manual-kyc-fullname" class="form-control" placeholder="e.g. Rajesh Kumar Sharma" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Date of Birth</label>
+                            <input type="date" id="manual-kyc-dob" class="form-control" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">PAN Number (10 characters) <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="manual-kyc-pan" class="form-control" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase;font-family:var(--font-mono)" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Aadhaar Number (12 digits)</label>
+                            <input type="text" id="manual-kyc-aadhaar" class="form-control" placeholder="e.g. 123456789012" maxlength="14" style="font-family:var(--font-mono)" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Address Information -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">
+                        <i class="fas fa-map-marker-alt"></i> Step 3: Residential Address
+                    </div>
+                    <div style="margin-bottom:10px">
+                        <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Street Address / House No.</label>
+                        <input type="text" id="manual-kyc-address-line1" class="form-control" placeholder="Flat No., Building Name, Street, Landmark" />
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px">
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">City</label>
+                            <input type="text" id="manual-kyc-city" class="form-control" placeholder="e.g. Mumbai" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">State</label>
+                            <input type="text" id="manual-kyc-state" class="form-control" placeholder="e.g. Maharashtra" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">PIN Code</label>
+                            <input type="text" id="manual-kyc-pincode" class="form-control" placeholder="e.g. 400001" maxlength="6" style="font-family:var(--font-mono)" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Document Photos Upload -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-camera"></i> Step 4: Upload Customer Document Photos
+                        </div>
+                        <span style="font-size:11px;color:var(--text-dim)">Supported formats: JPG, PNG, WEBP, PDF</span>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px">
+                        <!-- PAN Card Photo -->
+                        <div style="border:1px dashed var(--border);border-radius:8px;padding:12px;text-align:center;background:rgba(0,0,0,0.2)">
+                            <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px">PAN Card Photo</div>
+                            <input type="file" id="manual-kyc-pan-file" accept="image/*,.pdf" style="display:none" onchange="previewManualKycPhoto(this, 'preview-pan')" />
+                            <div id="preview-pan" style="cursor:pointer;min-height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;background:var(--surface);padding:8px" onclick="document.getElementById('manual-kyc-pan-file').click()">
+                                <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:var(--gold);margin-bottom:6px"></i>
+                                <span style="font-size:11px;color:var(--text-muted)">Click to select PAN photo</span>
+                            </div>
+                        </div>
+
+                        <!-- Aadhaar Front Photo -->
+                        <div style="border:1px dashed var(--border);border-radius:8px;padding:12px;text-align:center;background:rgba(0,0,0,0.2)">
+                            <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px">Aadhaar Front</div>
+                            <input type="file" id="manual-kyc-aadhaar-front-file" accept="image/*,.pdf" style="display:none" onchange="previewManualKycPhoto(this, 'preview-aadhaar-front')" />
+                            <div id="preview-aadhaar-front" style="cursor:pointer;min-height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;background:var(--surface);padding:8px" onclick="document.getElementById('manual-kyc-aadhaar-front-file').click()">
+                                <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:var(--info);margin-bottom:6px"></i>
+                                <span style="font-size:11px;color:var(--text-muted)">Click to select Front</span>
+                            </div>
+                        </div>
+
+                        <!-- Aadhaar Back Photo -->
+                        <div style="border:1px dashed var(--border);border-radius:8px;padding:12px;text-align:center;background:rgba(0,0,0,0.2)">
+                            <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px">Aadhaar Back</div>
+                            <input type="file" id="manual-kyc-aadhaar-back-file" accept="image/*,.pdf" style="display:none" onchange="previewManualKycPhoto(this, 'preview-aadhaar-back')" />
+                            <div id="preview-aadhaar-back" style="cursor:pointer;min-height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;background:var(--surface);padding:8px" onclick="document.getElementById('manual-kyc-aadhaar-back-file').click()">
+                                <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:var(--info);margin-bottom:6px"></i>
+                                <span style="font-size:11px;color:var(--text-muted)">Click to select Back</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Bank Account Details -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-university"></i> Step 5: Bank Account for Payouts & Redemptions
+                        </div>
+                        <span style="font-size:11px;color:var(--text-dim)">Synced to Customer Bank & MF Records</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px">
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Bank Name</label>
+                            <input type="text" id="manual-kyc-bank-name" class="form-control" placeholder="e.g. State Bank of India, HDFC" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Account Holder Name</label>
+                            <input type="text" id="manual-kyc-bank-holder" class="form-control" placeholder="Name as per Passbook / Cheque" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Account Number</label>
+                            <input type="text" id="manual-kyc-bank-acc" class="form-control" placeholder="e.g. 123456789012" style="font-family:var(--font-mono)" />
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">IFSC Code (11 chars)</label>
+                            <input type="text" id="manual-kyc-bank-ifsc" class="form-control" placeholder="e.g. SBIN0001234" maxlength="11" style="text-transform:uppercase;font-family:var(--font-mono)" />
+                        </div>
+                    </div>
+                    <div style="margin-top:10px">
+                        <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Account Type</label>
+                        <select id="manual-kyc-bank-type" class="form-control" style="max-width:200px">
+                            <option value="savings" selected>Savings Account</option>
+                            <option value="current">Current Account</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 6. Armed Forces / Soldier Verification (Optional) -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:1.25rem">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <input type="checkbox" id="manual-kyc-is-soldier" onchange="toggleManualSoldierSection(this.checked)" style="width:16px;height:16px;cursor:pointer" />
+                        <label for="manual-kyc-is-soldier" style="font-size:13px;font-weight:700;color:#34D399;cursor:pointer;margin:0">
+                            🎖️ Customer is Armed Forces / Police Personnel (Veer Jawan 5% Extra Benefit)
+                        </label>
+                    </div>
+
+                    <div id="manual-kyc-soldier-details-wrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(16,185,129,0.3)">
+                        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px">
+                            <div>
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Service Branch</label>
+                                <select id="manual-kyc-soldier-branch" class="form-control">
+                                    <option value="Army">Indian Army</option>
+                                    <option value="Navy">Indian Navy</option>
+                                    <option value="Air Force">Indian Air Force</option>
+                                    <option value="Police">State Police</option>
+                                    <option value="CRPF">CRPF / Paramilitary</option>
+                                    <option value="BSF">BSF</option>
+                                    <option value="CISF">CISF</option>
+                                    <option value="Other">Other Armed Forces</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Soldier / Service ID Number</label>
+                                <input type="text" id="manual-kyc-soldier-id" class="form-control" placeholder="e.g. JC-123456K" style="text-transform:uppercase;font-family:var(--font-mono)" />
+                            </div>
+                        </div>
+                        <div style="margin-top:10px">
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Soldier ID Card Photo</label>
+                            <input type="file" id="manual-kyc-soldier-file" accept="image/*,.pdf" style="display:none" onchange="previewManualKycPhoto(this, 'preview-soldier')" />
+                            <div id="preview-soldier" style="cursor:pointer;padding:12px;text-align:center;border:1px dashed #10B981;border-radius:6px;background:rgba(6,78,59,0.2)" onclick="document.getElementById('manual-kyc-soldier-file').click()">
+                                <i class="fas fa-id-badge" style="font-size:22px;color:#34D399;margin-bottom:4px"></i>
+                                <div style="font-size:11px;color:#6ee7b7">Click to upload Soldier ID Card photo</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. Status & Admin Remarks -->
+                <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
+                    <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">
+                        <i class="fas fa-check-double"></i> Step 6: Verification Status & Audit Note
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px">
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Set Verification Status</label>
+                            <select id="manual-kyc-status" class="form-control" style="font-weight:700">
+                                <option value="approved" selected>✅ Approved & Verified (Immediate Access)</option>
+                                <option value="pending">⏳ Pending Review</option>
+                                <option value="rejected">❌ Rejected</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">Admin Notes / Remarks</label>
+                            <input type="text" id="manual-kyc-notes" class="form-control" placeholder="e.g. Manually verified physical documents via branch support" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface)">
+                <button type="button" class="btn btn-secondary" onclick="closeManualKycModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-submit-manual-kyc" onclick="submitManualKyc()" style="background:linear-gradient(135deg,#d4a017,#b8860b);color:#000;font-weight:700;padding:8px 24px">
+                    <i class="fas fa-check-circle"></i> Save & Submit Manual KYC
+                </button>
+            </div>
         </div>
     </div>
 

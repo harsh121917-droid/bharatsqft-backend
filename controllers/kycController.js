@@ -1023,3 +1023,261 @@ exports.updateKycBank = async (req, res, next) => {
         next(err);
     }
 };
+
+/* ─────────────────────────────────────────
+   POST /api/admin/kyc/manual-entry
+   Admin: Manually enter & submit customer KYC (bypassing automated vendor checks)
+   Supports multipart/form-data with file uploads or JSON payload
+───────────────────────────────────────── */
+exports.manualKycEntry = async (req, res, next) => {
+    try {
+        const User = require("../models/User");
+        const BankAccount = require("../models/BankAccount");
+
+        let {
+            userId, phone, email,
+            fullName, dob,
+            "address.line1": line1, "address.city": city,
+            "address.state": state, "address.pincode": pincode,
+            address,
+            panNumber, aadhaarNumber,
+            "bankDetails.accountHolderName": accountHolderName,
+            "bankDetails.accountNumber": accountNumber,
+            "bankDetails.ifscCode": ifscCode,
+            "bankDetails.bankName": bankName,
+            "bankDetails.accountType": accountType,
+            bankDetails,
+            status = "approved",
+            rejectionReason,
+            adminNotes,
+            isSoldier, soldierIdNumber, serviceBranch, soldierStatus,
+            panImageUrl, aadhaarFrontUrl, aadhaarBackUrl, soldierIdCardUrl
+        } = req.body;
+
+        // 1. Resolve User
+        let user = null;
+        if (userId) {
+            user = await User.findById(userId);
+        } else if (phone) {
+            user = await User.findOne({ phone: phone.trim() });
+        } else if (email) {
+            user = await User.findOne({ email: email.trim().toLowerCase() });
+        }
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Target customer not found. Please provide a valid customer User ID, Phone number, or Email."
+            });
+        }
+
+        // Parse nested objects if passed as JSON string
+        if (typeof address === "string") {
+            try { address = JSON.parse(address); } catch(e){}
+        }
+        if (typeof bankDetails === "string") {
+            try { bankDetails = JSON.parse(bankDetails); } catch(e){}
+        }
+
+        const resolvedLine1 = line1 || address?.line1 || "Manually Verified Address";
+        const resolvedCity = city || address?.city || "";
+        const resolvedState = state || address?.state || "";
+        const resolvedPincode = pincode || address?.pincode || "";
+
+        const resolvedBankName = bankName || bankDetails?.bankName || "";
+        const resolvedHolder = accountHolderName || bankDetails?.accountHolderName || fullName || user.name || "Account Holder";
+        const resolvedAccNum = (accountNumber || bankDetails?.accountNumber || "").toString().trim();
+        const resolvedIfsc = (ifscCode || bankDetails?.ifscCode || "").toString().trim().toUpperCase();
+        const resolvedAccType = accountType || bankDetails?.accountType || "savings";
+
+        // File uploads
+        const files = req.files || {};
+        let finalPanUrl = panImageUrl || "";
+        let finalAadhaarFrontUrl = aadhaarFrontUrl || "";
+        let finalAadhaarBackUrl = aadhaarBackUrl || "";
+        let finalSoldierIdUrl = soldierIdCardUrl || "";
+
+        if (files.panImage && files.panImage[0]) {
+            finalPanUrl = files.panImage[0].path;
+        }
+        if (files.aadhaarFront && files.aadhaarFront[0]) {
+            finalAadhaarFrontUrl = files.aadhaarFront[0].path;
+        }
+        if (files.aadhaarBack && files.aadhaarBack[0]) {
+            finalAadhaarBackUrl = files.aadhaarBack[0].path;
+        }
+        if (files.soldierIdCard && files.soldierIdCard[0]) {
+            finalSoldierIdUrl = files.soldierIdCard[0].path;
+        }
+
+        if (!["approved", "pending", "rejected"].includes(status)) {
+            status = "approved";
+        }
+
+        let kyc = await Kyc.findOne({ user: user._id });
+
+        const kycData = {
+            user: user._id,
+            fullName: (fullName && fullName.trim()) ? fullName.trim() : (user.name || "Customer"),
+            dob: dob ? new Date(dob) : (kyc?.dob || new Date("1995-01-01")),
+            address: {
+                line1: resolvedLine1,
+                city: resolvedCity || kyc?.address?.city || "",
+                state: resolvedState || kyc?.address?.state || "",
+                pincode: resolvedPincode || kyc?.address?.pincode || "",
+            },
+            panNumber: (panNumber && panNumber.trim()) ? panNumber.trim().toUpperCase() : (kyc?.panNumber || "MANUAL_VERIFIED"),
+            aadhaarNumber: (aadhaarNumber && aadhaarNumber.trim()) ? aadhaarNumber.trim() : (kyc?.aadhaarNumber || ""),
+            status: status,
+            reviewedBy: req.user._id,
+            reviewedAt: new Date(),
+            submittedAt: kyc?.submittedAt || new Date(),
+        };
+
+        if (status === "rejected") {
+            kycData.rejectionReason = rejectionReason || adminNotes || "Rejected during manual review";
+        } else {
+            kycData.rejectionReason = undefined;
+            kycData.revokedReason = undefined;
+        }
+
+        if (finalPanUrl) {
+            kycData.panImage = { url: finalPanUrl, uploadedAt: new Date() };
+        } else if (!kyc?.panImage?.url) {
+            kycData.panImage = { url: "manual_admin_entry", uploadedAt: new Date() };
+        }
+
+        if (finalAadhaarFrontUrl) {
+            kycData.aadhaarFront = { url: finalAadhaarFrontUrl, uploadedAt: new Date() };
+        }
+        if (finalAadhaarBackUrl) {
+            kycData.aadhaarBack = { url: finalAadhaarBackUrl, uploadedAt: new Date() };
+        }
+
+        if (resolvedAccNum && resolvedIfsc) {
+            kycData.bankDetails = {
+                accountHolderName: resolvedHolder,
+                accountNumber: resolvedAccNum,
+                ifscCode: resolvedIfsc,
+                bankName: resolvedBankName || "Linked Bank",
+            };
+        }
+
+        const isSoldierBool = isSoldier === "true" || isSoldier === true;
+        if (isSoldierBool) {
+            kycData.soldierDetails = {
+                isSoldier: true,
+                soldierIdNumber: (soldierIdNumber || kyc?.soldierDetails?.soldierIdNumber || "").trim().toUpperCase(),
+                serviceBranch: (serviceBranch || kyc?.soldierDetails?.serviceBranch || "Armed Forces").trim(),
+                soldierIdCardUrl: finalSoldierIdUrl || kyc?.soldierDetails?.soldierIdCardUrl || "",
+                status: soldierStatus || (status === "approved" ? "approved" : "pending"),
+                submittedAt: new Date(),
+                reviewedAt: new Date(),
+                reviewedBy: req.user._id,
+            };
+        }
+
+        if (kyc) {
+            Object.assign(kyc, kycData);
+            await kyc.save();
+        } else {
+            kyc = await Kyc.create(kycData);
+        }
+
+        const userUpdate = {
+            kycStatus: status === "approved" ? "approved" : (status === "rejected" ? "rejected" : "pending"),
+        };
+        if (fullName && (!user.name || user.name === "Account Holder")) {
+            userUpdate.name = fullName.trim();
+        }
+        if (isSoldierBool) {
+            userUpdate.isSoldierVerified = kycData.soldierDetails.status === "approved";
+            userUpdate.soldierKycStatus = kycData.soldierDetails.status;
+        }
+        await User.findByIdAndUpdate(user._id, userUpdate);
+
+        if (resolvedAccNum && resolvedIfsc) {
+            let bank = await BankAccount.findOne({ user: user._id, accountNumber: resolvedAccNum });
+            if (!bank) {
+                bank = await BankAccount.create({
+                    user: user._id,
+                    accountHolder: resolvedHolder,
+                    accountNumber: resolvedAccNum,
+                    ifsc: resolvedIfsc,
+                    bankName: resolvedBankName || "Linked Bank",
+                    accountType: resolvedAccType || "savings",
+                    isDefault: true,
+                    isVerified: true,
+                });
+                await BankAccount.updateMany({ user: user._id, _id: { $ne: bank._id } }, { isDefault: false });
+            } else {
+                bank.accountHolder = resolvedHolder;
+                bank.ifsc = resolvedIfsc;
+                bank.bankName = resolvedBankName || bank.bankName;
+                bank.isDefault = true;
+                bank.isVerified = true;
+                await bank.save();
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Customer KYC manually ${status === "approved" ? "approved & verified" : "saved"} successfully!`,
+            data: kyc,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/* ─────────────────────────────────────────
+   POST /api/admin/kyc/:id/upload-docs
+   Admin: Upload or replace KYC document photos (PAN, Aadhaar Front/Back, Soldier ID)
+───────────────────────────────────────── */
+exports.adminUploadKycDocs = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const kyc = await Kyc.findById(id).populate("user", "name email phone");
+        if (!kyc) return res.status(404).json({ success: false, message: "KYC record not found" });
+
+        const files = req.files || {};
+        let updatedCount = 0;
+
+        if (files.panImage && files.panImage[0]) {
+            kyc.panImage = { url: files.panImage[0].path, uploadedAt: new Date() };
+            updatedCount++;
+        }
+        if (files.aadhaarFront && files.aadhaarFront[0]) {
+            kyc.aadhaarFront = { url: files.aadhaarFront[0].path, uploadedAt: new Date() };
+            updatedCount++;
+        }
+        if (files.aadhaarBack && files.aadhaarBack[0]) {
+            kyc.aadhaarBack = { url: files.aadhaarBack[0].path, uploadedAt: new Date() };
+            updatedCount++;
+        }
+        if (files.soldierIdCard && files.soldierIdCard[0]) {
+            if (!kyc.soldierDetails) kyc.soldierDetails = { isSoldier: true };
+            kyc.soldierDetails.soldierIdCardUrl = files.soldierIdCard[0].path;
+            updatedCount++;
+        }
+
+        if (updatedCount === 0) {
+            return res.status(400).json({ success: false, message: "No document photos uploaded" });
+        }
+
+        await kyc.save();
+
+        res.json({
+            success: true,
+            message: `${updatedCount} document photo(s) updated successfully!`,
+            data: {
+                panImage: kyc.panImage,
+                aadhaarFront: kyc.aadhaarFront,
+                aadhaarBack: kyc.aadhaarBack,
+                soldierDetails: kyc.soldierDetails,
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
