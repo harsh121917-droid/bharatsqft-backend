@@ -482,7 +482,7 @@ exports.getSchemeDetail = async (req, res) => {
     const ret1Y = retStats?.return1y ?? periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
     const ret3Y = retStats?.return3y ?? periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
     const ret5Y = retStats?.return5y ?? periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
-    const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
+    const retAll = retStats?.return_since_created ?? retStats?.return_default ?? periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
 
     if (retStats) {
       if (periodReturns['1M'] && retStats.return1m != null) {
@@ -504,6 +504,11 @@ exports.getSchemeDetail = async (req, res) => {
       if (periodReturns['5Y'] && retStats.return5y != null) {
         periodReturns['5Y'].returnPercent = retStats.return5y;
         periodReturns['5Y'].isPositive = retStats.return5y >= 0;
+      }
+      if (periodReturns['All'] && (retStats.return_since_created != null || retStats.return_default != null)) {
+        const allVal = retStats.return_since_created ?? retStats.return_default;
+        periodReturns['All'].returnPercent = allVal;
+        periodReturns['All'].isPositive = allVal >= 0;
       }
     }
 

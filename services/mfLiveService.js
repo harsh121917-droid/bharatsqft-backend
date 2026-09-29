@@ -10,6 +10,105 @@ const factsCache = new Map();
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
+const KNOWN_DIRECT_MAP = {
+  '101592': '119620', // Aditya Birla Sun Life Midcap Fund Regular -> Direct Growth (NAV 919.61, AUM 6966 Cr)
+  '147944': '147946', // Bandhan Small Cap Regular -> Direct Growth
+  '125494': '125497', // SBI Small Cap Regular -> Direct Growth
+  '113177': '120716', // Nippon India Small Cap Regular -> Direct Growth
+  '122640': '122639', // Parag Parikh Flexi Cap Regular -> Direct Growth
+  '100119': '120503', // HDFC Small Cap Regular -> Direct Growth
+  '100177': '119598', // Kotak Small Cap Regular -> Direct Growth
+  '108466': '120828', // Quant Small Cap Regular -> Direct Growth
+  '100412': '119775', // Axis Small Cap Regular -> Direct Growth
+  '148920': '148921', // Aditya Birla Sun Life Multi-Cap Regular -> Direct Growth
+};
+
+const KNOWN_SEARCH_ID_MAP = {
+  '101592': 'birla-sun-life-mid-cap-fund-plan-a-direct-growth',
+  '119620': 'birla-sun-life-mid-cap-fund-plan-a-direct-growth',
+  '147944': 'bandhan-small-cap-fund-direct-growth',
+  '147946': 'bandhan-small-cap-fund-direct-growth',
+  '125494': 'sbi-small-midcap-fund-direct-growth',
+  '125497': 'sbi-small-midcap-fund-direct-growth',
+  '148920': 'aditya-birla-sun-life-multi-cap-fund-direct-growth',
+  '148921': 'aditya-birla-sun-life-multi-cap-fund-direct-growth',
+};
+
+function pickBestGrowwMatch(items, targetSchemeName = '', targetSchemeCode = null) {
+  if (!items || items.length === 0) return null;
+
+  if (targetSchemeCode) {
+    if (KNOWN_DIRECT_MAP[String(targetSchemeCode)]) {
+      const targetDirect = KNOWN_DIRECT_MAP[String(targetSchemeCode)];
+      const directMatch = items.find((c) => String(c.scheme_code) === String(targetDirect));
+      if (directMatch) return directMatch;
+    }
+    const codeMatch = items.find((c) => String(c.scheme_code) === String(targetSchemeCode));
+    if (codeMatch) return codeMatch;
+  }
+
+  const cleanTarget = (targetSchemeName || '')
+    .toLowerCase()
+    .replace(/\s*-\s*(direct|regular)\s*(plan)?\s*-?\s*(growth|idcw)?(\s+option)?/gi, '')
+    .replace(/\s*-\s*(direct|regular)\s*growth/gi, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .trim();
+
+  const isTargetIndex = /\b(index|nifty|sensex|etf|fof)\b/.test(cleanTarget);
+  const isTargetLargeMid = /\b(large\s*(and|&)?\s*mid)\b/.test(cleanTarget);
+  const isTargetMulti = /\b(multi)\b/.test(cleanTarget);
+  const isTargetFlexi = /\b(flexi)\b/.test(cleanTarget);
+  const isTargetSmall = /\b(small)\b/.test(cleanTarget);
+  const isTargetMid = !isTargetLargeMid && /\b(mid)\b/.test(cleanTarget);
+  const isTargetLarge = !isTargetLargeMid && /\b(large)\b/.test(cleanTarget);
+
+  let bestItem = null;
+  let bestScore = -9999;
+
+  for (const item of items) {
+    const title = ((item.title || '') + ' ' + (item.search_id || '')).toLowerCase();
+    let score = 0;
+
+    const isItemIndex = /\b(index|nifty|sensex|etf|fof)\b/.test(title);
+    const isItemLargeMid = /\b(large\s*(and|&)?\s*mid)\b/.test(title);
+    const isItemMulti = /\b(multi)\b/.test(title);
+    const isItemFlexi = /\b(flexi)\b/.test(title);
+    const isItemSmall = /\b(small)\b/.test(title);
+    const isItemMid = !isItemLargeMid && /\b(mid)\b/.test(title);
+    const isItemLarge = !isItemLargeMid && /\b(large)\b/.test(title);
+
+    // Severe penalty if target is active (not index) but item is index
+    if (!isTargetIndex && isItemIndex) score -= 100;
+    if (isTargetIndex && isItemIndex) score += 50;
+
+    // Severe penalty for mismatched fund category
+    if (isTargetMid && isItemLargeMid) score -= 80;
+    if (isTargetMid && isItemMid) score += 40;
+    if (isTargetSmall && isItemSmall) score += 40;
+    if (isTargetSmall && !isItemSmall) score -= 50;
+    if (isTargetLarge && isItemLarge) score += 40;
+    if (isTargetLarge && !isItemLarge) score -= 50;
+    if (isTargetMulti && isItemMulti) score += 40;
+    if (isTargetFlexi && isItemFlexi) score += 40;
+
+    // Word token matching
+    const targetTokens = cleanTarget.split(/\s+/).filter(Boolean);
+    for (const t of targetTokens) {
+      if (t.length > 2 && title.includes(t)) {
+        score += 10;
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestItem = item;
+    }
+  }
+
+  return bestItem || items[0];
+}
+
+
 /**
  * Perform HTTPS GET request returning parsed JSON
  */
@@ -118,6 +217,10 @@ function normalizeSchemeKey(name) {
 async function resolveDirectCounterpart(schemeCode, schemeName = '') {
   if (!schemeName && !schemeCode) return schemeCode;
 
+  if (schemeCode && KNOWN_DIRECT_MAP[String(schemeCode)]) {
+    return KNOWN_DIRECT_MAP[String(schemeCode)];
+  }
+
   const normKey = normalizeSchemeKey(schemeName);
 
   if (directCodeMap.has(normKey)) {
@@ -131,7 +234,7 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
       const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&q=${encodeURIComponent(queryName)}`;
       const searchRes = await fetchJson(searchUrl);
       if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
-        const item = searchRes.content[0];
+        const item = pickBestGrowwMatch(searchRes.content, schemeName, schemeCode);
         if (item && item.scheme_code && String(item.scheme_code).length >= 5) {
           const directCode = String(item.scheme_code);
           directCodeMap.set(normKey, directCode);
@@ -362,6 +465,11 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
   let searchId = null;
   let directSchemeCode = null;
 
+  if (schemeCode && KNOWN_SEARCH_ID_MAP[String(schemeCode)]) {
+    searchId = KNOWN_SEARCH_ID_MAP[String(schemeCode)];
+    directSchemeCode = KNOWN_DIRECT_MAP[String(schemeCode)] || schemeCode;
+  }
+
   // Search by cleaned scheme name
   const queryName = sanitizeSchemeName(schemeName);
   if (queryName) {
@@ -370,7 +478,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
 
     if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
       // Find matching item by scheme code or first item
-      const matched = searchRes.content.find((c) => String(c.scheme_code) === String(schemeCode)) || searchRes.content[0];
+      const matched = pickBestGrowwMatch(searchRes.content, schemeName, schemeCode);
       if (matched && matched.search_id) {
         searchId = matched.search_id;
         directSchemeCode = matched.scheme_code ? String(matched.scheme_code) : null;
@@ -429,6 +537,8 @@ function parseGrowwScheme(d, directCode = null) {
       return1y: typeof s.return1y === 'number' ? s.return1y : parseFloat(s.return1y) || null,
       return3y: typeof s.return3y === 'number' ? s.return3y : parseFloat(s.return3y) || null,
       return5y: typeof s.return5y === 'number' ? s.return5y : parseFloat(s.return5y) || null,
+      return_since_created: typeof s.return_since_created === 'number' ? s.return_since_created : parseFloat(s.return_since_created) || null,
+      return_default: typeof s.return_default === 'number' ? s.return_default : parseFloat(s.return_default) || null,
       cat_return1y: typeof s.cat_return1y === 'number' ? s.cat_return1y : parseFloat(s.cat_return1y) || null,
       cat_return3y: typeof s.cat_return3y === 'number' ? s.cat_return3y : parseFloat(s.cat_return3y) || null,
       cat_return5y: typeof s.cat_return5y === 'number' ? s.cat_return5y : parseFloat(s.cat_return5y) || null,
