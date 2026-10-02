@@ -1123,5 +1123,37 @@ exports.updateMfOrderPayoutStatus = async (req, res) => {
   }
 };
 
+// ── 23. POST /api/admin/mutual-funds/master/reconcile ──
+exports.reconcileNseMaster = async (req, res) => {
+  try {
+    const { dryRun = false } = req.body || {};
+    const nseMasterReconciliationService = require('../services/nse/nseMasterReconciliationService');
+    const report = await nseMasterReconciliationService.reconcileAllSchemes({ dryRun: !!dryRun });
+    return res.json({
+      success: true,
+      message: dryRun ? 'Master reconciliation dry run completed' : 'Master reconciliation executed and applied successfully',
+      data: report,
+    });
+  } catch (err) {
+    console.error('[reconcileNseMaster Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── 24. GET /api/admin/mutual-funds/master/audit ──
+exports.getNseMasterAudit = async (req, res) => {
+  try {
+    const nseMasterReconciliationService = require('../services/nse/nseMasterReconciliationService');
+    const audit = nseMasterReconciliationService.getAuditReport();
+    return res.json({
+      success: true,
+      data: audit,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 
 

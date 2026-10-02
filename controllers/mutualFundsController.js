@@ -15,17 +15,20 @@ const mfLiveService = require('../services/mfLiveService');
 const DEFAULT_SCHEMES = [
   {
     schemeCode: '113177',
+    amfiCode: '113177',
     schemeName: 'Nippon India Small Cap Fund - Regular Plan - Growth Option',
     amcCode: 'NIPPON_MF',
     amcName: 'Nippon India Mutual Fund',
-    isin: 'INF204K01EF9',
+    isin: 'INF204K01HY3',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Small Cap',
-    nav: 183.76,
-    cagr1Y: 37.2,
-    cagr3Y: 27.5,
-    cagr5Y: 30.8,
+    nav: 180.77,
+    cagr1Y: 34.2,
+    cagr3Y: 26.5,
+    cagr5Y: 29.8,
     minPurchaseAmount: 1000,
     minSipAmount: 500,
     rating: 5,
@@ -39,17 +42,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '122640',
+    amfiCode: '122640',
     schemeName: 'Parag Parikh Flexi Cap Fund - Regular Plan - Growth',
     amcCode: 'PPFAS_MF',
     amcName: 'PPFAS Mutual Fund',
     isin: 'INF879O01019',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Flexi Cap',
-    nav: 81.61,
-    cagr1Y: 26.5,
-    cagr3Y: 20.8,
-    cagr5Y: 23.2,
+    nav: 80.80,
+    cagr1Y: 24.5,
+    cagr3Y: 19.8,
+    cagr5Y: 22.2,
     minPurchaseAmount: 1000,
     minSipAmount: 1000,
     rating: 5,
@@ -63,17 +69,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '100119',
+    amfiCode: '100119',
     schemeName: 'HDFC Balanced Advantage Fund - Regular Plan - Growth Option',
     amcCode: 'HDFC_MF',
     amcName: 'HDFC Mutual Fund',
-    isin: 'INF179K01BE2',
+    isin: 'INF179K01830',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Hybrid',
     subCategory: 'Dynamic Asset Allocation',
-    nav: 511.46,
-    cagr1Y: 24.2,
-    cagr3Y: 20.1,
-    cagr5Y: 18.9,
+    nav: 505.17,
+    cagr1Y: 22.8,
+    cagr3Y: 19.2,
+    cagr5Y: 17.9,
     minPurchaseAmount: 1000,
     minSipAmount: 500,
     rating: 5,
@@ -87,17 +96,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '125494',
+    amfiCode: '125494',
     schemeName: 'SBI SMALL CAP FUND - Regular Plan - Growth',
     amcCode: 'SBI_MF',
     amcName: 'SBI Mutual Fund',
-    isin: 'INF200K01T27',
+    isin: 'INF200K01T28',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Small Cap',
-    nav: 183.67,
-    cagr1Y: 38.5,
-    cagr3Y: 25.8,
-    cagr5Y: 29.4,
+    nav: 180.04,
+    cagr1Y: 35.8,
+    cagr3Y: 24.5,
+    cagr5Y: 27.8,
     minPurchaseAmount: 5000,
     minSipAmount: 500,
     rating: 5,
@@ -111,17 +123,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '100177',
+    amfiCode: '100177',
     schemeName: 'Quant Small Cap Fund - Regular Plan - Growth Option',
     amcCode: 'QUANT_MF',
     amcName: 'Quant Mutual Fund',
-    isin: 'INF966L01017',
+    isin: 'INF966L01AA0',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Small Cap',
-    nav: 289.84,
-    cagr1Y: 41.2,
-    cagr3Y: 28.9,
-    cagr5Y: 32.5,
+    nav: 286.35,
+    cagr1Y: 38.5,
+    cagr3Y: 27.2,
+    cagr5Y: 30.5,
     minPurchaseAmount: 5000,
     minSipAmount: 1000,
     rating: 5,
@@ -135,17 +150,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '108466',
+    amfiCode: '108466',
     schemeName: 'ICICI Prudential Large Cap Fund - Regular Plan - Growth',
     amcCode: 'ICICI_PRU_MF',
     amcName: 'ICICI Prudential Mutual Fund',
     isin: 'INF109K01BL4',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Large Cap',
-    nav: 104.19,
-    cagr1Y: 25.8,
-    cagr3Y: 18.5,
-    cagr5Y: 17.8,
+    nav: 102.46,
+    cagr1Y: 24.5,
+    cagr3Y: 17.8,
+    cagr5Y: 17.2,
     minPurchaseAmount: 1000,
     minSipAmount: 500,
     rating: 5,
@@ -159,17 +177,20 @@ const DEFAULT_SCHEMES = [
   },
   {
     schemeCode: '112932',
+    amfiCode: '112932',
     schemeName: 'Mirae Asset Large & Midcap Fund - Regular Plan - Growth',
     amcCode: 'MIRAE_ASSET_MF',
     amcName: 'Mirae Asset Mutual Fund',
-    isin: 'INF769K01135',
+    isin: 'INF769K01101',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Equity',
     subCategory: 'Large Cap',
-    nav: 152.33,
-    cagr1Y: 28.4,
-    cagr3Y: 21.5,
-    cagr5Y: 22.0,
+    nav: 149.06,
+    cagr1Y: 26.8,
+    cagr3Y: 20.4,
+    cagr5Y: 21.0,
     minPurchaseAmount: 1000,
     minSipAmount: 500,
     rating: 5,
@@ -182,18 +203,21 @@ const DEFAULT_SCHEMES = [
     isRecommended: true,
   },
   {
-    schemeCode: '100412',
-    schemeName: 'SBI Long Term Equity Fund (ELSS) - Regular Plan - Growth',
+    schemeCode: '105628',
+    amfiCode: '105628',
+    schemeName: 'SBI ELSS Tax Saver Fund - Regular Plan - Growth',
     amcCode: 'SBI_MF',
     amcName: 'SBI Mutual Fund',
-    isin: 'INF200K01844',
+    isin: 'INF200K01495',
     planType: 'REGULAR',
+    option: 'GROWTH',
+    dividendType: 'NONE',
     category: 'Tax Saver (ELSS)',
     subCategory: 'ELSS Tax Saver (Sec 80C)',
-    nav: 412.35,
-    cagr1Y: 41.5,
-    cagr3Y: 26.2,
-    cagr5Y: 22.8,
+    nav: 407.92,
+    cagr1Y: 38.5,
+    cagr3Y: 24.8,
+    cagr5Y: 21.9,
     minPurchaseAmount: 500,
     minSipAmount: 500,
     rating: 5,
@@ -409,11 +433,11 @@ exports.getSchemeDetail = async (req, res) => {
       });
     }
 
-    // 1. Fetch live scheme facts first to get direct growth counterpart & official return stats
+    // 1. Fetch live scheme facts for supplementary metadata (AUM, fund manager, holdings)
     const liveFacts = await mfLiveService.getLiveSchemeFacts(scheme.schemeName, scheme.schemeCode);
-    const targetSchemeCode = liveFacts?.directSchemeCode || scheme.schemeCode;
+    const targetSchemeCode = scheme.amfiCode || scheme.schemeCode;
 
-    // 2. Fetch live historical daily NAV & chart points for the target direct scheme
+    // 2. Fetch live historical daily NAV & chart points strictly for the REGULAR Plan
     const liveNav = await mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme);
 
     // Prepare chart points per timeframe
@@ -477,43 +501,15 @@ exports.getSchemeDetail = async (req, res) => {
       .limit(6)
       .select('schemeCode schemeName amcName nav cagr1Y cagr3Y cagr5Y rating aum expenseRatio minSipAmount');
 
-    // Align return figures with Groww return_stats if available
+    // Genuine Regular Plan returns computed strictly from historical daily NAVs
     const retStats = liveFacts?.returnStats;
-    const ret1Y = retStats?.return1y ?? periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
-    const ret3Y = retStats?.return3y ?? periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
-    const ret5Y = retStats?.return5y ?? periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
-    const retAll = retStats?.return_since_created ?? retStats?.return_default ?? periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
+    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
+    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
+    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
+    const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
 
-    if (retStats) {
-      if (periodReturns['1M'] && retStats.return1m != null) {
-        periodReturns['1M'].returnPercent = retStats.return1m;
-        periodReturns['1M'].isPositive = retStats.return1m >= 0;
-      }
-      if (periodReturns['6M'] && retStats.return6m != null) {
-        periodReturns['6M'].returnPercent = retStats.return6m;
-        periodReturns['6M'].isPositive = retStats.return6m >= 0;
-      }
-      if (periodReturns['1Y'] && retStats.return1y != null) {
-        periodReturns['1Y'].returnPercent = retStats.return1y;
-        periodReturns['1Y'].isPositive = retStats.return1y >= 0;
-      }
-      if (periodReturns['3Y'] && retStats.return3y != null) {
-        periodReturns['3Y'].returnPercent = retStats.return3y;
-        periodReturns['3Y'].isPositive = retStats.return3y >= 0;
-      }
-      if (periodReturns['5Y'] && retStats.return5y != null) {
-        periodReturns['5Y'].returnPercent = retStats.return5y;
-        periodReturns['5Y'].isPositive = retStats.return5y >= 0;
-      }
-      if (periodReturns['All'] && (retStats.return_since_created != null || retStats.return_default != null)) {
-        const allVal = retStats.return_since_created ?? retStats.return_default;
-        periodReturns['All'].returnPercent = allVal;
-        periodReturns['All'].isPositive = allVal >= 0;
-      }
-    }
-
-    const accurateNav = liveFacts?.nav || (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
-    const day1Ret = retStats?.return1d ?? (liveNav?.day1Return ?? 0.0);
+    const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
+    const day1Ret = liveNav?.day1Return ?? 0.0;
     const day1Pos = day1Ret >= 0;
 
     // Synchronize latest live facts and metrics to database

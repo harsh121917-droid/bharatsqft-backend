@@ -217,4 +217,8 @@ router.post("/mutual-funds/reconciliation/run", adminMfController.triggerReconci
 router.post("/mutual-funds/reconciliation/resolve/:discrepancyId", adminMfController.resolveDiscrepancy);
 router.post("/mutual-funds/orders/:id/payout-status", adminMfController.updateMfOrderPayoutStatus);
 
+// NSE MF II Master Data & RTA Reconciliation (Section 5 & 22)
+router.post("/mutual-funds/master/reconcile", adminMfController.reconcileNseMaster);
+router.get("/mutual-funds/master/audit", adminMfController.getNseMasterAudit);
+
 module.exports = router;

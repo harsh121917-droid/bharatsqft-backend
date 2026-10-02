@@ -26,12 +26,46 @@ const MutualFundSchemeSchema = new mongoose.Schema(
     isin: {
       type: String,
       trim: true,
+      index: true,
+    },
+    nseSchemeCode: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    amfiCode: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    rtaSchemeCode: {
+      type: String,
+      trim: true,
+    },
+    amcSchemeCode: {
+      type: String,
+      trim: true,
+    },
+    rtaAgentCode: {
+      type: String,
+      trim: true, // e.g. CAMS, KFINTECH
     },
     planType: {
       type: String,
       enum: ['REGULAR', 'DIRECT'],
       default: 'REGULAR',
       index: true,
+    },
+    option: {
+      type: String,
+      enum: ['GROWTH', 'IDCW', 'BONUS'],
+      default: 'GROWTH',
+      index: true,
+    },
+    dividendType: {
+      type: String,
+      enum: ['PAYOUT', 'REINVESTMENT', 'NONE'],
+      default: 'NONE',
     },
     category: {
       type: String,

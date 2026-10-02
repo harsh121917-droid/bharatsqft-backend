@@ -10,39 +10,13 @@ const factsCache = new Map();
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
-const KNOWN_DIRECT_MAP = {
-  '101592': '119620', // Aditya Birla Sun Life Midcap Fund Regular -> Direct Growth (NAV 919.61, AUM 6966 Cr)
-  '147944': '147946', // Bandhan Small Cap Regular -> Direct Growth
-  '125494': '125497', // SBI Small Cap Regular -> Direct Growth
-  '113177': '120716', // Nippon India Small Cap Regular -> Direct Growth
-  '122640': '122639', // Parag Parikh Flexi Cap Regular -> Direct Growth
-  '100119': '120503', // HDFC Small Cap Regular -> Direct Growth
-  '100177': '119598', // Kotak Small Cap Regular -> Direct Growth
-  '108466': '120828', // Quant Small Cap Regular -> Direct Growth
-  '100412': '119775', // Axis Small Cap Regular -> Direct Growth
-  '148920': '148921', // Aditya Birla Sun Life Multi-Cap Regular -> Direct Growth
-};
+// Regular Plan Master Cache & Mapping
+const regularCodeMap = new Map();
 
-const KNOWN_SEARCH_ID_MAP = {
-  '101592': 'birla-sun-life-mid-cap-fund-plan-a-direct-growth',
-  '119620': 'birla-sun-life-mid-cap-fund-plan-a-direct-growth',
-  '147944': 'bandhan-small-cap-fund-direct-growth',
-  '147946': 'bandhan-small-cap-fund-direct-growth',
-  '125494': 'sbi-small-midcap-fund-direct-growth',
-  '125497': 'sbi-small-midcap-fund-direct-growth',
-  '148920': 'aditya-birla-sun-life-multi-cap-fund-direct-growth',
-  '148921': 'aditya-birla-sun-life-multi-cap-fund-direct-growth',
-};
-
-function pickBestGrowwMatch(items, targetSchemeName = '', targetSchemeCode = null) {
+function pickBestRegularMatch(items, targetSchemeName = '', targetSchemeCode = null) {
   if (!items || items.length === 0) return null;
 
   if (targetSchemeCode) {
-    if (KNOWN_DIRECT_MAP[String(targetSchemeCode)]) {
-      const targetDirect = KNOWN_DIRECT_MAP[String(targetSchemeCode)];
-      const directMatch = items.find((c) => String(c.scheme_code) === String(targetDirect));
-      if (directMatch) return directMatch;
-    }
     const codeMatch = items.find((c) => String(c.scheme_code) === String(targetSchemeCode));
     if (codeMatch) return codeMatch;
   }
@@ -214,37 +188,19 @@ function normalizeSchemeKey(name) {
     .replace(/[^a-z0-9]/g, '');
 }
 
-async function resolveDirectCounterpart(schemeCode, schemeName = '') {
+/**
+ * Resolves the official AMFI Code for the REGULAR Plan (never Direct)
+ */
+async function resolveRegularAmfiCode(schemeCode, schemeName = '') {
   if (!schemeName && !schemeCode) return schemeCode;
-
-  if (schemeCode && KNOWN_DIRECT_MAP[String(schemeCode)]) {
-    return KNOWN_DIRECT_MAP[String(schemeCode)];
-  }
 
   const normKey = normalizeSchemeKey(schemeName);
 
-  if (directCodeMap.has(normKey)) {
-    return directCodeMap.get(normKey);
+  if (regularCodeMap.has(normKey)) {
+    return regularCodeMap.get(normKey);
   }
 
-  // 1. Check Groww Entity Search first (guaranteed 100% accurate direct growth AMFI code)
-  const queryName = sanitizeSchemeName(schemeName);
-  if (queryName) {
-    try {
-      const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&q=${encodeURIComponent(queryName)}`;
-      const searchRes = await fetchJson(searchUrl);
-      if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
-        const item = pickBestGrowwMatch(searchRes.content, schemeName, schemeCode);
-        if (item && item.scheme_code && String(item.scheme_code).length >= 5) {
-          const directCode = String(item.scheme_code);
-          directCodeMap.set(normKey, directCode);
-          return directCode;
-        }
-      }
-    } catch (_) {}
-  }
-
-  // 2. Load index if not loaded or older than 24 hours
+  // Load official mfapi index if not loaded or older than 24 hours
   if (!allMfApiSchemes || Date.now() - allMfApiSchemesTimestamp > 24 * 60 * 60 * 1000) {
     try {
       const list = await fetchJson('https://api.mfapi.in/mf');
@@ -253,14 +209,14 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
         allMfApiSchemesTimestamp = Date.now();
         for (const item of list) {
           const lower = item.schemeName.toLowerCase();
-          // STRICT RULE: Reject any IDCW, dividend, or bonus schemes!
-          if (lower.includes('idcw') || lower.includes('dividend') || lower.includes('bonus')) {
+          // STRICT RULE: Must be REGULAR Plan only. Exclude Direct & IDCW.
+          if (lower.includes('direct') || lower.includes('idcw') || lower.includes('dividend') || lower.includes('bonus')) {
             continue;
           }
-          if (lower.includes('direct') && (lower.includes('growth') || !lower.includes('plan'))) {
+          if (lower.includes('regular') || lower.includes('growth')) {
             const k = normalizeSchemeKey(item.schemeName);
-            if (!directCodeMap.has(k)) {
-              directCodeMap.set(k, String(item.schemeCode));
+            if (!regularCodeMap.has(k)) {
+              regularCodeMap.set(k, String(item.schemeCode));
             }
           }
         }
@@ -268,18 +224,8 @@ async function resolveDirectCounterpart(schemeCode, schemeName = '') {
     } catch (_) {}
   }
 
-  if (directCodeMap.has(normKey)) {
-    return directCodeMap.get(normKey);
-  }
-
-  // Try substring match only for clean direct growth codes
-  if (allMfApiSchemes && normKey.length > 5) {
-    for (const [k, code] of directCodeMap.entries()) {
-      if (k.includes(normKey) || normKey.includes(k)) {
-        directCodeMap.set(normKey, code);
-        return code;
-      }
-    }
+  if (regularCodeMap.has(normKey)) {
+    return regularCodeMap.get(normKey);
   }
 
   return schemeCode;
@@ -293,17 +239,16 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     return cached.data;
   }
 
-  // Resolve Direct Plan benchmark counterpart so NAV, returns, and chart match Groww
+  // Strictly resolve the REGULAR Plan AMFI code (never Direct)
   let targetCode = schemeCode;
   try {
-    const directCode = await resolveDirectCounterpart(schemeCode, fallbackScheme?.schemeName || '');
-    if (directCode) targetCode = directCode;
+    const regCode = await resolveRegularAmfiCode(schemeCode, fallbackScheme?.schemeName || '');
+    if (regCode) targetCode = regCode;
   } catch (_) {}
 
   const url = `https://api.mfapi.in/mf/${targetCode}`;
   let response = await fetchJson(url);
   if (!response && targetCode !== schemeCode) {
-    // Fallback to original code if direct resolution failed
     response = await fetchJson(`https://api.mfapi.in/mf/${schemeCode}`);
   }
 
@@ -453,7 +398,7 @@ function sanitizeSchemeName(name) {
 }
 
 /**
- * 2. Fetch Live Scheme Facts (Accurate AUM matching Groww, Real Holdings, Real Pros & Cons)
+ * 2. Fetch Live Scheme Facts (Accurate AUM, Real Holdings, Real Pros & Cons)
  */
 async function getLiveSchemeFacts(schemeName, schemeCode) {
   const cacheKey = `${schemeCode || ''}_${schemeName || ''}`;
@@ -463,12 +408,6 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
   }
 
   let searchId = null;
-  let directSchemeCode = null;
-
-  if (schemeCode && KNOWN_SEARCH_ID_MAP[String(schemeCode)]) {
-    searchId = KNOWN_SEARCH_ID_MAP[String(schemeCode)];
-    directSchemeCode = KNOWN_DIRECT_MAP[String(schemeCode)] || schemeCode;
-  }
 
   // Search by cleaned scheme name
   const queryName = sanitizeSchemeName(schemeName);
@@ -477,11 +416,9 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
     const searchRes = await fetchJson(searchUrl);
 
     if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
-      // Find matching item by scheme code or first item
-      const matched = pickBestGrowwMatch(searchRes.content, schemeName, schemeCode);
+      const matched = pickBestRegularMatch(searchRes.content, schemeName, schemeCode);
       if (matched && matched.search_id) {
         searchId = matched.search_id;
-        directSchemeCode = matched.scheme_code ? String(matched.scheme_code) : null;
       }
     }
   }
@@ -508,7 +445,7 @@ async function getLiveSchemeFacts(schemeName, schemeCode) {
     return null;
   }
 
-  const facts = parseGrowwScheme(detailRes, directSchemeCode);
+  const facts = parseGrowwScheme(detailRes, schemeCode);
   factsCache.set(cacheKey, { data: facts, timestamp: Date.now() });
   return facts;
 }
