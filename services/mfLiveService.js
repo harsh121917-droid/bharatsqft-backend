@@ -119,50 +119,8 @@ function fetchJson(url, headers = {}, timeoutMs = 30000) {
   });
 }
 
-function generateFallbackNavData(scheme) {
-  const baseNav = scheme.nav || 50;
-  const now = Date.now();
-
-  const makeSeries = (days, pts, returnPercent) => {
-    const startNav = +(baseNav / (1 + (returnPercent / 100))).toFixed(4);
-    const step = days / pts;
-    const points = [];
-    for (let i = 0; i < pts; i++) {
-      const dt = new Date(now - (days - i * step) * 24 * 3600 * 1000);
-      const prog = i / (pts - 1);
-      const osc = Math.sin(i * 0.9) * 0.012 * baseNav;
-      const nav = +(startNav + (baseNav - startNav) * prog + osc).toFixed(4);
-      points.push({ date: dt.toISOString().split('T')[0], nav: nav > 0 ? nav : baseNav });
-    }
-    return {
-      points,
-      returnPercent,
-      isPositive: returnPercent >= 0,
-      startNav,
-      endNav: baseNav,
-    };
-  };
-
-  const ret1M = -0.92; // realistic recent 1M down-tick
-  const ret6M = 14.5;
-  const ret1Y = scheme.cagr1Y || 24.5;
-  const ret3Y = scheme.cagr3Y || 18.2;
-  const ret5Y = scheme.cagr5Y || 21.0;
-
-  return {
-    meta: { scheme_name: scheme.schemeName },
-    latestNav: baseNav,
-    latestDate: new Date().toISOString().split('T')[0],
-    chartData: {
-      '1M': makeSeries(30, 20, ret1M),
-      '6M': makeSeries(180, 25, ret6M),
-      '1Y': makeSeries(365, 30, ret1Y),
-      '3Y': makeSeries(1095, 35, ret3Y),
-      '5Y': makeSeries(1825, 40, ret5Y),
-      'All': makeSeries(2500, 45, +(ret5Y * 1.4).toFixed(2)),
-    },
-  };
-}
+// Phase 1 Remediation: generateFallbackNavData has been completely removed.
+// Per project mandate, we never manufacture synthetic NAV series or guessed returns.
 
 /**
  * 1. Fetch Real Daily NAV History & Return Real Timeframe Chart Points
@@ -232,7 +190,7 @@ async function resolveRegularAmfiCode(schemeCode, schemeName = '') {
 }
 
 async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
-  if (!schemeCode) return fallbackScheme ? generateFallbackNavData(fallbackScheme) : null;
+  if (!schemeCode) return null;
 
   const cached = navCache.get(String(schemeCode));
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -253,9 +211,6 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   }
 
   if (!response || !Array.isArray(response.data) || response.data.length === 0) {
-    if (fallbackScheme) {
-      return generateFallbackNavData(fallbackScheme);
-    }
     return null;
   }
 
@@ -311,22 +266,32 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     const actualDays = Math.max(1, (endDate.getTime() - startDate.getTime()) / (24 * 3600 * 1000));
     const years = actualDays / 365.25;
 
-    let returnPercent = 0;
-    // Standardized SEBI & Groww formulas: exact 3.0 and 5.0 exponents for CAGR
-    if (periodKey === '3Y' && startNav > 0 && endNav > 0) {
+    if (subset.length < 2 || !startNav || !endNav) {
+      return {
+        points: subset,
+        returnPercent: null,
+        isPositive: null,
+        startNav: startNav || null,
+        endNav: endNav || null,
+      };
+    }
+
+    let returnPercent = null;
+    // Standardized SEBI & AMFI formulas: exact 3.0 and 5.0 exponents for CAGR
+    if (periodKey === '3Y' && years >= 2.5 && startNav > 0 && endNav > 0) {
       const cagr = (Math.pow(endNav / startNav, 1 / 3.0) - 1) * 100;
       returnPercent = +cagr.toFixed(2);
-    } else if (periodKey === '5Y' && startNav > 0 && endNav > 0) {
+    } else if (periodKey === '5Y' && years >= 4.5 && startNav > 0 && endNav > 0) {
       const cagr = (Math.pow(endNav / startNav, 1 / 5.0) - 1) * 100;
       returnPercent = +cagr.toFixed(2);
     } else if (periodKey === 'All' && years > 1.0 && startNav > 0 && endNav > 0) {
       const cagr = (Math.pow(endNav / startNav, 1 / years) - 1) * 100;
       returnPercent = +cagr.toFixed(2);
-    } else if (startNav > 0) {
+    } else if (['1M', '6M', '1Y'].includes(periodKey) && startNav > 0 && endNav > 0) {
       // Simple absolute return for <= 1 year (1M, 6M, 1Y)
       returnPercent = +(((endNav - startNav) / startNav) * 100).toFixed(2);
     }
-    const isPositive = returnPercent >= 0;
+    const isPositive = returnPercent !== null ? returnPercent >= 0 : null;
 
     // Evenly sample points to maxPoints
     let sampled = [];
@@ -359,8 +324,8 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   };
 
   // Real 1D return between the latest two consecutive trading days
-  let day1Return = 0.0;
-  let day1IsPositive = true;
+  let day1Return = null;
+  let day1IsPositive = null;
   if (chronological.length >= 2) {
     const latestN = chronological[chronological.length - 1].nav;
     const prevN = chronological[chronological.length - 2].nav;
@@ -398,92 +363,28 @@ function sanitizeSchemeName(name) {
 }
 
 /**
- * 2. Fetch Live Scheme Facts (Accurate AUM, Real Holdings, Real Pros & Cons)
+ * 2. Fetch Live Scheme Facts (External Enrichment Data - NOT NSE Data)
+ * PHASE 1 REMEDIATION: Uncontracted external scraping is strictly disabled.
+ * External third-party enrichment (AUM, ratings, manager, holdings) is preserved as null
+ * until an authoritative, contracted provider (AMFI / Morningstar / CRISIL) is integrated in Phase 2.
  */
 async function getLiveSchemeFacts(schemeName, schemeCode) {
-  const cacheKey = `${schemeCode || ''}_${schemeName || ''}`;
-  const cached = factsCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.data;
-  }
-
-  let searchId = null;
-
-  // Search by cleaned scheme name
-  const queryName = sanitizeSchemeName(schemeName);
-  if (queryName) {
-    const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&q=${encodeURIComponent(queryName)}`;
-    const searchRes = await fetchJson(searchUrl);
-
-    if (searchRes && Array.isArray(searchRes.content) && searchRes.content.length > 0) {
-      const matched = pickBestRegularMatch(searchRes.content, schemeName, schemeCode);
-      if (matched && matched.search_id) {
-        searchId = matched.search_id;
-      }
-    }
-  }
-
-  // If searchId not found, try searching by AMFI code directly
-  if (!searchId && schemeCode) {
-    const directSearchUrl = `https://groww.in/v1/api/data/mf/web/v1/scheme/search/${schemeCode}`;
-    const testDirect = await fetchJson(directSearchUrl);
-    if (testDirect && testDirect.aum) {
-      const facts = parseGrowwScheme(testDirect, schemeCode);
-      factsCache.set(cacheKey, { data: facts, timestamp: Date.now() });
-      return facts;
-    }
-  }
-
-  if (!searchId) {
-    return null;
-  }
-
-  const detailUrl = `https://groww.in/v1/api/data/mf/web/v1/scheme/search/${searchId}`;
-  const detailRes = await fetchJson(detailUrl);
-
-  if (!detailRes || !detailRes.aum) {
-    return null;
-  }
-
-  const facts = parseGrowwScheme(detailRes, schemeCode);
-  factsCache.set(cacheKey, { data: facts, timestamp: Date.now() });
-  return facts;
+  // Phase 1: Return null directly without hitting uncontracted third-party endpoints
+  return null;
 }
 
 /**
- * Parser for Groww scheme JSON to ensure clean data & zero synthetic mocks
+ * Parser for Groww scheme JSON - strictly labeled as external enrichment data
  */
 function parseGrowwScheme(d, directCode = null) {
   // AUM in Crores
   const aum = typeof d.aum === 'number' ? +d.aum.toFixed(2) : parseFloat(d.aum) || null;
 
-  // Live NAV from Groww
-  const nav = typeof d.nav === 'number' ? +d.nav.toFixed(4) : parseFloat(d.nav) || null;
-
-  // Direct Scheme Code
+  // Direct Scheme Code (if present)
   const directSchemeCode = directCode || (d.scheme_code ? String(d.scheme_code) : null);
 
-  // Return statistics (1D, 1M, 6M, 1Y, 3Y, 5Y, category averages, and category ranks)
-  let returnStats = null;
-  if (Array.isArray(d.return_stats) && d.return_stats.length > 0) {
-    const s = d.return_stats[0];
-    returnStats = {
-      return1d: typeof s.return1d === 'number' ? s.return1d : parseFloat(s.return1d) || null,
-      return1m: typeof s.return1m === 'number' ? s.return1m : parseFloat(s.return1m) || null,
-      return6m: typeof s.return6m === 'number' ? s.return6m : parseFloat(s.return6m) || null,
-      return1y: typeof s.return1y === 'number' ? s.return1y : parseFloat(s.return1y) || null,
-      return3y: typeof s.return3y === 'number' ? s.return3y : parseFloat(s.return3y) || null,
-      return5y: typeof s.return5y === 'number' ? s.return5y : parseFloat(s.return5y) || null,
-      return_since_created: typeof s.return_since_created === 'number' ? s.return_since_created : parseFloat(s.return_since_created) || null,
-      return_default: typeof s.return_default === 'number' ? s.return_default : parseFloat(s.return_default) || null,
-      cat_return1y: typeof s.cat_return1y === 'number' ? s.cat_return1y : parseFloat(s.cat_return1y) || null,
-      cat_return3y: typeof s.cat_return3y === 'number' ? s.cat_return3y : parseFloat(s.cat_return3y) || null,
-      cat_return5y: typeof s.cat_return5y === 'number' ? s.cat_return5y : parseFloat(s.cat_return5y) || null,
-      rank1yr: s.rank1yr || null,
-      rank3yr: s.rank3yr || null,
-      rank5yr: s.rank5yr || null,
-    };
-  }
+  // Return statistics from Groww are DIRECT plan returns - DO NOT use for Regular plan!
+  const returnStats = null;
 
   // All Holdings: Raw is array of arrays or objects
   const topHoldings = [];

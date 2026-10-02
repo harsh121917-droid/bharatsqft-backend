@@ -11,239 +11,9 @@ const nseClient = require('../services/nse/nseClient');
 const paymentGatewayService = require('../services/paymentGatewayService');
 const mfLiveService = require('../services/mfLiveService');
 
-// ── Default curated Mutual Fund schemes for instant out-of-the-box experience ──
-const DEFAULT_SCHEMES = [
-  {
-    schemeCode: '113177',
-    amfiCode: '113177',
-    schemeName: 'Nippon India Small Cap Fund - Regular Plan - Growth Option',
-    amcCode: 'NIPPON_MF',
-    amcName: 'Nippon India Mutual Fund',
-    isin: 'INF204K01HY3',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Small Cap',
-    nav: 180.77,
-    cagr1Y: 34.2,
-    cagr3Y: 26.5,
-    cagr5Y: 29.8,
-    minPurchaseAmount: 1000,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'Samir Rachh, Kinjal Desai',
-    aum: 62450,
-    expenseRatio: 1.52,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '122640',
-    amfiCode: '122640',
-    schemeName: 'Parag Parikh Flexi Cap Fund - Regular Plan - Growth',
-    amcCode: 'PPFAS_MF',
-    amcName: 'PPFAS Mutual Fund',
-    isin: 'INF879O01019',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Flexi Cap',
-    nav: 80.80,
-    cagr1Y: 24.5,
-    cagr3Y: 19.8,
-    cagr5Y: 22.2,
-    minPurchaseAmount: 1000,
-    minSipAmount: 1000,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'Rajeev Thakkar, Raunak Onkar',
-    aum: 78900,
-    expenseRatio: 1.33,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '100119',
-    amfiCode: '100119',
-    schemeName: 'HDFC Balanced Advantage Fund - Regular Plan - Growth Option',
-    amcCode: 'HDFC_MF',
-    amcName: 'HDFC Mutual Fund',
-    isin: 'INF179K01830',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Hybrid',
-    subCategory: 'Dynamic Asset Allocation',
-    nav: 505.17,
-    cagr1Y: 22.8,
-    cagr3Y: 19.2,
-    cagr5Y: 17.9,
-    minPurchaseAmount: 1000,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'High',
-    fundManager: 'Gopal Agrawal, Srinivasan R.',
-    aum: 92100,
-    expenseRatio: 1.48,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '125494',
-    amfiCode: '125494',
-    schemeName: 'SBI SMALL CAP FUND - Regular Plan - Growth',
-    amcCode: 'SBI_MF',
-    amcName: 'SBI Mutual Fund',
-    isin: 'INF200K01T28',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Small Cap',
-    nav: 180.04,
-    cagr1Y: 35.8,
-    cagr3Y: 24.5,
-    cagr5Y: 27.8,
-    minPurchaseAmount: 5000,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'R. Srinivasan',
-    aum: 31200,
-    expenseRatio: 1.58,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '100177',
-    amfiCode: '100177',
-    schemeName: 'Quant Small Cap Fund - Regular Plan - Growth Option',
-    amcCode: 'QUANT_MF',
-    amcName: 'Quant Mutual Fund',
-    isin: 'INF966L01AA0',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Small Cap',
-    nav: 286.35,
-    cagr1Y: 38.5,
-    cagr3Y: 27.2,
-    cagr5Y: 30.5,
-    minPurchaseAmount: 5000,
-    minSipAmount: 1000,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'Sandeep Tandon, Ankit Pande',
-    aum: 21500,
-    expenseRatio: 1.64,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '108466',
-    amfiCode: '108466',
-    schemeName: 'ICICI Prudential Large Cap Fund - Regular Plan - Growth',
-    amcCode: 'ICICI_PRU_MF',
-    amcName: 'ICICI Prudential Mutual Fund',
-    isin: 'INF109K01BL4',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Large Cap',
-    nav: 102.46,
-    cagr1Y: 24.5,
-    cagr3Y: 17.8,
-    cagr5Y: 17.2,
-    minPurchaseAmount: 1000,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'High',
-    fundManager: 'Anish Tawakley, Vaibhav Dusad',
-    aum: 65400,
-    expenseRatio: 1.42,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '112932',
-    amfiCode: '112932',
-    schemeName: 'Mirae Asset Large & Midcap Fund - Regular Plan - Growth',
-    amcCode: 'MIRAE_ASSET_MF',
-    amcName: 'Mirae Asset Mutual Fund',
-    isin: 'INF769K01101',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Equity',
-    subCategory: 'Large Cap',
-    nav: 149.06,
-    cagr1Y: 26.8,
-    cagr3Y: 20.4,
-    cagr5Y: 21.0,
-    minPurchaseAmount: 1000,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'Neelesh Surana',
-    aum: 38900,
-    expenseRatio: 1.55,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-  {
-    schemeCode: '105628',
-    amfiCode: '105628',
-    schemeName: 'SBI ELSS Tax Saver Fund - Regular Plan - Growth',
-    amcCode: 'SBI_MF',
-    amcName: 'SBI Mutual Fund',
-    isin: 'INF200K01495',
-    planType: 'REGULAR',
-    option: 'GROWTH',
-    dividendType: 'NONE',
-    category: 'Tax Saver (ELSS)',
-    subCategory: 'ELSS Tax Saver (Sec 80C)',
-    nav: 407.92,
-    cagr1Y: 38.5,
-    cagr3Y: 24.8,
-    cagr5Y: 21.9,
-    minPurchaseAmount: 500,
-    minSipAmount: 500,
-    rating: 5,
-    riskLevel: 'Very High',
-    fundManager: 'Dinesh Balachandran',
-    aum: 24800,
-    expenseRatio: 1.62,
-    isPopular: true,
-    isFeatured: true,
-    isRecommended: true,
-  },
-];
-
-// Helper to ensure database has initial schemes
-async function seedDefaultSchemesIfEmpty() {
-  const count = await MutualFundScheme.countDocuments();
-  if (count === 0) {
-    await MutualFundScheme.insertMany(DEFAULT_SCHEMES);
-    console.log('[Mutual Funds] Seeded default mutual fund schemes');
-  }
-}
-
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
   try {
-    await seedDefaultSchemesIfEmpty();
 
     const {
       category,
@@ -441,9 +211,10 @@ exports.getSchemeDetail = async (req, res) => {
     const liveNav = await mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme);
 
     // Prepare chart points per timeframe
-    let chartData = {};
+    let chartData = null;
     let periodReturns = {};
     if (liveNav && liveNav.chartData) {
+      chartData = {};
       for (const [tf, item] of Object.entries(liveNav.chartData)) {
         chartData[tf] = item.points; // array of { date, nav }
         periodReturns[tf] = {
@@ -453,34 +224,23 @@ exports.getSchemeDetail = async (req, res) => {
           endNav: item.endNav,
         };
       }
-    } else {
-      // Fallback only if live API is temporarily unreachable
-      const baseNav = scheme.nav;
-      chartData = {
-        '1M': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-        '6M': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-        '1Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-        '3Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-        '5Y': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-        'All': [{ date: new Date().toISOString().split('T')[0], nav: baseNav }],
-      };
     }
 
-    // Determine accurate AUM, min SIP, min purchase, and rating
-    const realAum = liveFacts?.aum || scheme.aum;
-    const realMinSip = liveFacts?.minSipAmount || scheme.minSipAmount || 500;
-    const realMinPurchase = liveFacts?.minPurchaseAmount || scheme.minPurchaseAmount || 1000;
-    const realRating = liveFacts?.rating || scheme.rating || 4;
+    // Determine accurate AUM, min SIP, min purchase, and rating (preserves null if unknown)
+    const realAum = scheme.aum ?? liveFacts?.aum ?? null;
+    const realMinSip = scheme.minSipAmount ?? liveFacts?.minSipAmount ?? null;
+    const realMinPurchase = scheme.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
+    const realRating = scheme.rating ?? liveFacts?.rating ?? null;
 
-    // Top holdings - ONLY real data, no synthetic mock fallback!
+    // Top holdings - ONLY real data, no synthetic mock fallback
     const topHoldings = liveFacts?.topHoldings || [];
 
-    // Pros & Cons - ONLY real data, no synthetic mock fallback!
+    // Pros & Cons - ONLY real data, no synthetic mock fallback
     const prosAndCons = liveFacts?.prosAndCons || { pros: [], cons: [] };
 
-    // Fund manager & expense ratio
-    const fundManagerName = liveFacts?.fundManager || scheme.fundManager || 'Portfolio Manager';
-    const expenseRatio = liveFacts?.expenseRatio || scheme.expenseRatio;
+    // Fund manager & expense ratio (preserves null if unknown)
+    const fundManagerName = scheme.fundManager ?? liveFacts?.fundManager ?? null;
+    const expenseRatio = scheme.expenseRatio ?? liveFacts?.expenseRatio ?? null;
     const cat = (scheme.category || '').toLowerCase();
 
     // Similar peer schemes strictly in the same Sub-Category (e.g. Mid Cap with Mid Cap)
@@ -503,41 +263,20 @@ exports.getSchemeDetail = async (req, res) => {
 
     // Genuine Regular Plan returns computed strictly from historical daily NAVs
     const retStats = liveFacts?.returnStats;
-    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y;
-    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y;
-    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y;
-    const retAll = periodReturns['All']?.returnPercent ?? scheme.cagr5Y;
+    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y ?? null;
+    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y ?? null;
+    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y ?? null;
+    const retAll = periodReturns['All']?.returnPercent ?? null;
 
     const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
-    const day1Ret = liveNav?.day1Return ?? 0.0;
-    const day1Pos = day1Ret >= 0;
+    const day1Ret = liveNav?.day1Return ?? null;
+    const day1Pos = day1Ret !== null ? day1Ret >= 0 : null;
 
-    // Synchronize latest live facts and metrics to database
-    const syncUpdates = {};
-    if (liveFacts?.aum && liveFacts.aum !== scheme.aum) syncUpdates.aum = liveFacts.aum;
-    if (liveFacts?.minSipAmount && liveFacts.minSipAmount !== scheme.minSipAmount) syncUpdates.minSipAmount = liveFacts.minSipAmount;
-    if (liveFacts?.minPurchaseAmount && liveFacts.minPurchaseAmount !== scheme.minPurchaseAmount) syncUpdates.minPurchaseAmount = liveFacts.minPurchaseAmount;
-    if (liveFacts?.rating && liveFacts.rating !== scheme.rating) syncUpdates.rating = liveFacts.rating;
-    if (liveFacts?.fundManager && liveFacts.fundManager !== scheme.fundManager) syncUpdates.fundManager = liveFacts.fundManager;
-    syncUpdates.cagr1Y = ret1Y;
-    syncUpdates.cagr3Y = ret3Y;
-    syncUpdates.cagr5Y = ret5Y;
-    syncUpdates.nav = accurateNav;
-    syncUpdates.day1Return = day1Ret;
-
-    MutualFundScheme.updateOne({ _id: scheme._id }, { $set: syncUpdates }).exec().catch(() => {});
+    // Do NOT overwrite database scheme records with external unverified scraper data
 
     const fundManagement = (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
       ? liveFacts.fundManagerDetails
-      : [
-          {
-            name: fundManagerName,
-            qualification: 'Investment Leadership & Research',
-            experience: `Managing funds at ${scheme.amcName}`,
-            tenure: 'Jan 2023 - Present',
-            fundsManaged: 'Active mutual fund schemes',
-          },
-        ];
+      : (fundManagerName ? [{ name: fundManagerName, qualification: '', experience: '', tenure: '', fundsManaged: '' }] : []);
 
     return res.json({
       success: true,
@@ -558,33 +297,33 @@ exports.getSchemeDetail = async (req, res) => {
         fundManager: fundManagerName,
         chartData,
         periodReturns,
-        navHistory: chartData['1M'] || [],
+        navHistory: chartData ? (chartData['1M'] || []) : [],
         returnsComparison: {
           '1Y': {
             fund: ret1Y,
-            categoryAvg: retStats?.cat_return1y ?? 18.5,
-            rank: retStats?.rank1yr ?? 1,
+            categoryAvg: retStats?.cat_return1y ?? null,
+            rank: retStats?.rank1yr ?? null,
           },
           '3Y': {
             fund: ret3Y,
-            categoryAvg: retStats?.cat_return3y ?? 21.0,
-            rank: retStats?.rank3yr ?? 1,
+            categoryAvg: retStats?.cat_return3y ?? null,
+            rank: retStats?.rank3yr ?? null,
           },
           '5Y': {
             fund: ret5Y,
-            categoryAvg: retStats?.cat_return5y ?? 19.2,
-            rank: retStats?.rank5yr ?? 1,
+            categoryAvg: retStats?.cat_return5y ?? null,
+            rank: retStats?.rank5yr ?? null,
           },
           'All': {
             fund: retAll,
-            categoryAvg: 18.0,
-            rank: 1,
+            categoryAvg: null,
+            rank: null,
           },
         },
         topHoldings,
         expenseDetails: {
           expenseRatio,
-          exitLoad: liveFacts?.exitLoad || '1.00% if redeemed within 365 days. Nil thereafter.',
+          exitLoad: scheme.exitLoad || liveFacts?.exitLoad || null,
           stampDuty: '0.005% on purchase as per Indian Stamp Act.',
           taxImplications:
             cat.includes('debt')
@@ -595,11 +334,11 @@ exports.getSchemeDetail = async (req, res) => {
         fundHouse: {
           name: scheme.amcName,
           code: scheme.amcCode,
-          rank: 'Verified AMC',
-          totalAum: `₹${Number(realAum).toLocaleString('en-IN')} Crores`,
+          rank: null,
+          totalAum: realAum ? `₹${Number(realAum).toLocaleString('en-IN')} Crores` : null,
           objective: liveFacts?.benchmarkName
-            ? `Benchmark: ${liveFacts.benchmarkName}. Long-term capital appreciation by investing in ${scheme.subCategory || scheme.category} assets.`
-            : `To achieve capital growth by predominantly investing in a diversified portfolio of ${scheme.subCategory || scheme.category} instruments.`,
+            ? `Benchmark: ${liveFacts.benchmarkName}`
+            : null,
         },
         prosAndCons,
         similarFunds,
@@ -929,41 +668,40 @@ exports.createPurchaseOrder = async (req, res) => {
 
     // 2. Dispatch to NSE Gateway
     const nseRes = await nseClient.createNormalOrder([nseOrderPayload]);
-    const rawNseOrderId = nseRes?.data?.transaction_details?.[0]?.trxn_order_id;
-    const nseOrderId = (rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0) ? String(rawNseOrderId) : `NSE_${Date.now()}`;
+    const trxnItem = nseRes?.data?.transaction_details?.[0];
+    const rawNseOrderId = trxnItem?.trxn_order_id;
+    const isSuccess = nseRes?.success && trxnItem?.trxn_status === 'TRXN SUCCESS' && rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0;
+
+    if (!isSuccess && !nseClient.isMockMode()) {
+      const errMsg = trxnItem?.trxn_remark || nseRes?.data?.message || nseRes?.error || 'NSE Exchange rejected purchase order';
+      return res.status(400).json({
+        success: false,
+        message: `NSE MFSS Exchange: ${errMsg}`,
+        data: {
+          exchangeStatus: trxnItem?.trxn_status || 'FAILED',
+          exchangeRemark: trxnItem?.trxn_remark || '',
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+        },
+      });
+    }
+
+    const nseOrderId = isSuccess ? String(rawNseOrderId) : (nseClient.isMockMode() ? String(rawNseOrderId || `TEST_PUR_${Date.now()}`) : null);
 
     // 3. Request Payment Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
-    const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
-    if (linkRes.success && linkRes.data?.firstHolderLink) {
-      paymentLink = linkRes.data.firstHolderLink;
+    if (nseOrderId) {
+      try {
+        const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
+        if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
+          paymentLink = linkRes.data.firstHolderLink;
+        }
+      } catch (_) {}
     }
 
-    // 4. Create dedicated Mutual Fund Razorpay Order
-    let rzpOrder = null;
-    let rzpKeyId = '';
-    try {
-      const rzpRes = await paymentGatewayService.createRazorpayOrder({
-        amount: Number(orderAmount),
-        purpose: 'mutual_fund',
-        notes: {
-          orderId,
-          clientCode: ucc.clientCode,
-          schemeCode: scheme.schemeCode,
-          type: 'mf_lumpsum',
-        },
-      });
-      rzpOrder = rzpRes.order;
-      rzpKeyId = rzpRes.keyId;
-    } catch (rzpErr) {
-      console.warn('[createPurchaseOrder] Razorpay order creation warning:', rzpErr.message);
-    }
-
-    // 5. Save order to MongoDB
-    const unitsCalculated = +(orderAmount / scheme.nav).toFixed(3);
-    const isMock = process.env.NSE_MOCK_MODE === 'true';
-    const initialPaymentStatus = isMock ? 'SUCCESS' : 'PENDING';
+    // 4. Units & Allotment: Never treat estimated units as actual allotted units!
+    const estimatedUnits = scheme.nav && scheme.nav > 0 ? +(orderAmount / scheme.nav).toFixed(3) : null;
 
     const order = await MfOrder.create({
       user: userId,
@@ -974,25 +712,26 @@ exports.createPurchaseOrder = async (req, res) => {
       transactionType: 'P',
       buySellType: 'FRESH',
       orderAmount: Number(orderAmount),
-      units: unitsCalculated,
+      estimatedUnits,
+      units: 0, // Actual units remain 0 until Allotment Statement Report confirms allotment
+      allottedUnits: 0,
+      allottedNav: null,
+      allotmentStatus: 'PENDING',
       navAtOrder: scheme.nav,
-      paymentMode: paymentMode === 'RAZORPAY' || rzpOrder ? 'RAZORPAY' : paymentMode,
-      paymentStatus: initialPaymentStatus,
+      paymentMode: paymentMode || 'UPI',
+      paymentStatus: 'PENDING',
       paymentLink,
-      razorpayOrderId: rzpOrder ? rzpOrder.id : '',
       nseTrxnOrderId: nseOrderId,
-      nseStatus: isMock ? 'ALLOTTED (SANDBOX)' : 'TRXN SUCCESS',
-      remarks: isMock ? 'Sandbox test order - Auto-Allotted' : 'Order placed on NSE MFSS',
+      nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
+      remarks: 'Order placed on NSE MFSS. Awaiting investor payment and AMC unit allotment.',
     });
 
     return res.json({
       success: true,
-      message: 'Mutual fund order created successfully',
+      message: 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.',
       data: {
         order,
         paymentLink,
-        razorpayOrderId: rzpOrder ? rzpOrder.id : '',
-        key: rzpKeyId,
         amount: Number(orderAmount),
         currency: 'INR',
       },
@@ -1098,72 +837,46 @@ exports.registerSipOrder = async (req, res) => {
 
     const regItem = nseRes?.data?.reg_data?.[0];
     const rawRegId = regItem?.reg_id;
-    const isSuccess = nseRes?.success && regItem?.status === 'SUCCESS' && rawRegId && rawRegId !== '0' && rawRegId !== 0;
-
-    // Critical: sipRegNo must NEVER be "0" or empty, otherwise MongoDB unique index crashes
-    let sipRegNo = isSuccess ? String(rawRegId) : '';
-    if (!sipRegNo || sipRegNo === '0') {
-      sipRegNo = `XSIP_${Date.now()}`;
-    }
+    const isSuccess = nseRes?.success && (regItem?.status === 'SUCCESS' || regItem?.reg_status === 'REG_SUCCESS') && rawRegId && rawRegId !== '0' && rawRegId !== 0;
 
     // If live NSE explicitly rejected the registration, surface the reason to the user/admin
-    if (nseRes && nseRes.data && regItem && (regItem.status === 'FAILURE' || regItem.status === 'REJECTED' || rawRegId === '0')) {
-      const nseMsg = regItem.message || nseRes.data.message || 'NSE Exchange rejected SIP registration';
+    if (!isSuccess && !nseClient.isMockMode()) {
+      const nseMsg = regItem?.reg_remark || regItem?.message || nseRes?.data?.message || 'NSE Exchange rejected SIP registration';
       console.warn(`[registerSipOrder] NSE rejected SIP registration: ${nseMsg}`);
-
-      if (!nseClient.isMockMode()) {
-        return res.status(400).json({
-          success: false,
-          message: `NSE MFSS Exchange: ${nseMsg}. Please verify investor UCC approval or eNACH mandate authorization.`,
-          data: {
-            exchangeStatus: regItem.status || 'REJECTED',
-            exchangeMessage: nseMsg,
-            clientCode: ucc.clientCode,
-            schemeCode: scheme.schemeCode,
-          },
-        });
-      }
+      return res.status(400).json({
+        success: false,
+        message: `NSE MFSS Exchange: ${nseMsg}. Please verify investor UCC approval or eNACH mandate authorization.`,
+        data: {
+          exchangeStatus: regItem?.reg_status || regItem?.status || 'REJECTED',
+          exchangeMessage: nseMsg,
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+        },
+      });
     }
+
+    const sipRegNo = isSuccess ? String(rawRegId) : (nseClient.isMockMode() ? String(rawRegId || `TEST_SIP_${Date.now()}`) : '');
 
     // 3. Request Official Payment / Mandate Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
-    try {
-      const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
-      if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
-        paymentLink = linkRes.data.firstHolderLink;
-      } else {
-        const purLinkRes = await nseClient.getShortLink('PUR', sipRegNo);
-        if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
-          paymentLink = purLinkRes.data.firstHolderLink;
+    if (sipRegNo) {
+      try {
+        const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
+        if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
+          paymentLink = linkRes.data.firstHolderLink;
+        } else {
+          const purLinkRes = await nseClient.getShortLink('PUR', sipRegNo);
+          if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
+            paymentLink = purLinkRes.data.firstHolderLink;
+          }
         }
+      } catch (linkErr) {
+        console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
       }
-    } catch (linkErr) {
-      console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
     }
 
-    // 4. Create dedicated Mutual Fund Razorpay Order for 1st installment (for sandbox testing)
-    let rzpOrder = null;
-    let rzpKeyId = '';
-    try {
-      const rzpRes = await paymentGatewayService.createRazorpayOrder({
-        amount: Number(installmentAmount),
-        purpose: 'mutual_fund',
-        notes: {
-          sipRegNo: String(sipRegNo),
-          sipRefNo: String(sipRefNo),
-          clientCode: ucc.clientCode,
-          schemeCode: scheme.schemeCode,
-          type: 'mf_sip_first_installment',
-        },
-      });
-      rzpOrder = rzpRes.order;
-      rzpKeyId = rzpRes.keyId;
-    } catch (rzpErr) {
-      console.warn('[registerSipOrder] Razorpay order creation warning:', rzpErr.message);
-    }
-
-    // 5. Save SIP record
+    // 4. Save SIP record
     const sipRecord = await MfSip.create({
       user: userId,
       clientCode: ucc.clientCode,
@@ -1190,8 +903,6 @@ exports.registerSipOrder = async (req, res) => {
         sip: sipRecord,
         sipId: sipRecord._id,
         paymentLink,
-        razorpayOrderId: rzpOrder ? rzpOrder.id : '',
-        key: rzpKeyId,
         amount: Number(installmentAmount),
         currency: 'INR',
       },
@@ -1367,9 +1078,12 @@ async function getUserSchemeHoldings(userId, schemeCode) {
   let totalUnits = 0;
   for (const ord of orders) {
     if (ord.transactionType === 'P') {
-      totalUnits += ord.units;
+      const confirmedUnits = ord.allottedUnits !== undefined && ord.allottedUnits !== null
+        ? ord.allottedUnits
+        : (ord.allotmentStatus === 'CONFIRMED' ? ord.units : 0);
+      totalUnits += confirmedUnits;
     } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
-      totalUnits -= (ord.redemptionUnits || ord.units);
+      totalUnits -= (ord.redemptionUnits || ord.units || 0);
     }
   }
   return Math.max(0, +totalUnits.toFixed(3));
@@ -1417,14 +1131,27 @@ exports.getPortfolio = async (req, res) => {
         };
       }
       if (ord.transactionType === 'P') {
-        holdingsMap[ord.schemeCode].totalUnits += ord.units;
+        const confirmedUnits = ord.allottedUnits !== undefined && ord.allottedUnits !== null
+          ? ord.allottedUnits
+          : (ord.allotmentStatus === 'CONFIRMED' ? ord.units : 0);
+        holdingsMap[ord.schemeCode].totalUnits += confirmedUnits;
         holdingsMap[ord.schemeCode].investedAmount += ord.orderAmount;
         totalInvested += ord.orderAmount;
       } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
-        const unitsReduced = ord.redemptionUnits || ord.units;
-        holdingsMap[ord.schemeCode].totalUnits = Math.max(0, holdingsMap[ord.schemeCode].totalUnits - unitsReduced);
-        holdingsMap[ord.schemeCode].investedAmount = Math.max(0, holdingsMap[ord.schemeCode].investedAmount - ord.orderAmount);
-        totalInvested = Math.max(0, totalInvested - ord.orderAmount);
+        const unitsReduced = ord.redemptionUnits || ord.units || 0;
+        const previousUnits = holdingsMap[ord.schemeCode].totalUnits;
+        const previousInvested = holdingsMap[ord.schemeCode].investedAmount;
+
+        // Reduce invested amount proportionally by weighted average cost basis of redeemed units
+        let costBasisReduced = 0;
+        if (previousUnits > 0 && previousInvested > 0) {
+          const costPerUnit = previousInvested / previousUnits;
+          costBasisReduced = Math.min(previousInvested, unitsReduced * costPerUnit);
+        }
+
+        holdingsMap[ord.schemeCode].totalUnits = Math.max(0, previousUnits - unitsReduced);
+        holdingsMap[ord.schemeCode].investedAmount = Math.max(0, previousInvested - costBasisReduced);
+        totalInvested = Math.max(0, totalInvested - costBasisReduced);
       }
     }
 
@@ -1968,15 +1695,26 @@ exports.createRedemptionOrder = async (req, res) => {
     };
 
     // 2. Dispatch to NSE Gateway
-    let nseTrxnOrderId = `NSE_RED_${Date.now()}`;
-    try {
-      const nseRes = await nseClient.createNormalOrder([nseRedemptionPayload]);
-      if (nseRes?.data?.transaction_details?.[0]?.trxn_order_id) {
-        nseTrxnOrderId = nseRes.data.transaction_details[0].trxn_order_id;
-      }
-    } catch (nseErr) {
-      console.warn('[Redemption] NSE dispatch warning:', nseErr.message);
+    const nseRes = await nseClient.createNormalOrder([nseRedemptionPayload]);
+    const trxnItem = nseRes?.data?.transaction_details?.[0];
+    const rawOrderId = trxnItem?.trxn_order_id;
+    const isSuccess = nseRes?.success && trxnItem?.trxn_status === 'TRXN SUCCESS' && rawOrderId && rawOrderId !== '0';
+
+    if (!isSuccess && !nseClient.isMockMode()) {
+      const errMsg = trxnItem?.trxn_remark || nseRes?.data?.message || 'NSE Exchange rejected redemption order';
+      return res.status(400).json({
+        success: false,
+        message: `NSE MFSS Exchange: ${errMsg}`,
+        data: {
+          exchangeStatus: trxnItem?.trxn_status || 'FAILED',
+          exchangeRemark: trxnItem?.trxn_remark || '',
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+        },
+      });
     }
+
+    const nseTrxnOrderId = isSuccess ? String(rawOrderId) : (nseClient.isMockMode() ? String(rawOrderId || `TEST_RED_${Date.now()}`) : null);
 
     // 3. Save Redemption Order
     const redemptionOrder = await MfOrder.create({
@@ -2065,25 +1803,27 @@ exports.createSwitchOrder = async (req, res) => {
     const orderId = `MFSW${Date.now()}`;
 
     // Dispatch to NSE Switch
-    const nseSwitchPayload = {
-      order_ref_number: orderId,
-      source_scheme_code: srcScheme.schemeCode,
-      target_scheme_code: tgtScheme.schemeCode,
-      trxn_type: 'SO', // Switch Out
-      client_code: ucc.clientCode,
-      switch_units: String(unitsToSwitch),
-      all_units: allUnits ? 'Y' : 'N',
-    };
+    const nseRes = await nseClient.createSwitchOrder([nseSwitchPayload]);
+    const trxnItem = nseRes?.data?.transaction_details?.[0];
+    const rawOrderId = trxnItem?.trxn_so_order_id || trxnItem?.trxn_order_id;
+    const isSuccess = nseRes?.success && trxnItem?.trxn_status === 'TRXN SUCCESS' && rawOrderId;
 
-    let nseTrxnOrderId = `NSE_SW_${Date.now()}`;
-    try {
-      const nseRes = await nseClient.createSwitchOrder([nseSwitchPayload]);
-      if (nseRes?.data?.transaction_details?.[0]?.trxn_order_id) {
-        nseTrxnOrderId = nseRes.data.transaction_details[0].trxn_order_id;
-      }
-    } catch (err) {
-      console.warn('[Switch Order] NSE switch warning:', err.message);
+    if (!isSuccess && !nseClient.isMockMode()) {
+      const errMsg = trxnItem?.trxn_remark || nseRes?.data?.message || 'NSE Exchange rejected switch order';
+      return res.status(400).json({
+        success: false,
+        message: `NSE MFSS Exchange: ${errMsg}`,
+        data: {
+          exchangeStatus: trxnItem?.trxn_status || 'FAILED',
+          exchangeRemark: trxnItem?.trxn_remark || '',
+          clientCode: ucc.clientCode,
+          fromSchemeCode: srcScheme.schemeCode,
+          toSchemeCode: tgtScheme.schemeCode,
+        },
+      });
     }
+
+    const nseTrxnOrderId = isSuccess ? String(rawOrderId) : (nseClient.isMockMode() ? String(rawOrderId || `TEST_SW_${Date.now()}`) : null);
 
     // Record source Switch-Out Order
     const switchOrder = await MfOrder.create({
@@ -2311,30 +2051,42 @@ exports.setupUserMandate = async (req, res) => {
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
 
     if (!mandate) {
-      const mandateId = `MND_${Date.now()}`;
-      let authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
+      let mandateId = null;
+      let authLink = null;
 
-      try {
-        if (!nseClient.isMockMode()) {
-          const nseRes = await nseClient.registerMandate([
-            {
-              client_code: ucc.clientCode,
-              mandate_type: 'E',
-              amount: String(amount),
-              acc_no: ucc.primaryBank?.accountNo,
-              ifsc_code: ucc.primaryBank?.ifsc,
+      if (!nseClient.isMockMode()) {
+        const nseRes = await nseClient.registerMandate([
+          {
+            client_code: ucc.clientCode,
+            mandate_type: 'E',
+            amount: String(amount),
+            acc_no: ucc.primaryBank?.accountNo,
+            ifsc_code: ucc.primaryBank?.ifsc,
+          },
+        ]);
+        const regItem = nseRes?.data?.reg_data?.[0];
+        const liveMandateId = regItem?.mandate_id || regItem?.reg_id;
+        if (!nseRes?.success || !liveMandateId || regItem?.reg_status === 'REG_FAILED') {
+          const errMsg = regItem?.reg_remark || nseRes?.data?.message || 'NSE Exchange rejected mandate registration';
+          return res.status(400).json({
+            success: false,
+            message: `NSE MFSS Mandate: ${errMsg}`,
+            data: {
+              status: regItem?.reg_status || 'FAILED',
+              remark: regItem?.reg_remark || '',
             },
-          ]);
-          if (nseRes?.success && nseRes?.data?.reg_data?.[0]?.mandate_id) {
-            const liveMandateId = nseRes.data.reg_data[0].mandate_id;
-            const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
-            if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
-              authLink = shortLinkRes.data.firstHolderLink;
-            }
-          }
+          });
         }
-      } catch (nseErr) {
-        console.warn('[setupUserMandate NSE Warning]:', nseErr.message);
+        mandateId = String(liveMandateId);
+        try {
+          const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
+          if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
+            authLink = shortLinkRes.data.firstHolderLink;
+          }
+        } catch (_) {}
+      } else {
+        mandateId = `TEST_MND_${Date.now()}`;
+        authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
       }
 
       mandate = await MfMandate.create({

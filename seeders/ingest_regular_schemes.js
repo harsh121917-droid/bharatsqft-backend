@@ -3,55 +3,40 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 const MutualFundScheme = require('../models/MutualFundScheme');
 
-// Star fund managers for major Indian mutual funds
-const STAR_MANAGERS = {
-  '122640': 'Rajeev Thakkar, Raunak Onkar', // Parag Parikh Flexi Cap Regular
-  '113177': 'Samir Rachh, Kinjal Desai',     // Nippon India Small Cap Regular
-  '100177': 'Sandeep Tandon, Ankit Pande',   // Quant Small Cap Regular
-  '125494': 'R. Srinivasan',                  // SBI Small Cap Regular
-  '101662': 'Chirag Setalvad',                // HDFC Small Cap Regular
-  '125353': 'Shreyash Devalkar',              // Axis Small Cap Regular
-  '103175': 'Pankaj Tibrewal',                // Kotak Small Cap Regular
-  '100119': 'Gopal Agrawal, Srinivasan R.',   // HDFC Balanced Advantage Regular
-  '100412': 'Dinesh Balachandran',            // SBI ELSS Tax Saver Regular
-  '135800': 'Meeta Shetty',                   // Tata Digital India Regular
-  '108466': 'Anish Tawakley, Vaibhav Dusad',  // ICICI Prudential Large Cap Regular
-  '112932': 'Neelesh Surana',                 // Mirae Asset Large & Midcap Regular
-};
 
 function mapCategory(header) {
   const h = header.toLowerCase();
   if (h.includes('elss') || h.includes('tax')) {
-    return { category: 'Tax Saver (ELSS)', subCategory: 'ELSS Tax Saver (Sec 80C)', riskLevel: 'Very High', base1Y: 36.5, base3Y: 23.5, base5Y: 20.0 };
+    return { category: 'Tax Saver (ELSS)', subCategory: 'ELSS Tax Saver (Sec 80C)', riskLevel: 'Very High' };
   }
   if (h.includes('gold') || h.includes('silver') || h.includes('commodity')) {
-    return { category: 'Gold & Commodity', subCategory: 'Gold ETF FoF', riskLevel: 'Moderately High', base1Y: 27.5, base3Y: 17.2, base5Y: 14.8 };
+    return { category: 'Gold & Commodity', subCategory: 'Gold ETF FoF', riskLevel: 'Moderately High' };
   }
   if (h.includes('liquid') || h.includes('overnight') || h.includes('money market')) {
-    return { category: 'Liquid & Overnight', subCategory: 'Liquid Fund', riskLevel: 'Low', base1Y: 7.1, base3Y: 6.7, base5Y: 5.8 };
+    return { category: 'Liquid & Overnight', subCategory: 'Liquid Fund', riskLevel: 'Low' };
   }
   if (h.includes('hybrid') || h.includes('balanced') || h.includes('dynamic asset') || h.includes('arbitrage')) {
-    return { category: 'Hybrid', subCategory: 'Dynamic Asset Allocation', riskLevel: 'High', base1Y: 23.5, base3Y: 19.2, base5Y: 17.8 };
+    return { category: 'Hybrid', subCategory: 'Dynamic Asset Allocation', riskLevel: 'High' };
   }
   if (h.includes('index') || h.includes('etf')) {
-    return { category: 'Index', subCategory: 'Index / Passive ETF', riskLevel: 'Very High', base1Y: 25.8, base3Y: 18.0, base5Y: 16.5 };
+    return { category: 'Index', subCategory: 'Index / Passive ETF', riskLevel: 'Very High' };
   }
   if (h.includes('debt') || h.includes('gilt') || h.includes('bond') || h.includes('banking and psu')) {
-    return { category: 'Debt', subCategory: 'Debt / Fixed Income', riskLevel: 'Moderate', base1Y: 8.8, base3Y: 7.8, base5Y: 7.2 };
+    return { category: 'Debt', subCategory: 'Debt / Fixed Income', riskLevel: 'Moderate' };
   }
   if (h.includes('small cap')) {
-    return { category: 'Equity', subCategory: 'Small Cap', riskLevel: 'Very High', base1Y: 40.2, base3Y: 28.5, base5Y: 31.0 };
+    return { category: 'Equity', subCategory: 'Small Cap', riskLevel: 'Very High' };
   }
   if (h.includes('mid cap')) {
-    return { category: 'Equity', subCategory: 'Mid Cap', riskLevel: 'Very High', base1Y: 34.0, base3Y: 24.8, base5Y: 26.5 };
+    return { category: 'Equity', subCategory: 'Mid Cap', riskLevel: 'Very High' };
   }
   if (h.includes('large cap') || h.includes('large & mid')) {
-    return { category: 'Equity', subCategory: 'Large Cap', riskLevel: 'High', base1Y: 25.5, base3Y: 18.8, base5Y: 17.5 };
+    return { category: 'Equity', subCategory: 'Large Cap', riskLevel: 'High' };
   }
   if (h.includes('flexi cap') || h.includes('multi cap')) {
-    return { category: 'Equity', subCategory: 'Flexi Cap', riskLevel: 'Very High', base1Y: 27.5, base3Y: 21.8, base5Y: 23.2 };
+    return { category: 'Equity', subCategory: 'Flexi Cap', riskLevel: 'Very High' };
   }
-  return { category: 'Equity', subCategory: 'Equity Fund', riskLevel: 'Very High', base1Y: 27.0, base3Y: 20.0, base5Y: 19.0 };
+  return { category: 'Equity', subCategory: 'Equity Fund', riskLevel: 'Very High' };
 }
 
 function deriveAmcCode(amcName) {
@@ -62,31 +47,6 @@ function deriveAmcCode(amcName) {
     .trim()
     .replace(/\s+/g, '_')
     .slice(0, 15) + '_MF';
-}
-
-function getVariance(code, maxDelta = 4) {
-  const num = parseInt(code, 10) || 1000;
-  return +(((num % 20) - 10) * (maxDelta / 10)).toFixed(1);
-}
-
-function formatFisdomSchemeName(rawName) {
-  let name = rawName.trim();
-  // Strip any accidental 'direct' text
-  name = name.replace(/-\s*Direct\s*Plan/gi, '')
-             .replace(/Direct\s*Plan/gi, '')
-             .replace(/-\s*Direct\s*Growth/gi, '')
-             .replace(/\(Direct\)/gi, '')
-             .trim();
-
-  // If already contains 'Regular', standardize it
-  if (!name.toLowerCase().includes('regular')) {
-    if (name.toLowerCase().endsWith('growth')) {
-      name = name.replace(/growth$/i, 'Regular Plan - Growth').trim();
-    } else {
-      name += ' - Regular Plan - Growth';
-    }
-  }
-  return name;
 }
 
 async function ingestRegularSchemes() {
@@ -156,7 +116,7 @@ async function ingestRegularSchemes() {
 
     if (!isin || isNaN(nav) || nav <= 0) continue;
 
-    // Construct clean name
+    // Construct raw scheme name faithfully from feed without altering source identity
     let nameParts = [];
     for (let i = 3; i < parts.length - 2; i++) {
       const p = parts[i]?.trim();
@@ -164,47 +124,10 @@ async function ingestRegularSchemes() {
         nameParts.push(p);
       }
     }
-    const rawSchemeName = nameParts.join(' - ');
-    const cleanName = formatFisdomSchemeName(rawSchemeName);
+    const sourceSchemeName = nameParts.join(' - ').trim();
 
     const catMeta = mapCategory(currentCategory);
     const amcCode = deriveAmcCode(currentAmc);
-
-    const nameLower = cleanName.toLowerCase();
-    const isPopular =
-      nameLower.includes('parag parikh flexi') ||
-      nameLower.includes('nippon india small cap') ||
-      nameLower.includes('hdfc balanced advantage') ||
-      nameLower.includes('sbi small cap') ||
-      nameLower.includes('quant small cap') ||
-      nameLower.includes('mirae asset large & midcap') ||
-      nameLower.includes('icici prudential large cap') ||
-      nameLower.includes('tata digital india') ||
-      nameLower.includes('sbi elss');
-
-    const isFeatured = isPopular;
-
-    const delta = getVariance(schemeCode, 3.5);
-    const cagr1Y = +(catMeta.base1Y + delta).toFixed(1);
-    const cagr3Y = +(catMeta.base3Y + (delta * 0.7)).toFixed(1);
-    const cagr5Y = +(catMeta.base5Y + (delta * 0.5)).toFixed(1);
-
-    const codeNum = parseInt(schemeCode, 10) || 120000;
-    // Regular plan expense ratios typically range from 1.25% to 1.85% (Fisdom / distributor standard)
-    const expenseRatio = +(1.25 + ((codeNum % 60) / 100)).toFixed(2);
-    const aum = Math.floor(nav * 140 + ((codeNum % 700) * 45) + 3500);
-    const rating = isPopular ? 5 : (cagr3Y > 24 ? 5 : (cagr3Y > 17 ? 4 : 3));
-
-    let fundManager = STAR_MANAGERS[schemeCode];
-    if (!fundManager) {
-      if (nameLower.includes('parag parikh')) fundManager = 'Rajeev Thakkar, Raunak Onkar';
-      else if (nameLower.includes('nippon india')) fundManager = 'Samir Rachh, Kinjal Desai';
-      else if (nameLower.includes('hdfc balanced')) fundManager = 'Gopal Agrawal, Srinivasan R.';
-      else if (nameLower.includes('quant small')) fundManager = 'Sandeep Tandon, Ankit Pande';
-      else if (nameLower.includes('sbi small')) fundManager = 'R. Srinivasan';
-      else if (nameLower.includes('icici prudential')) fundManager = 'Anish Tawakley, Vaibhav Dusad';
-      else fundManager = `${currentAmc.replace(' Mutual Fund', '')} Investment Management Team`;
-    }
 
     processedCodes.add(schemeCode);
 
@@ -214,8 +137,9 @@ async function ingestRegularSchemes() {
         update: {
           $set: {
             schemeCode,
-            schemeName: cleanName,
+            schemeName: sourceSchemeName, // Faithful source scheme name
             planType: 'REGULAR',
+            option: 'GROWTH',
             amcCode,
             amcName: currentAmc,
             isin,
@@ -224,18 +148,19 @@ async function ingestRegularSchemes() {
             nav,
             navDate: new Date(),
             riskLevel: catMeta.riskLevel,
-            cagr1Y,
-            cagr3Y,
-            cagr5Y,
-            minPurchaseAmount: 1000,
-            minSipAmount: 500,
-            rating,
-            fundManager,
-            aum,
-            expenseRatio,
-            isPopular,
-            isFeatured,
-            isRecommended: isPopular,
+            // Financial fields default to null if not authoritatively available
+            cagr1Y: null,
+            cagr3Y: null,
+            cagr5Y: null,
+            minPurchaseAmount: null,
+            minSipAmount: null,
+            rating: null,
+            fundManager: null,
+            aum: null,
+            expenseRatio: null,
+            isPopular: false,
+            isFeatured: false,
+            isRecommended: false,
             isActive: true,
           },
         },

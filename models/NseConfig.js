@@ -9,12 +9,12 @@ const NseConfigSchema = new mongoose.Schema(
     },
     memberCode: {
       type: String,
-      default: process.env.NSE_MEMBER_CODE || '1031616',
+      default: process.env.NSE_MEMBER_CODE || '',
       trim: true,
     },
     loginUserId: {
       type: String,
-      default: process.env.NSE_LOGIN_USER_ID || 'ADMIN',
+      default: process.env.NSE_LOGIN_USER_ID || '',
       trim: true,
     },
     apiSecret: {
@@ -29,7 +29,7 @@ const NseConfigSchema = new mongoose.Schema(
     },
     mockMode: {
       type: Boolean,
-      default: process.env.NSE_MOCK_MODE !== 'false',
+      default: process.env.NODE_ENV === 'test',
     },
     lastTestedAt: {
       type: Date,
@@ -63,11 +63,11 @@ NseConfigSchema.statics.getEffectiveConfig = async function () {
   if (!config) {
     config = await this.create({
       env: process.env.NSE_ENV || 'UAT',
-      memberCode: process.env.NSE_MEMBER_CODE || '1031616',
-      loginUserId: process.env.NSE_LOGIN_USER_ID || 'ADMIN',
+      memberCode: process.env.NSE_MEMBER_CODE || '',
+      loginUserId: process.env.NSE_LOGIN_USER_ID || '',
       apiSecret: process.env.NSE_API_SECRET || '',
       licenseKey: process.env.NSE_MEMBER_LICENSE_KEY || '',
-      mockMode: process.env.NSE_MOCK_MODE !== 'false',
+      mockMode: process.env.NODE_ENV === 'test',
     });
   }
   return config;

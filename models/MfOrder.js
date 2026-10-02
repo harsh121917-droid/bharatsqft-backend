@@ -68,13 +68,35 @@ const MfOrderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    units: {
+    estimatedUnits: {
+      type: Number,
+      default: null,
+    },
+    allottedUnits: {
       type: Number,
       default: 0,
     },
+    allottedNav: {
+      type: Number,
+      default: null,
+    },
+    allotmentDate: {
+      type: Date,
+      default: null,
+    },
+    allotmentStatus: {
+      type: String,
+      enum: ['PENDING', 'ALLOTTED', 'REJECTED', 'NOT_APPLICABLE'],
+      default: 'PENDING',
+      index: true,
+    },
+    units: {
+      type: Number,
+      default: 0, // Strictly 0 until verified via Exchange Allotment Statement Report
+    },
     navAtOrder: {
       type: Number,
-      default: 0,
+      default: null,
     },
     paymentMode: {
       type: String,

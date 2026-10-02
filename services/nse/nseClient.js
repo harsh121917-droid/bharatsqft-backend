@@ -29,10 +29,14 @@ class NseClient {
   }
 
   isMockMode() {
-    if (typeof this.mockModeOverride === 'boolean') {
-      return this.mockModeOverride;
+    // Strictly isolated to automated test environment (NODE_ENV === 'test')
+    if (process.env.NODE_ENV === 'test') {
+      if (typeof this.mockModeOverride === 'boolean') {
+        return this.mockModeOverride;
+      }
+      return process.env.NSE_MOCK_MODE === 'true';
     }
-    return process.env.NSE_MOCK_MODE === 'true';
+    return false;
   }
 
   getMockResponse(endpoint, payload) {
@@ -269,22 +273,12 @@ class NseClient {
       const errorData = error.response?.data || { message: error.message };
       console.error(`[NSE Client Error] POST ${endpoint} -> ${status}:`, errorData);
 
-      // Graceful fallback if IP is unwhitelisted, gateway drops connection, or times out
-      if (
-        error.code === 'ECONNABORTED' ||
-        error.code === 'ETIMEDOUT' ||
-        error.code === 'ECONNREFUSED' ||
-        status === 403
-      ) {
-        console.warn(`[NSE Gateway Alert] Call to ${endpoint} failed (${error.message}). Falling back to Sandbox mock response.`);
-        return this.getMockResponse(endpoint, payload);
-      }
-
+      // Phase 1 Remediation: NEVER convert network failures, 403 Forbidden, or timeouts into fake mock success!
       return {
         success: false,
         status,
         error: errorData,
-        message: error.message,
+        message: error.response?.data?.message || error.message || 'NSE Exchange request failed',
       };
     }
   }

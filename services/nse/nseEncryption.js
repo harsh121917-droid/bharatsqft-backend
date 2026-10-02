@@ -72,20 +72,23 @@ class NseEncryption {
     const loginUserId = overrides.loginUserId || this.loginUserId;
     const apiSecret = overrides.apiSecret || this.apiSecret;
     const licenseKey = overrides.licenseKey || this.licenseKey;
-    const memberCode = overrides.memberCode || this.memberCode || '1031616';
+    const memberCode = overrides.memberCode || this.memberCode;
 
-    if (!loginUserId || !apiSecret || !licenseKey) {
-      const devMock = Buffer.from(`${loginUserId || 'ADMIN'}:MOCK_PASS`).toString('base64');
-      return {
-        'Content-Type': 'application/json',
-        'memberId': String(memberCode),
-        'Authorization': `Basic ${devMock}`,
-        'User-Agent': 'PostmanRuntime/7.43.0',
-        'Accept-Language': 'en-US',
-        'Referer': 'www.google.com',
-        'Accept': '',
-        'Connection': 'keep-alive',
-      };
+    if (!loginUserId || !apiSecret || !licenseKey || !memberCode) {
+      if (process.env.NODE_ENV === 'test') {
+        const devMock = Buffer.from(`${loginUserId || 'TEST_USER'}:MOCK_PASS`).toString('base64');
+        return {
+          'Content-Type': 'application/json',
+          'memberId': String(memberCode || 'TEST_MEMBER'),
+          'Authorization': `Basic ${devMock}`,
+          'User-Agent': 'PostmanRuntime/7.43.0',
+          'Accept-Language': 'en-US',
+          'Referer': 'www.google.com',
+          'Accept': '',
+          'Connection': 'keep-alive',
+        };
+      }
+      throw new Error('[NSE Encryption] Missing required NSE API credentials (loginUserId, apiSecret, licenseKey, memberCode)');
     }
 
     const randomNumber = Math.floor(Math.random() * 10000000000 + 1);

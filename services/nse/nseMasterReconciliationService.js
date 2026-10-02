@@ -1,5 +1,6 @@
 const axios = require('axios');
 const MutualFundScheme = require('../../models/MutualFundScheme');
+const MfSipSchemeMaster = require('../../models/MfSipSchemeMaster');
 const nseClient = require('./nseClient');
 
 /**
@@ -51,6 +52,10 @@ class NseMasterReconciliationService {
     if (flag === 'N') {
       return { option: 'IDCW', dividendType: 'PAYOUT' };
     }
+    if (flag === 'Z') {
+      if (name.includes('bonus')) return { option: 'BONUS', dividendType: 'NONE' };
+      return { option: 'GROWTH', dividendType: 'NONE' };
+    }
     if (code.endsWith('-GR') || code.endsWith('GR') || name.includes('growth')) {
       return { option: 'GROWTH', dividendType: 'NONE' };
     }
@@ -101,16 +106,22 @@ class NseMasterReconciliationService {
 
   /**
    * 1. Ingest & Parse NSE Master Scheme Raw Pipe-separated text
-   * Format per NSE Spec (Web file Structure page 77):
+   * Format strictly per NSE Spec (Web file Structure pages 77-79, Demat Scheme Master):
    * 0: Unique No | 1: Scheme Code | 2: RTA Scheme Code | 3: AMC Scheme Code | 4: ISIN |
    * 5: AMC Code | 6: Scheme Type | 7: Scheme Plan ('D' for Direct) | 8: Scheme Name |
-   * 9: Purchase Allowed | ... | 25: RTA Agent Code | 26: AMC Active Flag | 27: Dividend Reinvest Flag | 28: SIP Flag
+   * 9: Purchase Allowed | 10: Purchase Tran Mode | 11: Min Purchase Amount | 12: Add Purchase Amount |
+   * 13: Max Purchase Amount | 14: Purchase Amount Multiplier | 15: Purchase Cutoff Time |
+   * 16: Redemption Allowed | 17: Redemption Tran Mode | 18: Min Redemption Qty | 19: Red Qty Mult |
+   * 20: Max Redemption Qty | 21: Red Amount Min | 22: Red Amount Max | 23: Red Amount Mult |
+   * 24: Redemption Cutoff Time | 25: RTA Agent Code | 26: AMC Active Flag | 27: Dividend Reinvest Flag |
+   * 28: SIP Flag | 29: STP Flag | 30: SWP Flag | 31: Switch Flag | 32: Settlement Type |
+   * 33: AMC Ind | 34: Face Value | 35: Start Date | 36: End Date | 37: Exit Load Flag |
+   * 38: Exit Load | 39: Lock In Period Flag | 40: Lock In Period | 41: Channel Partner Code | 42: Reopening Date
    */
   parseNseSchemeMasterText(fileContent) {
     const lines = fileContent.split(/\r?\n/);
     const regularSchemes = [];
     const directSchemesExcluded = [];
-    const errors = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -121,22 +132,38 @@ class NseMasterReconciliationService {
 
       const uniqueNo = cols[0];
       const schemeCode = cols[1]; // NSE Scheme Code
-      const rtaSchemeCode = cols[2];
-      const amcSchemeCode = cols[3];
-      const isin = cols[4];
-      const amcCode = cols[5];
-      const schemeType = cols[6];
-      const planCode = cols[7]; // 'D' for Direct, else Regular
-      const schemeName = cols[8];
+      const rtaSchemeCode = cols[2] || '';
+      const amcSchemeCode = cols[3] || '';
+      const isin = cols[4] || '';
+      const amcCode = cols[5] || '';
+      const schemeType = cols[6] || '';
+      const planCode = cols[7] || ''; // 'D' for Direct, else Regular
+      const schemeName = cols[8]; // PRESERVE SOURCE NAME FAITHFULLY
       const purchaseAllowed = cols[9] === 'Y';
-      const rtaAgentCode = cols[25] || '';
-      const amcActive = cols[26] === '1' || cols[26] === 'Y';
-      const divReinvestFlag = cols[27];
-      const sipAllowed = cols[28] === '1' || cols[28] === 'Y';
+      const minPurchaseAmount = cols.length > 11 && cols[11] ? parseFloat(cols[11]) || null : null;
+      const addPurchaseAmount = cols.length > 12 && cols[12] ? parseFloat(cols[12]) || null : null;
+      const maxPurchaseAmount = cols.length > 13 && cols[13] ? parseFloat(cols[13]) || null : null;
+      const purchaseAmountMultiplier = cols.length > 14 && cols[14] ? parseFloat(cols[14]) || null : null;
+      const purchaseCutoffTime = cols.length > 15 ? cols[15] || null : null;
+
+      const redemptionAllowed = cols.length > 16 ? (cols[16] === '1' || cols[16] === 'Y') : true;
+      const minRedemptionQty = cols.length > 18 && cols[18] ? parseFloat(cols[18]) || null : null;
+      const minRedemptionAmount = cols.length > 21 && cols[21] ? parseFloat(cols[21]) || null : null;
+      const redemptionCutoffTime = cols.length > 24 ? cols[24] || null : null;
+
+      const rtaAgentCode = cols.length > 25 ? cols[25] || '' : '';
+      const amcActive = cols.length > 26 ? (cols[26] === '1' || cols[26] === 'Y') : true;
+      const divReinvestFlag = cols.length > 27 ? cols[27] : '';
+      const sipAllowed = cols.length > 28 ? (cols[28] === '1' || cols[28] === 'Y') : true;
+      const stpAllowed = cols.length > 29 ? (cols[29] === '1' || cols[29] === 'Y') : false;
+      const swpAllowed = cols.length > 30 ? (cols[30] === '1' || cols[30] === 'Y') : false;
+      const switchAllowed = cols.length > 31 ? (cols[31] === '1' || cols[31] === 'Y') : false;
+      const exitLoad = cols.length > 38 && cols[38] ? cols[38] : null;
+      const lockInPeriod = cols.length > 40 && cols[40] ? parseInt(cols[40], 10) || null : null;
 
       const planType = this.parsePlanType(planCode, schemeName);
 
-      // RULE 3: Exclude ALL Direct Plans at the backend/database level
+      // RULE: Exclude ALL Direct Plans at the backend/database level for MFD Regular catalog
       if (planType === 'DIRECT') {
         directSchemesExcluded.push({
           schemeCode,
@@ -147,7 +174,7 @@ class NseMasterReconciliationService {
         continue;
       }
 
-      // RULE 4: Parse Option strictly
+      // RULE: Parse Option strictly
       const { option, dividendType } = this.parseOption(divReinvestFlag, schemeCode, schemeName);
       const category = this.parseCategory(schemeType, schemeName);
       const subCategory = this.parseSubCategory(category, schemeName);
@@ -164,15 +191,29 @@ class NseMasterReconciliationService {
         amcSchemeCode,
         isin,
         amcCode,
-        amcName: amcCode.replace(/_/g, ' ').replace(' MF', ' Mutual Fund'),
-        schemeName,
+        amcName: amcCode ? amcCode.replace(/_/g, ' ').replace(' MF', ' Mutual Fund') : 'Mutual Fund',
+        schemeName, // Preserved without invented suffixes
         planType: 'REGULAR',
         option,
         dividendType,
         category,
         subCategory,
         purchaseAllowed,
+        minPurchaseAmount,
+        addPurchaseAmount,
+        maxPurchaseAmount,
+        purchaseAmountMultiplier,
+        purchaseCutoffTime,
+        redemptionAllowed,
+        minRedemptionQty,
+        minRedemptionAmount,
+        redemptionCutoffTime,
         sipAllowed,
+        stpAllowed,
+        swpAllowed,
+        switchAllowed,
+        exitLoad,
+        lockInPeriod,
         isActive: amcActive,
         rtaAgentCode,
       });
@@ -184,6 +225,150 @@ class NseMasterReconciliationService {
       directExcludedCount: directSchemesExcluded.length,
       regularSchemes,
       directSchemesExcluded,
+    };
+  }
+
+  /**
+   * 1b. Ingest & Parse NSE SIP Scheme Master Raw Pipe-separated text
+   * Format strictly per NSE Spec (Web file Structure pages 79-80, SIP Scheme Master):
+   * 0: AMC CODE | 1: AMC NAME | 2: SCHEME CODE | 3: SCHEME NAME | 4: SIP TRANSACTION MODE |
+   * 5: SIP FREQUENCY | 6: SIP DATES | 7: SIP MINIMUM GAP | 8: SIP MAXIMUM GAP |
+   * 9: SIP INSTALLMENT GAP | 10: SIP STATUS | 11: SIP MINIMUM INSTALLMENT AMOUNT |
+   * 12: SIP MAXIMUM INSTALLMENT AMOUNT | 13: SIP MULTIPLIER AMOUNT |
+   * 14: SIP MINIMUM INSTALLMENT NUMBERS | 15: SIP MAXIMUM INSTALLMENT NUMBERS |
+   * 16: SCHEME ISIN | 17: SCHEME TYPE | 18: PAUSE FLAG | 19: PAUSE MIN INSTALLMENTS |
+   * 20: PAUSE MAX INSTALLMENTS | 21: PAUSE MODIFICATION COUNT
+   */
+  parseNseSipMasterText(fileContent) {
+    const lines = fileContent.split(/\r?\n/);
+    const sipRecords = [];
+    const errors = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('#') || line.toUpperCase().startsWith('AMC CODE')) continue;
+
+      const cols = line.split('|').map((c) => c.trim());
+      if (cols.length < 17) continue;
+
+      const amcCode = cols[0];
+      const amcName = cols[1];
+      const schemeCode = cols[2];
+      const schemeName = cols[3];
+      const sipTransactionMode = cols[4];
+      const sipFrequency = cols[5];
+      const sipDates = cols[6];
+      const sipMinimumGap = cols[7] ? parseFloat(cols[7]) || null : null;
+      const sipMaximumGap = cols[8] ? parseFloat(cols[8]) || null : null;
+      const sipInstallmentGap = cols[9] ? parseFloat(cols[9]) || null : null;
+      const sipStatus = cols[10];
+      const minInstallmentAmount = cols[11] ? parseFloat(cols[11]) || null : null;
+      const maxInstallmentAmount = cols[12] ? parseFloat(cols[12]) || null : null;
+      const multiplierAmount = cols[13] ? parseFloat(cols[13]) || null : null;
+      const minInstallmentNumbers = cols[14] ? parseInt(cols[14], 10) || null : null;
+      const maxInstallmentNumbers = cols[15] ? parseInt(cols[15], 10) || null : null;
+      const isin = cols[16];
+      const schemeType = cols.length > 17 ? cols[17] : '';
+      const pauseFlag = cols.length > 18 ? cols[18] : 'N';
+      const pauseMinInstallments = cols.length > 19 && cols[19] ? parseInt(cols[19], 10) || null : null;
+      const pauseMaxInstallments = cols.length > 20 && cols[20] ? parseInt(cols[20], 10) || null : null;
+      const pauseModificationCount = cols.length > 21 && cols[21] ? parseInt(cols[21], 10) || null : null;
+
+      sipRecords.push({
+        amcCode,
+        amcName,
+        schemeCode,
+        schemeName,
+        sipTransactionMode,
+        sipFrequency,
+        frequency: sipFrequency,
+        sipDates,
+        sipMinimumGap,
+        sipMaximumGap,
+        sipInstallmentGap,
+        sipStatus,
+        minInstallmentAmount,
+        maxInstallmentAmount,
+        multiplierAmount,
+        minInstallmentNumbers,
+        maxInstallmentNumbers,
+        isin,
+        schemeType,
+        pauseFlag,
+        pauseMinInstallments,
+        pauseMaxInstallments,
+        pauseModificationCount,
+      });
+    }
+
+    return {
+      totalParsed: lines.length,
+      sipRecordCount: sipRecords.length,
+      sipRecords,
+    };
+  }
+
+  /**
+   * Ingests parsed SIP Master rows into MfSipSchemeMaster and synchronizes MutualFundScheme
+   */
+  async ingestNseSipMaster(fileContent) {
+    const { sipRecords } = this.parseNseSipMasterText(fileContent);
+    if (!sipRecords || sipRecords.length === 0) {
+      return { success: false, message: 'No valid SIP master records parsed' };
+    }
+
+    const sipOps = [];
+    const schemeOps = [];
+
+    // Group by schemeCode to find MONTHLY or default minimum SIP amount
+    const schemeSipMap = new Map();
+
+    for (const record of sipRecords) {
+      sipOps.push({
+        updateOne: {
+          filter: { schemeCode: record.schemeCode, sipFrequency: record.sipFrequency },
+          update: { $set: record },
+          upsert: true,
+        },
+      });
+
+      // Keep lowest valid minInstallmentAmount or MONTHLY frequency for MutualFundScheme summary
+      if (!schemeSipMap.has(record.schemeCode) || record.sipFrequency === 'MONTHLY') {
+        schemeSipMap.set(record.schemeCode, record);
+      }
+    }
+
+    for (const [code, r] of schemeSipMap.entries()) {
+      schemeOps.push({
+        updateOne: {
+          filter: { schemeCode: code },
+          update: {
+            $set: {
+              minSipAmount: r.minInstallmentAmount, // Null if not in master; never default to 500!
+              maxSipAmount: r.maxInstallmentAmount,
+              sipMultiplierAmount: r.multiplierAmount,
+              sipFrequency: r.sipFrequency,
+              sipDates: r.sipDates,
+              minSipInstallments: r.minInstallmentNumbers,
+              maxSipInstallments: r.maxInstallmentNumbers,
+              sipAllowed: r.sipStatus === '1' || r.sipStatus === 'Y',
+            },
+          },
+        },
+      });
+    }
+
+    if (sipOps.length > 0) {
+      await MfSipSchemeMaster.bulkWrite(sipOps, { ordered: false });
+    }
+    if (schemeOps.length > 0) {
+      await MutualFundScheme.bulkWrite(schemeOps, { ordered: false });
+    }
+
+    return {
+      success: true,
+      totalSipRecords: sipRecords.length,
+      schemesUpdated: schemeOps.length,
     };
   }
 
