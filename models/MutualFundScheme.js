@@ -279,6 +279,19 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       enum: ['Low', 'Low to Moderate', 'Moderate', 'Moderately High', 'High', 'Very High', null],
       default: null,
     },
+    riskometer: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    riskometerAsOfDate: {
+      type: Date,
+      default: null,
+    },
+    inceptionDate: {
+      type: Date,
+      default: null,
+    },
     fundManager: {
       type: String,
       default: null,
@@ -348,6 +361,10 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: String,
       default: null,
       trim: true,
+    },
+    dataProvenance: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     isPopular: {
       type: Boolean,

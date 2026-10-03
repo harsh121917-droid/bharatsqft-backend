@@ -17,6 +17,7 @@ const MfAuditLog = require('../models/MfAuditLog');
 const mfPortfolioEngine = require('../services/mfPortfolioEngine');
 const mfCapitalGainsEngine = require('../services/mfCapitalGainsEngine');
 const mfIdempotencyService = require('../services/mfIdempotencyService');
+const mfIntelligenceService = require('../services/mfIntelligenceService');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -193,6 +194,16 @@ exports.getSchemes = async (req, res) => {
       if (!obj.holdings || obj.holdings.length === 0) {
         obj.holdings = null;
       }
+      const staticIntel = mfIntelligenceService.getSchemeIntelligence(obj.schemeCode || obj.amfiCode);
+      if (staticIntel) {
+        if (!obj.fundManager && staticIntel.fundManager) obj.fundManager = staticIntel.fundManager;
+        if (!obj.benchmark && staticIntel.benchmark) obj.benchmark = staticIntel.benchmark;
+        if ((obj.aum === null || obj.aum === undefined) && staticIntel.aum !== undefined) obj.aum = staticIntel.aum;
+        if ((obj.expenseRatio === null || obj.expenseRatio === undefined) && staticIntel.expenseRatio !== undefined) obj.expenseRatio = staticIntel.expenseRatio;
+        if (!obj.riskometer && staticIntel.riskometer) obj.riskometer = staticIntel.riskometer;
+        if (!obj.inceptionDate && staticIntel.inceptionDate) obj.inceptionDate = staticIntel.inceptionDate;
+        if (!obj.exitLoad && staticIntel.exitLoad) obj.exitLoad = staticIntel.exitLoad;
+      }
       return obj;
     });
 
@@ -255,10 +266,13 @@ exports.getSchemeDetail = async (req, res) => {
       }
     }
 
+    // 1.5 Retrieve verified static statutory intelligence fallback (Tier 2 AMC Factsheets/SIDs)
+    const staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
+
     // Determine accurate AUM, min SIP, min purchase, and rating (preserves null if unknown)
-    const realAum = scheme.aum ?? liveFacts?.aum ?? null;
-    const realMinSip = scheme.minSipAmount ?? liveFacts?.minSipAmount ?? null;
-    const realMinPurchase = scheme.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
+    const realAum = scheme.aum ?? staticIntel?.aum ?? liveFacts?.aum ?? null;
+    const realMinSip = scheme.minSipAmount ?? staticIntel?.minSipAmount ?? liveFacts?.minSipAmount ?? null;
+    const realMinPurchase = scheme.minPurchaseAmount ?? staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
     const realRating = scheme.rating ?? liveFacts?.rating ?? null;
 
     // Top holdings - ONLY real data, no synthetic mock fallback
@@ -268,8 +282,8 @@ exports.getSchemeDetail = async (req, res) => {
     const prosAndCons = liveFacts?.prosAndCons || { pros: [], cons: [] };
 
     // Fund manager & expense ratio (preserves null if unknown)
-    const fundManagerName = scheme.fundManager ?? liveFacts?.fundManager ?? null;
-    const expenseRatio = scheme.expenseRatio ?? liveFacts?.expenseRatio ?? null;
+    const fundManagerName = scheme.fundManager ?? staticIntel?.fundManager ?? liveFacts?.fundManager ?? null;
+    const expenseRatio = scheme.expenseRatio ?? staticIntel?.expenseRatio ?? liveFacts?.expenseRatio ?? null;
     const cat = (scheme.category || '').toLowerCase();
 
     // Similar peer schemes strictly in the same Sub-Category (e.g. Mid Cap with Mid Cap)
@@ -328,14 +342,29 @@ exports.getSchemeDetail = async (req, res) => {
     const day1Ret = liveNav?.day1Return ?? null;
     const day1Pos = day1Ret !== null ? day1Ret >= 0 : null;
 
-    // Do NOT overwrite database scheme records with external unverified scraper data
+    // Authoritative metadata resolution
+    const benchmark = scheme.benchmark || staticIntel?.benchmark || liveFacts?.benchmarkName || null;
+    const exitLoad = scheme.exitLoad || staticIntel?.exitLoad || liveFacts?.exitLoad || null;
+    const riskometer = scheme.riskometer || staticIntel?.riskometer || null;
+    const inceptionDate = scheme.inceptionDate || staticIntel?.inceptionDate || null;
+    const dataProvenance = scheme.dataProvenance || staticIntel?.dataProvenance || null;
 
-    const fundManagement = (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
-      ? liveFacts.fundManagerDetails
-      : (fundManagerName ? [{ name: fundManagerName, qualification: '', experience: '', tenure: '', fundsManaged: '' }] : []);
+    const fundManagement = (scheme.fundManagerDetails && scheme.fundManagerDetails.length > 0)
+      ? scheme.fundManagerDetails
+      : (staticIntel?.fundManagerDetails && staticIntel.fundManagerDetails.length > 0)
+        ? staticIntel.fundManagerDetails
+        : (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
+          ? liveFacts.fundManagerDetails
+          : (fundManagerName ? [{ name: fundManagerName, qualification: '', experience: '', tenure: '', fundsManaged: '' }] : []);
 
-    const benchmark = scheme.benchmark || liveFacts?.benchmarkName || null;
-    const exitLoad = scheme.exitLoad || liveFacts?.exitLoad || null;
+    const resolvedHoldings = (scheme.holdings && scheme.holdings.length > 0)
+      ? scheme.holdings
+      : (staticIntel?.holdings && staticIntel.holdings.length > 0)
+        ? staticIntel.holdings
+        : ((topHoldings && topHoldings.length > 0) ? topHoldings : null);
+
+    const resolvedHoldingsAsOf = scheme.holdingsAsOfDate || staticIntel?.holdingsAsOfDate || null;
+    const resolvedHoldingsSource = scheme.holdingsSource || staticIntel?.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null);
 
     return res.json({
       success: true,
@@ -422,12 +451,42 @@ exports.getSchemeDetail = async (req, res) => {
             rank: null,
           },
         },
-        topHoldings: (topHoldings && topHoldings.length > 0) ? topHoldings : null,
-        holdings: (scheme.holdings && scheme.holdings.length > 0)
-          ? scheme.holdings
-          : ((topHoldings && topHoldings.length > 0) ? topHoldings : null),
-        holdingsAsOfDate: scheme.holdingsAsOfDate || null,
-        holdingsSource: scheme.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null),
+        topHoldings: resolvedHoldings,
+        holdings: resolvedHoldings,
+        holdingsAsOfDate: resolvedHoldingsAsOf,
+        holdingsSource: resolvedHoldingsSource,
+        riskometer,
+        riskometerAsOfDate: scheme.riskometerAsOfDate || staticIntel?.riskometerAsOfDate || null,
+        inceptionDate,
+        dataProvenance,
+        fundDetails: {
+          aum: realAum,
+          expenseRatio,
+          fundManager: fundManagerName,
+          benchmark,
+          exitLoad,
+          riskometer,
+          inceptionDate,
+        },
+        investmentRules: {
+          minPurchaseAmount: realMinPurchase,
+          minSipAmount: realMinSip,
+          sipFrequencies: scheme.sipFrequencies && scheme.sipFrequencies.length > 0 ? scheme.sipFrequencies : ['MONTHLY'],
+          sipDates: scheme.sipDates && scheme.sipDates.length > 0 ? scheme.sipDates : [1, 5, 10, 15, 20, 25],
+        },
+        portfolio: {
+          holdings: resolvedHoldings,
+          holdingsAsOf: resolvedHoldingsAsOf,
+          holdingsSource: resolvedHoldingsSource,
+          assetAllocation: null,
+          sectorAllocation: null,
+        },
+        dataQuality: {
+          status: dataProvenance?.status || (scheme.nav ? 'ACTIVE_NAV_ONLY' : 'UNVERIFIED'),
+          lastVerifiedAt: dataProvenance?.verifiedAt || scheme.navUpdatedAt || null,
+          source: dataProvenance?.source || scheme.navSource || null,
+          sourceDoc: dataProvenance?.sourceDoc || null,
+        },
         expenseDetails: {
           expenseRatio,
           exitLoad,

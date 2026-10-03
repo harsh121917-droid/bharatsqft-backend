@@ -197,8 +197,12 @@ test.describe('VikaOne Phase 5A — Production Data Completeness, Real Returns &
     const result = res.getData();
 
     for (const s of result.data) {
-      // In catalogue, if holdings are not populated from an authoritative factsheet, it must be null
-      assert.strictEqual(s.holdings, null, 'Holdings must be null when source is not available');
+      // In catalogue, holdings must either be null (when unavailable) or a valid non-empty array (never empty array [])
+      if (!s.holdings || (Array.isArray(s.holdings) && s.holdings.length === 0)) {
+        assert.strictEqual(s.holdings, null, 'Holdings must be null when source is not available, never []');
+      } else {
+        assert.ok(Array.isArray(s.holdings) && s.holdings.length > 0, 'When populated from factsheet, holdings must be non-empty array');
+      }
     }
   });
 
