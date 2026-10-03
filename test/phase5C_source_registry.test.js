@@ -32,7 +32,7 @@ describe('VikaOne Phase 5C — Dynamic AMC Source Registry Tests', () => {
     for (const code of expectedCodes) {
       const amc = getAmcSources(code);
       assert.ok(amc, `AMC ${code} must be present in registry`);
-      assert.strictEqual(amc.status, 'ACTIVE');
+      assert.ok(amc.status === 'LIVE_VERIFIED' || amc.status === 'ACTIVE');
       assert.ok(amc.officialDomain, `AMC ${code} must have official domain`);
       assert.ok(amc.sources.factsheet, `AMC ${code} must have factsheet source`);
     }

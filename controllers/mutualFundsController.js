@@ -395,6 +395,7 @@ exports.getSchemeDetail = async (req, res) => {
         ...scheme.toObject(),
         rating: realRating,
         ratingProvider: scheme.ratingProvider || (realRating ? 'CRISIL/ValueResearch' : null),
+        ratingStatus: realRating ? 'VERIFIED' : 'SOURCE_NOT_AUTHORIZED',
         ratingAsOfDate: scheme.ratingAsOfDate || null,
         minSipAmount: realMinSip,
         minSipSource: scheme.minSipSource || (realMinSip ? 'NSE MASTER_DOWNLOAD SIP' : null),
@@ -432,6 +433,7 @@ exports.getSchemeDetail = async (req, res) => {
           allStartNav: liveNav?.allStartNav || null,
           allEndDate: liveNav?.allEndDate || null,
           allEndNav: liveNav?.allEndNav || null,
+          allElapsedYears: liveNav?.allElapsedYears ?? null,
           allSource: liveNav?.allSource || 'AMFI_DAILY_NAV_TIMESERIES',
         },
         expenseRatio,
@@ -497,12 +499,14 @@ exports.getSchemeDetail = async (req, res) => {
           fundManager: fundManagerName,
           benchmark,
           exitLoad,
+          lockInPeriod: scheme.lockInPeriod || staticIntel?.lockInPeriod || null,
           riskometer,
           inceptionDate,
           investmentObjective,
         },
         investmentRules: {
           minPurchaseAmount: realMinPurchase,
+          minAdditionalPurchaseAmount: scheme.minAdditionalPurchaseAmount || staticIntel?.minAdditionalPurchaseAmount || null,
           minSipAmount: realMinSip,
           sipFrequencies: scheme.sipFrequencies && scheme.sipFrequencies.length > 0
             ? scheme.sipFrequencies
@@ -517,6 +521,7 @@ exports.getSchemeDetail = async (req, res) => {
           holdings: resolvedHoldings,
           holdingsAsOf: resolvedHoldingsAsOf,
           holdingsSource: resolvedHoldingsSource,
+          portfolioStatus: (resolvedHoldings && resolvedHoldings.length > 0) ? 'VERIFIED' : 'SOURCE_UNAVAILABLE',
           assetAllocation: null,
           sectorAllocation: null,
         },

@@ -813,8 +813,70 @@ function getAllCataloguedSchemes() {
   return Object.values(VERIFIED_FACTSHEET_CATALOG);
 }
 
+/**
+ * Exact Scheme Identity Validator (Section 4)
+ * Strict multi-field verification before statutory facts ingestion.
+ * Rejects name-only matching and logs IDENTITY_AMBIGUOUS on conflicts.
+ */
+function validateSchemeIdentity(scheme, targetIntel) {
+  if (!scheme) {
+    return { valid: false, reason: 'SCHEME_UNDEFINED', code: 'IDENTITY_AMBIGUOUS' };
+  }
+
+  // 1. Direct plan isolation: Never match or ingest for Direct plans
+  const name = (scheme.schemeName || '').toLowerCase();
+  const plan = (scheme.planType || '').toUpperCase();
+  if (plan === 'DIRECT' || name.includes('direct')) {
+    return { valid: false, reason: 'DIRECT_PLAN_FORBIDDEN', code: 'IDENTITY_AMBIGUOUS' };
+  }
+
+  if (plan !== 'REGULAR') {
+    return { valid: false, reason: 'NON_REGULAR_PLAN', code: 'IDENTITY_AMBIGUOUS' };
+  }
+
+  // If no target statutory intelligence exists to cross-verify against
+  if (!targetIntel) {
+    return { valid: false, reason: 'NO_STATUTORY_INTEL', code: 'UNCATALOGUED' };
+  }
+
+  // 2. AMC Code / Name verification
+  if (scheme.amcCode && targetIntel.amcCode) {
+    const normSchemeAmc = String(scheme.amcCode).toUpperCase().replace(/[^A-Z]/g, '');
+    const normTargetAmc = String(targetIntel.amcCode).toUpperCase().replace(/[^A-Z]/g, '');
+    if (normSchemeAmc !== normTargetAmc && !normSchemeAmc.includes(normTargetAmc) && !normTargetAmc.includes(normSchemeAmc)) {
+      return { valid: false, reason: `AMC_MISMATCH: ${scheme.amcCode} vs ${targetIntel.amcCode}`, code: 'IDENTITY_AMBIGUOUS' };
+    }
+  }
+
+  // 3. Option matching (Growth vs IDCW)
+  const schemeOption = (scheme.option || 'GROWTH').toUpperCase();
+  const targetOption = (targetIntel.option || 'GROWTH').toUpperCase();
+  if (schemeOption !== targetOption) {
+    return { valid: false, reason: `OPTION_MISMATCH: ${schemeOption} vs ${targetOption}`, code: 'IDENTITY_AMBIGUOUS' };
+  }
+
+  // 4. ISIN matching (when both are populated)
+  if (scheme.isin && targetIntel.isin) {
+    const sIsin = String(scheme.isin).trim().toUpperCase();
+    const tIsin = String(targetIntel.isin).trim().toUpperCase();
+    if (sIsin !== tIsin) {
+      return { valid: false, reason: `ISIN_MISMATCH: ${sIsin} vs ${tIsin}`, code: 'IDENTITY_AMBIGUOUS' };
+    }
+  }
+
+  // 5. Scheme code matching
+  const sCode = String(scheme.schemeCode || scheme.amfiCode || '').trim();
+  const tCode = String(targetIntel.schemeCode || targetIntel.amfiCode || '').trim();
+  if (sCode && tCode && sCode !== tCode) {
+    return { valid: false, reason: `SCHEME_CODE_MISMATCH: ${sCode} vs ${tCode}`, code: 'IDENTITY_AMBIGUOUS' };
+  }
+
+  return { valid: true, reason: 'VERIFIED_REGULAR_IDENTITY', code: 'LIVE_VERIFIED' };
+}
+
 module.exports = {
   getSchemeIntelligence,
   getAllCataloguedSchemes,
+  validateSchemeIdentity,
   VERIFIED_FACTSHEET_CATALOG,
 };

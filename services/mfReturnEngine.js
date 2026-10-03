@@ -123,6 +123,7 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
       allStartNav: null,
       allEndDate: null,
       allEndNav: null,
+      allElapsedYears: null,
       allSource: 'AMFI_DAILY_NAV_TIMESERIES',
       returnsCalculatedAt: new Date().toISOString(),
       returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
@@ -205,14 +206,19 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
     results[p.key] = calculatedReturn;
     provenance[p.key] = {
       period: p.key,
+      targetDate: targetStartDate.toISOString().split('T')[0],
       targetStartDate: targetStartDate.toISOString().split('T')[0],
+      selectedNavDate: startPoint.date,
       selectedStartDate: startPoint.date,
+      startNAV: startPoint.nav,
       selectedStartNav: startPoint.nav,
       endDate: endDateStr,
       endNav,
+      endNAV: endNav,
       elapsedDays,
       elapsedYears,
       formula: formulaStr,
+      methodology: p.isCagr ? 'CAGR' : 'SIMPLE_ABSOLUTE',
       calculatedReturn,
       matchType: startPoint.matchType,
       status: 'VERIFIED',
@@ -240,28 +246,33 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
   }
 
   let allReturn = null;
-  let allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_SERIES_START';
+  let allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_AVAILABLE_SERIES_START';
   if (earliestItem.nav > 0 && endNav > 0 && allElapsedYears >= 1.0) {
     const cagrAll = (Math.pow(endNav / earliestItem.nav, 1 / allElapsedYears) - 1) * 100;
     allReturn = isFinite(cagrAll) ? +cagrAll.toFixed(2) : null;
-    allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_SERIES_START';
+    allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_AVAILABLE_SERIES_START';
   } else if (earliestItem.nav > 0 && endNav > 0) {
     const simpleAll = ((endNav - earliestItem.nav) / earliestItem.nav) * 100;
     allReturn = isFinite(simpleAll) ? +simpleAll.toFixed(2) : null;
-    allMethodology = isInceptionMatch ? 'SIMPLE_ABSOLUTE_SINCE_INCEPTION' : 'SIMPLE_ABSOLUTE_SINCE_SERIES_START';
+    allMethodology = isInceptionMatch ? 'SIMPLE_ABSOLUTE_SINCE_INCEPTION' : 'SIMPLE_ABSOLUTE_SINCE_AVAILABLE_SERIES_START';
   }
 
   results['All'] = allReturn;
   provenance['All'] = {
     period: 'All',
+    targetDate: earliestItem.date,
     targetStartDate: earliestItem.date,
+    selectedNavDate: earliestItem.date,
     selectedStartDate: earliestItem.date,
+    startNAV: earliestItem.nav,
     selectedStartNav: earliestItem.nav,
     endDate: endDateStr,
     endNav,
+    endNAV: endNav,
     elapsedDays: allElapsedDays,
     elapsedYears: allElapsedYears,
     formula: allMethodology.startsWith('CAGR') ? '((endNav / startNav) ^ (1 / elapsedYears) - 1) * 100' : '((endNav - startNav) / startNav) * 100',
+    methodology: allMethodology,
     calculatedReturn: allReturn,
     status: 'VERIFIED',
     source: 'AMFI_DAILY_NAV_TIMESERIES',
@@ -287,6 +298,7 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
     allStartNav: earliestItem.nav,
     allEndDate: endDateStr,
     allEndNav: endNav,
+    allElapsedYears,
     allSource: 'AMFI_DAILY_NAV_TIMESERIES',
     returnsCalculatedAt: new Date().toISOString(),
     returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
