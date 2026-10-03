@@ -119,9 +119,9 @@ describe('VikaOne Phase 5E — Fund Detail UI + Complete Holdings Accuracy Remed
       const { data } = await ctx.promise;
 
       assert.equal(data.data.portfolio.holdingsAvailable, true);
-      assert.equal(data.data.portfolio.isPartial, true);
+      assert.equal(data.data.portfolio.isPartial, false);
       assert.equal(data.data.portfolio.totalHoldingsCount, 78);
-      assert.ok(data.data.portfolio.holdings.length >= 10);
+      assert.equal(data.data.portfolio.holdings.length, 78);
 
       // Verify authentic official weights preserved
       const firstHolding = data.data.portfolio.holdings[0];
@@ -308,7 +308,7 @@ describe('VikaOne Phase 5E — Fund Detail UI + Complete Holdings Accuracy Remed
     });
 
     it('Req 11: 10 or fewer authentic holdings => NO View More button rendered', async () => {
-      const ctx = createMockContext({ code: '108466' }); // ICICI Bluechip: exactly 10 holdings
+      const ctx = createMockContext({ code: '129006' }); // Franklin Banking & PSU Debt: exactly 10 authentic holdings
       await mutualFundsController.getSchemeDetail(ctx.req, ctx.res);
       const { data } = await ctx.promise;
 

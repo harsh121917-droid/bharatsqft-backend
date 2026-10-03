@@ -1,4 +1,5 @@
 const MutualFundScheme = require('../models/MutualFundScheme');
+const MfSchemePortfolioSnapshot = require('../models/MfSchemePortfolioSnapshot');
 const MfClientUcc = require('../models/MfClientUcc');
 const MfOrder = require('../models/MfOrder');
 const MfMandate = require('../models/MfMandate');
@@ -398,36 +399,62 @@ exports.getSchemeDetail = async (req, res) => {
           ? liveFacts.fundManagerDetails
           : [];
 
-    const rawHoldings = (staticIntel?.holdings && staticIntel.holdings.length > 0)
-      ? staticIntel.holdings
+    const portfolioSnapshot = await MfSchemePortfolioSnapshot.findOne({
+      schemeCode: scheme.schemeCode,
+      planType: 'REGULAR',
+      option: 'GROWTH',
+      isCurrent: true,
+    }).lean();
+
+    const rawHoldings = (portfolioSnapshot?.holdings && portfolioSnapshot.holdings.length > 0)
+      ? portfolioSnapshot.holdings
       : (scheme.holdings && scheme.holdings.length > 0)
         ? scheme.holdings
-        : null;
+        : (staticIntel?.holdings && staticIntel.holdings.length > 0)
+          ? staticIntel.holdings
+          : null;
 
     const isHoldingsAvailable = rawHoldings !== null && rawHoldings.length > 0;
-    const resolvedHoldingsAsOf = isHoldingsAvailable ? (staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || '2026-09-30') : null;
-    const resolvedHoldingsSource = isHoldingsAvailable ? (staticIntel?.holdingsSource || scheme.holdingsSource || 'Official AMC Factsheet') : null;
+    const resolvedHoldingsAsOf = isHoldingsAvailable
+      ? (portfolioSnapshot?.asOfDate ? (portfolioSnapshot.asOfDate instanceof Date ? portfolioSnapshot.asOfDate.toISOString().split('T')[0] : String(portfolioSnapshot.asOfDate).split('T')[0]) : (staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || '2026-09-30'))
+      : null;
+    const resolvedHoldingsSource = isHoldingsAvailable
+      ? (portfolioSnapshot?.source || staticIntel?.holdingsSource || scheme.holdingsSource || 'Official AMC Factsheet')
+      : null;
+    const resolvedSourceDoc = portfolioSnapshot?.sourceDocument || staticIntel?.holdingsSourceDocument || 'Statutory Monthly Portfolio Disclosure';
+    const resolvedSourceUrl = portfolioSnapshot?.sourceUrl || staticIntel?.holdingsSourceUrl || staticIntel?.factsheetUrl || null;
+    const isPartialHoldings = isHoldingsAvailable
+      ? (portfolioSnapshot ? portfolioSnapshot.isPartial === true : (staticIntel?.isPartial ?? false))
+      : false;
+    const totalHoldingsCount = isHoldingsAvailable
+      ? (portfolioSnapshot?.totalHoldingsCount || staticIntel?.totalHoldingsCount || rawHoldings.length)
+      : null;
 
     const normalizedHoldings = isHoldingsAvailable ? rawHoldings.map(h => {
       const securityName = h.securityName || h.name || h.company || 'Unknown Security';
-      const weightPercent = typeof h.weightPercent === 'number' ? h.weightPercent : (typeof h.percentage === 'number' ? h.percentage : (typeof h.weight === 'number' ? h.weight : 0));
+      const weightPercent = typeof h.weightPercent === 'number'
+        ? h.weightPercent
+        : (typeof h.percentage === 'number'
+            ? h.percentage
+            : (typeof h.weight === 'number' ? h.weight : null));
       return {
         securityName,
         name: securityName,
         isin: h.isin || null,
         sector: h.sector || 'Diversified',
+        assetClass: h.assetClass || 'Equity',
         quantity: typeof h.quantity === 'number' ? h.quantity : (h.quantity ? Number(h.quantity) : null),
         marketValue: typeof h.marketValue === 'number' ? h.marketValue : (h.marketValue ? Number(h.marketValue) : null),
         weightPercent,
         weight: weightPercent,
         percentage: weightPercent,
         weightSource: h.weightSource || staticIntel?.holdingsWeightSource || 'OFFICIAL_AMC_DISCLOSURE',
-        asOfDate: h.asOfDate || resolvedHoldingsAsOf,
+        asOfDate: h.asOfDate ? (h.asOfDate instanceof Date ? h.asOfDate.toISOString().split('T')[0] : String(h.asOfDate).split('T')[0]) : resolvedHoldingsAsOf,
         sourceName: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
         source: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
-        sourceUrl: h.sourceUrl || staticIntel?.holdingsSourceUrl || staticIntel?.factsheetUrl || null,
-        sourceDocument: h.sourceDocument || staticIntel?.holdingsSourceDocument || 'Statutory Monthly Portfolio Disclosure',
-        sourceType: h.sourceType || 'STATUTORY_AMC_DISCLOSURE',
+        sourceUrl: h.sourceUrl || resolvedSourceUrl,
+        sourceDocument: h.sourceDocument || resolvedSourceDoc,
+        sourceType: h.sourceType || 'AMC_MONTHLY_PORTFOLIO',
       };
     }) : null;
 
@@ -449,8 +476,8 @@ exports.getSchemeDetail = async (req, res) => {
         fundType: 'Growth',
         plan: 'Regular',
         holdingsAvailable: isHoldingsAvailable,
-        totalHoldingsCount: isHoldingsAvailable ? (staticIntel?.totalHoldingsCount || normalizedHoldings.length) : null,
-        isPartial: isHoldingsAvailable ? (staticIntel?.isPartial === true) : false,
+        totalHoldingsCount: isHoldingsAvailable ? totalHoldingsCount : null,
+        isPartial: isHoldingsAvailable ? isPartialHoldings : false,
         holdings: normalizedHoldings,
         topHoldings: normalizedHoldings,
         minSipAmount: realMinSip,
@@ -593,11 +620,15 @@ exports.getSchemeDetail = async (req, res) => {
         portfolio: {
           asOfDate: isHoldingsAvailable ? resolvedHoldingsAsOf : null,
           source: isHoldingsAvailable ? resolvedHoldingsSource : null,
-          totalHoldingsCount: isHoldingsAvailable ? (staticIntel?.totalHoldingsCount || normalizedHoldings.length) : null,
+          sourceDocument: isHoldingsAvailable ? resolvedSourceDoc : null,
+          sourceUrl: isHoldingsAvailable ? resolvedSourceUrl : null,
+          totalHoldingsCount: isHoldingsAvailable ? totalHoldingsCount : null,
           holdingsAvailable: isHoldingsAvailable,
-          isPartial: isHoldingsAvailable ? (staticIntel?.isPartial === true) : false,
+          isPartial: isHoldingsAvailable ? isPartialHoldings : false,
           displayedCount: isHoldingsAvailable ? normalizedHoldings.length : null,
-          portfolioStatus: isHoldingsAvailable ? 'VERIFIED' : 'SOURCE_UNAVAILABLE',
+          portfolioStatus: isHoldingsAvailable
+            ? (portfolioSnapshot?.portfolioStatus || (isPartialHoldings ? 'SOURCE_PARTIAL' : 'SOURCE_AVAILABLE_AND_VERIFIED'))
+            : 'SOURCE_UNAVAILABLE',
           holdings: normalizedHoldings,
           holdingsAsOf: isHoldingsAvailable ? resolvedHoldingsAsOf : null,
           holdingsSource: isHoldingsAvailable ? resolvedHoldingsSource : null,
