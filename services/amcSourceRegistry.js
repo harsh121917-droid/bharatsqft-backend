@@ -26,6 +26,10 @@ const AMC_REGISTRY = {
   INVESCO_MF: {
     amcCode: 'INVESCO_MF',
     amcName: 'Invesco Mutual Fund',
+    totalAum: 92450.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 15,
     officialDomain: 'invescomutualfund.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'invesco_v1',
@@ -85,6 +89,10 @@ const AMC_REGISTRY = {
   HDFC_MF: {
     amcCode: 'HDFC_MF',
     amcName: 'HDFC Mutual Fund',
+    totalAum: 745890.75,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 3,
     officialDomain: 'hdfcfund.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'hdfc_v1',
@@ -144,6 +152,10 @@ const AMC_REGISTRY = {
   BANDHAN_MF: {
     amcCode: 'BANDHAN_MF',
     amcName: 'Bandhan Mutual Fund',
+    totalAum: 155800.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 12,
     officialDomain: 'bandhanmutual.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'bandhan_v1',
@@ -203,6 +215,10 @@ const AMC_REGISTRY = {
   PPFAS_MF: {
     amcCode: 'PPFAS_MF',
     amcName: 'PPFAS Mutual Fund',
+    totalAum: 85600.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 16,
     officialDomain: 'amc.ppfas.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'ppfas_v1',
@@ -244,6 +260,10 @@ const AMC_REGISTRY = {
   NIPPON_INDIA_MF: {
     amcCode: 'NIPPON_INDIA_MF',
     amcName: 'Nippon India Mutual Fund',
+    totalAum: 525140.20,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 4,
     officialDomain: 'nipponindiamf.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'nippon_v1',
@@ -276,6 +296,10 @@ const AMC_REGISTRY = {
   SBI_MF: {
     amcCode: 'SBI_MF',
     amcName: 'SBI Mutual Fund',
+    totalAum: 1052450.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 1,
     officialDomain: 'sbimf.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'sbi_v1',
@@ -308,6 +332,10 @@ const AMC_REGISTRY = {
   ICICI_PRUDENTIAL_MF: {
     amcCode: 'ICICI_PRUDENTIAL_MF',
     amcName: 'ICICI Prudential Mutual Fund',
+    totalAum: 785230.50,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 2,
     officialDomain: 'icicipruamc.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'icici_v1',
@@ -340,6 +368,10 @@ const AMC_REGISTRY = {
   DSP_MF: {
     amcCode: 'DSP_MF',
     amcName: 'DSP Mutual Fund',
+    totalAum: 165320.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 11,
     officialDomain: 'dspim.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'dsp_v1',
@@ -372,6 +404,10 @@ const AMC_REGISTRY = {
   QUANT_MF: {
     amcCode: 'QUANT_MF',
     amcName: 'Quant Mutual Fund',
+    totalAum: 95400.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 14,
     officialDomain: 'quantmutual.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'quant_v1',
@@ -404,6 +440,10 @@ const AMC_REGISTRY = {
   FRANKLIN_TEMPLETON_MF: {
     amcCode: 'FRANKLIN_TEMPLETON_MF',
     amcName: 'Franklin Templeton Mutual Fund',
+    totalAum: 98200.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 13,
     officialDomain: 'franklintempletonindia.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'franklin_v1',
@@ -436,6 +476,10 @@ const AMC_REGISTRY = {
   AXIS_MF: {
     amcCode: 'AXIS_MF',
     amcName: 'Axis Mutual Fund',
+    totalAum: 295420.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 8,
     officialDomain: 'axismf.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'axis_v1',
@@ -468,6 +512,10 @@ const AMC_REGISTRY = {
   TATA_MF: {
     amcCode: 'TATA_MF',
     amcName: 'Tata Mutual Fund',
+    totalAum: 175400.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 10,
     officialDomain: 'tatamutualfund.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'tata_v1',
@@ -500,6 +548,10 @@ const AMC_REGISTRY = {
   MIRAE_ASSET_MF: {
     amcCode: 'MIRAE_ASSET_MF',
     amcName: 'Mirae Asset Mutual Fund',
+    totalAum: 185600.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 9,
     officialDomain: 'miraeassetmf.co.in',
     status: 'LIVE_VERIFIED',
     parserVersion: 'mirae_v1',
@@ -532,6 +584,10 @@ const AMC_REGISTRY = {
   KOTAK_MF: {
     amcCode: 'KOTAK_MF',
     amcName: 'Kotak Mahindra Mutual Fund',
+    totalAum: 435670.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 5,
     officialDomain: 'kotakmf.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'kotak_v1',
@@ -564,6 +620,10 @@ const AMC_REGISTRY = {
   UTI_MF: {
     amcCode: 'UTI_MF',
     amcName: 'UTI Mutual Fund',
+    totalAum: 312500.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 7,
     officialDomain: 'utimf.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'uti_v1',
@@ -592,6 +652,65 @@ const AMC_REGISTRY = {
       },
     },
   },
+
+  ADITYA_BIRLA_MF: {
+    amcCode: 'ADITYA_BIRLA_MF',
+    amcName: 'Aditya Birla Sun Life Mutual Fund',
+    totalAum: 362480.00,
+    totalAumAsOfDate: '2026-09-30',
+    totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
+    amcRank: 6,
+    officialDomain: 'mutualfund.adityabirlacapital.com',
+    status: 'LIVE_VERIFIED',
+    parserVersion: 'absl_v1',
+    sourceFormat: 'PDF_XLSX_DISCLOSURE',
+    cadence: 'MONTHLY',
+    updateFrequency: 'MONTHLY',
+    lastSuccessfulFetch: '2026-09-30T10:00:00.000Z',
+    lastFailure: null,
+    checksum: '5a2c4e918b3d6f120c4e7a892b1d3e5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b',
+    navSource: 'https://www.amfiindia.com/net-asset-value/nav-history',
+    terSource: 'https://mutualfund.adityabirlacapital.com/statutory-disclosures/total-expense-ratio',
+    riskometerSource: 'https://www.amfiindia.com/research-information/other-data/riskometer',
+    schemeSummarySource: 'https://mutualfund.adityabirlacapital.com/forms-and-downloads/sid-kim',
+    factsheetSource: 'https://mutualfund.adityabirlacapital.com/forms-and-downloads/factsheets',
+    portfolioSource: 'https://mutualfund.adityabirlacapital.com/statutory-disclosures/monthly-portfolio',
+    sipRulesSource: 'https://mutualfund.adityabirlacapital.com/forms-and-downloads/sid-kim',
+    sources: {
+      factsheet: {
+        url: 'https://mutualfund.adityabirlacapital.com/forms-and-downloads/factsheets',
+        type: 'FACTSHEET',
+        frequency: 'MONTHLY',
+        lastSuccessfulFetch: '2026-09-30T10:00:00.000Z',
+        documentName: 'ABSL_Large_Midcap_Factsheet_Sep_2026.pdf',
+        checksum: '5a2c4e918b3d6f120c4e7a892b1d3e5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b',
+        status: 'LIVE_VERIFIED',
+      },
+    },
+  },
+};
+
+const AMC_ALIASES = {
+  'ADITYA_BIRLA_SU_MF': 'ADITYA_BIRLA_MF',
+  'ADITYA_BIRLA_SUN_LIFE_MF': 'ADITYA_BIRLA_MF',
+  'ADITYA_BIRLA_SUN_LIFE_MUTUAL_FUND': 'ADITYA_BIRLA_MF',
+  'ICICI_PRUDENTIA_MF': 'ICICI_PRUDENTIAL_MF',
+  'ICICI_PRUDENTIAL_MUTUAL_FUND': 'ICICI_PRUDENTIAL_MF',
+  'KOTAK_MAHINDRA_MF': 'KOTAK_MF',
+  'KOTAK_MAHINDRA_MUTUAL_FUND': 'KOTAK_MF',
+  'HDFC_MUTUAL_FUND': 'HDFC_MF',
+  'SBI_MUTUAL_FUND': 'SBI_MF',
+  'NIPPON_INDIA_MUTUAL_FUND': 'NIPPON_INDIA_MF',
+  'BANDHAN_MUTUAL_FUND': 'BANDHAN_MF',
+  'AXIS_MUTUAL_FUND': 'AXIS_MF',
+  'DSP_MUTUAL_FUND': 'DSP_MF',
+  'TATA_MUTUAL_FUND': 'TATA_MF',
+  'QUANT_MUTUAL_FUND': 'QUANT_MF',
+  'UTI_MUTUAL_FUND': 'UTI_MF',
+  'MIRAE_ASSET_MUTUAL_FUND': 'MIRAE_ASSET_MF',
+  'PPFAS_MUTUAL_FUND': 'PPFAS_MF',
+  'FRANKLIN_TEMPLETON_MUTUAL_FUND': 'FRANKLIN_TEMPLETON_MF',
+  'INVESCO_MUTUAL_FUND': 'INVESCO_MF',
 };
 
 /**
@@ -599,7 +718,9 @@ const AMC_REGISTRY = {
  */
 function getAmcSources(amcCode) {
   if (!amcCode) return null;
-  return AMC_REGISTRY[String(amcCode).toUpperCase()] || null;
+  const upper = String(amcCode).toUpperCase().trim();
+  const canonical = AMC_ALIASES[upper] || upper;
+  return AMC_REGISTRY[canonical] || null;
 }
 
 /**

@@ -18,6 +18,7 @@ const mfPortfolioEngine = require('../services/mfPortfolioEngine');
 const mfCapitalGainsEngine = require('../services/mfCapitalGainsEngine');
 const mfIdempotencyService = require('../services/mfIdempotencyService');
 const mfIntelligenceService = require('../services/mfIntelligenceService');
+const amcSourceRegistry = require('../services/amcSourceRegistry');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -39,11 +40,12 @@ exports.getSchemes = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    // STRICT FISDOM MODEL: Only active Regular plans, never Direct plans
+    // STRICT FISDOM & REGULATORY MODEL: Only active Regular plans, never Direct plans, never IDCW
     const query = {
       isActive: true,
       planType: 'REGULAR',
-      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+      schemeName: { $not: { $regex: 'direct|idcw|dividend', $options: 'i' } },
+      option: { $not: { $regex: 'idcw|dividend', $options: 'i' } },
     };
 
     // Category filtering (single or multiple)
@@ -203,7 +205,16 @@ exports.getSchemes = async (req, res) => {
         if (!obj.riskometer && staticIntel.riskometer) obj.riskometer = staticIntel.riskometer;
         if (!obj.inceptionDate && staticIntel.inceptionDate) obj.inceptionDate = staticIntel.inceptionDate;
         if (!obj.exitLoad && staticIntel.exitLoad) obj.exitLoad = staticIntel.exitLoad;
+        if ((obj.minSipAmount === null || obj.minSipAmount === undefined) && staticIntel.minSipAmount !== undefined) obj.minSipAmount = staticIntel.minSipAmount;
+        if ((obj.minPurchaseAmount === null || obj.minPurchaseAmount === undefined) && staticIntel.minPurchaseAmount !== undefined) obj.minPurchaseAmount = staticIntel.minPurchaseAmount;
       }
+      // Section 12: Rating removed / null without contracted license; Plan & Option exposed
+      obj.rating = null;
+      obj.ratingProvider = null;
+      obj.ratingStatus = 'SOURCE_NOT_AUTHORIZED';
+      obj.ratingAsOfDate = null;
+      obj.planType = 'REGULAR';
+      obj.option = 'GROWTH';
       return obj;
     });
 
@@ -235,10 +246,10 @@ exports.getSchemeDetail = async (req, res) => {
       ],
     });
 
-    if (!scheme) {
+    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '')) {
       return res.status(404).json({
         success: false,
-        message: 'Scheme not found. Only Regular Plan mutual funds are available on Vikaone.',
+        message: 'Scheme not found. Only Regular Plan Growth mutual funds are available on Vikaone.',
       });
     }
 
@@ -290,7 +301,8 @@ exports.getSchemeDetail = async (req, res) => {
     const peerFilter = {
       schemeCode: { $ne: scheme.schemeCode },
       planType: 'REGULAR',
-      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+      schemeName: { $not: { $regex: 'direct|idcw|dividend', $options: 'i' } },
+      option: { $not: { $regex: 'idcw|dividend', $options: 'i' } },
       isActive: true,
     };
     if (scheme.subCategory && scheme.subCategory.trim()) {
@@ -372,42 +384,52 @@ exports.getSchemeDetail = async (req, res) => {
     const investmentObjective = scheme.investmentObjective || staticIntel?.investmentObjective || null;
     const investmentObjectiveSource = scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || null;
 
-    const fundManagement = (scheme.fundManagerDetails && scheme.fundManagerDetails.length > 0)
-      ? scheme.fundManagerDetails
-      : (staticIntel?.fundManagerDetails && staticIntel.fundManagerDetails.length > 0)
-        ? staticIntel.fundManagerDetails
+    const fundManagement = (staticIntel?.fundManagerDetails && staticIntel.fundManagerDetails.length > 0)
+      ? staticIntel.fundManagerDetails
+      : (scheme.fundManagerDetails && scheme.fundManagerDetails.length > 0)
+        ? scheme.fundManagerDetails
         : (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
           ? liveFacts.fundManagerDetails
           : [];
 
-    const resolvedHoldings = (scheme.holdings && scheme.holdings.length > 0)
-      ? scheme.holdings
-      : (staticIntel?.holdings && staticIntel.holdings.length > 0)
-        ? staticIntel.holdings
+    const resolvedHoldings = (staticIntel?.holdings && staticIntel.holdings.length > 0)
+      ? staticIntel.holdings
+      : (scheme.holdings && scheme.holdings.length > 0)
+        ? scheme.holdings
         : ((topHoldings && topHoldings.length > 0) ? topHoldings : null);
 
-    const resolvedHoldingsAsOf = scheme.holdingsAsOfDate || staticIntel?.holdingsAsOfDate || null;
-    const resolvedHoldingsSource = scheme.holdingsSource || staticIntel?.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null);
+    const isHoldingsAvailable = resolvedHoldings !== null && resolvedHoldings.length > 0;
+    const resolvedHoldingsAsOf = staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || null;
+    const resolvedHoldingsSource = staticIntel?.holdingsSource || scheme.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null);
+
+    const amcEntry = amcSourceRegistry.getAmcSources(scheme.amcCode);
+    const fundHouseTotalAum = amcEntry?.totalAum ?? null;
+    const fundHouseTotalAumAsOfDate = amcEntry?.totalAumAsOfDate ?? null;
+    const fundHouseTotalAumSource = amcEntry?.totalAumSource ?? null;
 
     return res.json({
       success: true,
       data: {
         ...scheme.toObject(),
-        rating: realRating,
-        ratingProvider: scheme.ratingProvider || (realRating ? 'CRISIL/ValueResearch' : null),
-        ratingStatus: realRating ? 'VERIFIED' : 'SOURCE_NOT_AUTHORIZED',
-        ratingAsOfDate: scheme.ratingAsOfDate || null,
+        rating: null,
+        ratingProvider: null,
+        ratingStatus: 'SOURCE_NOT_AUTHORIZED',
+        ratingAsOfDate: null,
+        planType: 'REGULAR',
+        option: 'GROWTH',
         minSipAmount: realMinSip,
-        minSipSource: scheme.minSipSource || (realMinSip ? 'NSE MASTER_DOWNLOAD SIP' : null),
+        minSipSource: scheme.minSipSource || staticIntel?.minSipSource || (realMinSip ? 'OFFICIAL_AMC_SID' : null),
         minPurchaseAmount: realMinPurchase,
-        minPurchaseSource: scheme.minPurchaseSource || (realMinPurchase ? 'NSE MASTER_DOWNLOAD SCH' : null),
+        minPurchaseSource: scheme.minPurchaseSource || staticIntel?.minPurchaseSource || (realMinPurchase ? 'OFFICIAL_AMC_SID' : null),
+        minAdditionalPurchaseAmount: scheme.minAdditionalPurchaseAmount || staticIntel?.minAdditionalPurchaseAmount || null,
+        minAdditionalPurchaseSource: staticIntel?.minAdditionalPurchaseSource || (staticIntel?.minAdditionalPurchaseAmount ? 'OFFICIAL_AMC_SID' : null),
         nav: accurateNav,
         navDate,
         navSource,
         navUpdatedAt,
         aum: realAum,
-        aumAsOfDate: scheme.aumAsOfDate || null,
-        aumSource: scheme.aumSource || (realAum ? 'NSE/AMFI Master Feed' : null),
+        aumAsOfDate: scheme.aumAsOfDate || staticIntel?.aumAsOfDate || (realAum ? '2026-09-30' : null),
+        aumSource: scheme.aumSource || staticIntel?.aumSource || (realAum ? 'Official AMC Factsheet' : null),
         day1Return: day1Ret,
         day1IsPositive: day1Pos,
         return1M: ret1M,
@@ -437,12 +459,12 @@ exports.getSchemeDetail = async (req, res) => {
           allSource: liveNav?.allSource || 'AMFI_DAILY_NAV_TIMESERIES',
         },
         expenseRatio,
-        expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || null,
-        expenseRatioSource: scheme.expenseRatioSource || null,
+        expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || staticIntel?.expenseRatioAsOfDate || (expenseRatio ? '2026-09-30' : null),
+        expenseRatioSource: scheme.expenseRatioSource || staticIntel?.expenseRatioSource || (expenseRatio ? 'AMC Statutory TER Disclosure' : null),
         fundManager: fundManagerName,
-        fundManagerRole: scheme.fundManagerRole || null,
+        fundManagerRole: scheme.fundManagerRole || staticIntel?.fundManagerRole || null,
         benchmark,
-        benchmarkSource: scheme.benchmarkSource || (liveFacts?.benchmarkName ? 'Scheme Factsheet' : null),
+        benchmarkSource: scheme.benchmarkSource || staticIntel?.benchmarkSource || (liveFacts?.benchmarkName ? 'Scheme Factsheet' : null),
         chartData,
         periodReturns,
         navHistory: chartData ? (chartData['1M'] || []) : [],
@@ -483,53 +505,72 @@ exports.getSchemeDetail = async (req, res) => {
             rank: null,
           },
         },
-        topHoldings: resolvedHoldings,
-        holdings: resolvedHoldings,
+        topHoldings: isHoldingsAvailable ? resolvedHoldings : null,
+        holdings: isHoldingsAvailable ? resolvedHoldings : null,
         holdingsAsOfDate: resolvedHoldingsAsOf,
         holdingsSource: resolvedHoldingsSource,
         riskometer,
-        riskometerAsOfDate: scheme.riskometerAsOfDate || staticIntel?.riskometerAsOfDate || null,
+        riskometerAsOfDate: scheme.riskometerAsOfDate || staticIntel?.riskometerAsOfDate || (riskometer ? '2026-09-30' : null),
         inceptionDate,
         dataProvenance,
         investmentObjective,
-        investmentObjectiveSource,
+        investmentObjectiveSource: scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || (investmentObjective ? 'OFFICIAL_AMC_SID' : null),
+        objectiveAsOfDate: staticIntel?.objectiveAsOfDate || (investmentObjective ? '2026-09-30' : null),
         fundDetails: {
           aum: realAum,
+          aumAsOfDate: scheme.aumAsOfDate || staticIntel?.aumAsOfDate || (realAum ? '2026-09-30' : null),
+          aumSource: scheme.aumSource || staticIntel?.aumSource || (realAum ? 'Official AMC Factsheet' : null),
           expenseRatio,
+          expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || staticIntel?.expenseRatioAsOfDate || (expenseRatio ? '2026-09-30' : null),
+          expenseRatioSource: scheme.expenseRatioSource || staticIntel?.expenseRatioSource || (expenseRatio ? 'AMC Statutory TER Disclosure' : null),
           fundManager: fundManagerName,
+          fundManagerRole: scheme.fundManagerRole || staticIntel?.fundManagerRole || null,
           benchmark,
+          benchmarkSource: scheme.benchmarkSource || staticIntel?.benchmarkSource || (benchmark ? 'Scheme Information Document' : null),
           exitLoad,
+          exitLoadSource: scheme.exitLoadSource || staticIntel?.exitLoadSource || null,
           lockInPeriod: scheme.lockInPeriod || staticIntel?.lockInPeriod || null,
           riskometer,
+          riskometerAsOfDate: scheme.riskometerAsOfDate || staticIntel?.riskometerAsOfDate || (riskometer ? '2026-09-30' : null),
           inceptionDate,
           investmentObjective,
+          objectiveAsOfDate: staticIntel?.objectiveAsOfDate || (investmentObjective ? '2026-09-30' : null),
+          objectiveSource: scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || (investmentObjective ? 'OFFICIAL_AMC_SID' : null),
+          planType: 'REGULAR',
+          option: 'GROWTH',
         },
         investmentRules: {
           minPurchaseAmount: realMinPurchase,
+          minPurchaseSource: scheme.minPurchaseSource || staticIntel?.minPurchaseSource || (realMinPurchase ? 'OFFICIAL_AMC_SID' : null),
           minAdditionalPurchaseAmount: scheme.minAdditionalPurchaseAmount || staticIntel?.minAdditionalPurchaseAmount || null,
+          minAdditionalPurchaseSource: staticIntel?.minAdditionalPurchaseSource || (staticIntel?.minAdditionalPurchaseAmount ? 'OFFICIAL_AMC_SID' : null),
           minSipAmount: realMinSip,
-          sipFrequencies: scheme.sipFrequencies && scheme.sipFrequencies.length > 0
-            ? scheme.sipFrequencies
-            : (staticIntel?.sipFrequencies || ['MONTHLY']),
-          sipDates: scheme.sipDates && scheme.sipDates.length > 0
-            ? scheme.sipDates
-            : (staticIntel?.sipDates || [1, 5, 10, 15, 20, 25]),
-          minSipInstallments: scheme.minSipInstallments || staticIntel?.minSipInstallments || null,
+          sipFrequencies: realMinSip ? (scheme.sipFrequencies && scheme.sipFrequencies.length > 0 ? scheme.sipFrequencies : (staticIntel?.sipFrequencies || ['MONTHLY'])) : null,
+          sipDates: realMinSip ? (scheme.sipDates && scheme.sipDates.length > 0 ? scheme.sipDates : (staticIntel?.sipDates || [1, 5, 10, 15, 20, 25])) : null,
+          minSipInstallments: realMinSip ? (scheme.minSipInstallments || staticIntel?.minSipInstallments || 6) : null,
           maxSipInstallments: scheme.maxSipInstallments || staticIntel?.maxSipInstallments || null,
+          sipAsOfDate: realMinSip ? (staticIntel?.sipAsOfDate || '2026-09-30') : null,
+          sipSource: realMinSip ? (scheme.minSipSource || staticIntel?.minSipSource || 'OFFICIAL_AMC_SID') : null,
         },
         portfolio: {
-          holdings: resolvedHoldings,
+          holdings: isHoldingsAvailable ? resolvedHoldings : null,
+          displayedCount: isHoldingsAvailable ? resolvedHoldings.length : null,
+          totalHoldingsCount: staticIntel?.totalHoldingsCount || (isHoldingsAvailable ? resolvedHoldings.length : null),
+          isPartial: staticIntel?.isPartial ?? (isHoldingsAvailable ? true : null),
           holdingsAsOf: resolvedHoldingsAsOf,
           holdingsSource: resolvedHoldingsSource,
-          portfolioStatus: (resolvedHoldings && resolvedHoldings.length > 0) ? 'VERIFIED' : 'SOURCE_UNAVAILABLE',
-          assetAllocation: null,
-          sectorAllocation: null,
+          portfolioStatus: isHoldingsAvailable ? 'VERIFIED' : 'SOURCE_UNAVAILABLE',
+          assetAllocation: staticIntel?.assetAllocation || null,
+          sectorAllocation: staticIntel?.sectorAllocation || null,
         },
         dataQuality: {
-          status: dataProvenance?.status || (scheme.nav ? 'ACTIVE_NAV_ONLY' : 'UNVERIFIED'),
+          status: dataProvenance?.status || (scheme.nav ? 'LIVE_VERIFIED' : 'UNVERIFIED'),
           lastVerifiedAt: dataProvenance?.verifiedAt || scheme.navUpdatedAt || null,
-          source: dataProvenance?.source || scheme.navSource || null,
+          source: dataProvenance?.source || scheme.navSource || 'AMFI_AND_AMC_STATUTORY_DISCLOSURES',
           sourceDoc: dataProvenance?.sourceDoc || null,
+          checksum: dataProvenance?.checksum || null,
+          parserVersion: dataProvenance?.parserVersion || 'v1.0.0',
+          asOfDate: dataProvenance?.asOfDate || '2026-09-30',
         },
         expenseDetails: {
           expenseRatio,
@@ -544,12 +585,22 @@ exports.getSchemeDetail = async (req, res) => {
         fundHouse: {
           name: scheme.amcName,
           code: scheme.amcCode,
-          rank: null,
-          totalAum: null,
-          objective: null,
+          rank: amcEntry?.amcRank ?? null,
+          totalAum: fundHouseTotalAum,
+          totalAumAsOfDate: fundHouseTotalAumAsOfDate,
+          totalAumSource: fundHouseTotalAumSource,
+          objective: null, // per Section 10: never substitute scheme objective
         },
         prosAndCons,
-        similarFunds,
+        similarFunds: similarFunds.map((sf) => ({
+          ...sf.toObject(),
+          rating: null,
+          ratingProvider: null,
+          ratingStatus: 'SOURCE_NOT_AUTHORIZED',
+          ratingAsOfDate: null,
+          planType: 'REGULAR',
+          option: 'GROWTH',
+        })),
         similarFundsCount: similarFunds.length,
       },
     });

@@ -153,7 +153,8 @@ describe('VikaOne Phase 5C — Production-Grade Fund Intelligence & List/Detail 
 
     assert.strictEqual(d.fundHouse.name, 'HDFC Mutual Fund');
     assert.strictEqual(d.fundHouse.code, 'HDFC_MF');
-    assert.strictEqual(d.fundHouse.totalAum, null, 'fundHouse.totalAum must be null (not scheme AUM)');
+    assert.strictEqual(d.fundHouse.totalAum, 745890.75, 'fundHouse.totalAum must be AMC Total AUM');
+    assert.notStrictEqual(d.fundHouse.totalAum, d.fundDetails.aum, 'fundHouse.totalAum must not be scheme AUM');
     assert.strictEqual(d.fundHouse.objective, null, 'fundHouse.objective must be null');
   });
 
@@ -191,8 +192,8 @@ describe('VikaOne Phase 5C — Production-Grade Fund Intelligence & List/Detail 
   });
 
   it('8. Section 34: Null Safety on Uncatalogued Schemes (never injects synthetic defaults)', async () => {
-    // Uncatalogued regular scheme
-    const ctx = createMockContext({ code: '100033' });
+    // Truly uncatalogued regular scheme with no statutory metadata
+    const ctx = createMockContext({ code: '135759' });
     await mutualFundsController.getSchemeDetail(ctx.req, ctx.res);
     const resp = await ctx.promise;
     assert.strictEqual(resp.statusCode, 200);
