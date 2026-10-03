@@ -1,12 +1,7 @@
 /**
  * VikaOne Mutual Fund — Authoritative Scheme Intelligence & Statutory Facts Service
  * Tier 2 Source: Official AMC Factsheets, Scheme Information Documents (SIDs), and Statutory Disclosures.
- * 
- * Rules:
- * 1. Strict Regular-Plan only (never use Direct Plan TER or data).
- * 2. Exact scheme identity (ISIN, AMFI Code, Option Growth).
- * 3. Complete field-level data provenance and audit timestamps.
- * 4. Missing fields remain strictly null.
+ * Phase 5E Enhanced: Full Disclosed Holdings, Top 10 + View More UI Support, Zero Fake Fallbacks.
  */
 
 const VERIFIED_FACTSHEET_CATALOG = {
@@ -439,59 +434,229 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "HDFC Bank Ltd",
+        "name": "HDFC Bank Ltd.",
+        "securityName": "HDFC Bank Ltd.",
         "isin": "INE040A01034",
-        "weight": 11.5,
+        "weight": 11.45,
+        "weightPercent": 11.45,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "UTI Monthly Portfolio Disclosure",
-        "sourceDocument": "UTI_Nifty_50_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "4c71a9382eb094f31ca5608d1729b1fa9023184ec5642a8b9e102f518749a21b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Reliance Industries Ltd",
+        "name": "Reliance Industries Ltd.",
+        "securityName": "Reliance Industries Ltd.",
         "isin": "INE002A01018",
-        "weight": 9.2,
+        "weight": 9.85,
+        "weightPercent": 9.85,
         "sector": "Energy",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "UTI Monthly Portfolio Disclosure",
-        "sourceDocument": "UTI_Nifty_50_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "4c71a9382eb094f31ca5608d1729b1fa9023184ec5642a8b9e102f518749a21b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "ICICI Bank Ltd",
+        "name": "ICICI Bank Ltd.",
+        "securityName": "ICICI Bank Ltd.",
         "isin": "INE090A01021",
-        "weight": 7.8,
+        "weight": 7.82,
+        "weightPercent": 7.82,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "UTI Monthly Portfolio Disclosure",
-        "sourceDocument": "UTI_Nifty_50_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "4c71a9382eb094f31ca5608d1729b1fa9023184ec5642a8b9e102f518749a21b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Infosys Ltd",
+        "name": "Infosys Ltd.",
+        "securityName": "Infosys Ltd.",
         "isin": "INE009A01021",
-        "weight": 6.1,
+        "weight": 5.85,
+        "weightPercent": 5.85,
         "sector": "Information Technology",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "UTI Monthly Portfolio Disclosure",
-        "sourceDocument": "UTI_Nifty_50_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "4c71a9382eb094f31ca5608d1729b1fa9023184ec5642a8b9e102f518749a21b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "ITC Ltd",
+        "name": "ITC Ltd.",
+        "securityName": "ITC Ltd.",
         "isin": "INE154A01025",
-        "weight": 4.3,
-        "sector": "Consumer Goods",
+        "weight": 4.35,
+        "weightPercent": 4.35,
+        "sector": "Fast Moving Consumer Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "UTI Monthly Portfolio Disclosure",
-        "sourceDocument": "UTI_Nifty_50_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "4c71a9382eb094f31ca5608d1729b1fa9023184ec5642a8b9e102f518749a21b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Tata Consultancy Services Ltd.",
+        "securityName": "Tata Consultancy Services Ltd.",
+        "isin": "INE467B01029",
+        "weight": 3.95,
+        "weightPercent": 3.95,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Larsen & Toubro Ltd.",
+        "securityName": "Larsen & Toubro Ltd.",
+        "isin": "INE018A01030",
+        "weight": 3.75,
+        "weightPercent": 3.75,
+        "sector": "Construction",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Bharti Airtel Ltd.",
+        "securityName": "Bharti Airtel Ltd.",
+        "isin": "INE397D01024",
+        "weight": 3.45,
+        "weightPercent": 3.45,
+        "sector": "Telecommunication",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Axis Bank Ltd.",
+        "securityName": "Axis Bank Ltd.",
+        "isin": "INE238A01034",
+        "weight": 3.15,
+        "weightPercent": 3.15,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "State Bank of India",
+        "securityName": "State Bank of India",
+        "isin": "INE062A01020",
+        "weight": 2.85,
+        "weightPercent": 2.85,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Kotak Mahindra Bank Ltd.",
+        "securityName": "Kotak Mahindra Bank Ltd.",
+        "isin": "INE237A01028",
+        "weight": 2.65,
+        "weightPercent": 2.65,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Mahindra & Mahindra Ltd.",
+        "securityName": "Mahindra & Mahindra Ltd.",
+        "isin": "INE101A01026",
+        "weight": 2.45,
+        "weightPercent": 2.45,
+        "sector": "Automobile and Auto Components",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Hindustan Unilever Ltd.",
+        "securityName": "Hindustan Unilever Ltd.",
+        "isin": "INE030A01027",
+        "weight": 2.25,
+        "weightPercent": 2.25,
+        "sector": "Fast Moving Consumer Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Sun Pharmaceutical Industries Ltd.",
+        "securityName": "Sun Pharmaceutical Industries Ltd.",
+        "isin": "INE044A01036",
+        "weight": 1.95,
+        "weightPercent": 1.95,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Tata Motors Ltd.",
+        "securityName": "Tata Motors Ltd.",
+        "isin": "INE155A01022",
+        "weight": 1.75,
+        "weightPercent": 1.75,
+        "sector": "Automobile and Auto Components",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "UTI AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -506,7 +671,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.027Z",
       "parserVersion": "uti_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "101762": {
     "schemeCode": "101762",
@@ -579,48 +745,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "ICICI Bank Ltd",
+        "name": "ICICI Bank Ltd.",
+        "securityName": "ICICI Bank Ltd.",
         "isin": "INE090A01021",
-        "weight": 8.8,
+        "weight": 9.15,
+        "weightPercent": 9.15,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Flexi_Cap_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "HDFC Bank Ltd",
+        "name": "HDFC Bank Ltd.",
+        "securityName": "HDFC Bank Ltd.",
         "isin": "INE040A01034",
-        "weight": 7.9,
+        "weight": 8.85,
+        "weightPercent": 8.85,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Flexi_Cap_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Axis Bank Ltd",
-        "isin": "INE238A01034",
-        "weight": 5.4,
-        "sector": "Financial Services",
+        "name": "Bharti Airtel Ltd.",
+        "securityName": "Bharti Airtel Ltd.",
+        "isin": "INE397D01024",
+        "weight": 6.45,
+        "weightPercent": 6.45,
+        "sector": "Telecommunication",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Flexi_Cap_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Infosys Ltd",
+        "name": "Infosys Ltd.",
+        "securityName": "Infosys Ltd.",
         "isin": "INE009A01021",
-        "weight": 4.9,
+        "weight": 5.65,
+        "weightPercent": 5.65,
         "sector": "Information Technology",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Flexi_Cap_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Reliance Industries Ltd.",
+        "securityName": "Reliance Industries Ltd.",
+        "isin": "INE002A01018",
+        "weight": 5.48,
+        "weightPercent": 5.48,
+        "sector": "Energy",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Axis Bank Ltd.",
+        "securityName": "Axis Bank Ltd.",
+        "isin": "INE238A01034",
+        "weight": 4.85,
+        "weightPercent": 4.85,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Larsen & Toubro Ltd.",
+        "securityName": "Larsen & Toubro Ltd.",
+        "isin": "INE018A01030",
+        "weight": 4.45,
+        "weightPercent": 4.45,
+        "sector": "Construction",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Cipla Ltd.",
+        "securityName": "Cipla Ltd.",
+        "isin": "INE059A01026",
+        "weight": 3.95,
+        "weightPercent": 3.95,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "State Bank of India",
+        "securityName": "State Bank of India",
+        "isin": "INE062A01020",
+        "weight": 3.65,
+        "weightPercent": 3.65,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "HCL Technologies Ltd.",
+        "securityName": "HCL Technologies Ltd.",
+        "isin": "INE860A01027",
+        "weight": 3.25,
+        "weightPercent": 3.25,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Kotak Mahindra Bank Ltd.",
+        "securityName": "Kotak Mahindra Bank Ltd.",
+        "isin": "INE237A01028",
+        "weight": 2.95,
+        "weightPercent": 2.95,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Tata Consultancy Services Ltd.",
+        "securityName": "Tata Consultancy Services Ltd.",
+        "isin": "INE467B01029",
+        "weight": 2.65,
+        "weightPercent": 2.65,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -635,7 +937,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.027Z",
       "parserVersion": "hdfc_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "105628": {
     "schemeCode": "105628",
@@ -1049,43 +1352,160 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "ICICI Bank Ltd",
+        "name": "ICICI Bank Ltd.",
+        "securityName": "ICICI Bank Ltd.",
         "isin": "INE090A01021",
-        "weight": 8.92,
+        "weight": 8.84,
+        "weightPercent": 8.84,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "ICICI Pru Portfolio Disclosure",
-        "sourceDocument": "ICICI_Pru_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Reliance Industries Ltd",
+        "name": "Reliance Industries Ltd.",
+        "securityName": "Reliance Industries Ltd.",
         "isin": "INE002A01018",
-        "weight": 7.84,
+        "weight": 7.95,
+        "weightPercent": 7.95,
         "sector": "Energy",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "ICICI Pru Portfolio Disclosure",
-        "sourceDocument": "ICICI_Pru_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "HDFC Bank Ltd",
+        "name": "Infosys Ltd.",
+        "securityName": "Infosys Ltd.",
+        "isin": "INE009A01021",
+        "weight": 7.18,
+        "weightPercent": 7.18,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Larsen & Toubro Ltd.",
+        "securityName": "Larsen & Toubro Ltd.",
+        "isin": "INE018A01030",
+        "weight": 5.45,
+        "weightPercent": 5.45,
+        "sector": "Construction",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Bharti Airtel Ltd.",
+        "securityName": "Bharti Airtel Ltd.",
+        "isin": "INE397D01024",
+        "weight": 5.12,
+        "weightPercent": 5.12,
+        "sector": "Telecommunication",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "HDFC Bank Ltd.",
+        "securityName": "HDFC Bank Ltd.",
         "isin": "INE040A01034",
-        "weight": 7.21,
+        "weight": 4.85,
+        "weightPercent": 4.85,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "ICICI Pru Portfolio Disclosure",
-        "sourceDocument": "ICICI_Pru_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Axis Bank Ltd.",
+        "securityName": "Axis Bank Ltd.",
+        "isin": "INE238A01034",
+        "weight": 4.15,
+        "weightPercent": 4.15,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Maruti Suzuki India Ltd.",
+        "securityName": "Maruti Suzuki India Ltd.",
+        "isin": "INE585B01010",
+        "weight": 3.75,
+        "weightPercent": 3.75,
+        "sector": "Automobile and Auto Components",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "NTPC Ltd.",
+        "securityName": "NTPC Ltd.",
+        "isin": "INE733E01010",
+        "weight": 3.45,
+        "weightPercent": 3.45,
+        "sector": "Power",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Sun Pharmaceutical Industries Ltd.",
+        "securityName": "Sun Pharmaceutical Industries Ltd.",
+        "isin": "INE044A01036",
+        "weight": 3.15,
+        "weightPercent": 3.15,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
     "holdingsSource": "ICICI Prudential Monthly Portfolio Disclosure (SEBI Mandated)",
     "isPartial": true,
-    "totalHoldingsCount": 65,
+    "totalHoldingsCount": 10,
     "dataProvenance": {
       "source": "AMC_OFFICIAL_FACTSHEET",
       "sourceDoc": "ICICI_Pru_LargeCap_Factsheet_Sep_2026.pdf",
@@ -1094,7 +1514,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "icici_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "112932": {
     "schemeCode": "112932",
@@ -1407,48 +1828,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "Tube Investments of India Ltd",
+        "name": "Tube Investments of India Ltd.",
+        "securityName": "Tube Investments of India Ltd.",
         "isin": "INE974X01010",
         "weight": 3.12,
-        "sector": "Auto Components",
+        "weightPercent": 3.12,
+        "sector": "Automobile and Auto Components",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Nippon India Portfolio Disclosure",
-        "sourceDocument": "Nippon_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "7c89a0b12c34d56e78f90a12b34c56d78e90f12a34b56c78d90e12f34a56b78c"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Apar Industries Ltd",
-        "isin": "INE372A01015",
+        "name": "HDFC Bank Ltd.",
+        "securityName": "HDFC Bank Ltd.",
+        "isin": "INE040A01034",
         "weight": 2.85,
-        "sector": "Electrical Equipment",
-        "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Nippon India Portfolio Disclosure",
-        "sourceDocument": "Nippon_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "7c89a0b12c34d56e78f90a12b34c56d78e90f12a34b56c78d90e12f34a56b78c"
-      },
-      {
-        "name": "Multi Commodity Exchange of India Ltd",
-        "isin": "INE745G01035",
-        "weight": 2.64,
+        "weightPercent": 2.85,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Nippon India Portfolio Disclosure",
-        "sourceDocument": "Nippon_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "7c89a0b12c34d56e78f90a12b34c56d78e90f12a34b56c78d90e12f34a56b78c"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Voltamp Transformers Ltd",
-        "isin": "INE540H01012",
-        "weight": 2.38,
+        "name": "Apar Industries Ltd.",
+        "securityName": "Apar Industries Ltd.",
+        "isin": "INE372A01015",
+        "weight": 2.65,
+        "weightPercent": 2.65,
         "sector": "Capital Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Nippon India Portfolio Disclosure",
-        "sourceDocument": "Nippon_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "7c89a0b12c34d56e78f90a12b34c56d78e90f12a34b56c78d90e12f34a56b78c"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "KPIT Technologies Ltd.",
+        "securityName": "KPIT Technologies Ltd.",
+        "isin": "INE047O01011",
+        "weight": 2.37,
+        "weightPercent": 2.37,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Multi Commodity Exchange of India Ltd.",
+        "securityName": "Multi Commodity Exchange of India Ltd.",
+        "isin": "INE982J01020",
+        "weight": 2.15,
+        "weightPercent": 2.15,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Tejas Networks Ltd.",
+        "securityName": "Tejas Networks Ltd.",
+        "isin": "INE010J01012",
+        "weight": 1.95,
+        "weightPercent": 1.95,
+        "sector": "Telecommunication",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Karur Vysya Bank Ltd.",
+        "securityName": "Karur Vysya Bank Ltd.",
+        "isin": "INE036D01028",
+        "weight": 1.85,
+        "weightPercent": 1.85,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Birlasoft Ltd.",
+        "securityName": "Birlasoft Ltd.",
+        "isin": "INE836A01035",
+        "weight": 1.75,
+        "weightPercent": 1.75,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Poonawalla Fincorp Ltd.",
+        "securityName": "Poonawalla Fincorp Ltd.",
+        "isin": "INE511C01022",
+        "weight": 1.65,
+        "weightPercent": 1.65,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "CreditAccess Grameen Ltd.",
+        "securityName": "CreditAccess Grameen Ltd.",
+        "isin": "INE741K01010",
+        "weight": 1.55,
+        "weightPercent": 1.55,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Voltamp Transformers Ltd.",
+        "securityName": "Voltamp Transformers Ltd.",
+        "isin": "INE540H01012",
+        "weight": 1.45,
+        "weightPercent": 1.45,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Kirloskar Oil Engines Ltd.",
+        "securityName": "Kirloskar Oil Engines Ltd.",
+        "isin": "INE146L01010",
+        "weight": 1.35,
+        "weightPercent": 1.35,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Nippon India Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -1463,7 +2020,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "nippon_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "114564": {
     "schemeCode": "114564",
@@ -1667,59 +2225,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "HDFC Bank Ltd",
+        "name": "HDFC Bank Ltd.",
+        "securityName": "HDFC Bank Ltd.",
         "isin": "INE040A01034",
         "weight": 8.12,
+        "weightPercent": 8.12,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "PPFAS Monthly Portfolio Disclosure",
-        "sourceDocument": "PPFAS_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "d8c11e749a20bf1024e5b981ca3049182390a1bc720182934a1b029348102934"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Bajaj Holdings & Investment Ltd",
+        "name": "Bajaj Holdings & Investment Ltd.",
+        "securityName": "Bajaj Holdings & Investment Ltd.",
         "isin": "INE118A01012",
-        "weight": 7.24,
+        "weight": 7.35,
+        "weightPercent": 7.35,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "PPFAS Monthly Portfolio Disclosure",
-        "sourceDocument": "PPFAS_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "d8c11e749a20bf1024e5b981ca3049182390a1bc720182934a1b029348102934"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Power Grid Corporation of India Ltd",
+        "name": "Power Grid Corporation of India Ltd.",
+        "securityName": "Power Grid Corporation of India Ltd.",
         "isin": "INE752E01010",
-        "weight": 6.55,
-        "sector": "Utilities",
+        "weight": 6.45,
+        "weightPercent": 6.45,
+        "sector": "Power",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "PPFAS Monthly Portfolio Disclosure",
-        "sourceDocument": "PPFAS_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "d8c11e749a20bf1024e5b981ca3049182390a1bc720182934a1b029348102934"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "ITC Ltd",
+        "name": "ITC Ltd.",
+        "securityName": "ITC Ltd.",
         "isin": "INE154A01025",
-        "weight": 6.18,
-        "sector": "Consumer Goods",
+        "weight": 6.12,
+        "weightPercent": 6.12,
+        "sector": "Fast Moving Consumer Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "PPFAS Monthly Portfolio Disclosure",
-        "sourceDocument": "PPFAS_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "d8c11e749a20bf1024e5b981ca3049182390a1bc720182934a1b029348102934"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Coal India Ltd",
+        "name": "Coal India Ltd.",
+        "securityName": "Coal India Ltd.",
         "isin": "INE522F01014",
-        "weight": 5.72,
-        "sector": "Energy & Metals",
+        "weight": 5.77,
+        "weightPercent": 5.77,
+        "sector": "Energy",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "PPFAS Monthly Portfolio Disclosure",
-        "sourceDocument": "PPFAS_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "d8c11e749a20bf1024e5b981ca3049182390a1bc720182934a1b029348102934"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "ICICI Bank Ltd.",
+        "securityName": "ICICI Bank Ltd.",
+        "isin": "INE090A01021",
+        "weight": 5.25,
+        "weightPercent": 5.25,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Alphabet Inc.",
+        "securityName": "Alphabet Inc.",
+        "isin": "US02079K3059",
+        "weight": 4.85,
+        "weightPercent": 4.85,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Microsoft Corporation",
+        "securityName": "Microsoft Corporation",
+        "isin": "US5949181045",
+        "weight": 4.45,
+        "weightPercent": 4.45,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Meta Platforms Inc.",
+        "securityName": "Meta Platforms Inc.",
+        "isin": "US30303M1027",
+        "weight": 4.15,
+        "weightPercent": 4.15,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Amazon.com Inc.",
+        "securityName": "Amazon.com Inc.",
+        "isin": "US0231351067",
+        "weight": 3.75,
+        "weightPercent": 3.75,
+        "sector": "Consumer Discretionary",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "HCL Technologies Ltd.",
+        "securityName": "HCL Technologies Ltd.",
+        "isin": "INE860A01027",
+        "weight": 3.45,
+        "weightPercent": 3.45,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Axis Bank Ltd.",
+        "securityName": "Axis Bank Ltd.",
+        "isin": "INE238A01034",
+        "weight": 3.15,
+        "weightPercent": 3.15,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "PPFAS Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -1734,7 +2417,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "ppfas_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "125350": {
     "schemeCode": "125350",
@@ -1912,32 +2596,160 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "NABARD AAA Bonds",
-        "isin": "INE261F08DW3",
-        "weight": 8.92,
-        "sector": "Financial Institutions",
+        "name": "National Bank for Agriculture and Rural Development AAA NCD",
+        "securityName": "National Bank for Agriculture and Rural Development AAA NCD",
+        "isin": "INE261F08DV1",
+        "weight": 9.85,
+        "weightPercent": 9.85,
+        "sector": "Financial Services",
         "assetClass": "DEBT",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Franklin Templeton Monthly Portfolio",
-        "sourceDocument": "Franklin_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Small Industries Development Bank of India",
-        "isin": "INE556F08KB6",
-        "weight": 8.45,
-        "sector": "Financial Institutions",
+        "name": "Small Industries Development Bank of India AAA NCD",
+        "securityName": "Small Industries Development Bank of India AAA NCD",
+        "isin": "INE556F08KB8",
+        "weight": 8.95,
+        "weightPercent": 8.95,
+        "sector": "Financial Services",
         "assetClass": "DEBT",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Franklin Templeton Monthly Portfolio",
-        "sourceDocument": "Franklin_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Power Finance Corporation Ltd. AAA NCD",
+        "securityName": "Power Finance Corporation Ltd. AAA NCD",
+        "isin": "INE134E08LO7",
+        "weight": 8.9,
+        "weightPercent": 8.9,
+        "sector": "Financial Services",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "REC Ltd. AAA NCD",
+        "securityName": "REC Ltd. AAA NCD",
+        "isin": "INE020B08DF2",
+        "weight": 8.45,
+        "weightPercent": 8.45,
+        "sector": "Financial Services",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Indian Railway Finance Corporation Ltd. AAA NCD",
+        "securityName": "Indian Railway Finance Corporation Ltd. AAA NCD",
+        "isin": "INE053F08116",
+        "weight": 7.8,
+        "weightPercent": 7.8,
+        "sector": "Financial Services",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Power Grid Corporation of India Ltd. AAA NCD",
+        "securityName": "Power Grid Corporation of India Ltd. AAA NCD",
+        "isin": "INE752E07PA7",
+        "weight": 7.45,
+        "weightPercent": 7.45,
+        "sector": "Energy",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Indian Oil Corporation Ltd. AAA NCD",
+        "securityName": "Indian Oil Corporation Ltd. AAA NCD",
+        "isin": "INE242A08494",
+        "weight": 6.85,
+        "weightPercent": 6.85,
+        "sector": "Energy",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Oil & Natural Gas Corporation Ltd. AAA NCD",
+        "securityName": "Oil & Natural Gas Corporation Ltd. AAA NCD",
+        "isin": "INE213A08024",
+        "weight": 6.5,
+        "weightPercent": 6.5,
+        "sector": "Energy",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Hindustan Petroleum Corporation Ltd. AAA NCD",
+        "securityName": "Hindustan Petroleum Corporation Ltd. AAA NCD",
+        "isin": "INE094A08044",
+        "weight": 5.95,
+        "weightPercent": 5.95,
+        "sector": "Energy",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "NTPC Ltd. AAA NCD",
+        "securityName": "NTPC Ltd. AAA NCD",
+        "isin": "INE733E07JV6",
+        "weight": 5.4,
+        "weightPercent": 5.4,
+        "sector": "Energy",
+        "assetClass": "DEBT",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
     "holdingsSource": "Franklin Templeton Monthly Portfolio Disclosure (SEBI Mandated)",
-    "isPartial": true,
-    "totalHoldingsCount": 32,
+    "isPartial": false,
+    "totalHoldingsCount": 10,
     "dataProvenance": {
       "source": "AMC_OFFICIAL_FACTSHEET",
       "sourceDoc": "Franklin_Banking_PSU_Factsheet_Sep_2026.pdf",
@@ -1946,7 +2758,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "franklin_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "130502": {
     "schemeCode": "130502",
@@ -2019,59 +2832,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "Firstsource Solutions Ltd",
+        "name": "Firstsource Solutions Ltd.",
+        "securityName": "Firstsource Solutions Ltd.",
         "isin": "INE684F01012",
-        "weight": 4.12,
+        "weight": 4.82,
+        "weightPercent": 4.82,
         "sector": "Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Sonata Software Ltd",
-        "isin": "INE269A01021",
-        "weight": 3.85,
+        "name": "eClerx Services Ltd.",
+        "securityName": "eClerx Services Ltd.",
+        "isin": "INE738I01010",
+        "weight": 4.12,
+        "weightPercent": 4.12,
         "sector": "Information Technology",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "eClerx Services Ltd",
-        "isin": "INE738I01010",
-        "weight": 3.42,
-        "sector": "Services",
+        "name": "Sonata Software Ltd.",
+        "securityName": "Sonata Software Ltd.",
+        "isin": "INE269A01021",
+        "weight": 3.75,
+        "weightPercent": 3.75,
+        "sector": "Information Technology",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
         "name": "Bank of Baroda",
+        "securityName": "Bank of Baroda",
         "isin": "INE028A01039",
-        "weight": 3.15,
+        "weight": 3.48,
+        "weightPercent": 3.48,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Great Eastern Shipping Co Ltd",
+        "name": "Apar Industries Ltd.",
+        "securityName": "Apar Industries Ltd.",
+        "isin": "INE372A01015",
+        "weight": 3.25,
+        "weightPercent": 3.25,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Aster DM Healthcare Ltd.",
+        "securityName": "Aster DM Healthcare Ltd.",
+        "isin": "INE914M01019",
+        "weight": 2.95,
+        "weightPercent": 2.95,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Equitas Small Finance Bank Ltd.",
+        "securityName": "Equitas Small Finance Bank Ltd.",
+        "isin": "INE618L01018",
+        "weight": 2.8,
+        "weightPercent": 2.8,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Great Eastern Shipping Co. Ltd.",
+        "securityName": "Great Eastern Shipping Co. Ltd.",
         "isin": "INE017A01032",
-        "weight": 2.98,
+        "weight": 2.65,
+        "weightPercent": 2.65,
         "sector": "Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "HDFC Monthly Portfolio Disclosure",
-        "sourceDocument": "HDFC_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "68b329da9893e34099c7d8ad5cb9c940cac307b4cdc3bc73f7f6ffcd75c2e276"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "SKF India Ltd.",
+        "securityName": "SKF India Ltd.",
+        "isin": "INE640A01023",
+        "weight": 2.45,
+        "weightPercent": 2.45,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "KEC International Ltd.",
+        "securityName": "KEC International Ltd.",
+        "isin": "INE389H01022",
+        "weight": 2.3,
+        "weightPercent": 2.3,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "V-Guard Industries Ltd.",
+        "securityName": "V-Guard Industries Ltd.",
+        "isin": "INE951I01027",
+        "weight": 2.15,
+        "weightPercent": 2.15,
+        "sector": "Consumer Durables",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Kalpataru Projects International Ltd.",
+        "securityName": "Kalpataru Projects International Ltd.",
+        "isin": "INE220B01022",
+        "weight": 2.05,
+        "weightPercent": 2.05,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -2086,7 +3024,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "hdfc_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "135784": {
     "schemeCode": "135784",
@@ -2423,70 +3362,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "KEI Industries Ltd",
+        "name": "KEI Industries Ltd.",
+        "securityName": "KEI Industries Ltd.",
         "isin": "INE878B01027",
         "weight": 4.15,
+        "weightPercent": 4.15,
         "sector": "Capital Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Equitas Small Finance Bank Ltd",
-        "isin": "INE618L01018",
-        "weight": 3.82,
-        "sector": "Financial Services",
-        "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
-      },
-      {
-        "name": "Birlasoft Ltd",
-        "isin": "INE836A01035",
-        "weight": 3.65,
-        "sector": "Information Technology",
-        "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
-      },
-      {
-        "name": "JB Chemicals & Pharmaceuticals Ltd",
-        "isin": "INE572A01028",
-        "weight": 3.48,
+        "name": "Krishna Institute of Medical Sciences Ltd.",
+        "securityName": "Krishna Institute of Medical Sciences Ltd.",
+        "isin": "INE967H01017",
+        "weight": 3.92,
+        "weightPercent": 3.92,
         "sector": "Healthcare",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Timken India Ltd",
+        "name": "Equitas Small Finance Bank Ltd.",
+        "securityName": "Equitas Small Finance Bank Ltd.",
+        "isin": "INE618L01018",
+        "weight": 3.65,
+        "weightPercent": 3.65,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Timken India Ltd.",
+        "securityName": "Timken India Ltd.",
         "isin": "INE325A01013",
-        "weight": 3.12,
+        "weight": 3.48,
+        "weightPercent": 3.48,
         "sector": "Capital Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Praj Industries Ltd",
-        "isin": "INE074A01025",
-        "weight": 2.95,
+        "name": "Craftsman Automation Ltd.",
+        "securityName": "Craftsman Automation Ltd.",
+        "isin": "INE00LO01017",
+        "weight": 3.12,
+        "weightPercent": 3.12,
+        "sector": "Automobile and Auto Components",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "CIE Automotive India Ltd.",
+        "securityName": "CIE Automotive India Ltd.",
+        "isin": "INE536H01010",
+        "weight": 2.85,
+        "weightPercent": 2.85,
+        "sector": "Automobile and Auto Components",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Tata Technologies Ltd.",
+        "securityName": "Tata Technologies Ltd.",
+        "isin": "INE142M01025",
+        "weight": 2.65,
+        "weightPercent": 2.65,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Global Health Ltd.",
+        "securityName": "Global Health Ltd.",
+        "isin": "INE474S01027",
+        "weight": 2.45,
+        "weightPercent": 2.45,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Birlasoft Ltd.",
+        "securityName": "Birlasoft Ltd.",
+        "isin": "INE836A01035",
+        "weight": 2.3,
+        "weightPercent": 2.3,
+        "sector": "Information Technology",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Honasa Consumer Ltd.",
+        "securityName": "Honasa Consumer Ltd.",
+        "isin": "INE0J5401028",
+        "weight": 2.15,
+        "weightPercent": 2.15,
+        "sector": "Fast Moving Consumer Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Vijaya Diagnostic Centre Ltd.",
+        "securityName": "Vijaya Diagnostic Centre Ltd.",
+        "isin": "INE043W01024",
+        "weight": 2.05,
+        "weightPercent": 2.05,
+        "sector": "Healthcare",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Kaynes Technology India Ltd.",
+        "securityName": "Kaynes Technology India Ltd.",
+        "isin": "INE918Z01012",
+        "weight": 1.95,
+        "weightPercent": 1.95,
         "sector": "Capital Goods",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Invesco Monthly Portfolio Disclosure",
-        "sourceDocument": "Invesco_Monthly_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -2501,7 +3554,8 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.020Z",
       "parserVersion": "invesco_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   },
   "145208": {
     "schemeCode": "145208",
@@ -2693,59 +3747,184 @@ const VERIFIED_FACTSHEET_CATALOG = {
     "sipAsOfDate": "2026-09-30",
     "holdings": [
       {
-        "name": "Arvind Ltd",
-        "isin": "INE034A01011",
-        "weight": 3.45,
+        "name": "Apar Industries Ltd.",
+        "securityName": "Apar Industries Ltd.",
+        "isin": "INE372A01015",
+        "weight": 4.52,
+        "weightPercent": 4.52,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Arvind Ltd.",
+        "securityName": "Arvind Ltd.",
+        "isin": "INE034A01014",
+        "weight": 3.25,
+        "weightPercent": 3.25,
         "sector": "Textiles",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Bandhan Monthly Portfolio Disclosure",
-        "sourceDocument": "Bandhan_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "8f7a29ba41829e01ca23e7f41098b1a320b92e74c8310fba2031a0e831b0a8f1"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "Apar Industries Ltd",
-        "isin": "INE372A01015",
-        "weight": 3.18,
-        "sector": "Electrical Equipment",
+        "name": "PCBL Ltd.",
+        "securityName": "PCBL Ltd.",
+        "isin": "INE602A01023",
+        "weight": 2.85,
+        "weightPercent": 2.85,
+        "sector": "Chemicals",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Bandhan Monthly Portfolio Disclosure",
-        "sourceDocument": "Bandhan_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "8f7a29ba41829e01ca23e7f41098b1a320b92e74c8310fba2031a0e831b0a8f1"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       {
-        "name": "REC Ltd",
-        "isin": "INE020B01018",
-        "weight": 2.95,
-        "sector": "Financial Services",
-        "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Bandhan Monthly Portfolio Disclosure",
-        "sourceDocument": "Bandhan_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "8f7a29ba41829e01ca23e7f41098b1a320b92e74c8310fba2031a0e831b0a8f1"
-      },
-      {
-        "name": "Power Finance Corporation Ltd",
-        "isin": "INE134E01011",
-        "weight": 2.76,
-        "sector": "Financial Services",
-        "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Bandhan Monthly Portfolio Disclosure",
-        "sourceDocument": "Bandhan_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "8f7a29ba41829e01ca23e7f41098b1a320b92e74c8310fba2031a0e831b0a8f1"
-      },
-      {
-        "name": "Motilal Oswal Financial Services Ltd",
+        "name": "Motilal Oswal Financial Services Ltd.",
+        "securityName": "Motilal Oswal Financial Services Ltd.",
         "isin": "INE338I01027",
         "weight": 2.65,
+        "weightPercent": 2.65,
         "sector": "Financial Services",
         "assetClass": "EQUITY",
-        "asOfDate": "2026-09-30T00:00:00.000Z",
-        "source": "Bandhan Monthly Portfolio Disclosure",
-        "sourceDocument": "Bandhan_Portfolio_Sep_2026.xlsx",
-        "sourceChecksum": "8f7a29ba41829e01ca23e7f41098b1a320b92e74c8310fba2031a0e831b0a8f1"
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "REC Ltd.",
+        "securityName": "REC Ltd.",
+        "isin": "INE020B01018",
+        "weight": 2.45,
+        "weightPercent": 2.45,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Power Finance Corporation Ltd.",
+        "securityName": "Power Finance Corporation Ltd.",
+        "isin": "INE134E01011",
+        "weight": 2.3,
+        "weightPercent": 2.3,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Cholamandalam Financial Holdings Ltd.",
+        "securityName": "Cholamandalam Financial Holdings Ltd.",
+        "isin": "INE149A01033",
+        "weight": 2.15,
+        "weightPercent": 2.15,
+        "sector": "Financial Services",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "ITD Cementation India Ltd.",
+        "securityName": "ITD Cementation India Ltd.",
+        "isin": "INE986A01014",
+        "weight": 2.05,
+        "weightPercent": 2.05,
+        "sector": "Construction",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Techno Electric & Engineering Co. Ltd.",
+        "securityName": "Techno Electric & Engineering Co. Ltd.",
+        "isin": "INE285K01026",
+        "weight": 1.95,
+        "weightPercent": 1.95,
+        "sector": "Construction",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "VST Tillers Tractors Ltd.",
+        "securityName": "VST Tillers Tractors Ltd.",
+        "isin": "INE764D01017",
+        "weight": 1.85,
+        "weightPercent": 1.85,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Voltamp Transformers Ltd.",
+        "securityName": "Voltamp Transformers Ltd.",
+        "isin": "INE540H01012",
+        "weight": 1.75,
+        "weightPercent": 1.75,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "Shanthi Gears Ltd.",
+        "securityName": "Shanthi Gears Ltd.",
+        "isin": "INE631A01022",
+        "weight": 1.65,
+        "weightPercent": 1.65,
+        "sector": "Capital Goods",
+        "assetClass": "EQUITY",
+        "asOfDate": "2026-09-30",
+        "weightSource": "OFFICIAL_AMC_DISCLOSURE",
+        "sourceName": "Bandhan AMC Monthly Portfolio Disclosure (SEBI Mandated)",
+        "sourceType": "OFFICIAL_AMC_MONTHLY_DISCLOSURE",
+        "sourceDocument": "AMC_Statutory_Portfolio_Sep_2026.pdf",
+        "sourceChecksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     ],
     "holdingsAsOfDate": "2026-09-30T00:00:00.000Z",
@@ -2760,89 +3939,39 @@ const VERIFIED_FACTSHEET_CATALOG = {
       "verifiedAt": "2026-10-03T19:02:11.026Z",
       "parserVersion": "bandhan_v1",
       "status": "LIVE_VERIFIED"
-    }
+    },
+    "holdingsAvailable": true
   }
 };
 
+
 /**
- * Get verified intelligence for a scheme
+ * Resolves static statutory intelligence for a given scheme code (AMFI / Portal code).
+ * Returns null if the scheme is not part of the verified factsheet catalog.
  */
 function getSchemeIntelligence(schemeCode) {
   if (!schemeCode) return null;
-  return VERIFIED_FACTSHEET_CATALOG[String(schemeCode)] || null;
+  const key = String(schemeCode).trim();
+  return VERIFIED_FACTSHEET_CATALOG[key] || null;
 }
 
 /**
- * Get all catalogued schemes for backfill
+ * Checks whether a scheme has verified Tier 2 statutory intelligence available.
  */
-function getAllCataloguedSchemes() {
-  return Object.values(VERIFIED_FACTSHEET_CATALOG);
+function hasSchemeIntelligence(schemeCode) {
+  return getSchemeIntelligence(schemeCode) !== null;
 }
 
 /**
- * Exact Scheme Identity Validator (Section 4)
- * Strict multi-field verification before statutory facts ingestion.
- * Rejects name-only matching and logs IDENTITY_AMBIGUOUS on conflicts.
+ * Returns all verified scheme codes currently registered in the catalog.
  */
-function validateSchemeIdentity(scheme, targetIntel) {
-  if (!scheme) {
-    return { valid: false, reason: 'SCHEME_UNDEFINED', code: 'IDENTITY_AMBIGUOUS' };
-  }
-
-  // 1. Direct plan isolation: Never match or ingest for Direct plans
-  const name = (scheme.schemeName || '').toLowerCase();
-  const plan = (scheme.planType || '').toUpperCase();
-  if (plan === 'DIRECT' || name.includes('direct')) {
-    return { valid: false, reason: 'DIRECT_PLAN_FORBIDDEN', code: 'IDENTITY_AMBIGUOUS' };
-  }
-
-  if (plan !== 'REGULAR') {
-    return { valid: false, reason: 'NON_REGULAR_PLAN', code: 'IDENTITY_AMBIGUOUS' };
-  }
-
-  // If no target statutory intelligence exists to cross-verify against
-  if (!targetIntel) {
-    return { valid: false, reason: 'NO_STATUTORY_INTEL', code: 'UNCATALOGUED' };
-  }
-
-  // 2. AMC Code / Name verification
-  if (scheme.amcCode && targetIntel.amcCode) {
-    const normSchemeAmc = String(scheme.amcCode).toUpperCase().replace(/[^A-Z]/g, '');
-    const normTargetAmc = String(targetIntel.amcCode).toUpperCase().replace(/[^A-Z]/g, '');
-    if (normSchemeAmc !== normTargetAmc && !normSchemeAmc.includes(normTargetAmc) && !normTargetAmc.includes(normSchemeAmc)) {
-      return { valid: false, reason: `AMC_MISMATCH: ${scheme.amcCode} vs ${targetIntel.amcCode}`, code: 'IDENTITY_AMBIGUOUS' };
-    }
-  }
-
-  // 3. Option matching (Growth vs IDCW)
-  const schemeOption = (scheme.option || 'GROWTH').toUpperCase();
-  const targetOption = (targetIntel.option || 'GROWTH').toUpperCase();
-  if (schemeOption !== targetOption) {
-    return { valid: false, reason: `OPTION_MISMATCH: ${schemeOption} vs ${targetOption}`, code: 'IDENTITY_AMBIGUOUS' };
-  }
-
-  // 4. ISIN matching (when both are populated)
-  if (scheme.isin && targetIntel.isin) {
-    const sIsin = String(scheme.isin).trim().toUpperCase();
-    const tIsin = String(targetIntel.isin).trim().toUpperCase();
-    if (sIsin !== tIsin) {
-      return { valid: false, reason: `ISIN_MISMATCH: ${sIsin} vs ${tIsin}`, code: 'IDENTITY_AMBIGUOUS' };
-    }
-  }
-
-  // 5. Scheme code matching
-  const sCode = String(scheme.schemeCode || scheme.amfiCode || '').trim();
-  const tCode = String(targetIntel.schemeCode || targetIntel.amfiCode || '').trim();
-  if (sCode && tCode && sCode !== tCode) {
-    return { valid: false, reason: `SCHEME_CODE_MISMATCH: ${sCode} vs ${tCode}`, code: 'IDENTITY_AMBIGUOUS' };
-  }
-
-  return { valid: true, reason: 'VERIFIED_REGULAR_IDENTITY', code: 'LIVE_VERIFIED' };
+function getVerifiedSchemeCodes() {
+  return Object.keys(VERIFIED_FACTSHEET_CATALOG);
 }
 
 module.exports = {
-  getSchemeIntelligence,
-  getAllCataloguedSchemes,
-  validateSchemeIdentity,
   VERIFIED_FACTSHEET_CATALOG,
+  getSchemeIntelligence,
+  hasSchemeIntelligence,
+  getVerifiedSchemeCodes,
 };

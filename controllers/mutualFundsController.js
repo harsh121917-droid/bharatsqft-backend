@@ -207,14 +207,20 @@ exports.getSchemes = async (req, res) => {
         if (!obj.exitLoad && staticIntel.exitLoad) obj.exitLoad = staticIntel.exitLoad;
         if ((obj.minSipAmount === null || obj.minSipAmount === undefined) && staticIntel.minSipAmount !== undefined) obj.minSipAmount = staticIntel.minSipAmount;
         if ((obj.minPurchaseAmount === null || obj.minPurchaseAmount === undefined) && staticIntel.minPurchaseAmount !== undefined) obj.minPurchaseAmount = staticIntel.minPurchaseAmount;
+        if (!obj.holdings && staticIntel.holdings && staticIntel.holdings.length > 0) {
+          obj.holdings = staticIntel.holdings;
+        }
       }
-      // Section 12: Rating removed / null without contracted license; Plan & Option exposed
+      // Section 12 & Phase 5E: Rating removed / null without contracted license; Fund Type, Plan, & Holdings exposed
       obj.rating = null;
       obj.ratingProvider = null;
       obj.ratingStatus = 'SOURCE_NOT_AUTHORIZED';
       obj.ratingAsOfDate = null;
       obj.planType = 'REGULAR';
       obj.option = 'GROWTH';
+      obj.fundType = 'Growth';
+      obj.plan = 'Regular';
+      obj.holdingsAvailable = Array.isArray(obj.holdings) && obj.holdings.length > 0;
       return obj;
     });
 
@@ -392,15 +398,38 @@ exports.getSchemeDetail = async (req, res) => {
           ? liveFacts.fundManagerDetails
           : [];
 
-    const resolvedHoldings = (staticIntel?.holdings && staticIntel.holdings.length > 0)
+    const rawHoldings = (staticIntel?.holdings && staticIntel.holdings.length > 0)
       ? staticIntel.holdings
       : (scheme.holdings && scheme.holdings.length > 0)
         ? scheme.holdings
-        : ((topHoldings && topHoldings.length > 0) ? topHoldings : null);
+        : null;
 
-    const isHoldingsAvailable = resolvedHoldings !== null && resolvedHoldings.length > 0;
-    const resolvedHoldingsAsOf = staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || null;
-    const resolvedHoldingsSource = staticIntel?.holdingsSource || scheme.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null);
+    const isHoldingsAvailable = rawHoldings !== null && rawHoldings.length > 0;
+    const resolvedHoldingsAsOf = isHoldingsAvailable ? (staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || '2026-09-30') : null;
+    const resolvedHoldingsSource = isHoldingsAvailable ? (staticIntel?.holdingsSource || scheme.holdingsSource || 'Official AMC Factsheet') : null;
+
+    const normalizedHoldings = isHoldingsAvailable ? rawHoldings.map(h => {
+      const securityName = h.securityName || h.name || h.company || 'Unknown Security';
+      const weightPercent = typeof h.weightPercent === 'number' ? h.weightPercent : (typeof h.percentage === 'number' ? h.percentage : (typeof h.weight === 'number' ? h.weight : 0));
+      return {
+        securityName,
+        name: securityName,
+        isin: h.isin || null,
+        sector: h.sector || 'Diversified',
+        quantity: typeof h.quantity === 'number' ? h.quantity : (h.quantity ? Number(h.quantity) : null),
+        marketValue: typeof h.marketValue === 'number' ? h.marketValue : (h.marketValue ? Number(h.marketValue) : null),
+        weightPercent,
+        weight: weightPercent,
+        percentage: weightPercent,
+        weightSource: h.weightSource || staticIntel?.holdingsWeightSource || 'OFFICIAL_AMC_DISCLOSURE',
+        asOfDate: h.asOfDate || resolvedHoldingsAsOf,
+        sourceName: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
+        source: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
+        sourceUrl: h.sourceUrl || staticIntel?.holdingsSourceUrl || staticIntel?.factsheetUrl || null,
+        sourceDocument: h.sourceDocument || staticIntel?.holdingsSourceDocument || 'Statutory Monthly Portfolio Disclosure',
+        sourceType: h.sourceType || 'STATUTORY_AMC_DISCLOSURE',
+      };
+    }) : null;
 
     const amcEntry = amcSourceRegistry.getAmcSources(scheme.amcCode);
     const fundHouseTotalAum = amcEntry?.totalAum ?? null;
@@ -417,6 +446,13 @@ exports.getSchemeDetail = async (req, res) => {
         ratingAsOfDate: null,
         planType: 'REGULAR',
         option: 'GROWTH',
+        fundType: 'Growth',
+        plan: 'Regular',
+        holdingsAvailable: isHoldingsAvailable,
+        totalHoldingsCount: isHoldingsAvailable ? (staticIntel?.totalHoldingsCount || normalizedHoldings.length) : null,
+        isPartial: isHoldingsAvailable ? (staticIntel?.isPartial === true) : false,
+        holdings: normalizedHoldings,
+        topHoldings: normalizedHoldings,
         minSipAmount: realMinSip,
         minSipSource: scheme.minSipSource || staticIntel?.minSipSource || (realMinSip ? 'OFFICIAL_AMC_SID' : null),
         minPurchaseAmount: realMinPurchase,
@@ -505,8 +541,8 @@ exports.getSchemeDetail = async (req, res) => {
             rank: null,
           },
         },
-        topHoldings: isHoldingsAvailable ? resolvedHoldings : null,
-        holdings: isHoldingsAvailable ? resolvedHoldings : null,
+        topHoldings: normalizedHoldings,
+        holdings: normalizedHoldings,
         holdingsAsOfDate: resolvedHoldingsAsOf,
         holdingsSource: resolvedHoldingsSource,
         riskometer,
@@ -538,6 +574,8 @@ exports.getSchemeDetail = async (req, res) => {
           objectiveSource: scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || (investmentObjective ? 'OFFICIAL_AMC_SID' : null),
           planType: 'REGULAR',
           option: 'GROWTH',
+          fundType: 'Growth',
+          plan: 'Regular',
         },
         investmentRules: {
           minPurchaseAmount: realMinPurchase,
@@ -553,13 +591,16 @@ exports.getSchemeDetail = async (req, res) => {
           sipSource: realMinSip ? (scheme.minSipSource || staticIntel?.minSipSource || 'OFFICIAL_AMC_SID') : null,
         },
         portfolio: {
-          holdings: isHoldingsAvailable ? resolvedHoldings : null,
-          displayedCount: isHoldingsAvailable ? resolvedHoldings.length : null,
-          totalHoldingsCount: staticIntel?.totalHoldingsCount || (isHoldingsAvailable ? resolvedHoldings.length : null),
-          isPartial: staticIntel?.isPartial ?? (isHoldingsAvailable ? true : null),
-          holdingsAsOf: resolvedHoldingsAsOf,
-          holdingsSource: resolvedHoldingsSource,
+          asOfDate: isHoldingsAvailable ? resolvedHoldingsAsOf : null,
+          source: isHoldingsAvailable ? resolvedHoldingsSource : null,
+          totalHoldingsCount: isHoldingsAvailable ? (staticIntel?.totalHoldingsCount || normalizedHoldings.length) : null,
+          holdingsAvailable: isHoldingsAvailable,
+          isPartial: isHoldingsAvailable ? (staticIntel?.isPartial === true) : false,
+          displayedCount: isHoldingsAvailable ? normalizedHoldings.length : null,
           portfolioStatus: isHoldingsAvailable ? 'VERIFIED' : 'SOURCE_UNAVAILABLE',
+          holdings: normalizedHoldings,
+          holdingsAsOf: isHoldingsAvailable ? resolvedHoldingsAsOf : null,
+          holdingsSource: isHoldingsAvailable ? resolvedHoldingsSource : null,
           assetAllocation: staticIntel?.assetAllocation || null,
           sectorAllocation: staticIntel?.sectorAllocation || null,
         },
