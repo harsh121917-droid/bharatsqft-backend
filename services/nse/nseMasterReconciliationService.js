@@ -496,12 +496,20 @@ class NseMasterReconciliationService {
         const amfiCode = parts[0];
         const isinGrowth = parts[1];
         const isinDiv = parts[2];
-        const schemeName = parts[3];
+        const nameParts = [];
+        for (let i = 3; i < parts.length - 2; i++) {
+          const p = parts[i]?.trim();
+          if (p && !nameParts.includes(p)) {
+            nameParts.push(p);
+          }
+        }
+        const schemeName = nameParts.join(' - ');
         const navStr = parts[parts.length - 2];
         const dateStr = parts[parts.length - 1]; // e.g. 29-Sep-2026
         const nav = parseFloat(navStr);
 
         if (!isNaN(nav) && nav > 0) {
+          const lowerName = schemeName.toLowerCase();
           const amfiRecord = {
             amfiCode,
             isinGrowth: isinGrowth !== '-' ? isinGrowth : null,
@@ -509,8 +517,8 @@ class NseMasterReconciliationService {
             schemeName,
             nav,
             dateStr,
-            isDirect: schemeName.toLowerCase().includes('direct'),
-            isGrowth: schemeName.toLowerCase().includes('growth'),
+            isDirect: lowerName.includes('direct'),
+            isGrowth: lowerName.includes('growth') || (!lowerName.includes('idcw') && !lowerName.includes('dividend')),
           };
 
           if (isinGrowth && isinGrowth !== '-') amfiByIsin.set(isinGrowth, amfiRecord);
@@ -648,7 +656,7 @@ class NseMasterReconciliationService {
                   nav: rtaNav,
                   amfiCode: amfiMatch.amfiCode,
                   planType: 'REGULAR',
-                  option: amfiMatch.isGrowth ? 'GROWTH' : 'IDCW',
+                  option: (amfiMatch.isGrowth || (scheme.schemeName && scheme.schemeName.toLowerCase().includes('growth'))) ? 'GROWTH' : 'IDCW',
                   navDate: amfiMatch.dateStr ? new Date(amfiMatch.dateStr.split('-').reverse().join('-')) : new Date(),
                 },
               },
@@ -665,7 +673,7 @@ class NseMasterReconciliationService {
                 $set: {
                   amfiCode: amfiMatch.amfiCode,
                   planType: 'REGULAR',
-                  option: amfiMatch.isGrowth ? 'GROWTH' : 'IDCW',
+                  option: (amfiMatch.isGrowth || (scheme.schemeName && scheme.schemeName.toLowerCase().includes('growth'))) ? 'GROWTH' : 'IDCW',
                 },
               },
             },

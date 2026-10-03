@@ -151,21 +151,33 @@ exports.getSchemes = async (req, res) => {
     }
 
     // ── Sorting ──
-    let sortOption = { rating: -1, cagr3Y: -1 };
+    let sortOption = { rating: -1, cagr3Y: -1, schemeName: 1 };
     if (sort === 'popularity' || sort === 'popular') {
-      sortOption = { isPopular: -1, aum: -1, rating: -1, cagr3Y: -1 };
-    } else if (sort === 'returns1y' || sort === '1Y Returns') {
-      sortOption = { cagr1Y: -1 };
-    } else if (sort === 'returns3y' || sort === '3Y Returns' || sort === '3Y Re') {
-      sortOption = { cagr3Y: -1 };
-    } else if (sort === 'returns5y' || sort === '5Y Returns' || sort === '5Y') {
-      sortOption = { cagr5Y: -1 };
+      sortOption = { isPopular: -1, aum: -1, rating: -1, cagr3Y: -1, schemeName: 1 };
+    } else if (sort === 'returns1y' || sort === '1Y Returns' || sort === '1y') {
+      query.cagr1Y = { $ne: null };
+      sortOption = { cagr1Y: -1, schemeName: 1, schemeCode: 1 };
+    } else if (sort === 'returns3y' || sort === '3Y Returns' || sort === '3Y Re' || sort === '3y') {
+      query.cagr3Y = { $ne: null };
+      sortOption = { cagr3Y: -1, schemeName: 1, schemeCode: 1 };
+    } else if (sort === 'returns5y' || sort === '5Y Returns' || sort === '5Y' || sort === '5y') {
+      query.cagr5Y = { $ne: null };
+      sortOption = { cagr5Y: -1, schemeName: 1, schemeCode: 1 };
+    } else if (sort === 'returns1m' || sort === '1M Returns' || sort === '1m') {
+      query.return1M = { $ne: null };
+      sortOption = { return1M: -1, schemeName: 1, schemeCode: 1 };
+    } else if (sort === 'returns3m' || sort === '3M Returns' || sort === '3m') {
+      query.return3M = { $ne: null };
+      sortOption = { return3M: -1, schemeName: 1, schemeCode: 1 };
+    } else if (sort === 'returns6m' || sort === '6M Returns' || sort === '6m') {
+      query.return6M = { $ne: null };
+      sortOption = { return6M: -1, schemeName: 1, schemeCode: 1 };
     } else if (sort === 'rating' || sort === 'Rating') {
-      sortOption = { rating: -1, cagr3Y: -1 };
+      sortOption = { rating: -1, cagr3Y: -1, schemeName: 1, schemeCode: 1 };
     } else if (sort === 'nav') {
-      sortOption = { nav: 1 };
+      sortOption = { nav: 1, schemeName: 1, schemeCode: 1 };
     } else if (sort === 'aum') {
-      sortOption = { aum: -1 };
+      sortOption = { aum: -1, schemeName: 1, schemeCode: 1 };
     }
 
     const schemes = await MutualFundScheme.find(query)
@@ -175,9 +187,18 @@ exports.getSchemes = async (req, res) => {
 
     const total = await MutualFundScheme.countDocuments(query);
 
+    // Sanitize schemes: null holdings instead of empty array when source unavailable
+    const sanitizedSchemes = schemes.map((s) => {
+      const obj = s.toObject ? s.toObject() : { ...s };
+      if (!obj.holdings || obj.holdings.length === 0) {
+        obj.holdings = null;
+      }
+      return obj;
+    });
+
     return res.json({
       success: true,
-      data: schemes,
+      data: sanitizedSchemes,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
@@ -265,7 +286,7 @@ exports.getSchemeDetail = async (req, res) => {
     }
 
     const similarFunds = await MutualFundScheme.find(peerFilter)
-      .sort({ aum: -1, cagr3Y: -1 })
+      .sort({ aum: -1, cagr3Y: -1, schemeName: 1 })
       .limit(6)
       .select('schemeCode schemeName amcName nav cagr1Y cagr3Y cagr5Y rating aum expenseRatio minSipAmount');
 
@@ -278,6 +299,26 @@ exports.getSchemeDetail = async (req, res) => {
     const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y ?? null;
     const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y ?? null;
     const retAll = periodReturns['All']?.returnPercent ?? null;
+
+    // Persist verified calculated returns back to MongoDB if not yet populated
+    if (liveNav && (scheme.cagr3Y === null || scheme.cagr1Y === null) && (ret3Y !== null || ret1Y !== null)) {
+      MutualFundScheme.updateOne(
+        { _id: scheme._id },
+        {
+          $set: {
+            return1M: ret1M,
+            return3M: ret3M,
+            return6M: ret6M,
+            cagr1Y: ret1Y,
+            cagr3Y: ret3Y,
+            cagr5Y: ret5Y,
+            returnsCalculatedAt: new Date(),
+            returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
+            returnsSource: 'AMFI_DAILY_NAV_TIMESERIES',
+          },
+        }
+      ).catch((e) => console.error('[LiveNav Return Cache Error]:', e.message));
+    }
 
     const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
     const navDate = liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate;
@@ -381,10 +422,12 @@ exports.getSchemeDetail = async (req, res) => {
             rank: null,
           },
         },
-        topHoldings,
-        holdings: topHoldings,
+        topHoldings: (topHoldings && topHoldings.length > 0) ? topHoldings : null,
+        holdings: (scheme.holdings && scheme.holdings.length > 0)
+          ? scheme.holdings
+          : ((topHoldings && topHoldings.length > 0) ? topHoldings : null),
         holdingsAsOfDate: scheme.holdingsAsOfDate || null,
-        holdingsSource: scheme.holdingsSource || (topHoldings.length > 0 ? 'Scheme Factsheet' : null),
+        holdingsSource: scheme.holdingsSource || (topHoldings && topHoldings.length > 0 ? 'Scheme Factsheet' : null),
         expenseDetails: {
           expenseRatio,
           exitLoad,
