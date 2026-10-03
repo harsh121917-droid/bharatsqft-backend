@@ -16,8 +16,8 @@ async function verifyProduction() {
 
   // 1. Environment & Credentials Check
   const env = process.env.NSE_ENV || 'UAT';
-  const memberCode = process.env.NSE_MEMBER_CODE || '1031616';
-  const userId = process.env.NSE_LOGIN_USER_ID || 'ADMIN';
+  const memberCode = process.env.NSE_MEMBER_CODE || '';
+  const userId = process.env.NSE_LOGIN_USER_ID || '';
   const baseUrl = nseClient.getBaseUrl();
 
   console.log('1. Configuration Audit:');

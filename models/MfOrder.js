@@ -84,10 +84,57 @@ const MfOrderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    orderStatus: {
+      type: String,
+      enum: [
+        'CREATED',
+        'PAYMENT_PENDING',
+        'PAYMENT_SUCCESS',
+        'SUBMITTED',
+        'PROCESSING',
+        'ALLOTTED',
+        'PARTIALLY_ALLOTTED',
+        'FAILED',
+        'REJECTED',
+        'CANCELLED',
+        'REFUNDED',
+      ],
+      default: 'CREATED',
+      index: true,
+    },
+    planType: {
+      type: String,
+      enum: ['REGULAR'],
+      default: 'REGULAR',
+      required: true,
+    },
     allotmentStatus: {
       type: String,
-      enum: ['PENDING', 'ALLOTTED', 'REJECTED', 'NOT_APPLICABLE'],
+      enum: ['PENDING', 'ALLOTTED', 'PARTIALLY_ALLOTTED', 'REJECTED', 'NOT_APPLICABLE'],
       default: 'PENDING',
+      index: true,
+    },
+    estimatedPayout: {
+      type: Number,
+      default: null,
+    },
+    finalSettledAmount: {
+      type: Number,
+      default: null,
+    },
+    settlementDate: {
+      type: Date,
+      default: null,
+    },
+    rtaReferenceNo: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    idempotencyKey: {
+      type: String,
+      default: null,
+      sparse: true,
       index: true,
     },
     units: {

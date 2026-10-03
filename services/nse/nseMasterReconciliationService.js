@@ -22,16 +22,45 @@ class NseMasterReconciliationService {
   }
 
   /**
-   * Determine Plan Type: Regular vs Direct
-   * As per NSE spec: If Scheme Plan is 'D' or name contains 'DIRECT' -> DIRECT
+   * Determine Plan Type: Regular vs Direct vs Unknown
+   * Strictly follows NSE Demat Scheme Master specification:
+   * Field 8 (0-indexed col[7]): Scheme Plan
+   * 'D' or 'DIRECT' -> 'DIRECT'
+   * 'R' or 'REGULAR' -> 'REGULAR'
+   * Blank / empty -> 'REGULAR' (NSE Spec: "IF D THEN DIRECT ELSE REGULAR", where blank denotes default Regular)
+   * Any other value (e.g. 'X', 'Z', '?', invalid string) -> 'UNKNOWN'
+   * 
+   * Note: We do NOT infer plan type purely from scheme name.
+   * If plan is nominally blank or R but schemeName explicitly indicates 'direct', we classify as UNKNOWN to prevent Direct leakage.
    */
   parsePlanType(planCode, schemeName = '') {
-    const p = String(planCode || '').trim().toUpperCase();
-    const nameLower = String(schemeName || '').toLowerCase();
-    if (p === 'D' || p === 'DIRECT' || nameLower.includes('direct')) {
+    const raw = String(planCode ?? '').trim().toUpperCase();
+    const nameLower = String(schemeName ?? '').toLowerCase();
+
+    // 1. Direct Plan explicit codes
+    if (raw === 'D' || raw === 'DIRECT') {
       return 'DIRECT';
     }
-    return 'REGULAR';
+
+    // 2. Regular Plan explicit codes
+    if (raw === 'R' || raw === 'REGULAR') {
+      if (nameLower.includes('direct')) {
+        return 'UNKNOWN';
+      }
+      return 'REGULAR';
+    }
+
+    // 3. Blank / empty: NSE Web File Structure specifies "IF D THEN DIRECT ELSE REGULAR".
+    // Blank is accepted as REGULAR only if schemeName does not indicate Direct.
+    if (raw === '') {
+      if (nameLower.includes('direct')) {
+        return 'UNKNOWN';
+      }
+      return 'REGULAR';
+    }
+
+    // 4. Any other code (e.g., 'X', 'Z', '9', 'OTHER') is strictly UNKNOWN
+    return 'UNKNOWN';
   }
 
   /**
@@ -122,6 +151,7 @@ class NseMasterReconciliationService {
     const lines = fileContent.split(/\r?\n/);
     const regularSchemes = [];
     const directSchemesExcluded = [];
+    const unknownSchemesExcluded = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -137,7 +167,7 @@ class NseMasterReconciliationService {
       const isin = cols[4] || '';
       const amcCode = cols[5] || '';
       const schemeType = cols[6] || '';
-      const planCode = cols[7] || ''; // 'D' for Direct, else Regular
+      const rawPlanCode = cols[7] ? cols[7].trim() : ''; // Raw plan code from NSE
       const schemeName = cols[8]; // PRESERVE SOURCE NAME FAITHFULLY
       const purchaseAllowed = cols[9] === 'Y';
       const minPurchaseAmount = cols.length > 11 && cols[11] ? parseFloat(cols[11]) || null : null;
@@ -161,7 +191,7 @@ class NseMasterReconciliationService {
       const exitLoad = cols.length > 38 && cols[38] ? cols[38] : null;
       const lockInPeriod = cols.length > 40 && cols[40] ? parseInt(cols[40], 10) || null : null;
 
-      const planType = this.parsePlanType(planCode, schemeName);
+      const planType = this.parsePlanType(rawPlanCode, schemeName);
 
       // RULE: Exclude ALL Direct Plans at the backend/database level for MFD Regular catalog
       if (planType === 'DIRECT') {
@@ -169,7 +199,21 @@ class NseMasterReconciliationService {
           schemeCode,
           isin,
           schemeName,
+          rawPlanCode,
           reason: 'Direct Plan excluded per MFD regulatory compliance',
+        });
+        continue;
+      }
+
+      // RULE: Exclude ALL Unknown / Invalid Plans (never silently default unknown to Regular)
+      if (planType !== 'REGULAR') {
+        unknownSchemesExcluded.push({
+          schemeCode,
+          isin,
+          schemeName,
+          rawPlanCode,
+          planType,
+          reason: 'Unknown/Invalid Plan excluded per strict NSE plan parsing',
         });
         continue;
       }
@@ -194,6 +238,7 @@ class NseMasterReconciliationService {
         amcName: amcCode ? amcCode.replace(/_/g, ' ').replace(' MF', ' Mutual Fund') : 'Mutual Fund',
         schemeName, // Preserved without invented suffixes
         planType: 'REGULAR',
+        rawPlanCode: rawPlanCode || null,
         option,
         dividendType,
         category,
@@ -223,8 +268,10 @@ class NseMasterReconciliationService {
       totalParsed: lines.length,
       regularCount: regularSchemes.length,
       directExcludedCount: directSchemesExcluded.length,
+      unknownExcludedCount: unknownSchemesExcluded.length,
       regularSchemes,
       directSchemesExcluded,
+      unknownSchemesExcluded,
     };
   }
 
@@ -640,6 +687,194 @@ class NseMasterReconciliationService {
 
     console.log(`✅ [Reconciliation Complete]: Matched: ${report.matchedAccurately}, Nav Updated: ${report.navDiscrepanciesFlagged}, Direct Removed: ${report.directPlansRemoved}, Flags: ${report.flags.length}`);
     return report;
+  }
+
+  /**
+   * Complete NSE Master-Data Ingestion Pipeline
+   * Traces: NSE MASTER_DOWNLOAD -> SCH / NAV / SIP -> Parser -> Regular-only filtering -> Upsert to MongoDB
+   * 
+   * Failure Safety:
+   * - If NSE returns 403, timeout, invalid or empty data:
+   *   1. Log explicit failure
+   *   2. Preserve existing valid database records (NO destructive deletion)
+   *   3. Expose failure status in return object
+   *   4. Never synthesize or fake data
+   */
+  async syncNseMasterPipeline({ dryRun = false } = {}) {
+    const pipelineReport = {
+      startTime: new Date().toISOString(),
+      sch: { status: 'PENDING', totalParsed: 0, regularCount: 0, directExcluded: 0, unknownExcluded: 0, upserted: 0 },
+      nav: { status: 'PENDING', totalNavRecords: 0, schemesUpdated: 0 },
+      sip: { status: 'PENDING', totalSipRecords: 0, schemesUpdated: 0 },
+      errors: [],
+      preservedExistingData: true,
+      success: false,
+    };
+
+    console.log('🚀 [NSE Pipeline] Starting end-to-end Master Ingestion Pipeline...');
+
+    // ── Step 1: Scheme Master (SCH) ──
+    try {
+      console.log('[NSE Pipeline] Requesting MASTER_DOWNLOAD for file_type: SCH...');
+      const schRes = await nseClient.downloadMaster('SCH');
+      if (!schRes || !schRes.success || !schRes.data) {
+        throw new Error(`NSE SCH download failed: ${schRes?.message || 'Empty or invalid response from NSE'}`);
+      }
+
+      // Extract text content from response
+      const rawContent = typeof schRes.data === 'string'
+        ? schRes.data
+        : (schRes.data.file_content || schRes.data.file_data || schRes.data.content || '');
+
+      if (!rawContent || rawContent.trim().length === 0) {
+        throw new Error('NSE SCH master download returned empty file content. Aborting to protect existing database.');
+      }
+
+      const parsedSch = this.parseNseSchemeMasterText(rawContent);
+      pipelineReport.sch.totalParsed = parsedSch.totalParsed;
+      pipelineReport.sch.regularCount = parsedSch.regularCount;
+      pipelineReport.sch.directExcluded = parsedSch.directExcludedCount;
+      pipelineReport.sch.unknownExcluded = parsedSch.unknownExcludedCount;
+
+      if (parsedSch.regularCount === 0) {
+        throw new Error('NSE SCH parser found 0 Regular schemes. Aborting to prevent empty database overwrite.');
+      }
+
+      // Upsert regular schemes into MongoDB
+      if (!dryRun) {
+        const bulkOps = parsedSch.regularSchemes.map((s) => ({
+          updateOne: {
+            filter: { schemeCode: s.schemeCode },
+            update: {
+              $set: {
+                uniqueNo: s.uniqueNo,
+                schemeCode: s.schemeCode,
+                nseSchemeCode: s.schemeCode,
+                rtaSchemeCode: s.rtaSchemeCode,
+                amcSchemeCode: s.amcSchemeCode,
+                isin: s.isin,
+                amcCode: s.amcCode,
+                amcName: s.amcName,
+                schemeName: s.schemeName,
+                planType: 'REGULAR',
+                rawPlanCode: s.rawPlanCode,
+                option: s.option,
+                dividendType: s.dividendType,
+                category: s.category,
+                subCategory: s.subCategory,
+                purchaseAllowed: s.purchaseAllowed,
+                minPurchaseAmount: s.minPurchaseAmount,
+                addPurchaseAmount: s.addPurchaseAmount,
+                maxPurchaseAmount: s.maxPurchaseAmount,
+                purchaseAmountMultiplier: s.purchaseAmountMultiplier,
+                purchaseCutoffTime: s.purchaseCutoffTime,
+                redemptionAllowed: s.redemptionAllowed,
+                minRedemptionQty: s.minRedemptionQty,
+                minRedemptionAmount: s.minRedemptionAmount,
+                redemptionCutoffTime: s.redemptionCutoffTime,
+                sipAllowed: s.sipAllowed,
+                stpAllowed: s.stpAllowed,
+                swpAllowed: s.swpAllowed,
+                switchAllowed: s.switchAllowed,
+                exitLoad: s.exitLoad,
+                lockInPeriod: s.lockInPeriod,
+                isActive: s.isActive,
+                rtaAgentCode: s.rtaAgentCode,
+              },
+            },
+            upsert: true,
+          },
+        }));
+
+        const writeResult = await MutualFundScheme.bulkWrite(bulkOps, { ordered: false });
+        pipelineReport.sch.upserted = (writeResult.upsertedCount || 0) + (writeResult.modifiedCount || 0);
+      }
+      pipelineReport.sch.status = 'SUCCESS';
+    } catch (schErr) {
+      console.error('❌ [NSE Pipeline] SCH Step Failed:', schErr.message);
+      pipelineReport.sch.status = 'FAILED';
+      pipelineReport.errors.push({ step: 'SCH', message: schErr.message });
+      // Protect existing data!
+    }
+
+    // ── Step 2: NAV Master (NAV) ──
+    try {
+      console.log('[NSE Pipeline] Requesting MASTER_DOWNLOAD for file_type: NAV...');
+      const navRes = await nseClient.downloadMaster('NAV');
+      if (!navRes || !navRes.success || !navRes.data) {
+        throw new Error(`NSE NAV download failed: ${navRes?.message || 'Empty or invalid response from NSE'}`);
+      }
+
+      const rawContent = typeof navRes.data === 'string'
+        ? navRes.data
+        : (navRes.data.file_content || navRes.data.file_data || navRes.data.content || '');
+
+      if (!rawContent || rawContent.trim().length === 0) {
+        throw new Error('NSE NAV download returned empty content. Preserving existing NAV data.');
+      }
+
+      const { navMapBySchemeCode, navMapByIsin, totalNavRecords } = this.parseNseNavMasterText(rawContent);
+      pipelineReport.nav.totalNavRecords = totalNavRecords;
+
+      if (!dryRun && totalNavRecords > 0) {
+        const navOps = [];
+        for (const [code, n] of navMapBySchemeCode.entries()) {
+          navOps.push({
+            updateOne: {
+              filter: { schemeCode: code },
+              update: {
+                $set: {
+                  nav: n.nav,
+                  navDate: n.navDate ? new Date(n.navDate) : new Date(),
+                },
+              },
+            },
+          });
+        }
+        if (navOps.length > 0) {
+          const navWrite = await MutualFundScheme.bulkWrite(navOps, { ordered: false });
+          pipelineReport.nav.schemesUpdated = navWrite.modifiedCount || 0;
+        }
+      }
+      pipelineReport.nav.status = 'SUCCESS';
+    } catch (navErr) {
+      console.error('❌ [NSE Pipeline] NAV Step Failed:', navErr.message);
+      pipelineReport.nav.status = 'FAILED';
+      pipelineReport.errors.push({ step: 'NAV', message: navErr.message });
+    }
+
+    // ── Step 3: SIP Master (SIP) ──
+    try {
+      console.log('[NSE Pipeline] Requesting MASTER_DOWNLOAD for file_type: SIP...');
+      const sipRes = await nseClient.downloadMaster('SIP');
+      if (!sipRes || !sipRes.success || !sipRes.data) {
+        throw new Error(`NSE SIP download failed: ${sipRes?.message || 'Empty or invalid response from NSE'}`);
+      }
+
+      const rawContent = typeof sipRes.data === 'string'
+        ? sipRes.data
+        : (sipRes.data.file_content || sipRes.data.file_data || sipRes.data.content || '');
+
+      if (!rawContent || rawContent.trim().length === 0) {
+        throw new Error('NSE SIP download returned empty content. Preserving existing SIP master records.');
+      }
+
+      if (!dryRun) {
+        const sipResult = await this.ingestNseSipMaster(rawContent);
+        pipelineReport.sip.totalSipRecords = sipResult.totalSipRecords || 0;
+        pipelineReport.sip.schemesUpdated = sipResult.schemesUpdated || 0;
+      }
+      pipelineReport.sip.status = 'SUCCESS';
+    } catch (sipErr) {
+      console.error('❌ [NSE Pipeline] SIP Step Failed:', sipErr.message);
+      pipelineReport.sip.status = 'FAILED';
+      pipelineReport.errors.push({ step: 'SIP', message: sipErr.message });
+    }
+
+    pipelineReport.endTime = new Date().toISOString();
+    pipelineReport.success = pipelineReport.sch.status === 'SUCCESS';
+    console.log(`🏁 [NSE Pipeline Complete] Success: ${pipelineReport.success}, Errors: ${pipelineReport.errors.length}`);
+    return pipelineReport;
   }
 
   getAuditReport() {

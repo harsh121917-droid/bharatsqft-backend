@@ -11,6 +11,18 @@ const {
   verifySipPayment,
   abandonSipOrder,
   getPortfolio,
+  getPortfolioHistory,
+  getHoldingDetail,
+  getTransactions,
+  getTransactionDetail,
+  getUserSips,
+  getSipDetail,
+  pauseUserSip,
+  resumeUserSip,
+  cancelUserSip,
+  getCapitalGains,
+  confirmOrderAllotment,
+  settleRedemptionOrder,
   getMyOrders,
   simulatePayment,
   renderCheckoutSimulator,
@@ -47,12 +59,24 @@ router.post('/orders/purchase', createPurchaseOrder);
 router.post('/orders/verify', verifyPurchasePayment);
 router.post('/orders/redeem', createRedemptionOrder);
 router.post('/orders/switch', createSwitchOrder);
+router.post('/orders/:orderId/confirm-allotment', confirmOrderAllotment);
+router.post('/orders/:orderId/settle-redemption', settleRedemptionOrder);
 router.post('/stp/register', registerStpOrder);
 router.post('/swp/register', registerSwpOrder);
 router.post('/sip/register', registerSipOrder);
 router.post('/sip/verify', verifySipPayment);
 router.post('/sip/:id/abandon', abandonSipOrder);
+router.get('/sips', getUserSips);
+router.get('/sips/:id', getSipDetail);
+router.post('/sips/:id/pause', pauseUserSip);
+router.post('/sips/:id/resume', resumeUserSip);
+router.post('/sips/:id/cancel', cancelUserSip);
 router.get('/portfolio', getPortfolio);
+router.get('/portfolio/history', getPortfolioHistory);
+router.get('/portfolio/holdings/:schemeCode', getHoldingDetail);
+router.get('/transactions', getTransactions);
+router.get('/transactions/:id', getTransactionDetail);
+router.get('/tax/capital-gains', getCapitalGains);
 router.get('/orders/my', getMyOrders);
 router.post('/test/reset', resetTestData);
 

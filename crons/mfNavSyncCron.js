@@ -13,10 +13,17 @@ const nseMasterReconciliationService = require('../services/nse/nseMasterReconci
 async function syncMutualFundNavs() {
   console.log('[MF NAV Sync] Starting daily official Master & NAV synchronization...');
   try {
+    // Step 1: Execute NSE Master Ingestion Pipeline (SCH, NAV, SIP)
+    const pipelineReport = await nseMasterReconciliationService.syncNseMasterPipeline({ dryRun: false });
+    console.log(`[MF NAV Sync] NSE Master Pipeline completed. SCH=${pipelineReport.sch.status}, NAV=${pipelineReport.nav.status}, SIP=${pipelineReport.sip.status}`);
+
+    // Step 2: Cross-reconcile against official AMFI/RTA feed
     const report = await nseMasterReconciliationService.reconcileAllSchemes({ dryRun: false });
     console.log(`✅ [MF NAV Sync] Successfully reconciled ${report.totalDbSchemes} schemes. NAVs Updated: ${report.navDiscrepanciesFlagged}, Matched: ${report.matchedAccurately}.`);
     return {
       success: true,
+      pipelineReport,
+      reconciliationReport: report,
       updatedCount: report.navDiscrepanciesFlagged,
       matchedCount: report.matchedAccurately,
       totalSchemes: report.totalDbSchemes,

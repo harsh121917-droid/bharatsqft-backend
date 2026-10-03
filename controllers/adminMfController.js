@@ -6,6 +6,7 @@ const MutualFundScheme = require('../models/MutualFundScheme');
 const User = require('../models/User');
 const NseConfig = require('../models/NseConfig');
 const MfReconciliation = require('../models/MfReconciliation');
+const MfAuditLog = require('../models/MfAuditLog');
 const mfReconciliationEngine = require('../services/mfReconciliationEngine');
 const nseClient = require('../services/nse/nseClient');
 const nseEncryption = require('../services/nse/nseEncryption');
@@ -1150,6 +1151,58 @@ exports.getNseMasterAudit = async (req, res) => {
       data: audit,
     });
   } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── 25. GET /api/admin/mutual-funds/audit-logs ──
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      entityType,
+      entityId,
+      event,
+      actor,
+      source,
+    } = req.query;
+
+    const query = {};
+    if (entityType) query.entityType = entityType;
+    if (entityId) query.entityId = entityId;
+    if (event) query.event = event;
+    if (actor) query.actor = actor;
+    if (source) query.source = source;
+
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const [logs, total] = await Promise.all([
+      MfAuditLog.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parsedLimit)
+        .populate('user', 'name email phone')
+        .lean(),
+      MfAuditLog.countDocuments(query),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        logs,
+        pagination: {
+          total,
+          page: parsedPage,
+          limit: parsedLimit,
+          pages: Math.ceil(total / parsedLimit),
+        },
+      },
+    });
+  } catch (err) {
+    console.error('[getAuditLogs Error]:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };

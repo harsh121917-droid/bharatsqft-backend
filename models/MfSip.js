@@ -68,6 +68,45 @@ const MfSipSchema = new mongoose.Schema(
       enum: ['PENDING_PAYMENT', 'ACTIVE', 'PAUSED', 'CANCELLED'],
       default: 'PENDING_PAYMENT',
     },
+    planType: {
+      type: String,
+      enum: ['REGULAR'],
+      default: 'REGULAR',
+      required: true,
+    },
+    mandateRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MfMandate',
+    },
+    pausedAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    pauseReason: {
+      type: String,
+      default: '',
+    },
+    installments: [
+      {
+        installmentNo: { type: Number, required: true },
+        dueDate: { type: Date, required: true },
+        amount: { type: Number, required: true },
+        paymentStatus: {
+          type: String,
+          enum: ['UPCOMING', 'PAYMENT_PENDING', 'PAID', 'PROCESSING', 'ALLOTTED', 'FAILED', 'SKIPPED', 'CANCELLED'],
+          default: 'UPCOMING',
+        },
+        orderStatus: { type: String, default: 'PENDING' },
+        allotmentStatus: { type: String, default: 'PENDING' },
+        units: { type: Number, default: 0 },
+        nav: { type: Number, default: null },
+        transactionRef: { type: String, default: null },
+      },
+    ],
     stepUpRequired: {
       type: Boolean,
       default: false,

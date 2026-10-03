@@ -258,10 +258,10 @@ class NseClient {
 
     const baseUrl = this.getBaseUrl();
     const url = `${baseUrl}${endpoint}`;
-    const headers = nseEncryption.generateAuthHeaders();
-    const httpsAgent = nseEncryption.getHttpsAgent();
 
     try {
+      const headers = nseEncryption.generateAuthHeaders();
+      const httpsAgent = nseEncryption.getHttpsAgent();
       const response = await axios.post(url, payload, {
         headers,
         httpsAgent,

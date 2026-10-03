@@ -52,9 +52,14 @@ const MutualFundSchemeSchema = new mongoose.Schema(
     },
     planType: {
       type: String,
-      enum: ['REGULAR', 'DIRECT'],
-      default: 'REGULAR',
+      enum: ['REGULAR', 'DIRECT', 'UNKNOWN'],
+      default: 'UNKNOWN',
       index: true,
+    },
+    rawPlanCode: {
+      type: String,
+      default: null,
+      trim: true,
     },
     option: {
       type: String,
@@ -85,6 +90,27 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    navSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    navUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    return1M: {
+      type: Number,
+      default: null,
+    },
+    return3M: {
+      type: Number,
+      default: null,
+    },
+    return6M: {
+      type: Number,
+      default: null,
+    },
     cagr1Y: {
       type: Number,
       default: null,
@@ -96,6 +122,20 @@ const MutualFundSchemeSchema = new mongoose.Schema(
     cagr5Y: {
       type: Number,
       default: null,
+    },
+    returnsCalculatedAt: {
+      type: Date,
+      default: null,
+    },
+    returnsMethodology: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    returnsSource: {
+      type: String,
+      default: null,
+      trim: true,
     },
     minPurchaseAmount: {
       type: Number,
@@ -195,6 +235,11 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    exitLoadSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     lockInPeriod: {
       type: Number,
       default: null,
@@ -204,10 +249,29 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    benchmark: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    benchmarkSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     rating: {
       type: Number,
       min: 1,
       max: 5,
+      default: null,
+    },
+    ratingProvider: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    ratingAsOfDate: {
+      type: Date,
       default: null,
     },
     riskLevel: {
@@ -219,13 +283,71 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    fundManagerRole: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    fundManagerAsOfDate: {
+      type: Date,
+      default: null,
+    },
     aum: {
       type: Number, // In Crores INR
       default: null,
     },
+    aumAsOfDate: {
+      type: Date,
+      default: null,
+    },
+    aumSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     expenseRatio: {
       type: Number, // e.g. 0.75%
       default: null,
+    },
+    expenseRatioAsOfDate: {
+      type: Date,
+      default: null,
+    },
+    expenseRatioSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    holdings: {
+      type: [
+        {
+          name: { type: String, trim: true },
+          weight: { type: Number },
+          sector: { type: String, trim: true },
+          asOfDate: { type: Date, default: null },
+          source: { type: String, trim: true, default: null },
+        },
+      ],
+      default: [],
+    },
+    holdingsAsOfDate: {
+      type: Date,
+      default: null,
+    },
+    holdingsSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    minSipSource: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    minPurchaseSource: {
+      type: String,
+      default: null,
+      trim: true,
     },
     isPopular: {
       type: Boolean,

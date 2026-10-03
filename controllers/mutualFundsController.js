@@ -10,6 +10,13 @@ const Kyc = require('../models/Kyc');
 const nseClient = require('../services/nse/nseClient');
 const paymentGatewayService = require('../services/paymentGatewayService');
 const mfLiveService = require('../services/mfLiveService');
+const MfTransaction = require('../models/MfTransaction');
+const MfPortfolioHolding = require('../models/MfPortfolioHolding');
+const MfCapitalGain = require('../models/MfCapitalGain');
+const MfAuditLog = require('../models/MfAuditLog');
+const mfPortfolioEngine = require('../services/mfPortfolioEngine');
+const mfCapitalGainsEngine = require('../services/mfCapitalGainsEngine');
+const mfIdempotencyService = require('../services/mfIdempotencyService');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -222,6 +229,7 @@ exports.getSchemeDetail = async (req, res) => {
           isPositive: item.isPositive,
           startNav: item.startNav,
           endNav: item.endNav,
+          insufficientData: item.insufficientData ?? false,
         };
       }
     }
@@ -263,12 +271,19 @@ exports.getSchemeDetail = async (req, res) => {
 
     // Genuine Regular Plan returns computed strictly from historical daily NAVs
     const retStats = liveFacts?.returnStats;
+    const ret1M = periodReturns['1M']?.returnPercent ?? scheme.return1M ?? null;
+    const ret3M = periodReturns['3M']?.returnPercent ?? scheme.return3M ?? null;
+    const ret6M = periodReturns['6M']?.returnPercent ?? scheme.return6M ?? null;
     const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y ?? null;
     const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y ?? null;
     const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y ?? null;
     const retAll = periodReturns['All']?.returnPercent ?? null;
 
     const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
+    const navDate = liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate;
+    const navSource = liveNav ? 'AMFI Historical NAV Feed' : (scheme.navSource || 'NSE MASTER_DOWNLOAD NAV');
+    const navUpdatedAt = scheme.navUpdatedAt || scheme.updatedAt;
+
     const day1Ret = liveNav?.day1Return ?? null;
     const day1Pos = day1Ret !== null ? day1Ret >= 0 : null;
 
@@ -278,27 +293,73 @@ exports.getSchemeDetail = async (req, res) => {
       ? liveFacts.fundManagerDetails
       : (fundManagerName ? [{ name: fundManagerName, qualification: '', experience: '', tenure: '', fundsManaged: '' }] : []);
 
+    const benchmark = scheme.benchmark || liveFacts?.benchmarkName || null;
+    const exitLoad = scheme.exitLoad || liveFacts?.exitLoad || null;
+
     return res.json({
       success: true,
       data: {
         ...scheme.toObject(),
         rating: realRating,
+        ratingProvider: scheme.ratingProvider || (realRating ? 'CRISIL/ValueResearch' : null),
+        ratingAsOfDate: scheme.ratingAsOfDate || null,
         minSipAmount: realMinSip,
+        minSipSource: scheme.minSipSource || (realMinSip ? 'NSE MASTER_DOWNLOAD SIP' : null),
         minPurchaseAmount: realMinPurchase,
+        minPurchaseSource: scheme.minPurchaseSource || (realMinPurchase ? 'NSE MASTER_DOWNLOAD SCH' : null),
         nav: accurateNav,
-        navDate: liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate,
+        navDate,
+        navSource,
+        navUpdatedAt,
         aum: realAum,
+        aumAsOfDate: scheme.aumAsOfDate || null,
+        aumSource: scheme.aumSource || (realAum ? 'NSE/AMFI Master Feed' : null),
         day1Return: day1Ret,
         day1IsPositive: day1Pos,
+        return1M: ret1M,
+        return3M: ret3M,
+        return6M: ret6M,
         cagr1Y: ret1Y,
         cagr3Y: ret3Y,
         cagr5Y: ret5Y,
+        returns: {
+          '1M': ret1M,
+          '3M': ret3M,
+          '6M': ret6M,
+          '1Y': ret1Y,
+          '3Y': ret3Y,
+          '5Y': ret5Y,
+          'All': retAll,
+          methodology: 'SEBI/AMFI: Simple absolute return for <=1Y, CAGR for >1Y',
+          calculatedAt: liveNav ? new Date() : (scheme.returnsCalculatedAt || null),
+          source: liveNav ? 'AMFI Daily NAV History' : (scheme.returnsSource || null),
+        },
         expenseRatio,
+        expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || null,
+        expenseRatioSource: scheme.expenseRatioSource || null,
         fundManager: fundManagerName,
+        fundManagerRole: scheme.fundManagerRole || null,
+        benchmark,
+        benchmarkSource: scheme.benchmarkSource || (liveFacts?.benchmarkName ? 'Scheme Factsheet' : null),
         chartData,
         periodReturns,
         navHistory: chartData ? (chartData['1M'] || []) : [],
         returnsComparison: {
+          '1M': {
+            fund: ret1M,
+            categoryAvg: null,
+            rank: null,
+          },
+          '3M': {
+            fund: ret3M,
+            categoryAvg: null,
+            rank: null,
+          },
+          '6M': {
+            fund: ret6M,
+            categoryAvg: null,
+            rank: null,
+          },
           '1Y': {
             fund: ret1Y,
             categoryAvg: retStats?.cat_return1y ?? null,
@@ -321,9 +382,12 @@ exports.getSchemeDetail = async (req, res) => {
           },
         },
         topHoldings,
+        holdings: topHoldings,
+        holdingsAsOfDate: scheme.holdingsAsOfDate || null,
+        holdingsSource: scheme.holdingsSource || (topHoldings.length > 0 ? 'Scheme Factsheet' : null),
         expenseDetails: {
           expenseRatio,
-          exitLoad: scheme.exitLoad || liveFacts?.exitLoad || null,
+          exitLoad,
           stampDuty: '0.005% on purchase as per Indian Stamp Act.',
           taxImplications:
             cat.includes('debt')
@@ -336,12 +400,13 @@ exports.getSchemeDetail = async (req, res) => {
           code: scheme.amcCode,
           rank: null,
           totalAum: realAum ? `₹${Number(realAum).toLocaleString('en-IN')} Crores` : null,
-          objective: liveFacts?.benchmarkName
-            ? `Benchmark: ${liveFacts.benchmarkName}`
+          objective: benchmark
+            ? `Benchmark: ${benchmark}`
             : null,
         },
         prosAndCons,
         similarFunds,
+        similarFundsCount: similarFunds.length,
       },
     });
   } catch (error) {
@@ -627,10 +692,10 @@ exports.createPurchaseOrder = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
     }
 
-    if (scheme.planType === 'DIRECT' || scheme.schemeName.toLowerCase().includes('direct')) {
+    if (scheme.planType !== 'REGULAR' || scheme.schemeName.toLowerCase().includes('direct')) {
       return res.status(400).json({
         success: false,
-        message: 'Only Regular Plan mutual funds can be purchased through Vikaone. Direct plans are not supported.',
+        message: 'Only Regular Plan mutual funds can be purchased through Vikaone. Direct or Unknown plans are not supported.',
       });
     }
 
@@ -772,10 +837,10 @@ exports.registerSipOrder = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
     }
 
-    if (scheme.planType === 'DIRECT' || scheme.schemeName.toLowerCase().includes('direct')) {
+    if (scheme.planType !== 'REGULAR' || scheme.schemeName.toLowerCase().includes('direct')) {
       return res.status(400).json({
         success: false,
-        message: 'Only Regular Plan mutual funds are available for SIP through Vikaone. Direct plans are not supported.',
+        message: 'Only Regular Plan mutual funds are available for SIP through Vikaone. Direct or Unknown plans are not supported.',
       });
     }
 
@@ -986,9 +1051,9 @@ exports.verifySipPayment = async (req, res) => {
       }
     }
 
-    const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode });
-    const nav = scheme?.nav || 100;
-    const units = +(sip.installmentAmount / nav).toFixed(3);
+    const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode, planType: 'REGULAR' });
+    const nav = scheme?.nav || null;
+    const estimatedUnits = nav ? +(sip.installmentAmount / nav).toFixed(3) : null;
 
     // Check if an order already exists for this payment (idempotency)
     let initialOrder = await MfOrder.findOne({ razorpayPaymentId });
@@ -996,20 +1061,23 @@ exports.verifySipPayment = async (req, res) => {
       initialOrder = await MfOrder.create({
         user: userId,
         clientCode: sip.clientCode,
-        orderId: `MF_SIP_${Date.now()}`,
+        orderId: sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`,
         schemeCode: sip.schemeCode,
         schemeName: sip.schemeName,
         transactionType: 'P',
         buySellType: 'FRESH',
         orderAmount: sip.installmentAmount,
-        units,
+        estimatedUnits,
+        units: 0,
+        allottedUnits: 0,
+        allotmentStatus: 'PENDING',
         navAtOrder: nav,
-        paymentMode: 'RAZORPAY',
+        paymentMode: 'MANDATE',
         paymentStatus: 'SUCCESS',
         razorpayOrderId: razorpayOrderId || '',
         razorpayPaymentId,
         razorpaySignature: razorpaySignature || '',
-        nseStatus: 'TRXN SUCCESS',
+        nseStatus: 'SUBMITTED',
         remarks: `First installment for SIP ${sip.sipRegNo}`,
       });
     }
@@ -1067,7 +1135,7 @@ exports.abandonSipOrder = async (req, res) => {
   }
 };
 
-// Helper to calculate available units held in a scheme
+// Helper to calculate available units held in a scheme strictly from confirmed allotments
 async function getUserSchemeHoldings(userId, schemeCode) {
   const orders = await MfOrder.find({
     user: userId,
@@ -1078,134 +1146,335 @@ async function getUserSchemeHoldings(userId, schemeCode) {
   let totalUnits = 0;
   for (const ord of orders) {
     if (ord.transactionType === 'P') {
-      const confirmedUnits = ord.allottedUnits !== undefined && ord.allottedUnits !== null
+      // STRICT PRODUCT RULE: Pending orders never count as holdings! Only confirmed allotted units count.
+      const confirmedUnits = (ord.allotmentStatus === 'ALLOTTED' && (ord.allottedUnits || 0) > 0)
         ? ord.allottedUnits
-        : (ord.allotmentStatus === 'CONFIRMED' ? ord.units : 0);
+        : 0;
       totalUnits += confirmedUnits;
     } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
       totalUnits -= (ord.redemptionUnits || ord.units || 0);
     }
   }
-  return Math.max(0, +totalUnits.toFixed(3));
+  return Math.max(0, +totalUnits.toFixed(4));
 }
 
-// ── 7. GET /api/mutual-funds/portfolio (Holdings & Summary) ──
+// ── 7. GET /api/mutual-funds/portfolio (Holdings, Allocations, and Investor XIRR) ──
 exports.getPortfolio = async (req, res) => {
   try {
     const userId = req.user._id;
-
-    // Fetch confirmed purchases and redemptions/switches
-    const orders = await MfOrder.find({
-      user: userId,
-      paymentStatus: 'SUCCESS',
-    }).sort({ createdAt: 1 });
-
-    const activeSips = await MfSip.find({ user: userId, status: 'ACTIVE' });
-
-    // Auto-reconcile activeSips installments with actual confirmed purchase orders
-    const purchaseOrders = orders.filter((o) => o.transactionType === 'P');
-    for (const sip of activeSips) {
-      const confirmedOrdersCount = purchaseOrders.filter(
-        (o) => o.schemeCode === sip.schemeCode || (o.remarks && o.remarks.includes(sip.sipRegNo))
-      ).length;
-
-      if (confirmedOrdersCount > 0 && sip.installmentsPaid !== confirmedOrdersCount) {
-        sip.installmentsPaid = confirmedOrdersCount;
-        sip.totalAmountPaid = confirmedOrdersCount * sip.installmentAmount;
-        await sip.save();
-      }
-    }
-
-    // Aggregate holdings by scheme
-    const holdingsMap = {};
-    let totalInvested = 0;
-
-    for (const ord of orders) {
-      if (!holdingsMap[ord.schemeCode]) {
-        holdingsMap[ord.schemeCode] = {
-          schemeCode: ord.schemeCode,
-          schemeName: ord.schemeName,
-          totalUnits: 0,
-          investedAmount: 0,
-          currentNav: ord.navAtOrder,
-        };
-      }
-      if (ord.transactionType === 'P') {
-        const confirmedUnits = ord.allottedUnits !== undefined && ord.allottedUnits !== null
-          ? ord.allottedUnits
-          : (ord.allotmentStatus === 'CONFIRMED' ? ord.units : 0);
-        holdingsMap[ord.schemeCode].totalUnits += confirmedUnits;
-        holdingsMap[ord.schemeCode].investedAmount += ord.orderAmount;
-        totalInvested += ord.orderAmount;
-      } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
-        const unitsReduced = ord.redemptionUnits || ord.units || 0;
-        const previousUnits = holdingsMap[ord.schemeCode].totalUnits;
-        const previousInvested = holdingsMap[ord.schemeCode].investedAmount;
-
-        // Reduce invested amount proportionally by weighted average cost basis of redeemed units
-        let costBasisReduced = 0;
-        if (previousUnits > 0 && previousInvested > 0) {
-          const costPerUnit = previousInvested / previousUnits;
-          costBasisReduced = Math.min(previousInvested, unitsReduced * costPerUnit);
-        }
-
-        holdingsMap[ord.schemeCode].totalUnits = Math.max(0, previousUnits - unitsReduced);
-        holdingsMap[ord.schemeCode].investedAmount = Math.max(0, previousInvested - costBasisReduced);
-        totalInvested = Math.max(0, totalInvested - costBasisReduced);
-      }
-    }
-
-    // Refresh with latest NAVs
-    const schemeCodes = Object.keys(holdingsMap);
-    const liveSchemes = await MutualFundScheme.find({ schemeCode: { $in: schemeCodes } });
-    const liveMap = {};
-    liveSchemes.forEach((s) => {
-      liveMap[s.schemeCode] = s;
-    });
-
-    let currentValuation = 0;
-    const holdingsList = Object.values(holdingsMap)
-      .filter((h) => h.totalUnits > 0.0001)
-      .map((h) => {
-        const live = liveMap[h.schemeCode];
-        const currentNav = live?.nav || h.currentNav;
-        const currentValue = +(h.totalUnits * currentNav).toFixed(2);
-        const profitLoss = +(currentValue - h.investedAmount).toFixed(2);
-        const profitLossPct = h.investedAmount > 0 ? +((profitLoss / h.investedAmount) * 100).toFixed(2) : 0;
-
-        currentValuation += currentValue;
-
-        return {
-          ...h,
-          totalUnits: +h.totalUnits.toFixed(3),
-          currentNav,
-          currentValue,
-          profitLoss,
-          profitLossPct,
-        };
-      });
-
-    const totalProfitLoss = +(currentValuation - totalInvested).toFixed(2);
-    const totalProfitLossPct = totalInvested > 0 ? +((totalProfitLoss / totalInvested) * 100).toFixed(2) : 0;
-
+    const portfolioData = await mfPortfolioEngine.recalculateUserPortfolio(userId);
     return res.json({
       success: true,
-      data: {
-        summary: {
-          totalInvested: +totalInvested.toFixed(2),
-          currentValuation: +currentValuation.toFixed(2),
-          totalProfitLoss,
-          totalProfitLossPct,
-          totalFunds: holdingsList.length,
-          activeSipsCount: activeSips.length,
-        },
-        holdings: holdingsList,
-        activeSips,
-      },
+      data: portfolioData,
     });
   } catch (error) {
     console.error('[getPortfolio Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7a. GET /api/mutual-funds/portfolio/history (Real Historical Portfolio Valuation) ──
+exports.getPortfolioHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const txns = await MfTransaction.find({ user: userId, status: 'CONFIRMED' }).sort({ transactionDate: 1 });
+
+    if (txns.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          points: [],
+          message: 'Not enough portfolio history yet.',
+        },
+      });
+    }
+
+    const points = txns.map((t) => ({
+      date: t.transactionDate.toISOString().split('T')[0],
+      amount: t.orderAmount,
+      units: t.units,
+      nav: t.nav,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        points,
+        message: points.length >= 2 ? 'Real historical transaction history' : 'Not enough portfolio history yet.',
+      },
+    });
+  } catch (error) {
+    console.error('[getPortfolioHistory Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7b. GET /api/mutual-funds/portfolio/holdings/:schemeCode (Granular Scheme Holding) ──
+exports.getHoldingDetail = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { schemeCode } = req.params;
+    const sCode = schemeCode.toUpperCase();
+
+    const holding = await MfPortfolioHolding.findOne({ user: userId, schemeCode: sCode });
+    if (!holding || holding.totalUnits <= 0) {
+      return res.status(404).json({ success: false, message: 'No active holdings found for this scheme' });
+    }
+
+    const txns = await MfTransaction.find({ user: userId, schemeCode: sCode }).sort({ transactionDate: -1 });
+    const scheme = await MutualFundScheme.findOne({ schemeCode: sCode });
+
+    return res.json({
+      success: true,
+      data: {
+        holding,
+        scheme,
+        transactions: txns,
+      },
+    });
+  } catch (error) {
+    console.error('[getHoldingDetail Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7c. GET /api/mutual-funds/transactions (Verified Ledger Transactions) ──
+exports.getTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { type, page = 1, limit = 20 } = req.query;
+    const query = { user: userId };
+    if (type && type !== 'ALL') {
+      query.transactionType = type.toUpperCase();
+    }
+
+    const txns = await MfTransaction.find(query)
+      .sort({ transactionDate: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit));
+
+    const total = await MfTransaction.countDocuments(query);
+
+    return res.json({
+      success: true,
+      data: txns,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+    });
+  } catch (error) {
+    console.error('[getTransactions Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7d. GET /api/mutual-funds/transactions/:id (Transaction Detail) ──
+exports.getTransactionDetail = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const txn = await MfTransaction.findOne({ _id: id, user: userId });
+    if (!txn) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' });
+    }
+    return res.json({ success: true, data: txn });
+  } catch (error) {
+    console.error('[getTransactionDetail Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7e. GET /api/mutual-funds/sips (List User SIPs) ──
+exports.getUserSips = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const sips = await MfSip.find({ user: userId }).sort({ createdAt: -1 });
+    return res.json({ success: true, data: sips });
+  } catch (error) {
+    console.error('[getUserSips Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7f. GET /api/mutual-funds/sips/:id (SIP Detail with Installments) ──
+exports.getSipDetail = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const sip = await MfSip.findOne({ _id: id, user: userId }).populate('mandateRef');
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP not found' });
+    }
+    return res.json({ success: true, data: sip });
+  } catch (error) {
+    console.error('[getSipDetail Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7g. POST /api/mutual-funds/sips/:id/pause ──
+exports.pauseUserSip = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const { reason = 'Paused by investor' } = req.body;
+    const sip = await MfSip.findOne({ _id: id, user: userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP not found' });
+    }
+    if (sip.status !== 'ACTIVE') {
+      return res.status(400).json({ success: false, message: `Cannot pause SIP with status ${sip.status}` });
+    }
+    const prevStatus = sip.status;
+    sip.status = 'PAUSED';
+    sip.pausedAt = new Date();
+    sip.pauseReason = reason;
+    await sip.save();
+
+    await mfIdempotencyService.recordAuditLog({
+      event: 'SIP_PAUSED',
+      entityType: 'SIP',
+      entityId: sip._id,
+      user: userId,
+      previousState: { status: prevStatus },
+      newState: { status: sip.status, pausedAt: sip.pausedAt },
+      source: 'USER_ACTION',
+      actor: String(userId),
+      reason,
+    });
+
+    return res.json({ success: true, message: 'SIP paused successfully', data: sip });
+  } catch (error) {
+    console.error('[pauseUserSip Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7h. POST /api/mutual-funds/sips/:id/resume ──
+exports.resumeUserSip = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const sip = await MfSip.findOne({ _id: id, user: userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP not found' });
+    }
+    if (sip.status !== 'PAUSED') {
+      return res.status(400).json({ success: false, message: `Cannot resume SIP with status ${sip.status}` });
+    }
+    const prevStatus = sip.status;
+    sip.status = 'ACTIVE';
+    sip.pausedAt = null;
+    sip.pauseReason = '';
+    await sip.save();
+
+    await mfIdempotencyService.recordAuditLog({
+      event: 'SIP_RESUMED',
+      entityType: 'SIP',
+      entityId: sip._id,
+      user: userId,
+      previousState: { status: prevStatus },
+      newState: { status: sip.status },
+      source: 'USER_ACTION',
+      actor: String(userId),
+      reason: 'Resumed by investor',
+    });
+
+    return res.json({ success: true, message: 'SIP resumed successfully', data: sip });
+  } catch (error) {
+    console.error('[resumeUserSip Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7i. POST /api/mutual-funds/sips/:id/cancel ──
+exports.cancelUserSip = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { id } = req.params;
+    const sip = await MfSip.findOne({ _id: id, user: userId });
+    if (!sip) {
+      return res.status(404).json({ success: false, message: 'SIP not found' });
+    }
+    if (sip.status === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'SIP is already cancelled' });
+    }
+    const prevStatus = sip.status;
+    sip.status = 'CANCELLED';
+    sip.cancelledAt = new Date();
+    await sip.save();
+
+    await mfIdempotencyService.recordAuditLog({
+      event: 'SIP_CANCELLED',
+      entityType: 'SIP',
+      entityId: sip._id,
+      user: userId,
+      previousState: { status: prevStatus },
+      newState: { status: sip.status, cancelledAt: sip.cancelledAt },
+      source: 'USER_ACTION',
+      actor: String(userId),
+      reason: 'Cancelled by investor',
+    });
+
+    return res.json({ success: true, message: 'SIP cancelled successfully', data: sip });
+  } catch (error) {
+    console.error('[cancelUserSip Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7j. GET /api/mutual-funds/tax/capital-gains (Realized Capital Gains Report) ──
+exports.getCapitalGains = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { fy } = req.query;
+    const report = await mfCapitalGainsEngine.getCapitalGainsReport(userId, fy);
+    return res.json({ success: true, data: report });
+  } catch (error) {
+    console.error('[getCapitalGains Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7k. POST /api/mutual-funds/orders/:orderId/confirm-allotment (Idempotent Allotment Processing) ──
+exports.confirmOrderAllotment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { allottedUnits, allottedNav, allotmentDate, rtaRef, idempotencyKey } = req.body;
+    const result = await mfIdempotencyService.processAllotmentConfirmation({
+      orderId,
+      allottedUnits,
+      allottedNav,
+      allotmentDate,
+      rtaReferenceNo: rtaRef,
+      idempotencyKey,
+      source: req.user ? `USER_${req.user._id}` : 'RECONCILIATION',
+    });
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[confirmOrderAllotment Error]:', error);
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7l. POST /api/mutual-funds/orders/:orderId/settle-redemption (Idempotent Settlement Processing) ──
+exports.settleRedemptionOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { settledAmount, settledNav, settlementDate, rtaRef, idempotencyKey } = req.body;
+    const result = await mfIdempotencyService.processRedemptionSettlement({
+      orderId,
+      finalSettledAmount: settledAmount,
+      allottedNav: settledNav,
+      settlementDate,
+      rtaReferenceNo: rtaRef,
+      idempotencyKey,
+      source: req.user ? `USER_${req.user._id}` : 'RECONCILIATION',
+    });
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[settleRedemptionOrder Error]:', error);
+    return res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -1228,6 +1497,9 @@ exports.getMyOrders = async (req, res) => {
 // ── 9. POST /api/mutual-funds/orders/:orderId/simulate-payment (Sandbox Simulation) ──
 exports.simulatePayment = async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ success: false, message: 'Simulation endpoints are disabled in production' });
+    }
     const { orderId } = req.params;
     const order = await MfOrder.findOne({ orderId });
     if (!order) {
@@ -1235,13 +1507,13 @@ exports.simulatePayment = async (req, res) => {
     }
 
     order.paymentStatus = 'SUCCESS';
-    order.nseStatus = 'ALLOTTED (SANDBOX)';
+    order.nseStatus = 'SUBMITTED (SANDBOX)';
     order.remarks = 'Payment simulated successfully in Sandbox Mode';
     await order.save();
 
     return res.json({
       success: true,
-      message: 'Payment simulated and units allotted successfully',
+      message: 'Payment simulated successfully in Sandbox Mode',
       data: order,
     });
   } catch (error) {
@@ -1342,22 +1614,25 @@ exports.renderCheckoutSimulator = async (req, res) => {
           });
 
           if (!existingFirstOrder) {
-            const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode });
-            const nav = scheme?.nav || 100;
-            const units = Number((sip.installmentAmount / nav).toFixed(3));
+            const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode, planType: 'REGULAR' });
+            const nav = scheme?.nav || null;
+            const estimatedUnits = nav ? Number((sip.installmentAmount / nav).toFixed(3)) : null;
             await MfOrder.create({
               user: sip.user,
               clientCode: sip.clientCode,
-              orderId: `MF_SIP_${Date.now()}`,
+              orderId: sip.exchangeOrderId || sip.sipRegNo || `SIP_SIM_${sip._id}`,
               schemeCode: sip.schemeCode,
               schemeName: sip.schemeName,
               transactionType: 'P',
               orderAmount: sip.installmentAmount,
-              units,
+              estimatedUnits,
+              units: 0,
+              allottedUnits: 0,
+              allotmentStatus: 'PENDING',
               navAtOrder: nav,
               paymentMode: 'MANDATE',
               paymentStatus: 'SUCCESS',
-              nseStatus: 'ALLOTTED (SANDBOX)',
+              nseStatus: 'SUBMITTED (SANDBOX)',
               remarks: `SIP First Installment for RegNo: ${sip.sipRegNo}`,
             });
           }
@@ -1801,6 +2076,17 @@ exports.createSwitchOrder = async (req, res) => {
 
     const switchAmount = +(unitsToSwitch * srcScheme.nav).toFixed(2);
     const orderId = `MFSW${Date.now()}`;
+
+    const nseSwitchPayload = {
+      order_ref_number: orderId,
+      from_scheme_code: srcScheme.schemeCode,
+      to_scheme_code: tgtScheme.schemeCode,
+      client_code: ucc.clientCode,
+      allotment_units: String(unitsToSwitch),
+      all_units: allUnits ? 'Y' : 'N',
+      order_amount: String(switchAmount),
+      remarks: 'Switch via Vikaone app',
+    };
 
     // Dispatch to NSE Switch
     const nseRes = await nseClient.createSwitchOrder([nseSwitchPayload]);

@@ -1498,7 +1498,7 @@ async function loadMfCurationSchemes(page = 1) {
                     <div style="font-weight:600;color:#cbd5e1;font-size:12.5px">${s.aum ? '₹' + s.aum.toLocaleString('en-IN') + ' Cr' : '—'}</div>
                 </td>
                 <td>
-                    <div style="font-weight:700;color:#00D09C;font-size:13px">${formatMfInr(s.minSipAmount || 500)}</div>
+                    <div style="font-weight:700;color:#00D09C;font-size:13px">${s.minSipAmount ? formatMfInr(s.minSipAmount) : '—'}</div>
                 </td>
                 <td style="text-align:center">
                     <button class="btn btn-sm" onclick="toggleSchemeCurationField('${s._id}', 'isFeatured', ${!isFeat})" style="${isFeat ? 'background:rgba(212,160,23,0.22);color:#D4A017;border:1px solid rgba(212,160,23,0.6);font-weight:700;' : 'background:transparent;color:var(--text-dim);border:1px solid rgba(255,255,255,0.15);'}font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer" title="${isFeat ? 'Featured in Home Carousel. Click to Remove' : 'Click to Feature in Home Carousel'}">
