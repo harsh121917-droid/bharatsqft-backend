@@ -17,8 +17,30 @@ function getFinancialYear(date) {
 }
 
 /**
+ * Classify scheme tax bucket
+ * - EQUITY_ORIENTED: >= 65% domestic equity
+ * - DEBT_SPECIFIED: <= 35% equity (taxed at slab rate post Finance Act 2023)
+ * - OTHER_HYBRID: 35% to 65% equity
+ */
+function classifyTaxCategory(scheme) {
+  const cat = (scheme?.category || '').toLowerCase();
+  const subCat = (scheme?.subCategory || '').toLowerCase();
+
+  if (cat.includes('equity') || subCat.includes('equity') || subCat.includes('elss')) {
+    return 'EQUITY_ORIENTED';
+  }
+  if (cat.includes('debt') || subCat.includes('debt') || cat.includes('liquid') || cat.includes('money market')) {
+    return 'DEBT_SPECIFIED';
+  }
+  if (cat.includes('hybrid')) {
+    return 'OTHER_HYBRID';
+  }
+  return 'UNKNOWN_REQUIRES_REVIEW';
+}
+
+/**
  * Process realized capital gains on redemption using FIFO (First-In, First-Out) matching.
- * Matches redeemed units against earliest purchase lots.
+ * Distinguishes Equity vs Non-Equity/Debt without making unsubstantiated tax assumptions.
  */
 async function processRedemptionCapitalGains(redemptionOrder) {
   if (!redemptionOrder || !redemptionOrder.user) return [];
@@ -34,6 +56,7 @@ async function processRedemptionCapitalGains(redemptionOrder) {
   // Fetch scheme category for taxation classification
   const scheme = await MutualFundScheme.findOne({ schemeCode: sCode });
   const category = scheme?.category || 'Equity';
+  const taxCategory = classifyTaxCategory(scheme);
 
   // 1. Fetch available purchase lots in chronological FIFO order
   const purchaseLots = await MfTransaction.find({
@@ -62,12 +85,14 @@ async function processRedemptionCapitalGains(redemptionOrder) {
     const redemptionProceeds = +(unitsMatched * redemptionNav).toFixed(2);
     const realizedGain = +(redemptionProceeds - purchaseCost).toFixed(2);
 
-    // Tax classification:
-    // Equity: holding period > 365 days is LTCG, <= 365 days is STCG
-    // Debt & other: STCG per current tax guidelines
+    // Phase 4 Taxation classification:
+    // 1. Equity-oriented: Holding period > 365 days is LTCG, <= 365 days is STCG
+    // 2. Debt / Specified mutual funds post Finance Act 2023: Gains are treated as short term capital gains taxed at slab rates
     let gainType = 'STCG';
-    if (category.toLowerCase().includes('equity') && holdingDays > 365) {
+    if (taxCategory === 'EQUITY_ORIENTED' && holdingDays > 365) {
       gainType = 'LTCG';
+    } else if (taxCategory === 'DEBT_SPECIFIED') {
+      gainType = 'STCG'; // Taxed at applicable slab rate
     }
 
     // Deduct from lot
@@ -94,7 +119,7 @@ async function processRedemptionCapitalGains(redemptionOrder) {
       realizedGain,
       gainType,
       financialYear: fy,
-      remarks: `FIFO matched with lot from ${purchaseDate.toISOString().split('T')[0]} (${holdingDays} days)`,
+      remarks: `FIFO matched lot from ${purchaseDate.toISOString().split('T')[0]} (${holdingDays} days) [TaxBucket: ${taxCategory}]`,
     });
 
     createdGains.push(gainRecord);
@@ -106,6 +131,7 @@ async function processRedemptionCapitalGains(redemptionOrder) {
 
 /**
  * Fetch realized capital gains report for a specific financial year
+ * Strictly separates transaction calculation data from professional tax advice.
  */
 async function getCapitalGainsReport(userId, requestedFy = null) {
   const currentFy = requestedFy || getFinancialYear(new Date());
@@ -136,6 +162,8 @@ async function getCapitalGainsReport(userId, requestedFy = null) {
 
   return {
     financialYear: currentFy,
+    productionTaxVerified: false, // Per Phase 4 mandate: requires external qualified tax/legal review
+    taxReportingStatus: 'TAX_CALCULATION_DATA_ONLY_NOT_TAX_ADVICE',
     summary: {
       totalProceeds: +totalProceeds.toFixed(2),
       totalCost: +totalCost.toFixed(2),
@@ -143,7 +171,7 @@ async function getCapitalGainsReport(userId, requestedFy = null) {
       stcg: +totalStcg.toFixed(2),
       ltcg: +totalLtcg.toFixed(2),
       totalRedemptionsCount: gains.length,
-      disclaimer: 'These calculations are for informational and analytics purposes only and do not constitute formal tax advice. Please consult your chartered accountant or tax advisor for filing your ITR.',
+      disclaimer: 'DISCLAIMER: The calculations shown are derived strictly from transaction lot records for analytical purposes. VikaOne is not a tax advisor and does not provide legal or tax advice. Current Indian tax laws (including Finance Act 2023 & 2024 amendments) apply distinct tax rates based on underlying asset allocation, residency, and slab rates. Please consult your chartered accountant or tax advisor for filing your Income Tax Return.',
     },
     transactions: gains,
   };
@@ -151,6 +179,7 @@ async function getCapitalGainsReport(userId, requestedFy = null) {
 
 module.exports = {
   getFinancialYear,
+  classifyTaxCategory,
   processRedemptionCapitalGains,
   getCapitalGainsReport,
 };

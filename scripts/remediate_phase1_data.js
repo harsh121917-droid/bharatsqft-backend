@@ -27,14 +27,16 @@ async function remediateData() {
         rating: null,
         expenseRatio: null,
         fundManager: null,
+        minSipAmount: null,
+        minPurchaseAmount: null,
       },
     }
   );
   console.log(`Updated ${mfResult.modifiedCount} mutual fund scheme documents (set synthetic metrics to null).`);
 
   // 2. Remediate MfOrder collection
-  console.log('Remediating MfOrder unit separation...');
-  const orders = await db.collection('mforders').find({ transactionType: 'P' }).toArray();
+  console.log('Remediating MfOrder unit separation & synthetic IDs...');
+  const orders = await db.collection('mforders').find({}).toArray();
   let updatedOrders = 0;
   for (const ord of orders) {
     const updates = {};
@@ -51,12 +53,20 @@ async function remediateData() {
         updates.allotmentStatus = 'PENDING';
       }
     }
+    // Clean synthetic exchange order IDs
+    if (ord.nseTrxnOrderId && /^NSE_[0-9]+/.test(ord.nseTrxnOrderId)) {
+      updates.nseTrxnOrderId = null;
+      updates.remarks = 'Order placed (Pending Exchange Acknowledgment)';
+    }
+    if (ord.orderId && /^NSE_[0-9]+/.test(ord.orderId)) {
+      updates.orderId = `ORD_${ord._id}`;
+    }
     if (Object.keys(updates).length > 0) {
       await db.collection('mforders').updateOne({ _id: ord._id }, { $set: updates });
       updatedOrders++;
     }
   }
-  console.log(`Remediated ${updatedOrders} mutual fund purchase orders (separated estimatedUnits from allottedUnits).`);
+  console.log(`Remediated ${updatedOrders} mutual fund purchase orders (separated estimatedUnits, cleaned synthetic IDs).`);
 
   await mongoose.disconnect();
   console.log('Database remediation completed successfully.');

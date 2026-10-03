@@ -95,7 +95,7 @@ async function recalculateUserPortfolio(userId) {
   const orders = await MfOrder.find({
     user: userId,
     $or: [
-      { transactionType: 'P', paymentStatus: 'SUCCESS' },
+      { transactionType: 'P', paymentStatus: 'SUCCESS', orderStatus: { $nin: ['CANCELLED', 'REFUNDED', 'FAILED'] } },
       { transactionType: { $in: ['R', 'S'] } },
     ],
   }).sort({ createdAt: 1 });
@@ -197,6 +197,22 @@ async function recalculateUserPortfolio(userId) {
     }
   }
 
+  // 3b. Include any existing DB holdings to ensure zero-unit / fully-reversed schemes are marked CLOSED
+  const existingHoldings = await MfPortfolioHolding.find({ user: userId });
+  for (const eh of existingHoldings) {
+    const ehCode = (eh.schemeCode || '').toUpperCase();
+    if (ehCode && !holdingsMap[ehCode]) {
+      holdingsMap[ehCode] = {
+        schemeCode: ehCode,
+        schemeName: eh.schemeName,
+        totalUnits: 0,
+        investedAmount: 0,
+        pendingUnits: 0,
+        ordersCount: 0,
+      };
+    }
+  }
+
   // 4. Fetch live Scheme information for current NAV, Category, and AMC
   const schemeCodes = Object.keys(holdingsMap);
   const schemes = await MutualFundScheme.find({
@@ -219,7 +235,22 @@ async function recalculateUserPortfolio(userId) {
 
   for (const sCode of schemeCodes) {
     const h = holdingsMap[sCode];
-    if (h.totalUnits <= 0.0001) continue;
+    if (h.totalUnits <= 0.0001) {
+      await MfPortfolioHolding.findOneAndUpdate(
+        { user: userId, schemeCode: sCode },
+        {
+          $set: {
+            totalUnits: 0,
+            units: 0,
+            investedAmount: 0,
+            currentValue: 0,
+            holdingStatus: 'CLOSED',
+            lastUpdatedAt: new Date(),
+          },
+        }
+      );
+      continue;
+    }
 
     const schemeDoc = schemeLookup[sCode];
     const currentNav = schemeDoc?.nav || null;
@@ -286,6 +317,7 @@ async function recalculateUserPortfolio(userId) {
           subCategory,
           planType: 'REGULAR',
           totalUnits: holdingObj.totalUnits,
+          units: holdingObj.totalUnits,
           investedAmount: holdingObj.investedAmount,
           averageNav: holdingObj.averageNav,
           currentNav: holdingObj.currentNav,

@@ -49,6 +49,10 @@ const MfPortfolioHoldingSchema = new mongoose.Schema(
       required: true,
       default: 0, // Confirmed allotted units only
     },
+    units: {
+      type: Number,
+      default: 0,
+    },
     investedAmount: {
       type: Number,
       required: true,

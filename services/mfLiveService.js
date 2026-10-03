@@ -128,12 +128,11 @@ function fetchJson(url, headers = {}, timeoutMs = 30000) {
  */
 
 /**
- * Direct Plan resolution: Maps Regular Plan schemes to their Direct Growth counterpart
- * on mfapi.in so charts, returns, daily changes, and NAV match Groww (the Direct market benchmark).
+ * Regular Plan Resolution Master
+ * Indexes AMFI mfapi.in catalogue to resolve REGULAR Growth plan codes.
  */
 let allMfApiSchemes = null;
 let allMfApiSchemesTimestamp = 0;
-const directCodeMap = new Map();
 
 function normalizeSchemeKey(name) {
   return (name || '')

@@ -33,7 +33,17 @@ const MfReconciliationSchema = new mongoose.Schema(
     discrepancies: [
       {
         refId: { type: String, required: true },
-        type: { type: String, enum: ['ORDER', 'SIP'], required: true },
+        type: {
+          type: String,
+          enum: ['ORDER', 'SIP', 'PAYMENT', 'EXCHANGE', 'ALLOTMENT', 'HOLDING', 'SETTLEMENT'],
+          default: 'ORDER',
+          required: true,
+        },
+        discrepancyStatus: {
+          type: String,
+          enum: ['MATCHED', 'MISMATCH', 'MISSING_LOCAL', 'MISSING_EXTERNAL', 'DUPLICATE', 'PENDING_REVIEW', 'RESOLVED'],
+          default: 'MISMATCH',
+        },
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         userName: { type: String, default: '' },
         schemeCode: { type: String, default: '' },
@@ -45,6 +55,8 @@ const MfReconciliationSchema = new mongoose.Schema(
         description: { type: String, default: '' },
         resolved: { type: Boolean, default: false },
         resolvedAt: { type: Date },
+        resolvedBy: { type: String, default: null },
+        resolutionReason: { type: String, default: '' },
         autoResolved: { type: Boolean, default: false },
       },
     ],

@@ -53,4 +53,24 @@ config/firebase-service-account.json
 *-service-account.json
 
 # Scratch and temporary scripts
-scratch/
+scratch/
+tmp/
+temp/
+
+# Backups and database dumps
+backups/
+*.dump
+*.bak
+*.tar.gz
+
+# Certificates and private key files
+*.pem
+*.key
+*.cert
+*.pfx
+*.p12
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
