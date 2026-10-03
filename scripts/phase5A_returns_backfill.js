@@ -161,8 +161,8 @@ async function runBackfill() {
           cagr3Y: returns.return3Y,
           cagr5Y: returns.return5Y,
           returnsCalculatedAt: new Date(),
-          returnsMethodology: returns.methodology,
-          returnsSource: returns.source,
+          returnsMethodology: returns.returnsMethodology || returns.methodology || 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
+          returnsSource: returns.returnsSource || returns.source || 'AMFI_DAILY_NAV_TIMESERIES',
           navSource: 'AMFI_DAILY_NAV_TIMESERIES',
         };
 

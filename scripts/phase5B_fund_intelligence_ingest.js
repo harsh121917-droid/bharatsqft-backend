@@ -121,6 +121,19 @@ async function run() {
       updateFields.minSipSource = item.minSipSource || null;
     }
 
+    if (item.investmentObjective) {
+      updateFields.investmentObjective = item.investmentObjective;
+      updateFields.investmentObjectiveSource = item.investmentObjectiveSource || null;
+    }
+
+    if (item.sipFrequencies) {
+      updateFields.sipFrequencies = item.sipFrequencies;
+    }
+
+    if (item.sipDates) {
+      updateFields.sipDates = Array.isArray(item.sipDates) ? item.sipDates.join(',') : String(item.sipDates);
+    }
+
     if (Array.isArray(item.holdings) && item.holdings.length > 0) {
       updateFields.holdings = item.holdings;
       updateFields.holdingsAsOfDate = item.holdingsAsOfDate || null;

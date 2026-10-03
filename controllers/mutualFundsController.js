@@ -314,24 +314,45 @@ exports.getSchemeDetail = async (req, res) => {
     const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y ?? null;
     const retAll = periodReturns['All']?.returnPercent ?? null;
 
-    // Persist verified calculated returns back to MongoDB if not yet populated
-    if (liveNav && (scheme.cagr3Y === null || scheme.cagr1Y === null) && (ret3Y !== null || ret1Y !== null)) {
-      MutualFundScheme.updateOne(
-        { _id: scheme._id },
-        {
-          $set: {
-            return1M: ret1M,
-            return3M: ret3M,
-            return6M: ret6M,
-            cagr1Y: ret1Y,
-            cagr3Y: ret3Y,
-            cagr5Y: ret5Y,
-            returnsCalculatedAt: new Date(),
-            returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
-            returnsSource: 'AMFI_DAILY_NAV_TIMESERIES',
-          },
+    // Persist verified calculated returns back to MongoDB to guarantee List/Detail 100% parity
+    if (liveNav && liveNav.periodReturns) {
+      const needsUpdate =
+        scheme.cagr3Y !== ret3Y ||
+        scheme.cagr1Y !== ret1Y ||
+        scheme.cagr5Y !== ret5Y ||
+        scheme.return1M !== ret1M ||
+        scheme.return3M !== ret3M ||
+        scheme.return6M !== ret6M;
+
+      if (needsUpdate) {
+        try {
+          await MutualFundScheme.updateOne(
+            { _id: scheme._id },
+            {
+              $set: {
+                return1M: ret1M,
+                return3M: ret3M,
+                return6M: ret6M,
+                cagr1Y: ret1Y,
+                cagr3Y: ret3Y,
+                cagr5Y: ret5Y,
+                returnsCalculatedAt: new Date(),
+                returnsMethodology: liveNav.methodology || 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
+                returnsSource: liveNav.source || 'AMFI_DAILY_NAV_TIMESERIES',
+              },
+            }
+          );
+        } catch (e) {
+          console.error('[LiveNav Return Cache Error]:', e.message);
         }
-      ).catch((e) => console.error('[LiveNav Return Cache Error]:', e.message));
+
+        scheme.return1M = ret1M;
+        scheme.return3M = ret3M;
+        scheme.return6M = ret6M;
+        scheme.cagr1Y = ret1Y;
+        scheme.cagr3Y = ret3Y;
+        scheme.cagr5Y = ret5Y;
+      }
     }
 
     const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
@@ -348,6 +369,8 @@ exports.getSchemeDetail = async (req, res) => {
     const riskometer = scheme.riskometer || staticIntel?.riskometer || null;
     const inceptionDate = scheme.inceptionDate || staticIntel?.inceptionDate || null;
     const dataProvenance = scheme.dataProvenance || staticIntel?.dataProvenance || null;
+    const investmentObjective = scheme.investmentObjective || staticIntel?.investmentObjective || null;
+    const investmentObjectiveSource = scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || null;
 
     const fundManagement = (scheme.fundManagerDetails && scheme.fundManagerDetails.length > 0)
       ? scheme.fundManagerDetails
@@ -355,7 +378,7 @@ exports.getSchemeDetail = async (req, res) => {
         ? staticIntel.fundManagerDetails
         : (liveFacts?.fundManagerDetails && liveFacts.fundManagerDetails.length > 0)
           ? liveFacts.fundManagerDetails
-          : (fundManagerName ? [{ name: fundManagerName, qualification: '', experience: '', tenure: '', fundsManaged: '' }] : []);
+          : [];
 
     const resolvedHoldings = (scheme.holdings && scheme.holdings.length > 0)
       ? scheme.holdings
@@ -400,9 +423,16 @@ exports.getSchemeDetail = async (req, res) => {
           '3Y': ret3Y,
           '5Y': ret5Y,
           'All': retAll,
-          methodology: 'SEBI/AMFI: Simple absolute return for <=1Y, CAGR for >1Y',
+          methodology: liveNav?.methodology || 'SEBI/AMFI: Simple absolute return for <=1Y, CAGR for >1Y',
           calculatedAt: liveNav ? new Date() : (scheme.returnsCalculatedAt || null),
           source: liveNav ? 'AMFI Daily NAV History' : (scheme.returnsSource || null),
+          provenance: liveNav?.provenance || null,
+          allReturnMethodology: liveNav?.allReturnMethodology || 'CAGR_SINCE_TIMESERIES_START',
+          allStartDate: liveNav?.allStartDate || null,
+          allStartNav: liveNav?.allStartNav || null,
+          allEndDate: liveNav?.allEndDate || null,
+          allEndNav: liveNav?.allEndNav || null,
+          allSource: liveNav?.allSource || 'AMFI_DAILY_NAV_TIMESERIES',
         },
         expenseRatio,
         expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || null,
@@ -459,6 +489,8 @@ exports.getSchemeDetail = async (req, res) => {
         riskometerAsOfDate: scheme.riskometerAsOfDate || staticIntel?.riskometerAsOfDate || null,
         inceptionDate,
         dataProvenance,
+        investmentObjective,
+        investmentObjectiveSource,
         fundDetails: {
           aum: realAum,
           expenseRatio,
@@ -467,12 +499,19 @@ exports.getSchemeDetail = async (req, res) => {
           exitLoad,
           riskometer,
           inceptionDate,
+          investmentObjective,
         },
         investmentRules: {
           minPurchaseAmount: realMinPurchase,
           minSipAmount: realMinSip,
-          sipFrequencies: scheme.sipFrequencies && scheme.sipFrequencies.length > 0 ? scheme.sipFrequencies : ['MONTHLY'],
-          sipDates: scheme.sipDates && scheme.sipDates.length > 0 ? scheme.sipDates : [1, 5, 10, 15, 20, 25],
+          sipFrequencies: scheme.sipFrequencies && scheme.sipFrequencies.length > 0
+            ? scheme.sipFrequencies
+            : (staticIntel?.sipFrequencies || ['MONTHLY']),
+          sipDates: scheme.sipDates && scheme.sipDates.length > 0
+            ? scheme.sipDates
+            : (staticIntel?.sipDates || [1, 5, 10, 15, 20, 25]),
+          minSipInstallments: scheme.minSipInstallments || staticIntel?.minSipInstallments || null,
+          maxSipInstallments: scheme.maxSipInstallments || staticIntel?.maxSipInstallments || null,
         },
         portfolio: {
           holdings: resolvedHoldings,
@@ -501,10 +540,8 @@ exports.getSchemeDetail = async (req, res) => {
           name: scheme.amcName,
           code: scheme.amcCode,
           rank: null,
-          totalAum: realAum ? `₹${Number(realAum).toLocaleString('en-IN')} Crores` : null,
-          objective: benchmark
-            ? `Benchmark: ${benchmark}`
-            : null,
+          totalAum: null,
+          objective: null,
         },
         prosAndCons,
         similarFunds,

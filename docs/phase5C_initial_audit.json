@@ -1,0 +1,138 @@
+{
+  "auditDate": "2026-10-03T14:47:35.119Z",
+  "totalSchemes": 1864,
+  "regularSchemes": 1864,
+  "directSchemes": 0,
+  "coverage": [
+    {
+      "Field": "NAV (Current Daily)",
+      "Populated": 1864,
+      "Null": 0,
+      "Coverage": "100.00%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "AUM / Fund Size",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "TER (Regular Plan)",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Fund Manager",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Benchmark",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Exit Load",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Riskometer",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Inception Date",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Min Purchase Amount",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "SOURCE_DEFINED"
+    },
+    {
+      "Field": "Min SIP Amount",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "SOURCE_DEFINED"
+    },
+    {
+      "Field": "Portfolio Holdings",
+      "Populated": 15,
+      "Null": 1849,
+      "Coverage": "0.80%",
+      "Status": "TIER_2_VERIFIED"
+    },
+    {
+      "Field": "Fund Rating",
+      "Populated": 0,
+      "Null": 1864,
+      "Coverage": "0.00%",
+      "Status": "SOURCE_NOT_AUTHORIZED"
+    },
+    {
+      "Field": "Returns 1M",
+      "Populated": 64,
+      "Null": 1800,
+      "Coverage": "3.43%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "Returns 3M",
+      "Populated": 64,
+      "Null": 1800,
+      "Coverage": "3.43%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "Returns 6M",
+      "Populated": 64,
+      "Null": 1800,
+      "Coverage": "3.43%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "Returns 1Y",
+      "Populated": 63,
+      "Null": 1801,
+      "Coverage": "3.38%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "Returns 3Y",
+      "Populated": 59,
+      "Null": 1805,
+      "Coverage": "3.17%",
+      "Status": "VERIFIED"
+    },
+    {
+      "Field": "Returns 5Y",
+      "Populated": 57,
+      "Null": 1807,
+      "Coverage": "3.06%",
+      "Status": "VERIFIED"
+    }
+  ],
+  "antiFabrication": {
+    "fabricatedRatings": 0,
+    "status": "CLEAN_VERIFIED"
+  }
+}

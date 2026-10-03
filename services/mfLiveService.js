@@ -1,4 +1,6 @@
 const https = require('https');
+const { calculateFundReturns } = require('./mfReturnEngine');
+
 
 /**
  * In-memory caches to deliver instant responses and prevent rate-limiting:
@@ -238,70 +240,47 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   const latestItem = chronological[chronological.length - 1];
   const latestDate = new Date(latestItem.date);
 
+  // Compute unified authoritative returns snapshot
+  const fundReturns = calculateFundReturns(chronological, {
+    schemeCode: targetCode,
+    planType: fallbackScheme?.planType || 'REGULAR',
+    option: fallbackScheme?.option || 'GROWTH',
+  });
+
   /**
-   * Helper to sample points and calculate returns.
-   * Standard Industry Formula (SEBI & AMFI):
-   * - <= 1 Year (1M, 3M, 6M, 1Y): Absolute simple return ((End - Start) / Start) * 100
-   * - > 1 Year (3Y, 5Y, All): CAGR (Compound Annual Growth Rate / Annualised Return)
-   * 
-   * Weekend / Non-Trading Day Rule:
-   * Looks back up to 7 calendar days before target cutoff date to find the most recent published trading NAV.
-   * If history does not extend to the required window, returnPercent is strictly null.
+   * Helper to sample points for charting while using the exact start date,
+   * start NAV, and return percentage from the unified return engine.
    */
-  const extractPeriodSeries = (daysBack, maxPoints = 30, periodKey = '') => {
-    let subset = [];
-    if (daysBack === null) {
-      subset = chronological;
-    } else {
-      const cutoff = new Date(latestDate.getTime() - daysBack * 24 * 60 * 60 * 1000);
-      subset = chronological.filter((p) => new Date(p.date) >= cutoff);
-    }
-
-    const requestedCutoffMs = daysBack !== null ? latestDate.getTime() - daysBack * 24 * 60 * 60 * 1000 : 0;
-    const earliestPointMs = subset.length > 0 ? new Date(subset[0].date).getTime() : Infinity;
-    // Bounded tolerance: 7-10 calendar days for holiday/weekend lookback
-    const hasSufficientHistory = daysBack === null || (earliestPointMs <= requestedCutoffMs + 10 * 24 * 60 * 60 * 1000);
-
-    if (subset.length < 2 || !hasSufficientHistory) {
+  const extractPeriodSeries = (maxPoints = 30, periodKey = '') => {
+    const periodMeta = fundReturns.provenance?.[periodKey];
+    if (!periodMeta || !periodMeta.selectedStartDate || periodMeta.status === 'INSUFFICIENT_HISTORY') {
       return {
-        points: subset.length >= 2 ? subset : [],
+        points: [],
         returnPercent: null,
         isPositive: null,
         startNav: null,
-        endNav: subset.length > 0 ? subset[subset.length - 1].nav : null,
-        insufficientData: !hasSufficientHistory,
+        endNav: latestItem.nav,
+        insufficientData: true,
       };
     }
 
-    const startNav = subset[0].nav;
-    const endNav = subset[subset.length - 1].nav;
+    const startDateIso = periodMeta.selectedStartDate;
+    const subset = chronological.filter((p) => p.date >= startDateIso);
 
-    let returnPercent = null;
-    if (['1M', '3M', '6M', '1Y'].includes(periodKey) && startNav > 0 && endNav > 0) {
-      // Simple absolute return for <= 1 year
-      const ret = ((endNav - startNav) / startNav) * 100;
-      returnPercent = isFinite(ret) ? +ret.toFixed(2) : null;
-    } else if (periodKey === '3Y' && startNav > 0 && endNav > 0) {
-      // 3-Year CAGR Annualised Return
-      const cagr = (Math.pow(endNav / startNav, 1 / 3.0) - 1) * 100;
-      returnPercent = isFinite(cagr) ? +cagr.toFixed(2) : null;
-    } else if (periodKey === '5Y' && startNav > 0 && endNav > 0) {
-      // 5-Year CAGR Annualised Return
-      const cagr = (Math.pow(endNav / startNav, 1 / 5.0) - 1) * 100;
-      returnPercent = isFinite(cagr) ? +cagr.toFixed(2) : null;
-    } else if (periodKey === 'All' && startNav > 0 && endNav > 0) {
-      const startDate = new Date(subset[0].date);
-      const endDate = new Date(subset[subset.length - 1].date);
-      const actualDays = Math.max(1, (endDate.getTime() - startDate.getTime()) / (24 * 3600 * 1000));
-      const years = actualDays / 365.25;
-      if (years >= 1.0) {
-        const cagr = (Math.pow(endNav / startNav, 1 / years) - 1) * 100;
-        returnPercent = isFinite(cagr) ? +cagr.toFixed(2) : null;
-      } else {
-        const ret = ((endNav - startNav) / startNav) * 100;
-        returnPercent = isFinite(ret) ? +ret.toFixed(2) : null;
-      }
+    if (subset.length < 2) {
+      return {
+        points: subset,
+        returnPercent: fundReturns.returns[periodKey] ?? null,
+        isPositive: (fundReturns.returns[periodKey] ?? 0) >= 0,
+        startNav: periodMeta.selectedStartNav,
+        endNav: latestItem.nav,
+        insufficientData: true,
+      };
     }
+
+    const startNav = periodMeta.selectedStartNav;
+    const endNav = latestItem.nav;
+    const returnPercent = fundReturns.returns[periodKey] ?? null;
     const isPositive = returnPercent !== null ? returnPercent >= 0 : null;
 
     // Evenly sample points to maxPoints for charting
@@ -327,13 +306,13 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   };
 
   const chartData = {
-    '1M': extractPeriodSeries(30, 25, '1M'),
-    '3M': extractPeriodSeries(91, 40, '3M'),
-    '6M': extractPeriodSeries(182, 60, '6M'),
-    '1Y': extractPeriodSeries(365, 90, '1Y'),
-    '3Y': extractPeriodSeries(1095, 120, '3Y'),
-    '5Y': extractPeriodSeries(1826, 150, '5Y'),
-    'All': extractPeriodSeries(null, 180, 'All'),
+    '1M': extractPeriodSeries(25, '1M'),
+    '3M': extractPeriodSeries(40, '3M'),
+    '6M': extractPeriodSeries(60, '6M'),
+    '1Y': extractPeriodSeries(90, '1Y'),
+    '3Y': extractPeriodSeries(120, '3Y'),
+    '5Y': extractPeriodSeries(150, '5Y'),
+    'All': extractPeriodSeries(180, 'All'),
   };
 
   // Real 1D return between the latest two consecutive trading days
@@ -355,17 +334,17 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     day1Return,
     day1IsPositive,
     chartData,
-    periodReturns: {
-      '1M': chartData['1M'].returnPercent,
-      '3M': chartData['3M'].returnPercent,
-      '6M': chartData['6M'].returnPercent,
-      '1Y': chartData['1Y'].returnPercent,
-      '3Y': chartData['3Y'].returnPercent,
-      '5Y': chartData['5Y'].returnPercent,
-    },
-    methodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
-    source: 'AMFI_DAILY_NAV_TIMESERIES',
-    calculatedAt: new Date().toISOString(),
+    periodReturns: fundReturns.returns,
+    provenance: fundReturns.provenance,
+    allReturnMethodology: fundReturns.allReturnMethodology,
+    allStartDate: fundReturns.allStartDate,
+    allStartNav: fundReturns.allStartNav,
+    allEndDate: fundReturns.allEndDate,
+    allEndNav: fundReturns.allEndNav,
+    allSource: fundReturns.allSource,
+    methodology: fundReturns.returnsMethodology,
+    source: fundReturns.returnsSource,
+    calculatedAt: fundReturns.returnsCalculatedAt,
   };
 
   navCache.set(String(schemeCode), { data: result, timestamp: Date.now() });
@@ -374,72 +353,10 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
 
 /**
  * Pure calculation engine for historical NAV series
- * Applies SEBI & AMFI standards for 1M, 3M, 6M, 1Y, 3Y, 5Y returns.
+ * Delegates to unified mfReturnEngine
  */
-function calculateReturns(chronologicalNavSeries) {
-  if (!Array.isArray(chronologicalNavSeries) || chronologicalNavSeries.length < 2) {
-    return {
-      return1M: null,
-      return3M: null,
-      return6M: null,
-      return1Y: null,
-      return3Y: null,
-      return5Y: null,
-      methodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
-      calculatedAt: new Date().toISOString(),
-      source: 'AMFI_DAILY_NAV_TIMESERIES',
-    };
-  }
-
-  const latestItem = chronologicalNavSeries[chronologicalNavSeries.length - 1];
-  const endNav = latestItem.nav;
-  const latestDate = new Date(latestItem.date);
-
-  const findNavNearDate = (targetDate, toleranceDays = 7) => {
-    const targetMs = targetDate.getTime();
-    const toleranceMs = toleranceDays * 86400000;
-    let closestPoint = null;
-    let minDiff = Infinity;
-    for (let i = 0; i < chronologicalNavSeries.length; i++) {
-      const p = chronologicalNavSeries[i];
-      const pMs = new Date(p.date).getTime();
-      const diff = Math.abs(pMs - targetMs);
-      if (diff <= toleranceMs && diff < minDiff) {
-        minDiff = diff;
-        closestPoint = p;
-      }
-    }
-    return closestPoint ? closestPoint.nav : null;
-  };
-
-  const calcSimpleReturn = (daysBack) => {
-    const targetDate = new Date(latestDate.getTime() - daysBack * 86400000);
-    const startNav = findNavNearDate(targetDate, 7);
-    if (!startNav || startNav <= 0 || !endNav || endNav <= 0) return null;
-    const ret = ((endNav - startNav) / startNav) * 100;
-    return isFinite(ret) ? +ret.toFixed(2) : null;
-  };
-
-  const calcCagr = (years) => {
-    const daysBack = Math.round(years * 365.25);
-    const targetDate = new Date(latestDate.getTime() - daysBack * 86400000);
-    const startNav = findNavNearDate(targetDate, 10);
-    if (!startNav || startNav <= 0 || !endNav || endNav <= 0) return null;
-    const cagr = (Math.pow(endNav / startNav, 1 / years) - 1) * 100;
-    return isFinite(cagr) ? +cagr.toFixed(2) : null;
-  };
-
-  return {
-    return1M: calcSimpleReturn(30),
-    return3M: calcSimpleReturn(91),
-    return6M: calcSimpleReturn(182),
-    return1Y: calcSimpleReturn(365),
-    return3Y: calcCagr(3.0),
-    return5Y: calcCagr(5.0),
-    methodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
-    calculatedAt: new Date().toISOString(),
-    source: 'AMFI_DAILY_NAV_TIMESERIES',
-  };
+function calculateReturns(chronologicalNavSeries, options = {}) {
+  return calculateFundReturns(chronologicalNavSeries, options);
 }
 
 /**
