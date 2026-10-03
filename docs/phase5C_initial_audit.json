@@ -1,5 +1,5 @@
 {
-  "auditDate": "2026-10-03T14:47:35.119Z",
+  "auditDate": "2026-10-03T15:29:28.534Z",
   "totalSchemes": 1864,
   "regularSchemes": 1864,
   "directSchemes": 0,
@@ -13,72 +13,72 @@
     },
     {
       "Field": "AUM / Fund Size",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "TER (Regular Plan)",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Fund Manager",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Benchmark",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Exit Load",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Riskometer",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Inception Date",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {
       "Field": "Min Purchase Amount",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "SOURCE_DEFINED"
     },
     {
       "Field": "Min SIP Amount",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "SOURCE_DEFINED"
     },
     {
       "Field": "Portfolio Holdings",
-      "Populated": 15,
-      "Null": 1849,
-      "Coverage": "0.80%",
+      "Populated": 14,
+      "Null": 1850,
+      "Coverage": "0.75%",
       "Status": "TIER_2_VERIFIED"
     },
     {

@@ -28,11 +28,16 @@ function subtractMonths(date, months) {
 }
 
 /**
- * Subtract calendar years from a date
+ * Subtract calendar years from a date, handling leap-year overflow safely
  */
 function subtractYears(date, years) {
   const d = new Date(date.getTime());
+  const originalMonth = d.getMonth();
   d.setFullYear(d.getFullYear() - years);
+  // Handle leap-year overflow (e.g. Feb 29 - 1 year shouldn't become March 1st)
+  if (d.getMonth() !== originalMonth) {
+    d.setDate(0); // Set to last day of February
+  }
   return d;
 }
 
@@ -97,6 +102,9 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
       return1M: null,
       return3M: null,
       return6M: null,
+      return1Y: null,
+      return3Y: null,
+      return5Y: null,
       cagr1Y: null,
       cagr3Y: null,
       cagr5Y: null,
@@ -118,7 +126,9 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
       allSource: 'AMFI_DAILY_NAV_TIMESERIES',
       returnsCalculatedAt: new Date().toISOString(),
       returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
+      methodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
       returnsSource: 'AMFI_DAILY_NAV_TIMESERIES',
+      source: 'AMFI_DAILY_NAV_TIMESERIES',
     };
   }
 
@@ -173,7 +183,8 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
 
     const startDate = new Date(startPoint.date);
     const elapsedDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000);
-    const elapsedYears = +(elapsedDays / 365.25).toFixed(4);
+    const isStandardPeriod = p.isCagr && Math.abs(elapsedDays - (p.value * 365.25)) <= 10;
+    const elapsedYears = isStandardPeriod ? p.value : +(elapsedDays / 365.25).toFixed(4);
 
     let calculatedReturn = null;
     let formulaStr = '';
@@ -185,7 +196,7 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
       formulaStr = '((endNav - startNav) / startNav) * 100';
     } else {
       // Annualized Compound Annual Growth Rate (CAGR) for > 1 Year
-      // Use exact elapsed years to avoid leap year distortion
+      // Standard SEBI/AMFI convention uses integer years for standard trailing intervals
       const cagr = (Math.pow(endNav / startPoint.nav, 1 / elapsedYears) - 1) * 100;
       calculatedReturn = isFinite(cagr) ? +cagr.toFixed(2) : null;
       formulaStr = '((endNav / startNav) ^ (1 / elapsedYears) - 1) * 100';
@@ -218,16 +229,26 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
   const allElapsedDays = Math.round((endDate.getTime() - allStartDate.getTime()) / 86400000);
   const allElapsedYears = +(allElapsedDays / 365.25).toFixed(4);
 
+  // Check if series start matches official inception date (within 10 days)
+  let isInceptionMatch = false;
+  if (options.inceptionDate) {
+    const incDate = new Date(options.inceptionDate);
+    if (!isNaN(incDate.getTime())) {
+      const diffDays = Math.abs((allStartDate.getTime() - incDate.getTime()) / 86400000);
+      isInceptionMatch = diffDays <= 10;
+    }
+  }
+
   let allReturn = null;
-  let allMethodology = 'CAGR_SINCE_SERIES_START';
+  let allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_SERIES_START';
   if (earliestItem.nav > 0 && endNav > 0 && allElapsedYears >= 1.0) {
     const cagrAll = (Math.pow(endNav / earliestItem.nav, 1 / allElapsedYears) - 1) * 100;
     allReturn = isFinite(cagrAll) ? +cagrAll.toFixed(2) : null;
-    allMethodology = 'CAGR_SINCE_SERIES_START';
+    allMethodology = isInceptionMatch ? 'CAGR_SINCE_INCEPTION' : 'CAGR_SINCE_SERIES_START';
   } else if (earliestItem.nav > 0 && endNav > 0) {
     const simpleAll = ((endNav - earliestItem.nav) / earliestItem.nav) * 100;
     allReturn = isFinite(simpleAll) ? +simpleAll.toFixed(2) : null;
-    allMethodology = 'SIMPLE_ABSOLUTE_SINCE_SERIES_START';
+    allMethodology = isInceptionMatch ? 'SIMPLE_ABSOLUTE_SINCE_INCEPTION' : 'SIMPLE_ABSOLUTE_SINCE_SERIES_START';
   }
 
   results['All'] = allReturn;
@@ -269,7 +290,9 @@ function calculateFundReturns(chronologicalSeries, options = {}) {
     allSource: 'AMFI_DAILY_NAV_TIMESERIES',
     returnsCalculatedAt: new Date().toISOString(),
     returnsMethodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
+    methodology: 'ABSOLUTE_SIMPLE_LE_1Y_CAGR_GT_1Y',
     returnsSource: 'AMFI_DAILY_NAV_TIMESERIES',
+    source: 'AMFI_DAILY_NAV_TIMESERIES',
   };
 }
 

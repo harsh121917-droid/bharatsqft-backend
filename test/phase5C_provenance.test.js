@@ -78,7 +78,7 @@ describe('VikaOne Phase 5C — Field-Level Data Provenance & Return Accuracy Tes
     assert.strictEqual(meta3Y.selectedStartNav, 104.94);
     assert.strictEqual(meta3Y.matchType, 'PRECEDING_TRADING_DAY');
     assert.strictEqual(meta3Y.formula, '((endNav / startNav) ^ (1 / elapsedYears) - 1) * 100');
-    assert.strictEqual(result.returns['3Y'], 8.73);
+    assert.strictEqual(result.returns['3Y'], 8.75);
   });
 
   it('5. Section 0F: "All" return is transparently exposed with methodology & start metadata', () => {

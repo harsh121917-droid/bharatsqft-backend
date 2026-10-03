@@ -245,6 +245,7 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     schemeCode: targetCode,
     planType: fallbackScheme?.planType || 'REGULAR',
     option: fallbackScheme?.option || 'GROWTH',
+    inceptionDate: fallbackScheme?.inceptionDate || null,
   });
 
   /**

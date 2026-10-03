@@ -1,0 +1,406 @@
+{
+  "130502": {
+    "schemeCode": "130502",
+    "schemeName": "HDFC Small Cap Fund - Regular Plan - Growth Option",
+    "isin": "INF179KA1RZ8",
+    "planType": "REGULAR",
+    "option": "GROWTH",
+    "nav": 134.978,
+    "navDate": "2026-10-01T00:00:00.000Z",
+    "returns": {
+      "1M": -3.77,
+      "3M": -1.44,
+      "6M": 10.8,
+      "1Y": -3.74,
+      "3Y": 8.75,
+      "5Y": 12.84,
+      "All": 16.34,
+      "allReturnMethodology": "CAGR_SINCE_SERIES_START",
+      "allStartDate": "2014-06-30",
+      "allStartNav": 21.121,
+      "allEndDate": "2026-10-01",
+      "allEndNav": 134.978,
+      "allSource": "AMFI_DAILY_NAV_TIMESERIES"
+    },
+    "fundDetails": {
+      "aum": 35420.5,
+      "expenseRatio": 1.58,
+      "fundManager": "Chirag Dagli",
+      "benchmark": "S&P BSE 250 SmallCap TRI",
+      "exitLoad": "1.00% if redeemed or switched out on or before 1 year from the date of allotment; Nil thereafter.",
+      "riskometer": "Very High",
+      "inceptionDate": "2008-04-03T00:00:00.000Z",
+      "investmentObjective": "To generate long term capital appreciation from an actively managed portfolio of equity & equity related securities including equity derivatives of small cap companies."
+    },
+    "investmentRules": {
+      "minPurchaseAmount": 100,
+      "minSipAmount": 100,
+      "sipFrequencies": [
+        "MONTHLY",
+        "QUARTERLY"
+      ],
+      "sipDates": "1,5,10,15,20,25",
+      "minSipInstallments": 6,
+      "maxSipInstallments": null
+    },
+    "fundHouse": {
+      "name": "HDFC Mutual Fund",
+      "code": "HDFC_MF",
+      "rank": null,
+      "totalAum": null,
+      "objective": null
+    },
+    "fundManagement": [
+      {
+        "name": "Chirag Dagli",
+        "role": "Senior Fund Manager",
+        "qualification": "B.Com, CA, CFA",
+        "experience": "Over 18 years of experience in equity research and fund management.",
+        "tenure": "Oct 2021 - Present",
+        "asOfDate": "2026-09-30",
+        "source": "HDFC Mutual Fund SID"
+      }
+    ],
+    "portfolio": {
+      "holdingsCount": 5,
+      "holdings": [
+        {
+          "name": "Firstsource Solutions Ltd",
+          "weight": 4.12,
+          "sector": "Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "HDFC Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e656298"
+        },
+        {
+          "name": "Sonata Software Ltd",
+          "weight": 3.85,
+          "sector": "Information Technology",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "HDFC Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e656299"
+        },
+        {
+          "name": "eClerx Services Ltd",
+          "weight": 3.42,
+          "sector": "Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "HDFC Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e65629a"
+        },
+        {
+          "name": "Bank of Baroda",
+          "weight": 3.15,
+          "sector": "Financial Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "HDFC Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e65629b"
+        },
+        {
+          "name": "Great Eastern Shipping Co Ltd",
+          "weight": 2.98,
+          "sector": "Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "HDFC Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e65629c"
+        }
+      ],
+      "holdingsAsOf": "2026-09-30T00:00:00.000Z",
+      "holdingsSource": "HDFC AMC Monthly Portfolio Disclosure (SEBI Mandated)"
+    },
+    "dataQuality": {
+      "status": "VERIFIED",
+      "lastVerifiedAt": "2026-10-03T14:35:27.208Z",
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "HDFC_Monthly_Factsheet_Sep_2026.pdf"
+    },
+    "dataProvenance": {
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "HDFC_Monthly_Factsheet_Sep_2026.pdf",
+      "asOfDate": "2026-09-30",
+      "verifiedAt": "2026-10-03T14:35:27.208Z",
+      "status": "VERIFIED"
+    }
+  },
+  "145139": {
+    "schemeCode": "145139",
+    "schemeName": "Invesco India Small Cap Fund - Regular Plan - Growth",
+    "isin": "INF205K011T7",
+    "planType": "REGULAR",
+    "option": "GROWTH",
+    "nav": 46.41,
+    "navDate": "2026-10-01T00:00:00.000Z",
+    "returns": {
+      "1M": -4.23,
+      "3M": -0.81,
+      "6M": 23.2,
+      "1Y": 12.59,
+      "3Y": 19.97,
+      "5Y": 17.58,
+      "All": 21.27,
+      "allReturnMethodology": "CAGR_SINCE_INCEPTION",
+      "allStartDate": "2018-11-02",
+      "allStartNav": 10.09,
+      "allEndDate": "2026-10-01",
+      "allEndNav": 46.41,
+      "allSource": "AMFI_DAILY_NAV_TIMESERIES"
+    },
+    "fundDetails": {
+      "aum": 14475.25,
+      "expenseRatio": 1.84,
+      "fundManager": "Taher Badshah, Aditya Khemani",
+      "benchmark": "BSE 250 SmallCap TRI",
+      "exitLoad": "For units in excess of 10% of investment: 1% if redeemed/switched out within 1 year from allotment date; Nil thereafter.",
+      "riskometer": "Very High",
+      "inceptionDate": "2018-10-30T00:00:00.000Z",
+      "investmentObjective": null
+    },
+    "investmentRules": {
+      "minPurchaseAmount": 1000,
+      "minSipAmount": 500,
+      "sipFrequencies": [
+        "MONTHLY"
+      ],
+      "sipDates": [
+        1,
+        5,
+        10,
+        15,
+        20,
+        25
+      ],
+      "minSipInstallments": null,
+      "maxSipInstallments": null
+    },
+    "fundHouse": {
+      "name": "Invesco Mutual Fund",
+      "code": "INVESCO_MF",
+      "rank": null,
+      "totalAum": null,
+      "objective": null
+    },
+    "fundManagement": [
+      {
+        "name": "Taher Badshah",
+        "qualification": "B.E. (Mechanical), MMS (Finance)",
+        "experience": "Over 28 years of extensive experience in Indian equity markets and research.",
+        "tenure": "Oct 2018 - Present",
+        "fundsManaged": "Invesco India Small Cap Fund, Invesco India Contra Fund, Invesco India Focused 20 Equity Fund"
+      },
+      {
+        "name": "Aditya Khemani",
+        "qualification": "B.Com, PGDM (IIM Lucknow)",
+        "experience": "Over 16 years of experience in equity research and portfolio management.",
+        "tenure": "Nov 2020 - Present",
+        "fundsManaged": "Invesco India Small Cap Fund, Invesco India Mid Cap Fund"
+      }
+    ],
+    "portfolio": {
+      "holdingsCount": 8,
+      "holdings": [
+        {
+          "name": "KEl Industries Ltd",
+          "weight": 4.15,
+          "sector": "Capital Goods",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562a7"
+        },
+        {
+          "name": "Equitas Small Finance Bank Ltd",
+          "weight": 3.82,
+          "sector": "Financial Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562a8"
+        },
+        {
+          "name": "Birlasoft Ltd",
+          "weight": 3.65,
+          "sector": "Information Technology",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562a9"
+        },
+        {
+          "name": "JB Chemicals & Pharmaceuticals Ltd",
+          "weight": 3.48,
+          "sector": "Healthcare",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562aa"
+        },
+        {
+          "name": "Timken India Ltd",
+          "weight": 3.12,
+          "sector": "Capital Goods",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562ab"
+        },
+        {
+          "name": "Praj Industries Ltd",
+          "weight": 2.95,
+          "sector": "Capital Goods",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562ac"
+        },
+        {
+          "name": "Century Textile & Industries Ltd",
+          "weight": 2.78,
+          "sector": "Consumer Discretionary",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562ad"
+        },
+        {
+          "name": "CreditAccess Grameen Ltd",
+          "weight": 2.64,
+          "sector": "Financial Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Invesco Monthly Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562ae"
+        }
+      ],
+      "holdingsAsOf": "2026-09-30T00:00:00.000Z",
+      "holdingsSource": "Invesco Mutual Fund Monthly Portfolio Disclosure (SEBI Mandated)"
+    },
+    "dataQuality": {
+      "status": "VERIFIED",
+      "lastVerifiedAt": "2026-10-03T14:35:27.207Z",
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "Invesco_India_Smallcap_Fund_Factsheet_Sep_2026.pdf"
+    },
+    "dataProvenance": {
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "Invesco_India_Smallcap_Fund_Factsheet_Sep_2026.pdf",
+      "asOfDate": "2026-09-30",
+      "verifiedAt": "2026-10-03T14:35:27.207Z",
+      "status": "VERIFIED"
+    }
+  },
+  "147944": {
+    "schemeCode": "147944",
+    "schemeName": "BANDHAN Small Cap Fund - Regular Plan - Growth",
+    "isin": "INF194KB1AJ8",
+    "planType": "REGULAR",
+    "option": "GROWTH",
+    "nav": 50.665,
+    "navDate": "2026-10-01T00:00:00.000Z",
+    "returns": {
+      "1M": -1.98,
+      "3M": 2.05,
+      "6M": 20.54,
+      "1Y": 9.18,
+      "3Y": 21.61,
+      "5Y": 17.62,
+      "All": 27.89,
+      "allReturnMethodology": "CAGR_SINCE_INCEPTION",
+      "allStartDate": "2020-02-26",
+      "allStartNav": 10,
+      "allEndDate": "2026-10-01",
+      "allEndNav": 50.665,
+      "allSource": "AMFI_DAILY_NAV_TIMESERIES"
+    },
+    "fundDetails": {
+      "aum": 5840.2,
+      "expenseRatio": 1.78,
+      "fundManager": "Manish Gunwani, Kirthi Jain",
+      "benchmark": "S&P BSE 250 SmallCap TRI",
+      "exitLoad": "1% if redeemed/switched out within 1 year from the date of allotment; Nil thereafter.",
+      "riskometer": "Very High",
+      "inceptionDate": "2020-02-24T00:00:00.000Z",
+      "investmentObjective": "To generate long term capital appreciation by investing predominantly in equity and equity related instruments of small cap companies."
+    },
+    "investmentRules": {
+      "minPurchaseAmount": 1000,
+      "minSipAmount": 100,
+      "sipFrequencies": [
+        "MONTHLY"
+      ],
+      "sipDates": "1,5,10,15,20,25",
+      "minSipInstallments": 6,
+      "maxSipInstallments": null
+    },
+    "fundHouse": {
+      "name": "Bandhan Mutual Fund",
+      "code": "BANDHAN_MF",
+      "rank": null,
+      "totalAum": null,
+      "objective": null
+    },
+    "fundManagement": [
+      {
+        "name": "Manish Gunwani",
+        "role": "Head - Equity & Fund Manager",
+        "qualification": "B.Tech (IIT Madras), PGDM (IIM Bangalore)",
+        "experience": "Over 26 years of rich experience in equity research and fund management.",
+        "tenure": "Jan 2023 - Present",
+        "asOfDate": "2026-09-30",
+        "source": "Bandhan Mutual Fund SID"
+      },
+      {
+        "name": "Kirthi Jain",
+        "role": "Fund Manager",
+        "qualification": "B.Com, ACA, CS",
+        "experience": "Over 14 years of experience in equity research.",
+        "tenure": "Jun 2023 - Present",
+        "asOfDate": "2026-09-30",
+        "source": "Bandhan Mutual Fund SID"
+      }
+    ],
+    "portfolio": {
+      "holdingsCount": 4,
+      "holdings": [
+        {
+          "name": "Apar Industries Ltd",
+          "weight": 4.52,
+          "sector": "Capital Goods",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Bandhan Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562b5"
+        },
+        {
+          "name": "Arvind Ltd",
+          "weight": 3.91,
+          "sector": "Textiles",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Bandhan Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562b6"
+        },
+        {
+          "name": "Power Mech Projects Ltd",
+          "weight": 3.45,
+          "sector": "Construction",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Bandhan Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562b7"
+        },
+        {
+          "name": "REC Ltd",
+          "weight": 3.12,
+          "sector": "Financial Services",
+          "asOfDate": "2026-09-30T00:00:00.000Z",
+          "source": "Bandhan Portfolio Disclosure",
+          "_id": "6ac112b0f1865aaf1e6562b8"
+        }
+      ],
+      "holdingsAsOf": "2026-09-30T00:00:00.000Z",
+      "holdingsSource": "Bandhan Monthly Portfolio Disclosure (SEBI Mandated)"
+    },
+    "dataQuality": {
+      "status": "VERIFIED",
+      "lastVerifiedAt": "2026-10-03T14:35:27.208Z",
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "Bandhan_Small_Cap_Factsheet_Sep_2026.pdf"
+    },
+    "dataProvenance": {
+      "source": "AMC_OFFICIAL_FACTSHEET",
+      "sourceDoc": "Bandhan_Small_Cap_Factsheet_Sep_2026.pdf",
+      "asOfDate": "2026-09-30",
+      "verifiedAt": "2026-10-03T14:35:27.208Z",
+      "status": "VERIFIED"
+    }
+  }
+}
