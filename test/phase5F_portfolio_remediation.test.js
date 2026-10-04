@@ -461,7 +461,7 @@ describe('VikaOne Phase 5F — Production One-Shot Remediation Test Suite', () =
         isCurrent: true,
       }).lean();
       assert.ok(snapshot.checksum.length >= 64, 'Checksum must be SHA-256');
-      assert.match(snapshot.parserVersion, /phase5F|phase5G|v5G/);
+      assert.match(snapshot.parserVersion, /phase5F|phase5G|v5G|v5H/);
     });
   });
 });

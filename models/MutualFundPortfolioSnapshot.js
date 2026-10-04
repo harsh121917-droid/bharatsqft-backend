@@ -76,6 +76,19 @@ const PortfolioHoldingItemSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    weightDisplay: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    weightRank: {
+      type: Number,
+      default: null,
+    },
+    sourceRowNumber: {
+      type: Number,
+      default: null,
+    },
     weightSource: {
       type: String,
       enum: [

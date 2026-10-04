@@ -12,7 +12,7 @@ const sourceRegistry = require('./mfPortfolioSourceRegistry');
 
 class MfPortfolioSnapshotService {
   constructor() {
-    this.parserVersion = 'v5G-1.0.0';
+    this.parserVersion = 'v5H-1.0.0';
   }
 
   calculateHash(data) {
@@ -152,7 +152,7 @@ class MfPortfolioSnapshotService {
    * Get paginated holdings tied to snapshotId
    */
   async getPaginatedHoldings(schemeCode, options = {}) {
-    const { page = 1, limit = 50, assetClass, snapshotId } = options;
+    const { page = 1, limit = 50, assetClass, snapshotId, sortBy = 'weight' } = options;
 
     let snapshot;
     if (snapshotId) {
@@ -172,13 +172,28 @@ class MfPortfolioSnapshotService {
       };
     }
 
-    let filtered = snapshot.holdings;
+    let filtered = [...snapshot.holdings];
     if (assetClass && assetClass !== 'ALL') {
       filtered = filtered.filter((h) => h.assetClass === assetClass);
     }
 
+    if (sortBy === 'source' || sortBy === 'sourceOrder') {
+      filtered.sort((a, b) => Number(a.sourceOrder || a.sourceRowNumber || 0) - Number(b.sourceOrder || b.sourceRowNumber || 0));
+    } else {
+      // Default: sort descending by weight using canonical comparator
+      filtered.sort(validationService.comparePortfolioWeightDesc);
+    }
+
     const startIndex = (Number(page) - 1) * Number(limit);
-    const paginatedItems = filtered.slice(startIndex, startIndex + Number(limit));
+    const paginatedItems = filtered.slice(startIndex, startIndex + Number(limit)).map((h, idx) => ({
+      ...h,
+      name: h.instrumentName || h.securityName,
+      weightPercent: h.weightPercent != null ? h.weightPercent : null,
+      sourceWeightText: h.sourceWeightText || (h.weightPercent != null ? `${h.weightPercent}%` : null),
+      weightDisplay: h.weightDisplay || (h.weightPercent != null ? `${Number(h.weightPercent).toFixed(2)}%` : (h.sourceWeightText || '—')),
+      weightRank: h.weightRank || (startIndex + idx + 1),
+      sourceOrder: h.sourceOrder != null ? h.sourceOrder : h.sourceRowNumber,
+    }));
     const hasMore = startIndex + Number(limit) < filtered.length;
 
     return {

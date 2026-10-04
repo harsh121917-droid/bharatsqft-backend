@@ -47,11 +47,7 @@ class MfPortfolioService {
       ? snapshot.asOfDate.toISOString().split('T')[0]
       : String(snapshot.asOfDate).split('T')[0];
 
-    const sortedHoldings = [...snapshot.holdings].sort((a, b) => {
-      const wa = typeof a.weightPercent === 'number' ? a.weightPercent : -1;
-      const wb = typeof b.weightPercent === 'number' ? b.weightPercent : -1;
-      return wb - wa;
-    });
+    const sortedHoldings = [...snapshot.holdings].sort(validationService.comparePortfolioWeightDesc);
 
     const isPartial = snapshot.isPartial === true;
     const totalCount = snapshot.totalPortfolioPositions || snapshot.totalHoldingsCount || sortedHoldings.length;
@@ -77,31 +73,43 @@ class MfPortfolioService {
         derivativePositionCount: snapshot.derivativePositionCount || 0,
         otherPositionCount: snapshot.otherPositionCount || 0,
       },
-      holdings: sortedHoldings.map((h, idx) => ({
-        securityName: h.securityName,
-        name: h.securityName,
-        isin: h.isin,
-        sector: h.sector || 'Diversified',
-        assetClass: h.assetClass || 'EQUITY',
-        sourceAssetClass: h.sourceAssetClass || h.assetClass || 'EQUITY',
-        quantity: h.quantity,
-        marketValue: h.marketValue,
-        weightPercent: h.weightPercent,
-        weight: h.weightPercent,
-        percentage: h.weightPercent,
-        sourceWeightText: h.sourceWeightText || null,
-        weightSource: h.weightSource || 'OFFICIAL_AMC_DISCLOSURE',
-        rating: h.rating || null,
-        maturityDate: h.maturityDate || null,
-        coupon: h.coupon || null,
-        sourceOrder: h.sourceOrder || (idx + 1),
-        asOfDate: asOfStr,
-        source: h.source || h.sourceName || snapshot.source,
-        sourceName: h.sourceName || snapshot.source,
-        sourceDocument: h.sourceDocument || snapshot.sourceDocument,
-        sourceUrl: h.sourceUrl || snapshot.sourceUrl,
-        sourceType: h.sourceType || snapshot.sourceType || 'AMC_MONTHLY_PORTFOLIO',
-      })),
+      holdings: sortedHoldings.map((h, idx) => {
+        const weightPercent = typeof h.weightPercent === 'number' ? h.weightPercent : null;
+        const sourceWeightText = h.sourceWeightText || (weightPercent !== null ? `${weightPercent.toFixed(2)}%` : null);
+        const weightDisplay = h.weightDisplay || (weightPercent !== null ? `${weightPercent.toFixed(2)}%` : (sourceWeightText || '—'));
+        const sourceOrderNum = typeof h.sourceOrder === 'number' ? h.sourceOrder : (idx + 1);
+        const sourceRowNum = typeof h.sourceRowNumber === 'number' ? h.sourceRowNumber : (typeof h.sourceRow === 'number' ? h.sourceRow : sourceOrderNum);
+
+        return {
+          securityName: h.securityName,
+          name: h.securityName,
+          isin: h.isin,
+          sector: h.sector || 'Diversified',
+          assetClass: h.assetClass || 'EQUITY',
+          sourceAssetClass: h.sourceAssetClass || h.assetClass || 'EQUITY',
+          quantity: h.quantity,
+          marketValue: h.marketValue,
+          weightPercent,
+          weight: weightPercent,
+          percentage: weightPercent,
+          sourceWeightText,
+          weightDisplay,
+          weightRank: idx + 1,
+          sourceOrder: sourceOrderNum,
+          sourceRow: sourceRowNum,
+          sourceRowNumber: sourceRowNum,
+          weightSource: h.weightSource || 'OFFICIAL_AMC_DISCLOSURE',
+          rating: h.rating || null,
+          maturityDate: h.maturityDate || null,
+          coupon: h.coupon || null,
+          asOfDate: asOfStr,
+          source: h.source || h.sourceName || snapshot.source,
+          sourceName: h.sourceName || snapshot.source,
+          sourceDocument: h.sourceDocument || snapshot.sourceDocument,
+          sourceUrl: h.sourceUrl || snapshot.sourceUrl,
+          sourceType: h.sourceType || snapshot.sourceType || 'AMC_MONTHLY_PORTFOLIO',
+        };
+      }),
       holdingsAsOf: asOfStr,
       holdingsSource: snapshot.source,
     };
