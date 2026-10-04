@@ -318,6 +318,37 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    aumStatus: {
+      type: String,
+      enum: ['VERIFIED', 'STALE', 'SOURCE_UNAVAILABLE', null],
+      default: null,
+      trim: true,
+    },
+    aumSourceType: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    aumSourceDocument: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    aumSourceHash: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    aumDefinition: {
+      type: String,
+      default: 'SCHEME_AUM',
+      trim: true,
+    },
+    aumUnit: {
+      type: String,
+      default: 'CRORE',
+      trim: true,
+    },
     expenseRatio: {
       type: Number, // e.g. 0.75%
       default: null,

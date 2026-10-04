@@ -21,6 +21,7 @@ const mfIdempotencyService = require('../services/mfIdempotencyService');
 const mfIntelligenceService = require('../services/mfIntelligenceService');
 const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
+const mfAumService = require('../services/mfAumService');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -202,7 +203,6 @@ exports.getSchemes = async (req, res) => {
       if (staticIntel) {
         if (!obj.fundManager && staticIntel.fundManager) obj.fundManager = staticIntel.fundManager;
         if (!obj.benchmark && staticIntel.benchmark) obj.benchmark = staticIntel.benchmark;
-        if ((obj.aum === null || obj.aum === undefined) && staticIntel.aum !== undefined) obj.aum = staticIntel.aum;
         if ((obj.expenseRatio === null || obj.expenseRatio === undefined) && staticIntel.expenseRatio !== undefined) obj.expenseRatio = staticIntel.expenseRatio;
         if (!obj.riskometer && staticIntel.riskometer) obj.riskometer = staticIntel.riskometer;
         if (!obj.inceptionDate && staticIntel.inceptionDate) obj.inceptionDate = staticIntel.inceptionDate;
@@ -213,6 +213,16 @@ exports.getSchemes = async (req, res) => {
           obj.holdings = staticIntel.holdings;
         }
       }
+
+      // Canonical Scheme AUM resolution
+      const schemeAumInfo = mfAumService.resolveSchemeAum(obj);
+      obj.aum = schemeAumInfo.value;
+      obj.aumAsOf = schemeAumInfo.asOf;
+      obj.aumAsOfDate = schemeAumInfo.asOf;
+      obj.aumSource = schemeAumInfo.sourceName;
+      obj.aumStatus = schemeAumInfo.status;
+      obj.aumUnit = schemeAumInfo.unit;
+      obj.aumDefinition = schemeAumInfo.definition;
       // Section 12 & Phase 5E: Rating removed / null without contracted license; Fund Type, Plan, & Holdings exposed
       obj.rating = null;
       obj.ratingProvider = null;
@@ -288,8 +298,10 @@ exports.getSchemeDetail = async (req, res) => {
     // 1.5 Retrieve verified static statutory intelligence fallback (Tier 2 AMC Factsheets/SIDs)
     const staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
 
-    // Determine accurate AUM, min SIP, min purchase, and rating (preserves null if unknown)
-    const realAum = scheme.aum ?? staticIntel?.aum ?? liveFacts?.aum ?? null;
+    // Canonical Scheme & AMC AUM resolution via Phase 5I MfAumService
+    const schemeAumInfo = mfAumService.resolveSchemeAum(scheme);
+    const amcTotalAumInfo = mfAumService.resolveAmcTotalAum(scheme.amcCode, scheme);
+    const realAum = schemeAumInfo.value;
     const realMinSip = scheme.minSipAmount ?? staticIntel?.minSipAmount ?? liveFacts?.minSipAmount ?? null;
     const realMinPurchase = scheme.minPurchaseAmount ?? staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
     const realRating = scheme.rating ?? liveFacts?.rating ?? null;
@@ -409,9 +421,10 @@ exports.getSchemeDetail = async (req, res) => {
     const topHoldings = isHoldingsAvailable && normalizedHoldings ? normalizedHoldings.slice(0, 10) : null;
 
     const amcEntry = amcSourceRegistry.getAmcSources(scheme.amcCode);
-    const fundHouseTotalAum = amcEntry?.totalAum ?? null;
-    const fundHouseTotalAumAsOfDate = amcEntry?.totalAumAsOfDate ?? null;
-    const fundHouseTotalAumSource = amcEntry?.totalAumSource ?? null;
+    const fundHouseTotalAum = amcTotalAumInfo.value;
+    const fundHouseTotalAumAsOfDate = amcTotalAumInfo.asOf;
+    const fundHouseTotalAumSource = amcTotalAumInfo.sourceName;
+    const fundHouseTotalAumStatus = amcTotalAumInfo.status;
 
     return res.json({
       success: true,
@@ -448,9 +461,16 @@ exports.getSchemeDetail = async (req, res) => {
         navDate,
         navSource,
         navUpdatedAt,
-        aum: realAum,
-        aumAsOfDate: scheme.aumAsOfDate || staticIntel?.aumAsOfDate || (realAum ? '2026-09-30' : null),
-        aumSource: scheme.aumSource || staticIntel?.aumSource || (realAum ? 'Official AMC Factsheet' : null),
+        aum: schemeAumInfo.value,
+        aumAsOf: schemeAumInfo.asOf,
+        aumAsOfDate: schemeAumInfo.asOf,
+        aumSource: schemeAumInfo.sourceName,
+        aumStatus: schemeAumInfo.status,
+        aumUnit: schemeAumInfo.unit,
+        aumDefinition: schemeAumInfo.definition,
+        aumSourceType: schemeAumInfo.sourceType,
+        aumSourceDocument: schemeAumInfo.sourceDocument,
+        aumSourceHash: schemeAumInfo.sourceHash,
         day1Return: day1Ret,
         day1IsPositive: day1Pos,
         return1M: ret1M,
@@ -538,9 +558,16 @@ exports.getSchemeDetail = async (req, res) => {
         investmentObjectiveSource: scheme.investmentObjectiveSource || staticIntel?.investmentObjectiveSource || (investmentObjective ? 'OFFICIAL_AMC_SID' : null),
         objectiveAsOfDate: staticIntel?.objectiveAsOfDate || (investmentObjective ? '2026-09-30' : null),
         fundDetails: {
-          aum: realAum,
-          aumAsOfDate: scheme.aumAsOfDate || staticIntel?.aumAsOfDate || (realAum ? '2026-09-30' : null),
-          aumSource: scheme.aumSource || staticIntel?.aumSource || (realAum ? 'Official AMC Factsheet' : null),
+          aum: schemeAumInfo.value,
+          aumAsOf: schemeAumInfo.asOf,
+          aumAsOfDate: schemeAumInfo.asOf,
+          aumSource: schemeAumInfo.sourceName,
+          aumStatus: schemeAumInfo.status,
+          aumUnit: schemeAumInfo.unit,
+          aumDefinition: schemeAumInfo.definition,
+          sourceType: schemeAumInfo.sourceType,
+          sourceDocument: schemeAumInfo.sourceDocument,
+          sourceHash: schemeAumInfo.sourceHash,
           expenseRatio,
           expenseRatioAsOfDate: scheme.expenseRatioAsOfDate || staticIntel?.expenseRatioAsOfDate || (expenseRatio ? '2026-09-30' : null),
           expenseRatioSource: scheme.expenseRatioSource || staticIntel?.expenseRatioSource || (expenseRatio ? 'AMC Statutory TER Disclosure' : null),
@@ -613,12 +640,19 @@ exports.getSchemeDetail = async (req, res) => {
         },
         fundManagement,
         fundHouse: {
-          name: scheme.amcName,
+          name: amcTotalAumInfo.amcName || scheme.amcName,
           code: scheme.amcCode,
-          rank: amcEntry?.amcRank ?? null,
+          rank: amcTotalAumInfo.amcRank ?? amcEntry?.amcRank ?? null,
           totalAum: fundHouseTotalAum,
+          totalAumAsOf: fundHouseTotalAumAsOfDate,
           totalAumAsOfDate: fundHouseTotalAumAsOfDate,
           totalAumSource: fundHouseTotalAumSource,
+          totalAumStatus: fundHouseTotalAumStatus,
+          totalAumUnit: amcTotalAumInfo.unit,
+          totalAumDefinition: amcTotalAumInfo.definition,
+          sourceType: amcTotalAumInfo.sourceType,
+          sourceDocument: amcTotalAumInfo.sourceDocument,
+          sourceHash: amcTotalAumInfo.sourceHash,
           objective: null, // per Section 10: never substitute scheme objective
         },
         prosAndCons,
