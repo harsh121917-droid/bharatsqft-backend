@@ -20,6 +20,7 @@ const mfCapitalGainsEngine = require('../services/mfCapitalGainsEngine');
 const mfIdempotencyService = require('../services/mfIdempotencyService');
 const mfIntelligenceService = require('../services/mfIntelligenceService');
 const amcSourceRegistry = require('../services/amcSourceRegistry');
+const mfPortfolioService = require('../services/mfPortfolioService');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -293,9 +294,6 @@ exports.getSchemeDetail = async (req, res) => {
     const realMinPurchase = scheme.minPurchaseAmount ?? staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
     const realRating = scheme.rating ?? liveFacts?.rating ?? null;
 
-    // Top holdings - ONLY real data, no synthetic mock fallback
-    const topHoldings = liveFacts?.topHoldings || [];
-
     // Pros & Cons - ONLY real data, no synthetic mock fallback
     const prosAndCons = liveFacts?.prosAndCons || { pros: [], cons: [] };
 
@@ -399,64 +397,16 @@ exports.getSchemeDetail = async (req, res) => {
           ? liveFacts.fundManagerDetails
           : [];
 
-    const portfolioSnapshot = await MfSchemePortfolioSnapshot.findOne({
-      schemeCode: scheme.schemeCode,
-      planType: 'REGULAR',
-      option: 'GROWTH',
-      isCurrent: true,
-    }).lean();
-
-    const rawHoldings = (portfolioSnapshot?.holdings && portfolioSnapshot.holdings.length > 0)
-      ? portfolioSnapshot.holdings
-      : (scheme.holdings && scheme.holdings.length > 0)
-        ? scheme.holdings
-        : (staticIntel?.holdings && staticIntel.holdings.length > 0)
-          ? staticIntel.holdings
-          : null;
-
-    const isHoldingsAvailable = rawHoldings !== null && rawHoldings.length > 0;
-    const resolvedHoldingsAsOf = isHoldingsAvailable
-      ? (portfolioSnapshot?.asOfDate ? (portfolioSnapshot.asOfDate instanceof Date ? portfolioSnapshot.asOfDate.toISOString().split('T')[0] : String(portfolioSnapshot.asOfDate).split('T')[0]) : (staticIntel?.holdingsAsOfDate || scheme.holdingsAsOfDate || '2026-09-30'))
-      : null;
-    const resolvedHoldingsSource = isHoldingsAvailable
-      ? (portfolioSnapshot?.source || staticIntel?.holdingsSource || scheme.holdingsSource || 'Official AMC Factsheet')
-      : null;
-    const resolvedSourceDoc = portfolioSnapshot?.sourceDocument || staticIntel?.holdingsSourceDocument || 'Statutory Monthly Portfolio Disclosure';
-    const resolvedSourceUrl = portfolioSnapshot?.sourceUrl || staticIntel?.holdingsSourceUrl || staticIntel?.factsheetUrl || null;
-    const isPartialHoldings = isHoldingsAvailable
-      ? (portfolioSnapshot ? portfolioSnapshot.isPartial === true : (staticIntel?.isPartial ?? false))
-      : false;
-    const totalHoldingsCount = isHoldingsAvailable
-      ? (portfolioSnapshot?.totalHoldingsCount || staticIntel?.totalHoldingsCount || rawHoldings.length)
-      : null;
-
-    const normalizedHoldings = isHoldingsAvailable ? rawHoldings.map(h => {
-      const securityName = h.securityName || h.name || h.company || 'Unknown Security';
-      const weightPercent = typeof h.weightPercent === 'number'
-        ? h.weightPercent
-        : (typeof h.percentage === 'number'
-            ? h.percentage
-            : (typeof h.weight === 'number' ? h.weight : null));
-      return {
-        securityName,
-        name: securityName,
-        isin: h.isin || null,
-        sector: h.sector || 'Diversified',
-        assetClass: h.assetClass || 'Equity',
-        quantity: typeof h.quantity === 'number' ? h.quantity : (h.quantity ? Number(h.quantity) : null),
-        marketValue: typeof h.marketValue === 'number' ? h.marketValue : (h.marketValue ? Number(h.marketValue) : null),
-        weightPercent,
-        weight: weightPercent,
-        percentage: weightPercent,
-        weightSource: h.weightSource || staticIntel?.holdingsWeightSource || 'OFFICIAL_AMC_DISCLOSURE',
-        asOfDate: h.asOfDate ? (h.asOfDate instanceof Date ? h.asOfDate.toISOString().split('T')[0] : String(h.asOfDate).split('T')[0]) : resolvedHoldingsAsOf,
-        sourceName: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
-        source: h.sourceName || staticIntel?.holdingsSourceName || resolvedHoldingsSource,
-        sourceUrl: h.sourceUrl || resolvedSourceUrl,
-        sourceDocument: h.sourceDocument || resolvedSourceDoc,
-        sourceType: h.sourceType || 'AMC_MONTHLY_PORTFOLIO',
-      };
-    }) : null;
+    const portfolioResult = await mfPortfolioService.getSchemePortfolio(scheme.schemeCode);
+    const isHoldingsAvailable = portfolioResult.holdingsAvailable;
+    const resolvedHoldingsAsOf = portfolioResult.asOfDate;
+    const resolvedHoldingsSource = portfolioResult.source;
+    const resolvedSourceDoc = portfolioResult.sourceDocument;
+    const resolvedSourceUrl = portfolioResult.sourceUrl;
+    const isPartialHoldings = portfolioResult.isPartial;
+    const totalHoldingsCount = portfolioResult.totalPortfolioPositions;
+    const normalizedHoldings = portfolioResult.holdings;
+    const topHoldings = isHoldingsAvailable && normalizedHoldings ? normalizedHoldings.slice(0, 10) : null;
 
     const amcEntry = amcSourceRegistry.getAmcSources(scheme.amcCode);
     const fundHouseTotalAum = amcEntry?.totalAum ?? null;
@@ -477,9 +427,17 @@ exports.getSchemeDetail = async (req, res) => {
         plan: 'Regular',
         holdingsAvailable: isHoldingsAvailable,
         totalHoldingsCount: isHoldingsAvailable ? totalHoldingsCount : null,
+        totalPortfolioPositions: isHoldingsAvailable ? totalHoldingsCount : null,
         isPartial: isHoldingsAvailable ? isPartialHoldings : false,
+        portfolioStatus: portfolioResult.portfolioStatus,
+        portfolioBreakdown: portfolioResult.breakdown,
+        snapshotId: portfolioResult.snapshotId,
         holdings: normalizedHoldings,
-        topHoldings: normalizedHoldings,
+        topHoldings: topHoldings,
+        holdingsAsOf: resolvedHoldingsAsOf,
+        holdingsSource: resolvedHoldingsSource,
+        holdingsSourceDocument: resolvedSourceDoc,
+        holdingsSourceUrl: resolvedSourceUrl,
         minSipAmount: realMinSip,
         minSipSource: scheme.minSipSource || staticIntel?.minSipSource || (realMinSip ? 'OFFICIAL_AMC_SID' : null),
         minPurchaseAmount: realMinPurchase,
@@ -568,7 +526,7 @@ exports.getSchemeDetail = async (req, res) => {
             rank: null,
           },
         },
-        topHoldings: normalizedHoldings,
+        topHoldings: topHoldings,
         holdings: normalizedHoldings,
         holdingsAsOfDate: resolvedHoldingsAsOf,
         holdingsSource: resolvedHoldingsSource,
@@ -627,7 +585,7 @@ exports.getSchemeDetail = async (req, res) => {
           isPartial: isHoldingsAvailable ? isPartialHoldings : false,
           displayedCount: isHoldingsAvailable ? normalizedHoldings.length : null,
           portfolioStatus: isHoldingsAvailable
-            ? (portfolioSnapshot?.portfolioStatus || (isPartialHoldings ? 'SOURCE_PARTIAL' : 'SOURCE_AVAILABLE_AND_VERIFIED'))
+            ? (isPartialHoldings ? 'SOURCE_PARTIAL' : 'SOURCE_AVAILABLE_AND_VERIFIED')
             : 'SOURCE_UNAVAILABLE',
           holdings: normalizedHoldings,
           holdingsAsOf: isHoldingsAvailable ? resolvedHoldingsAsOf : null,
@@ -2930,3 +2888,44 @@ exports.verifyPanDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── GET /api/mutual-funds/schemes/:code/holdings ──
+exports.getSchemeHoldings = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { page = 1, limit = 50, assetClass } = req.query;
+
+    const scheme = await MutualFundScheme.findOne({
+      planType: 'REGULAR',
+      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+      $or: [
+        { schemeCode: code },
+        { schemeCode: code.toUpperCase() },
+        { isin: code.toUpperCase() },
+        { _id: code.match(/^[0-9a-fA-F]{24}$/) ? code : null },
+      ],
+    });
+
+    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Scheme not found. Only Regular Plan Growth mutual funds are available on Vikaone.',
+      });
+    }
+
+    const result = await mfPortfolioService.getPaginatedHoldings(scheme.schemeCode, {
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 50,
+      assetClass,
+    });
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[getSchemeHoldings Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve holdings' });
+  }
+};
+

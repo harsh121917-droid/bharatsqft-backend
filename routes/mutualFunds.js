@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getSchemes,
   getSchemeDetail,
+  getSchemeHoldings,
   getUserUcc,
   registerUserUcc,
   createPurchaseOrder,
@@ -41,6 +42,7 @@ const { protect } = require('../middleware/authMiddleware');
 
 // ── Public Routes (Scheme catalog & checkout simulator) ──
 router.get('/schemes', getSchemes);
+router.get('/schemes/:code/holdings', getSchemeHoldings);
 router.get('/schemes/:code', getSchemeDetail);
 router.get('/checkout/:orderId', renderCheckoutSimulator);
 router.post('/orders/:orderId/simulate-payment', simulatePayment);

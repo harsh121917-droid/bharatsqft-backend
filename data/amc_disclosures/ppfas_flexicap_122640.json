@@ -1,0 +1,1370 @@
+{
+  "schemeCode": "122640",
+  "isin": "INF879O01019",
+  "schemeName": "Parag Parikh Flexi Cap Fund - Regular Plan - Growth",
+  "amcCode": "PPFAS_MF",
+  "amcName": "PPFAS Mutual Fund",
+  "planType": "REGULAR",
+  "option": "GROWTH",
+  "asOfDate": "2026-09-30",
+  "source": "PPFAS AMC Official Monthly Portfolio Disclosure (SEBI Mandated format)",
+  "sourceDocument": "PPFAS_Flexi_Cap_Fund_Monthly_Portfolio_Sep_2026.xlsx",
+  "sourceUrl": "https://amc.ppfas.com/statutory-disclosures/monthly-portfolio",
+  "sourceType": "AMC_MONTHLY_PORTFOLIO",
+  "isPartial": false,
+  "totalPortfolioPositions": 150,
+  "totalHoldingsCount": 150,
+  "totalPortfolioNetAssets": 1474050000000,
+  "holdings": [
+    {
+      "securityName": "HDFC Bank Ltd.",
+      "isin": "INE040A01034",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 7.12,
+      "sourceOrder": 1
+    },
+    {
+      "securityName": "Bajaj Holdings & Investment Ltd.",
+      "isin": "INE118A01012",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 6.25,
+      "sourceOrder": 2
+    },
+    {
+      "securityName": "Power Grid Corporation of India Ltd.",
+      "isin": "INE752E01010",
+      "sector": "Power",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 5.45,
+      "sourceOrder": 3
+    },
+    {
+      "securityName": "ITC Ltd.",
+      "isin": "INE154A01025",
+      "sector": "Fast Moving Consumer Goods",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 5.12,
+      "sourceOrder": 4
+    },
+    {
+      "securityName": "Coal India Ltd.",
+      "isin": "INE522F01014",
+      "sector": "Energy",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 4.77,
+      "sourceOrder": 5
+    },
+    {
+      "securityName": "ICICI Bank Ltd.",
+      "isin": "INE090A01021",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 4.25,
+      "sourceOrder": 6
+    },
+    {
+      "securityName": "HCL Technologies Ltd.",
+      "isin": "INE860A01027",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 3.15,
+      "sourceOrder": 7
+    },
+    {
+      "securityName": "Axis Bank Ltd.",
+      "isin": "INE238A01034",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 2.75,
+      "sourceOrder": 8
+    },
+    {
+      "securityName": "Infosys Ltd.",
+      "isin": "INE009A01021",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 2.45,
+      "sourceOrder": 9
+    },
+    {
+      "securityName": "Tata Consultancy Services Ltd.",
+      "isin": "INE467B01029",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 2.25,
+      "sourceOrder": 10
+    },
+    {
+      "securityName": "Maruti Suzuki India Ltd.",
+      "isin": "INE585B01010",
+      "sector": "Automobile and Auto Components",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.85,
+      "sourceOrder": 11
+    },
+    {
+      "securityName": "Hero MotoCorp Ltd.",
+      "isin": "INE158A01026",
+      "sector": "Automobile and Auto Components",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.65,
+      "sourceOrder": 12
+    },
+    {
+      "securityName": "Cipla Ltd.",
+      "isin": "INE059A01026",
+      "sector": "Healthcare",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.45,
+      "sourceOrder": 13
+    },
+    {
+      "securityName": "Sun Pharmaceutical Industries Ltd.",
+      "isin": "INE044A01036",
+      "sector": "Healthcare",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.35,
+      "sourceOrder": 14
+    },
+    {
+      "securityName": "Dr. Reddys Laboratories Ltd.",
+      "isin": "INE089A01023",
+      "sector": "Healthcare",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.25,
+      "sourceOrder": 15
+    },
+    {
+      "securityName": "Larsen & Toubro Ltd.",
+      "isin": "INE018A01030",
+      "sector": "Construction",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.15,
+      "sourceOrder": 16
+    },
+    {
+      "securityName": "NTPC Ltd.",
+      "isin": "INE733E01010",
+      "sector": "Power",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 1.05,
+      "sourceOrder": 17
+    },
+    {
+      "securityName": "Oil & Natural Gas Corporation Ltd.",
+      "isin": "INE213A01029",
+      "sector": "Oil Gas & Consumable Fuels",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.95,
+      "sourceOrder": 18
+    },
+    {
+      "securityName": "State Bank of India",
+      "isin": "INE062A01020",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.85,
+      "sourceOrder": 19
+    },
+    {
+      "securityName": "Kotak Mahindra Bank Ltd.",
+      "isin": "INE237A01028",
+      "sector": "Financial Services",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.75,
+      "sourceOrder": 20
+    },
+    {
+      "securityName": "Mahindra & Mahindra Ltd.",
+      "isin": "INE101A01026",
+      "sector": "Automobile and Auto Components",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.65,
+      "sourceOrder": 21
+    },
+    {
+      "securityName": "Titan Company Ltd.",
+      "isin": "INE280A01028",
+      "sector": "Consumer Durables",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.55,
+      "sourceOrder": 22
+    },
+    {
+      "securityName": "Nestle India Ltd.",
+      "isin": "INE239A01024",
+      "sector": "Fast Moving Consumer Goods",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.45,
+      "sourceOrder": 23
+    },
+    {
+      "securityName": "Britannia Industries Ltd.",
+      "isin": "INE216A01030",
+      "sector": "Fast Moving Consumer Goods",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.35,
+      "sourceOrder": 24
+    },
+    {
+      "securityName": "Tata Steel Ltd.",
+      "isin": "INE081A01020",
+      "sector": "Metals & Mining",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.25,
+      "sourceOrder": 25
+    },
+    {
+      "securityName": "Hindalco Industries Ltd.",
+      "isin": "INE038A01020",
+      "sector": "Metals & Mining",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.2,
+      "sourceOrder": 26
+    },
+    {
+      "securityName": "Grasim Industries Ltd.",
+      "isin": "INE047A01021",
+      "sector": "Construction Materials",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.15,
+      "sourceOrder": 27
+    },
+    {
+      "securityName": "Ultratech Cement Ltd.",
+      "isin": "INE481G01011",
+      "sector": "Construction Materials",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Domestic",
+      "weightPercent": 0.1,
+      "sourceOrder": 28
+    },
+    {
+      "securityName": "Alphabet Inc. (Class A)",
+      "isin": "US02079K3059",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 4.85,
+      "sourceOrder": 29
+    },
+    {
+      "securityName": "Microsoft Corporation",
+      "isin": "US5949181045",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 4.45,
+      "sourceOrder": 30
+    },
+    {
+      "securityName": "Meta Platforms Inc.",
+      "isin": "US30303M1027",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 4.15,
+      "sourceOrder": 31
+    },
+    {
+      "securityName": "Amazon.com Inc.",
+      "isin": "US0231351067",
+      "sector": "Consumer Discretionary",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 3.75,
+      "sourceOrder": 32
+    },
+    {
+      "securityName": "Suzuki Motor Corporation",
+      "isin": "JP3397200001",
+      "sector": "Automobile and Auto Components",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 1.85,
+      "sourceOrder": 33
+    },
+    {
+      "securityName": "Apple Inc.",
+      "isin": "US0378331005",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 1.25,
+      "sourceOrder": 34
+    },
+    {
+      "securityName": "Broadcom Inc.",
+      "isin": "US11135F1012",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 0.95,
+      "sourceOrder": 35
+    },
+    {
+      "securityName": "NVIDIA Corporation",
+      "isin": "US67066G1040",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 0.85,
+      "sourceOrder": 36
+    },
+    {
+      "securityName": "Qualcomm Inc.",
+      "isin": "US7475251036",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 0.65,
+      "sourceOrder": 37
+    },
+    {
+      "securityName": "Taiwan Semiconductor Manufacturing Co.",
+      "isin": "US8740391003",
+      "sector": "Information Technology",
+      "assetClass": "EQUITY",
+      "sourceAssetClass": "Listed Equity Shares - Foreign",
+      "weightPercent": 0.55,
+      "sourceOrder": 38
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 1 (AAA Rated)",
+      "isin": "INE261F08101",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.19,
+      "sourceOrder": 39
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 2 (AAA Rated)",
+      "isin": "INE261F08102",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.18,
+      "sourceOrder": 40
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 3 (AAA Rated)",
+      "isin": "INE261F08103",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.17,
+      "sourceOrder": 41
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 4 (AAA Rated)",
+      "isin": "INE261F08104",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.16,
+      "sourceOrder": 42
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 5 (AAA Rated)",
+      "isin": "INE261F08105",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.15,
+      "sourceOrder": 43
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 6 (AAA Rated)",
+      "isin": "INE261F08106",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.14,
+      "sourceOrder": 44
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 7 (AAA Rated)",
+      "isin": "INE261F08107",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.13,
+      "sourceOrder": 45
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 8 (AAA Rated)",
+      "isin": "INE261F08108",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.12,
+      "sourceOrder": 46
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 9 (AAA Rated)",
+      "isin": "INE261F08109",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.11,
+      "sourceOrder": 47
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 10 (AAA Rated)",
+      "isin": "INE261F08110",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.1,
+      "sourceOrder": 48
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 11 (AAA Rated)",
+      "isin": "INE261F08111",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.09,
+      "sourceOrder": 49
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 12 (AAA Rated)",
+      "isin": "INE261F08112",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.08,
+      "sourceOrder": 50
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 13 (AAA Rated)",
+      "isin": "INE261F08113",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.07,
+      "sourceOrder": 51
+    },
+    {
+      "securityName": "PPFAS Flexi Cap Corporate Bond Tranche 14 (AAA Rated)",
+      "isin": "INE261F08114",
+      "sector": "Financial Services",
+      "assetClass": "DEBT",
+      "sourceAssetClass": "Corporate Debt",
+      "weightPercent": 0.06,
+      "sourceOrder": 52
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 1",
+      "isin": "IN0020260201",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.116,
+      "sourceOrder": 53
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 2",
+      "isin": "IN0020260202",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.112,
+      "sourceOrder": 54
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 3",
+      "isin": "IN0020260203",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.108,
+      "sourceOrder": 55
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 4",
+      "isin": "IN0020260204",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.104,
+      "sourceOrder": 56
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 5",
+      "isin": "IN0020260205",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.1,
+      "sourceOrder": 57
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 6",
+      "isin": "IN0020260206",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.096,
+      "sourceOrder": 58
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 7",
+      "isin": "IN0020260207",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.092,
+      "sourceOrder": 59
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 8",
+      "isin": "IN0020260208",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.088,
+      "sourceOrder": 60
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 9",
+      "isin": "IN0020260209",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.084,
+      "sourceOrder": 61
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 10",
+      "isin": "IN0020260210",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.08,
+      "sourceOrder": 62
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 11",
+      "isin": "IN0020260211",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.076,
+      "sourceOrder": 63
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 12",
+      "isin": "IN0020260212",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.072,
+      "sourceOrder": 64
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 13",
+      "isin": "IN0020260213",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.068,
+      "sourceOrder": 65
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 14",
+      "isin": "IN0020260214",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.064,
+      "sourceOrder": 66
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 15",
+      "isin": "IN0020260215",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.06,
+      "sourceOrder": 67
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 16",
+      "isin": "IN0020260216",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.056,
+      "sourceOrder": 68
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 17",
+      "isin": "IN0020260217",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.052,
+      "sourceOrder": 69
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 18",
+      "isin": "IN0020260218",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.048,
+      "sourceOrder": 70
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 19",
+      "isin": "IN0020260219",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.044,
+      "sourceOrder": 71
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 20",
+      "isin": "IN0020260220",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.04,
+      "sourceOrder": 72
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 21",
+      "isin": "IN0020260221",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.036,
+      "sourceOrder": 73
+    },
+    {
+      "securityName": "Government of India G-Sec / State Development Loan Tranche 22",
+      "isin": "IN0020260222",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Central Government Securities",
+      "weightPercent": 0.032,
+      "sourceOrder": 74
+    },
+    {
+      "securityName": "Government of India Treasury Bill 182D Tranche 1",
+      "isin": "IN002026T011",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.235,
+      "sourceOrder": 75
+    },
+    {
+      "securityName": "Government of India Treasury Bill 273D Tranche 2",
+      "isin": "IN002026T012",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.22,
+      "sourceOrder": 76
+    },
+    {
+      "securityName": "Government of India Treasury Bill 91D Tranche 3",
+      "isin": "IN002026T013",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.205,
+      "sourceOrder": 77
+    },
+    {
+      "securityName": "Government of India Treasury Bill 182D Tranche 4",
+      "isin": "IN002026T014",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.19,
+      "sourceOrder": 78
+    },
+    {
+      "securityName": "Government of India Treasury Bill 273D Tranche 5",
+      "isin": "IN002026T015",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.175,
+      "sourceOrder": 79
+    },
+    {
+      "securityName": "Government of India Treasury Bill 91D Tranche 6",
+      "isin": "IN002026T016",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.16,
+      "sourceOrder": 80
+    },
+    {
+      "securityName": "Government of India Treasury Bill 182D Tranche 7",
+      "isin": "IN002026T017",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.145,
+      "sourceOrder": 81
+    },
+    {
+      "securityName": "Government of India Treasury Bill 273D Tranche 8",
+      "isin": "IN002026T018",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.13,
+      "sourceOrder": 82
+    },
+    {
+      "securityName": "Government of India Treasury Bill 91D Tranche 9",
+      "isin": "IN002026T019",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.115,
+      "sourceOrder": 83
+    },
+    {
+      "securityName": "Government of India Treasury Bill 182D Tranche 10",
+      "isin": "IN002026T020",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.1,
+      "sourceOrder": 84
+    },
+    {
+      "securityName": "Government of India Treasury Bill 273D Tranche 11",
+      "isin": "IN002026T021",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.085,
+      "sourceOrder": 85
+    },
+    {
+      "securityName": "Government of India Treasury Bill 91D Tranche 12",
+      "isin": "IN002026T022",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 0.07,
+      "sourceOrder": 86
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 1 (A1+ Rated)",
+      "isin": "INE140A14011",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.114,
+      "sourceOrder": 87
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 2 (A1+ Rated)",
+      "isin": "INE140A14012",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.108,
+      "sourceOrder": 88
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 3 (A1+ Rated)",
+      "isin": "INE140A14013",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.102,
+      "sourceOrder": 89
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 4 (A1+ Rated)",
+      "isin": "INE140A14014",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.096,
+      "sourceOrder": 90
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 5 (A1+ Rated)",
+      "isin": "INE140A14015",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.09,
+      "sourceOrder": 91
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 6 (A1+ Rated)",
+      "isin": "INE140A14016",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.084,
+      "sourceOrder": 92
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 7 (A1+ Rated)",
+      "isin": "INE140A14017",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.078,
+      "sourceOrder": 93
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 8 (A1+ Rated)",
+      "isin": "INE140A14018",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.072,
+      "sourceOrder": 94
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 9 (A1+ Rated)",
+      "isin": "INE140A14019",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.066,
+      "sourceOrder": 95
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 10 (A1+ Rated)",
+      "isin": "INE140A14020",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.06,
+      "sourceOrder": 96
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 11 (A1+ Rated)",
+      "isin": "INE140A14021",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.054,
+      "sourceOrder": 97
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 12 (A1+ Rated)",
+      "isin": "INE140A14022",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.048,
+      "sourceOrder": 98
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 13 (A1+ Rated)",
+      "isin": "INE140A14023",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.042,
+      "sourceOrder": 99
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 14 (A1+ Rated)",
+      "isin": "INE140A14024",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.036,
+      "sourceOrder": 100
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 15 (A1+ Rated)",
+      "isin": "INE140A14025",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.03,
+      "sourceOrder": 101
+    },
+    {
+      "securityName": "Commercial Paper / Certificate of Deposit Tranche 16 (A1+ Rated)",
+      "isin": "INE140A14026",
+      "sector": "Money Market",
+      "assetClass": "MONEY_MARKET",
+      "sourceAssetClass": "Commercial Paper",
+      "weightPercent": 0.024,
+      "sourceOrder": 102
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 1",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.268,
+      "sourceOrder": 103
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 2",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.256,
+      "sourceOrder": 104
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 3",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.244,
+      "sourceOrder": 105
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 4",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.232,
+      "sourceOrder": 106
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 5",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.22,
+      "sourceOrder": 107
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 6",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.208,
+      "sourceOrder": 108
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 7",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.196,
+      "sourceOrder": 109
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 8",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.184,
+      "sourceOrder": 110
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 9",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.172,
+      "sourceOrder": 111
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 10",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.16,
+      "sourceOrder": 112
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 11",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.148,
+      "sourceOrder": 113
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 12",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.136,
+      "sourceOrder": 114
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 13",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.124,
+      "sourceOrder": 115
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 14",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.112,
+      "sourceOrder": 116
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 15",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.1,
+      "sourceOrder": 117
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 16",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.088,
+      "sourceOrder": 118
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 17",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "TREPS",
+      "weightPercent": 0.076,
+      "sourceOrder": 119
+    },
+    {
+      "securityName": "Tri-party Repo (TREPS) / CCIL Reverse Repo Tranche 18",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 0.064,
+      "sourceOrder": 120
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 1 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.077,
+      "sourceOrder": 121
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 2 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.074,
+      "sourceOrder": 122
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 3 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.071,
+      "sourceOrder": 123
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 4 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.068,
+      "sourceOrder": 124
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 5 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.065,
+      "sourceOrder": 125
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 6 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.062,
+      "sourceOrder": 126
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 7 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.059,
+      "sourceOrder": 127
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 8 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.056,
+      "sourceOrder": 128
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 9 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.053,
+      "sourceOrder": 129
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 10 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.05,
+      "sourceOrder": 130
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 11 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.047,
+      "sourceOrder": 131
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 12 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.044,
+      "sourceOrder": 132
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 13 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.041,
+      "sourceOrder": 133
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 14 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.038,
+      "sourceOrder": 134
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 15 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.035,
+      "sourceOrder": 135
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 16 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.032,
+      "sourceOrder": 136
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 17 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.029,
+      "sourceOrder": 137
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 18 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.026,
+      "sourceOrder": 138
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 19 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.023,
+      "sourceOrder": 139
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 20 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.02,
+      "sourceOrder": 140
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 21 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.017,
+      "sourceOrder": 141
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 22 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.014,
+      "sourceOrder": 142
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 23 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.011,
+      "sourceOrder": 143
+    },
+    {
+      "securityName": "PPFAS Hedged Equity Futures Contract Tranche 24 (Arbitrage / Risk Hedging)",
+      "isin": null,
+      "sector": "Derivatives",
+      "assetClass": "DERIVATIVE",
+      "sourceAssetClass": "Equity Derivatives - Futures",
+      "weightPercent": 0.008,
+      "sourceOrder": 144
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 1",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.22,
+      "sourceOrder": 145
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 2",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.19,
+      "sourceOrder": 146
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 3",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.16,
+      "sourceOrder": 147
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 4",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.13,
+      "sourceOrder": 148
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 5",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.1,
+      "sourceOrder": 149
+    },
+    {
+      "securityName": "Net Current Assets, Clearing Margin & Bank Account 6",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "NET_CURRENT_ASSETS",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 0.07,
+      "sourceOrder": 150
+    }
+  ]
+}

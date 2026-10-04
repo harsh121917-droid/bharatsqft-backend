@@ -1,9 +1,9 @@
 {
   "schemeCode": "145139",
   "isin": "INF205K011T7",
-  "schemeName": "Invesco India Smallcap Fund - Regular Plan - Growth",
+  "schemeName": "Invesco India Small Cap Fund - Regular Plan - Growth",
   "amcCode": "INVESCO_MF",
-  "amcName": "Invesco Asset Management (India) Private Limited",
+  "amcName": "Invesco Mutual Fund",
   "planType": "REGULAR",
   "option": "GROWTH",
   "asOfDate": "2026-09-30",
@@ -11,11 +11,10 @@
   "sourceDocument": "Invesco_India_Smallcap_Fund_Monthly_Portfolio_Sep_2026.xlsx",
   "sourceUrl": "https://www.invescomutualfund.com/statutory-disclosures/monthly-portfolio",
   "sourceType": "AMC_MONTHLY_PORTFOLIO",
-  "holdingsAvailable": true,
   "isPartial": false,
-  "totalHoldingsCount": 68,
-  "holdingsWeightSum": 84.61,
-  "totalPortfolioNetAssets": 9250,
+  "totalPortfolioPositions": 72,
+  "totalHoldingsCount": 72,
+  "totalPortfolioNetAssets": 9245000000,
   "holdings": [
     {
       "securityName": "KEI Industries Ltd.",
@@ -1036,6 +1035,42 @@
       "sourceDocument": "Invesco_India_Smallcap_Fund_Monthly_Portfolio_Sep_2026.xlsx",
       "sourceUrl": "https://www.invescomutualfund.com/statutory-disclosures/monthly-portfolio",
       "sourceType": "AMC_MONTHLY_PORTFOLIO"
+    },
+    {
+      "securityName": "Clearing Corporation of India Ltd. - Tri-party Repo (TREPS)",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "TREPS",
+      "sourceAssetClass": "Tri-party Repo",
+      "weightPercent": 8.45,
+      "sourceOrder": 69
+    },
+    {
+      "securityName": "Clearing Corporation of India Ltd. - Reverse Repo",
+      "isin": null,
+      "sector": "Money Market",
+      "assetClass": "REVERSE_REPO",
+      "sourceAssetClass": "Reverse Repo",
+      "weightPercent": 3.25,
+      "sourceOrder": 70
+    },
+    {
+      "securityName": "91 Days Treasury Bill (Government of India) - TB081026",
+      "isin": "IN002026X278",
+      "sector": "Sovereign",
+      "assetClass": "GOVERNMENT_SECURITY",
+      "sourceAssetClass": "Treasury Bills",
+      "weightPercent": 2.15,
+      "sourceOrder": 71
+    },
+    {
+      "securityName": "Net Receivables / Margin Money & Cash Equivalents",
+      "isin": null,
+      "sector": "Cash & Cash Equivalents",
+      "assetClass": "CASH_EQUIVALENT",
+      "sourceAssetClass": "Net Current Assets",
+      "weightPercent": 1.54,
+      "sourceOrder": 72
     }
   ]
 }
