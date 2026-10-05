@@ -945,19 +945,75 @@ exports.createPurchaseOrder = async (req, res) => {
       });
     }
 
-    const scheme = await MutualFundScheme.findOne({ schemeCode: schemeCode.toUpperCase() });
+    const searchCode = String(schemeCode || '').trim().toUpperCase();
+    const scheme = await MutualFundScheme.findOne({
+      $or: [
+        { schemeCode: searchCode },
+        { nseSchemeCode: searchCode },
+        { isin: searchCode },
+      ],
+    });
+
     if (!scheme) {
-      return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
+      return res.status(404).json({
+        success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
+        message: 'This mutual fund is currently unavailable for purchase through NSE.',
+      });
     }
 
-    if (scheme.planType !== 'REGULAR' || scheme.schemeName.toLowerCase().includes('direct')) {
+    // 1. Validate Active Status
+    if (scheme.isActive === false) {
       return res.status(400).json({
         success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
+        message: 'This mutual fund is currently unavailable for purchase through NSE.',
+      });
+    }
+
+    // 2. Validate Regular Plan Only (Direct or Unknown strictly rejected - No Direct fallback)
+    if (scheme.planType !== 'REGULAR' || (scheme.schemeName && scheme.schemeName.toLowerCase().includes('direct'))) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
         message: 'Only Regular Plan mutual funds can be purchased through Vikaone. Direct or Unknown plans are not supported.',
       });
     }
 
-    if (orderAmount < scheme.minPurchaseAmount) {
+    // 3. Validate Purchase Allowed
+    if (scheme.purchaseAllowed === false) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
+        message: 'This mutual fund is currently unavailable for purchase through NSE.',
+      });
+    }
+
+    // 4. Validate ISIN matches authentic pattern
+    if (!scheme.isin || !/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/i.test(scheme.isin)) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
+        message: 'This mutual fund is currently unavailable for purchase through NSE.',
+      });
+    }
+
+    // 5. Authoritative NSE Scheme Code resolution
+    let targetNseCode = scheme.nseSchemeCode;
+    if (!targetNseCode && scheme.schemeCode && !/^\d+$/.test(scheme.schemeCode)) {
+      targetNseCode = scheme.schemeCode;
+    }
+
+    if (!targetNseCode) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_SCHEME_UNAVAILABLE',
+        message: 'This mutual fund is currently unavailable for purchase through NSE.',
+      });
+    }
+
+    // 6. Minimum purchase amount validation
+    if (scheme.minPurchaseAmount && orderAmount < scheme.minPurchaseAmount) {
       return res.status(400).json({
         success: false,
         message: `Minimum purchase amount for ${scheme.schemeName} is ₹${scheme.minPurchaseAmount}`,
@@ -1002,7 +1058,7 @@ exports.createPurchaseOrder = async (req, res) => {
     // 1. Prepare NSE Order payload (Order Entry PUR)
     const nseOrderPayload = {
       order_ref_number: orderId,
-      scheme_code: scheme.schemeCode,
+      scheme_code: targetNseCode,
       trxn_type: 'P', // Purchase
       buy_sell_type: buySellType,
       client_code: ucc.clientCode,
@@ -1224,7 +1280,14 @@ exports.registerSipOrder = async (req, res) => {
       });
     }
 
-    const scheme = await MutualFundScheme.findOne({ schemeCode: schemeCode.toUpperCase() });
+    const searchCode = String(schemeCode || '').trim().toUpperCase();
+    const scheme = await MutualFundScheme.findOne({
+      $or: [
+        { schemeCode: searchCode },
+        { nseSchemeCode: searchCode },
+        { isin: searchCode },
+      ],
+    });
     if (!scheme) {
       return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
     }
@@ -1234,6 +1297,11 @@ exports.registerSipOrder = async (req, res) => {
         success: false,
         message: 'Only Regular Plan mutual funds are available for SIP through Vikaone. Direct or Unknown plans are not supported.',
       });
+    }
+
+    let targetNseCode = scheme.nseSchemeCode;
+    if (!targetNseCode && scheme.schemeCode && !/^\d+$/.test(scheme.schemeCode)) {
+      targetNseCode = scheme.schemeCode;
     }
 
     if (installmentAmount < scheme.minSipAmount) {
@@ -1255,7 +1323,7 @@ exports.registerSipOrder = async (req, res) => {
     // 1. Prepare NSE XSIP payload
     const nseXsipPayload = {
       amc_code: scheme.amcCode || 'NSE_MF',
-      sch_code: scheme.schemeCode,
+      sch_code: targetNseCode || scheme.schemeCode,
       client_code: ucc.clientCode,
       trans_mode: 'P', // Physical/Folio
       dp_txn_mode: 'P',
@@ -1525,14 +1593,20 @@ exports.abandonSipOrder = async (req, res) => {
 
 // Helper to calculate detailed holdings: confirmed units, pending redemptions, and available units to redeem
 async function getDetailedUserSchemeHoldings(userId, schemeCode) {
+  const code = String(schemeCode || '').trim().toUpperCase();
+  const holding = await MfPortfolioHolding.findOne({
+    user: userId,
+    schemeCode: code,
+  });
+
   const orders = await MfOrder.find({
     user: userId,
-    schemeCode: schemeCode.toUpperCase(),
+    schemeCode: code,
   });
 
   let totalConfirmedUnits = 0;
   let pendingRedemptionUnits = 0;
-  let folioNo = '';
+  let folioNo = holding?.folioNo || '';
 
   for (const ord of orders) {
     if (ord.folioNo && !folioNo) folioNo = ord.folioNo;
@@ -1555,6 +1629,16 @@ async function getDetailedUserSchemeHoldings(userId, schemeCode) {
       if (isSettled) {
         totalConfirmedUnits -= sUnits;
       }
+    }
+  }
+
+  // Fallback to MfPortfolioHolding if no completed orders are recorded
+  if (holding && holding.totalUnits > 0) {
+    if (totalConfirmedUnits === 0) {
+      totalConfirmedUnits = holding.totalUnits;
+    }
+    if (holding.pendingRedemptionUnits && holding.pendingRedemptionUnits > pendingRedemptionUnits) {
+      pendingRedemptionUnits = holding.pendingRedemptionUnits;
     }
   }
 
@@ -2403,7 +2487,15 @@ exports.createRedemptionOrder = async (req, res) => {
       });
     }
 
-    const scheme = await MutualFundScheme.findOne({ schemeCode: schemeCode.toUpperCase(), planType: 'REGULAR' });
+    const searchCode = String(schemeCode || '').trim().toUpperCase();
+    const scheme = await MutualFundScheme.findOne({
+      $or: [
+        { schemeCode: searchCode },
+        { nseSchemeCode: searchCode },
+        { isin: searchCode },
+      ],
+      planType: 'REGULAR',
+    });
     if (!scheme) {
       return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
     }
@@ -2413,6 +2505,11 @@ exports.createRedemptionOrder = async (req, res) => {
         success: false,
         message: `Redemptions are currently locked for ${scheme.schemeName} (e.g. ELSS statutory lock-in period)`,
       });
+    }
+
+    let targetNseCode = scheme.nseSchemeCode;
+    if (!targetNseCode && scheme.schemeCode && !/^\d+$/.test(scheme.schemeCode)) {
+      targetNseCode = scheme.schemeCode;
     }
 
     // 1. Detailed holding verification
@@ -2508,7 +2605,7 @@ exports.createRedemptionOrder = async (req, res) => {
     // 3. Prepare NSE Redemption payload (Order Entry RED)
     const nseRedemptionPayload = {
       order_ref_number: orderId,
-      scheme_code: scheme.schemeCode,
+      scheme_code: targetNseCode || scheme.schemeCode,
       trxn_type: 'R', // Redemption
       buy_sell_type: effectiveFolio ? 'ADDITIONAL' : 'FRESH',
       client_code: ucc.clientCode,
