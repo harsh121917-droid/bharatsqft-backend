@@ -42,7 +42,11 @@ async function creditAndCompleteTransaction(metalType, txnId, { paymentId = null
             ? "Verified via Gateway"
             : verifiedBy === "webhook"
                 ? "Auto-credited via Razorpay Webhook"
-                : "Approved & Credited by Admin";
+                : verifiedBy === "auto_reconciliation"
+                    ? "Auto-verified via UPI Sync"
+                    : verifiedBy === "signature"
+                        ? "Instant Online Verification"
+                        : "Approved & Credited by Admin";
         txn.note = txn.note ? `${txn.note} • ${auditTag}` : auditTag;
         await txn.save();
 
@@ -195,34 +199,43 @@ async function creditAndCompleteTransaction(metalType, txnId, { paymentId = null
 async function resolveTransactionByRazorpayOrder(orderId, paymentId, verifiedBy = "gateway") {
     if (!orderId) return null;
 
+    let effPaymentId = paymentId;
+    if (!effPaymentId) {
+        try {
+            const { checkRazorpayOrderStatus } = require("./paymentGatewayService");
+            const rzp = await checkRazorpayOrderStatus(orderId);
+            if (rzp && rzp.paymentId) effPaymentId = rzp.paymentId;
+        } catch (_) {}
+    }
+
     // 1. Check Gold
     const goldTxn = await GoldTransaction.findOne({ razorpayOrderId: orderId });
     if (goldTxn) {
-        return creditAndCompleteTransaction("Gold", goldTxn._id, { paymentId, verifiedBy });
+        return creditAndCompleteTransaction("Gold", goldTxn._id, { paymentId: effPaymentId, verifiedBy });
     }
 
     // 2. Check Silver
     const silverTxn = await SilverTransaction.findOne({ razorpayOrderId: orderId });
     if (silverTxn) {
-        return creditAndCompleteTransaction("Silver", silverTxn._id, { paymentId, verifiedBy });
+        return creditAndCompleteTransaction("Silver", silverTxn._id, { paymentId: effPaymentId, verifiedBy });
     }
 
     // 3. Check Copper
     const copperTxn = await CopperTransaction.findOne({ razorpayOrderId: orderId });
     if (copperTxn) {
-        return creditAndCompleteTransaction("Copper", copperTxn._id, { paymentId, verifiedBy });
+        return creditAndCompleteTransaction("Copper", copperTxn._id, { paymentId: effPaymentId, verifiedBy });
     }
 
     // 4. Check Property Investment
     const inv = await Investment.findOne({ razorpayOrderId: orderId });
     if (inv) {
-        return creditAndCompleteTransaction("Property", inv._id, { paymentId, verifiedBy });
+        return creditAndCompleteTransaction("Property", inv._id, { paymentId: effPaymentId, verifiedBy });
     }
 
     // 5. Check Wallet
     const walletTxn = await WalletTxn.findOne({ razorpayOrderId: orderId });
     if (walletTxn) {
-        return creditAndCompleteTransaction("Wallet", walletTxn._id, { paymentId, verifiedBy });
+        return creditAndCompleteTransaction("Wallet", walletTxn._id, { paymentId: effPaymentId, verifiedBy });
     }
 
     return null;

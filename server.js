@@ -87,6 +87,13 @@ app.use("/api/mutual-funds", require("./routes/mutualFunds"));
 app.use("/api/home-videos", require("./routes/homeVideos"));
 app.use("/api/admin/home-videos", require("./routes/homeVideos"));
 
+/* ---------- Razorpay Webhook Aliases ---------- */
+const { handleRazorpayWebhook } = require("./controllers/paymentController");
+app.post("/api/webhook", handleRazorpayWebhook);
+app.post("/api/webhook/razorpay", handleRazorpayWebhook);
+app.post("/api/razorpay/webhook", handleRazorpayWebhook);
+app.post("/webhook", handleRazorpayWebhook);
+
 /* ---------- Admin Panel (static) ---------- */
 const path = require("path");
 app.use("/admin", express.static(path.join(__dirname, "admin")));

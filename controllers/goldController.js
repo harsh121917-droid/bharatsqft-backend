@@ -1,5 +1,6 @@
 const https = require("https");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const {
     GoldBalance,
     GoldRate,
@@ -258,6 +259,48 @@ async function getOrCreateBalance(userId) {
     return bal;
 }
 
+/**
+ * Automatically reconciles any pending direct gold purchases for a user
+ * against Razorpay payment gateway to ensure UPI payments are immediately credited.
+ */
+async function autoReconcilePendingGoldTransactions(userId) {
+    if (!userId) return;
+    try {
+        const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
+        const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        const pendingTxns = await GoldTransaction.find({
+            user: userId,
+            status: "pending",
+            type: { $in: ["buy", "sip_buy"] },
+            razorpayOrderId: { $exists: true, $ne: "" },
+            createdAt: { $gte: cutoff },
+        }).sort({ createdAt: -1 }).limit(5);
+
+        if (!pendingTxns || pendingTxns.length === 0) return;
+
+        for (const txn of pendingTxns) {
+            try {
+                const rzpStatus = await paymentGatewayService.checkRazorpayOrderStatus(txn.razorpayOrderId);
+                if (rzpStatus && rzpStatus.isPaid) {
+                    await creditAndCompleteTransaction("Gold", txn._id, {
+                        paymentId: rzpStatus.paymentId,
+                        verifiedBy: "auto_reconciliation",
+                    });
+                    console.log(`[Auto-Reconcile] Gold txn ${txn._id} (${txn.grams}g) auto-credited for order ${txn.razorpayOrderId}`);
+                } else if (rzpStatus && (rzpStatus.orderStatus === "failed" || rzpStatus.orderStatus === "cancelled")) {
+                    txn.status = "failed";
+                    txn.note = (txn.note ? txn.note + " • " : "") + "Marked failed by Auto-Reconcile";
+                    await txn.save();
+                }
+            } catch (err) {
+                // Ignore transient gateway lookup errors
+            }
+        }
+    } catch (err) {
+        console.warn("[Auto-Reconcile Gold] Warning:", err.message);
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. GET /api/gold/rate  — live Gold + Silver + Copper rates in INR/gram
 // ══════════════════════════════════════════════════════════════════════════════
@@ -309,6 +352,8 @@ exports.getRate = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getBalance = async (req, res, next) => {
     try {
+        await autoReconcilePendingGoldTransactions(req.user._id);
+
         const [bal, rates] = await Promise.all([
             getOrCreateBalance(req.user._id),
             fetchLiveRates(),
@@ -435,7 +480,7 @@ exports.initiateBuy = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.verifyBuy = async (req, res, next) => {
     try {
-        const User = require("../models/User");
+        const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
         const {
             razorpayOrderId,
             razorpayPaymentId,
@@ -447,52 +492,125 @@ exports.verifyBuy = async (req, res, next) => {
         } = req.body;
 
         const orderId = razorpayOrderId || razorpay_order_id;
-        const paymentId = razorpayPaymentId || razorpay_payment_id;
+        let paymentId = razorpayPaymentId || razorpay_payment_id;
         const signature = razorpaySignature || razorpay_signature;
 
-        const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "spot" });
-        const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
-            orderId,
-            paymentId,
-            signature,
-            keySecret,
-            purpose: "spot",
-        });
-
-        if (!isValid) {
-            if (transactionId) await GoldTransaction.findByIdAndUpdate(transactionId, { status: "failed" });
-            return res.status(400).json({ success: false, message: "Payment verification failed" });
+        // 1. Locate the pending or existing transaction
+        let txn = null;
+        if (transactionId && mongoose.Types.ObjectId.isValid(transactionId)) {
+            txn = await GoldTransaction.findOne({ _id: transactionId, user: req.user._id });
+        }
+        if (!txn && orderId) {
+            txn = await GoldTransaction.findOne({ razorpayOrderId: orderId, user: req.user._id });
+        }
+        if (!txn && transactionId) {
+            txn = await GoldTransaction.findOne({ _id: transactionId, user: req.user._id });
         }
 
-        const txn = await GoldTransaction.findOne({
-            $or: [{ _id: transactionId }, { razorpayOrderId: orderId }],
-            user: req.user._id,
-        });
-        if (!txn) return res.status(404).json({ success: false, message: "Transaction not found" });
+        if (!txn) {
+            return res.status(404).json({ success: false, message: "Transaction not found" });
+        }
 
-        if (txn.status !== "success") {
+        // Idempotency: if already success, return immediately with current portfolio balance
+        if (txn.status === "success") {
             const bal = await getOrCreateBalance(req.user._id);
-            bal.totalGrams = parseFloat((bal.totalGrams + txn.grams).toFixed(6));
-            bal.investedAmt = parseFloat((bal.investedAmt + (txn.totalAmt || txn.goldValue)).toFixed(2));
-            await bal.save();
-
-            if (txn.isReferralRedeemed) {
-                const user = await User.findById(req.user._id);
-                user.referralBalance = Math.max(0, (user.referralBalance || 0) - 50);
-                await user.save();
-            }
-
-            txn.status = "success";
-            txn.razorpayPaymentId = paymentId;
-            txn.razorpaySignature = signature;
-            await txn.save();
+            return res.json({
+                success: true,
+                message: `${txn.grams}g gold credited to your account`,
+                data: { grams: txn.grams, totalGrams: bal.totalGrams, transaction: txn },
+            });
         }
 
-        res.json({
-            success: true,
-            message: `${txn.grams}g gold credited to your account`,
-            data: { grams: txn.grams, totalGrams: txn.grams, transaction: txn },
-        });
+        const effectiveOrderId = orderId || txn.razorpayOrderId;
+
+        // 2. Attempt HMAC signature check if signature is provided
+        let isValidSignature = false;
+        if (signature && effectiveOrderId && paymentId) {
+            try {
+                const keySecret = await paymentGatewayService.getRazorpayKeySecret(undefined, { purpose: "spot" });
+                isValidSignature = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
+                    orderId: effectiveOrderId,
+                    paymentId,
+                    signature,
+                    keySecret,
+                    purpose: "spot",
+                });
+            } catch (sigErr) {
+                console.warn("[verifyBuy] Signature check warning:", sigErr.message);
+            }
+        }
+
+        // 3. If signature verification succeeds, complete & credit immediately
+        if (isValidSignature) {
+            const result = await creditAndCompleteTransaction("Gold", txn._id, {
+                paymentId,
+                verifiedBy: "signature",
+            });
+            const bal = await getOrCreateBalance(req.user._id);
+            return res.json({
+                success: true,
+                message: `${txn.grams}g gold credited to your account`,
+                data: { grams: txn.grams, totalGrams: bal.totalGrams, transaction: result.txn },
+            });
+        }
+
+        // 4. Fallback for UPI / mobile intent (signature missing, null, or mismatched):
+        // Query Razorpay Order Status directly via official REST API
+        if (effectiveOrderId) {
+            try {
+                const rzpStatus = await paymentGatewayService.checkRazorpayOrderStatus(effectiveOrderId);
+                if (rzpStatus && rzpStatus.isPaid) {
+                    const verifiedPaymentId = paymentId || rzpStatus.paymentId;
+                    const result = await creditAndCompleteTransaction("Gold", txn._id, {
+                        paymentId: verifiedPaymentId,
+                        verifiedBy: "gateway",
+                    });
+                    const bal = await getOrCreateBalance(req.user._id);
+                    return res.json({
+                        success: true,
+                        message: `${txn.grams}g gold credited to your account (Verified via UPI)`,
+                        data: { grams: txn.grams, totalGrams: bal.totalGrams, transaction: result.txn },
+                    });
+                } else if (rzpStatus && (rzpStatus.orderStatus === "attempted" || rzpStatus.orderStatus === "created")) {
+                    // Payment is still in flight / pending with UPI bank
+                    return res.status(200).json({
+                        success: false,
+                        status: "pending",
+                        isPending: true,
+                        message: "UPI payment is currently being confirmed by your bank. Your gold will be added automatically once confirmed.",
+                        data: { transaction: txn },
+                    });
+                } else if (rzpStatus && (rzpStatus.orderStatus === "failed" || rzpStatus.orderStatus === "cancelled")) {
+                    txn.status = "failed";
+                    txn.note = (txn.note ? txn.note + " • " : "") + "Payment failed on gateway";
+                    await txn.save();
+                    return res.status(400).json({
+                        success: false,
+                        status: "failed",
+                        message: "UPI payment failed or was cancelled at the gateway.",
+                    });
+                }
+            } catch (fetchErr) {
+                console.warn("[verifyBuy] Gateway check failed:", fetchErr.message);
+            }
+        }
+
+        // 5. If neither signature matched nor gateway confirmed paid, do not prematurely fail if recently created
+        const isRecent = (Date.now() - new Date(txn.createdAt).getTime()) < 10 * 60 * 1000;
+        if (isRecent) {
+            return res.status(200).json({
+                success: false,
+                status: "pending",
+                isPending: true,
+                message: "Payment confirmation is in progress. Please check again shortly.",
+                data: { transaction: txn },
+            });
+        }
+
+        txn.status = "failed";
+        txn.note = (txn.note ? txn.note + " • " : "") + "Payment verification failed";
+        await txn.save();
+        return res.status(400).json({ success: false, status: "failed", message: "Payment verification failed" });
     } catch (err) { next(err); }
 };
 
@@ -571,7 +689,9 @@ exports.sellGold = async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getTransactions = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, type, status = "success" } = req.query;
+        await autoReconcilePendingGoldTransactions(req.user._id);
+
+        const { page = 1, limit = 20, type, status } = req.query;
         const query = { user: req.user._id };
         if (status && status !== "all") query.status = status;
         if (type) query.type = type;
@@ -599,7 +719,30 @@ exports.getTransactions = async (req, res, next) => {
             summary: {
                 totalBought: parseFloat(bought.toFixed(4)),
                 totalSold: parseFloat(sold.toFixed(4)),
+                netGrams: parseFloat((bought - sold).toFixed(4)),
                 totalSpent: parseFloat(spent.toFixed(2)),
+            },
+        });
+    } catch (err) { next(err); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5b. POST /api/gold/sync-pending  — proactively sync pending UPI transactions
+// ══════════════════════════════════════════════════════════════════════════════
+exports.syncPendingGold = async (req, res, next) => {
+    try {
+        await autoReconcilePendingGoldTransactions(req.user._id);
+        const [bal, recentTxns] = await Promise.all([
+            getOrCreateBalance(req.user._id),
+            GoldTransaction.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(10),
+        ]);
+        return res.json({
+            success: true,
+            message: "Pending transactions synced successfully",
+            data: {
+                totalGrams: bal.totalGrams,
+                investedAmt: bal.investedAmt,
+                transactions: recentTxns,
             },
         });
     } catch (err) { next(err); }
@@ -636,6 +779,25 @@ exports.getTransactionDetail = async (req, res, next) => {
         if (!txn) {
             return res.status(404).json({ success: false, message: "Transaction not found" });
         }
+
+        // If pending and has razorpayOrderId, check with gateway in real time
+        if (txn.status === "pending" && txn.razorpayOrderId) {
+            try {
+                const rzpStatus = await paymentGatewayService.checkRazorpayOrderStatus(txn.razorpayOrderId);
+                if (rzpStatus && rzpStatus.isPaid) {
+                    const { creditAndCompleteTransaction } = require("../services/transactionResolutionService");
+                    await creditAndCompleteTransaction("Gold", txn._id, {
+                        paymentId: rzpStatus.paymentId,
+                        verifiedBy: "gateway",
+                    });
+                    const updated = await GoldTransaction.findById(txn._id);
+                    return res.json({ success: true, data: updated });
+                }
+            } catch (e) {
+                // Ignore transient gateway errors
+            }
+        }
+
         res.json({
             success: true,
             data: {

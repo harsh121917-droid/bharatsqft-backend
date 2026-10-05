@@ -224,7 +224,7 @@ exports.getAllInvestments = async (req, res, next) => {
 };
 
 // ── RAZORPAY WEBHOOK LISTENER ──────────────────────────────────
-// Webhook endpoint to catch order.paid, payment.captured, payment.authorized
+// Webhook endpoint to catch order.paid, payment.captured, payment.authorized, payment.failed
 exports.handleRazorpayWebhook = async (req, res, next) => {
     try {
         const { resolveTransactionByRazorpayOrder } = require("../services/transactionResolutionService");
@@ -234,14 +234,29 @@ exports.handleRazorpayWebhook = async (req, res, next) => {
         console.log(`[Razorpay Webhook Received] Event: ${event}`);
 
         if (event === "order.paid" || event === "payment.captured" || event === "payment.authorized") {
-            const orderId = payload?.payment?.entity?.order_id || payload?.order?.entity?.id;
+            const orderId = payload?.payment?.entity?.order_id ||
+                payload?.order?.entity?.id ||
+                payload?.payment?.entity?.notes?.orderRef ||
+                payload?.payment?.entity?.notes?.orderId;
             const paymentId = payload?.payment?.entity?.id;
 
             if (orderId) {
                 const result = await resolveTransactionByRazorpayOrder(orderId, paymentId, "webhook");
                 if (result) {
                     console.log(`[Razorpay Webhook] Auto-credited and completed order ${orderId}:`, result.message);
+                } else {
+                    console.log(`[Razorpay Webhook] No pending transaction found for order ${orderId} (might already be completed).`);
                 }
+            }
+        } else if (event === "payment.failed") {
+            const orderId = payload?.payment?.entity?.order_id || payload?.order?.entity?.id;
+            if (orderId) {
+                const { GoldTransaction } = require("../models/Gold");
+                await GoldTransaction.findOneAndUpdate(
+                    { razorpayOrderId: orderId, status: "pending" },
+                    { status: "failed", note: "Marked failed by Razorpay payment.failed webhook" }
+                ).catch(() => null);
+                console.log(`[Razorpay Webhook] Marked pending transaction for order ${orderId} as failed.`);
             }
         }
 

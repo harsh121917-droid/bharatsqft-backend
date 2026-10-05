@@ -12,6 +12,7 @@ const {
     updateRate,
     giftAsset,
     getHistory,
+    syncPendingGold,
 } = require("../controllers/goldController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
@@ -26,6 +27,8 @@ router.post("/webhook", handleRazorpayWebhook);
 // ── User (auth required) ──────────────────────────────────────────────────────
 router.use(protect);
 router.get("/balance", getBalance);
+router.post("/sync-pending", syncPendingGold);
+router.get("/sync-pending", syncPendingGold);
 router.post("/buy/initiate", initiateBuy);
 router.post("/buy/verify", verifyBuy);
 router.post("/sell", sellGold);
