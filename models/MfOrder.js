@@ -33,6 +33,19 @@ const MfOrderSchema = new mongoose.Schema(
       enum: ['P', 'R', 'S'], // P: Purchase, R: Redemption, S: Switch
       default: 'P',
     },
+    redeemMode: {
+      type: String,
+      enum: ['UNITS', 'AMOUNT'],
+      default: 'UNITS',
+    },
+    requestedUnits: {
+      type: Number,
+      default: null,
+    },
+    requestedAmount: {
+      type: Number,
+      default: null,
+    },
     redemptionUnits: {
       type: Number,
       default: 0,
@@ -40,6 +53,14 @@ const MfOrderSchema = new mongoose.Schema(
     allUnits: {
       type: Boolean,
       default: false,
+    },
+    folioNo: {
+      type: String,
+      default: '',
+    },
+    isin: {
+      type: String,
+      default: '',
     },
     targetSchemeCode: {
       type: String,
@@ -147,14 +168,16 @@ const MfOrderSchema = new mongoose.Schema(
     },
     paymentMode: {
       type: String,
-      enum: ['UPI', 'NETBANKING', 'MANDATE', 'NEFT', 'WALLET', 'RAZORPAY'],
-      default: 'UPI',
+      enum: ['NSE_PAYMENT_LINK', 'UPI', 'NETBANKING', 'MANDATE', 'NEFT', 'WALLET', 'RAZORPAY', 'DIRECT_AMC_PAYOUT'],
+      default: 'NSE_PAYMENT_LINK',
     },
     paymentStatus: {
       type: String,
       enum: ['PENDING', 'SUCCESS', 'FAILED'],
       default: 'PENDING',
     },
+    // DEPRECATED: Historical Razorpay fields retained for backward compatibility with legacy DB records.
+    // New MF purchases strictly use NSE MF II payment links.
     razorpayOrderId: {
       type: String,
       default: '',
@@ -172,6 +195,14 @@ const MfOrderSchema = new mongoose.Schema(
       default: '',
     },
     nseTrxnOrderId: {
+      type: String,
+      default: '',
+    },
+    nsePaymentRefNo: {
+      type: String,
+      default: '',
+    },
+    nsePaymentStatus: {
       type: String,
       default: '',
     },

@@ -7,6 +7,7 @@ const {
   getUserUcc,
   registerUserUcc,
   createPurchaseOrder,
+  syncOrderStatus,
   verifyPurchasePayment,
   registerSipOrder,
   verifySipPayment,
@@ -58,6 +59,8 @@ router.post('/mandates/:id/verify', verifyUserMandate);
 router.get('/ucc/me', getUserUcc);
 router.post('/ucc/register', registerUserUcc);
 router.post('/orders/purchase', createPurchaseOrder);
+router.get('/orders/:orderId/status', syncOrderStatus);
+router.post('/orders/:orderId/sync-status', syncOrderStatus);
 router.post('/orders/verify', verifyPurchasePayment);
 router.post('/orders/redeem', createRedemptionOrder);
 router.post('/orders/switch', createSwitchOrder);

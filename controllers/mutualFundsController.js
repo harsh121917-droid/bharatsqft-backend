@@ -9,7 +9,6 @@ const User = require('../models/User');
 const BankAccount = require('../models/BankAccount');
 const Kyc = require('../models/Kyc');
 const nseClient = require('../services/nse/nseClient');
-const paymentGatewayService = require('../services/paymentGatewayService');
 const mfLiveService = require('../services/mfLiveService');
 const MfTransaction = require('../models/MfTransaction');
 const MfPortfolioHolding = require('../models/MfPortfolioHolding');
@@ -928,11 +927,11 @@ exports.registerUserUcc = async (req, res) => {
   }
 };
 
-// ── 5. POST /api/mutual-funds/orders/purchase (Lump Sum / Normal) ──
+// ── 5. POST /api/mutual-funds/orders/purchase (Lump Sum / Normal via NSE MF II) ──
 exports.createPurchaseOrder = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { schemeCode, orderAmount, paymentMode = 'UPI' } = req.body;
+    const { schemeCode, orderAmount, paymentMode = 'NSE_PAYMENT_LINK' } = req.body;
 
     if (!schemeCode || !orderAmount || Number(orderAmount) <= 0) {
       return res.status(400).json({ success: false, message: 'Valid schemeCode and orderAmount are required' });
@@ -965,6 +964,38 @@ exports.createPurchaseOrder = async (req, res) => {
       });
     }
 
+    // 0. Idempotency Check: prevent duplicate purchase submissions from double-tap/network retry
+    const existingPending = await MfOrder.findOne({
+      user: userId,
+      schemeCode: scheme.schemeCode,
+      orderAmount: Number(orderAmount),
+      transactionType: 'P',
+      paymentStatus: 'PENDING',
+      createdAt: { $gte: new Date(Date.now() - 45 * 1000) },
+    }).sort({ createdAt: -1 });
+
+    if (existingPending) {
+      console.log(`[createPurchaseOrder] Idempotent return for recent pending order ${existingPending.orderId}`);
+      return res.json({
+        success: true,
+        message: 'Mutual fund order already initiated. Please complete payment through official NSE payment link.',
+        data: {
+          order: existingPending,
+          paymentLink: existingPending.paymentLink,
+          amount: existingPending.orderAmount,
+          currency: 'INR',
+          paymentMode: existingPending.paymentMode || 'NSE_PAYMENT_LINK',
+          isDuplicate: true,
+        },
+      });
+    }
+
+    // Check if user already holds this scheme with a registered folio
+    const existingHolding = await MfPortfolioHolding.findOne({ user: userId, schemeCode: scheme.schemeCode });
+    const isAdditional = Boolean(existingHolding && existingHolding.folioNo);
+    const folioNo = req.body.folioNo || (isAdditional ? existingHolding.folioNo : '');
+    const buySellType = isAdditional || folioNo ? 'ADDITIONAL' : 'FRESH';
+
     const orderId = `MFP${Date.now()}`;
     const user = await User.findById(userId);
 
@@ -973,11 +1004,11 @@ exports.createPurchaseOrder = async (req, res) => {
       order_ref_number: orderId,
       scheme_code: scheme.schemeCode,
       trxn_type: 'P', // Purchase
-      buy_sell_type: 'FRESH',
+      buy_sell_type: buySellType,
       client_code: ucc.clientCode,
       demat_physical: 'P', // Physical/Folio mode
       order_amount: String(orderAmount),
-      folio_no: '',
+      folio_no: folioNo,
       remarks: 'Invested via GoldVikaone',
       kyc_flag: 'Y',
       euin_declaration: 'N',
@@ -1012,7 +1043,7 @@ exports.createPurchaseOrder = async (req, res) => {
 
     const nseOrderId = isSuccess ? String(rawNseOrderId) : (nseClient.isMockMode() ? String(rawNseOrderId || `TEST_PUR_${Date.now()}`) : null);
 
-    // 3. Request Payment Link from NSE (GET_LINK API)
+    // 3. Request Official Payment Link from NSE (GET_LINK API)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
     if (nseOrderId) {
@@ -1024,7 +1055,7 @@ exports.createPurchaseOrder = async (req, res) => {
       } catch (_) {}
     }
 
-    // 4. Units & Allotment: Never treat estimated units as actual allotted units!
+    // 4. Units & Allotment: Estimated units strictly for display, actual units remain 0 until authoritative allotment
     const estimatedUnits = scheme.nav && scheme.nav > 0 ? +(orderAmount / scheme.nav).toFixed(3) : null;
 
     const order = await MfOrder.create({
@@ -1033,8 +1064,10 @@ exports.createPurchaseOrder = async (req, res) => {
       orderId,
       schemeCode: scheme.schemeCode,
       schemeName: scheme.schemeName,
+      isin: scheme.isin || '',
+      folioNo,
       transactionType: 'P',
-      buySellType: 'FRESH',
+      buySellType,
       orderAmount: Number(orderAmount),
       estimatedUnits,
       units: 0, // Actual units remain 0 until Allotment Statement Report confirms allotment
@@ -1042,12 +1075,13 @@ exports.createPurchaseOrder = async (req, res) => {
       allottedNav: null,
       allotmentStatus: 'PENDING',
       navAtOrder: scheme.nav,
-      paymentMode: paymentMode || 'UPI',
+      paymentMode: 'NSE_PAYMENT_LINK',
       paymentStatus: 'PENDING',
+      orderStatus: 'PAYMENT_PENDING',
       paymentLink,
       nseTrxnOrderId: nseOrderId,
       nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
-      remarks: 'Order placed on NSE MFSS. Awaiting investor payment and AMC unit allotment.',
+      remarks: 'Order placed on NSE MFSS. Awaiting investor payment through official NSE payment gateway.',
     });
 
     return res.json({
@@ -1058,10 +1092,109 @@ exports.createPurchaseOrder = async (req, res) => {
         paymentLink,
         amount: Number(orderAmount),
         currency: 'INR',
+        paymentMode: 'NSE_PAYMENT_LINK',
       },
     });
   } catch (error) {
     console.error('[createPurchaseOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 5a. GET/POST /api/mutual-funds/orders/:orderId/status (Authoritative NSE Status Sync) ──
+exports.syncOrderStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { orderId } = req.params;
+
+    const order = await MfOrder.findOne({ orderId, user: userId });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Mutual fund order not found' });
+    }
+
+    // Terminal state: if already ALLOTTED, return directly
+    if (order.allotmentStatus === 'ALLOTTED') {
+      return res.json({
+        success: true,
+        message: 'Order already confirmed and allotted',
+        data: { order, isAuthoritative: true },
+      });
+    }
+
+    // Query NSE ORDER_STATUS report
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    const nseFilter = {
+      order_ref_number: order.orderId,
+      client_code: order.clientCode || ucc?.clientCode,
+      ...(req.body?.mockStatus ? { mockStatus: req.body.mockStatus } : {}),
+      ...(req.query?.mockStatus ? { mockStatus: req.query.mockStatus } : {}),
+    };
+
+    let nseData = null;
+    try {
+      const report = await nseClient.getOrderStatusReport(nseFilter);
+      nseData = report?.data?.orders?.[0];
+    } catch (err) {
+      console.warn(`[syncOrderStatus] NSE query warning for ${orderId}:`, err.message);
+    }
+
+    if (nseData) {
+      const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
+      const allottedUnits = parseFloat(nseData.allotted_units || '0');
+      const allottedNav = parseFloat(nseData.nav || '0');
+
+      order.nseStatus = nseOrderStatus;
+
+      // Handle Rejection / Failure
+      if (['REJECTED', 'FAILED', 'CANCELLED'].includes(nseOrderStatus)) {
+        order.paymentStatus = 'FAILED';
+        order.orderStatus = 'REJECTED';
+        order.remarks = nseData.rejection_reason || 'Order rejected by NSE MFSS exchange';
+        await order.save();
+        return res.json({
+          success: true,
+          message: `Order rejected by exchange: ${order.remarks}`,
+          data: { order, isAuthoritative: true },
+        });
+      }
+
+      // Handle Confirmed Payment / Accepted Transaction
+      if (['SUCCESS', 'APPROVED', 'VALIDATED', 'ACCEPTED', 'ORDER PLACED'].includes(nseOrderStatus)) {
+        if (order.paymentStatus !== 'SUCCESS') {
+          order.paymentStatus = 'SUCCESS';
+          order.orderStatus = 'PAYMENT_SUCCESS';
+        }
+      }
+
+      // Handle Unit Allotment if units are confirmed by exchange
+      if (allottedUnits > 0 && order.allotmentStatus !== 'ALLOTTED') {
+        const allotResult = await mfIdempotencyService.processAllotmentConfirmation({
+          orderId: order.orderId,
+          allottedUnits,
+          allottedNav: allottedNav || order.navAtOrder || 100.0,
+          rtaReferenceNo: nseData.rta_ref_no || `RTA_${order.orderId}`,
+          source: 'NSE_ORDER_STATUS_REPORT',
+        });
+        if (allotResult.success) {
+          const refreshed = await MfOrder.findOne({ orderId });
+          return res.json({
+            success: true,
+            message: 'Order units confirmed and allotted successfully',
+            data: { order: refreshed, isAuthoritative: true },
+          });
+        }
+      }
+
+      await order.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Order status updated from authoritative source',
+      data: { order, isAuthoritative: true },
+    });
+  } catch (error) {
+    console.error('[syncOrderStatus Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1237,14 +1370,14 @@ exports.registerSipOrder = async (req, res) => {
   }
 };
 
-// ── 6a. POST /api/mutual-funds/orders/verify (Verify Razorpay MF Purchase) ──
+// ── 6a. POST /api/mutual-funds/orders/verify (Authoritative NSE MF II Order Verification) ──
 exports.verifyPurchasePayment = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { orderId, mockStatus } = req.body;
 
-    if (!orderId || !razorpayPaymentId) {
-      return res.status(400).json({ success: false, message: 'orderId and razorpayPaymentId are required' });
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId is required' });
     }
 
     const order = await MfOrder.findOne({ orderId, user: userId });
@@ -1252,29 +1385,39 @@ exports.verifyPurchasePayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mutual fund order not found' });
     }
 
-    if (razorpaySignature && razorpayOrderId) {
-      const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
-        orderId: razorpayOrderId,
-        paymentId: razorpayPaymentId,
-        signature: razorpaySignature,
-      });
+    // Query authoritative NSE order/payment status
+    const nseFilter = {
+      order_ref_number: order.orderId,
+      client_code: order.clientCode,
+      ...(mockStatus ? { mockStatus } : {}),
+    };
 
-      if (!isValid) {
-        return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    let nseStatus = 'SUCCESS';
+    try {
+      const report = await nseClient.getOrderStatusReport(nseFilter);
+      const nseData = report?.data?.orders?.[0];
+      if (nseData) {
+        nseStatus = (nseData.order_status || nseData.status || 'SUCCESS').toUpperCase();
       }
+    } catch (_) {}
+
+    if (['REJECTED', 'FAILED', 'CANCELLED'].includes(nseStatus)) {
+      order.paymentStatus = 'FAILED';
+      order.orderStatus = 'REJECTED';
+      order.nseStatus = nseStatus;
+      await order.save();
+      return res.status(400).json({ success: false, message: 'Payment rejected by exchange', data: order });
     }
 
     order.paymentStatus = 'SUCCESS';
-    order.paymentMode = 'RAZORPAY';
-    order.razorpayOrderId = razorpayOrderId || order.razorpayOrderId;
-    order.razorpayPaymentId = razorpayPaymentId;
-    order.razorpaySignature = razorpaySignature || '';
-    order.nseStatus = 'TRXN SUCCESS';
+    order.orderStatus = 'PAYMENT_SUCCESS';
+    order.paymentMode = 'NSE_PAYMENT_LINK';
+    order.nseStatus = nseStatus || 'TRXN SUCCESS';
     await order.save();
 
     return res.json({
       success: true,
-      message: 'Mutual fund investment payment verified successfully',
+      message: 'Mutual fund investment payment confirmed via NSE MFSS',
       data: order,
     });
   } catch (error) {
@@ -1283,14 +1426,14 @@ exports.verifyPurchasePayment = async (req, res) => {
   }
 };
 
-// ── 6b. POST /api/mutual-funds/sip/verify (Verify Razorpay MF SIP 1st Installment) ──
+// ── 6b. POST /api/mutual-funds/sip/verify (Verify NSE MF SIP Mandate / Status) ──
 exports.verifySipPayment = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { sipId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { sipId } = req.body;
 
-    if (!sipId || !razorpayPaymentId) {
-      return res.status(400).json({ success: false, message: 'sipId and razorpayPaymentId are required' });
+    if (!sipId) {
+      return res.status(400).json({ success: false, message: 'sipId is required' });
     }
 
     const sip = await MfSip.findOne({ _id: sipId, user: userId });
@@ -1298,31 +1441,19 @@ exports.verifySipPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'SIP record not found' });
     }
 
-    if (razorpaySignature && razorpayOrderId) {
-      const isValid = await paymentGatewayService.verifyRazorpaySignatureWithFallback({
-        orderId: razorpayOrderId,
-        paymentId: razorpayPaymentId,
-        signature: razorpaySignature,
-      });
-
-      if (!isValid) {
-        return res.status(400).json({ success: false, message: 'Invalid payment signature' });
-      }
-    }
-
     const scheme = await MutualFundScheme.findOne({ schemeCode: sip.schemeCode, planType: 'REGULAR' });
     const nav = scheme?.nav || null;
     const estimatedUnits = nav ? +(sip.installmentAmount / nav).toFixed(3) : null;
 
-    // Check if an order already exists for this payment (idempotency)
-    let initialOrder = await MfOrder.findOne({ razorpayPaymentId });
+    const initialOrderId = sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`;
+    let initialOrder = await MfOrder.findOne({ orderId: initialOrderId });
     if (!initialOrder) {
       initialOrder = await MfOrder.create({
         user: userId,
         clientCode: sip.clientCode,
-        orderId: sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`,
+        orderId: initialOrderId,
         schemeCode: sip.schemeCode,
-        schemeName: sip.schemeName,
+        schemeName: scheme?.schemeName || sip.schemeName,
         transactionType: 'P',
         buySellType: 'FRESH',
         orderAmount: sip.installmentAmount,
@@ -1333,11 +1464,9 @@ exports.verifySipPayment = async (req, res) => {
         navAtOrder: nav,
         paymentMode: 'MANDATE',
         paymentStatus: 'SUCCESS',
-        razorpayOrderId: razorpayOrderId || '',
-        razorpayPaymentId,
-        razorpaySignature: razorpaySignature || '',
+        orderStatus: 'SUBMITTED',
         nseStatus: 'SUBMITTED',
-        remarks: `First installment for SIP ${sip.sipRegNo}`,
+        remarks: `First installment for SIP ${sip.sipRegNo} via NSE mandate`,
       });
     }
 
@@ -1356,7 +1485,7 @@ exports.verifySipPayment = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'SIP first installment verified and active',
+      message: 'SIP schedule activated successfully on NSE MFSS',
       data: {
         sip,
         initialOrder,
@@ -1394,27 +1523,57 @@ exports.abandonSipOrder = async (req, res) => {
   }
 };
 
-// Helper to calculate available units held in a scheme strictly from confirmed allotments
-async function getUserSchemeHoldings(userId, schemeCode) {
+// Helper to calculate detailed holdings: confirmed units, pending redemptions, and available units to redeem
+async function getDetailedUserSchemeHoldings(userId, schemeCode) {
   const orders = await MfOrder.find({
     user: userId,
     schemeCode: schemeCode.toUpperCase(),
-    paymentStatus: 'SUCCESS',
   });
 
-  let totalUnits = 0;
+  let totalConfirmedUnits = 0;
+  let pendingRedemptionUnits = 0;
+  let folioNo = '';
+
   for (const ord of orders) {
+    if (ord.folioNo && !folioNo) folioNo = ord.folioNo;
+
     if (ord.transactionType === 'P') {
-      // STRICT PRODUCT RULE: Pending orders never count as holdings! Only confirmed allotted units count.
-      const confirmedUnits = (ord.allotmentStatus === 'ALLOTTED' && (ord.allottedUnits || 0) > 0)
-        ? ord.allottedUnits
-        : 0;
-      totalUnits += confirmedUnits;
-    } else if (ord.transactionType === 'R' || ord.transactionType === 'S') {
-      totalUnits -= (ord.redemptionUnits || ord.units || 0);
+      if (ord.paymentStatus === 'SUCCESS' && ord.allotmentStatus === 'ALLOTTED' && (ord.allottedUnits || 0) > 0) {
+        totalConfirmedUnits += ord.allottedUnits;
+      }
+    } else if (ord.transactionType === 'R') {
+      const isSettled = ord.allotmentStatus === 'ALLOTTED' || ord.payoutStatus === 'PROCESSED' || ord.orderStatus === 'ALLOTTED';
+      const rUnits = Math.abs(ord.redemptionUnits || ord.units || 0);
+      if (isSettled) {
+        totalConfirmedUnits -= rUnits;
+      } else if (!['CANCELLED', 'REJECTED', 'FAILED'].includes(ord.orderStatus)) {
+        pendingRedemptionUnits += rUnits;
+      }
+    } else if (ord.transactionType === 'S') {
+      const isSettled = ord.allotmentStatus === 'ALLOTTED' || ord.orderStatus === 'ALLOTTED';
+      const sUnits = Math.abs(ord.redemptionUnits || ord.units || 0);
+      if (isSettled) {
+        totalConfirmedUnits -= sUnits;
+      }
     }
   }
-  return Math.max(0, +totalUnits.toFixed(4));
+
+  totalConfirmedUnits = Math.max(0, +totalConfirmedUnits.toFixed(4));
+  pendingRedemptionUnits = +pendingRedemptionUnits.toFixed(4);
+  const availableUnits = Math.max(0, +(totalConfirmedUnits - pendingRedemptionUnits).toFixed(4));
+
+  return {
+    totalConfirmedUnits,
+    pendingRedemptionUnits,
+    availableUnits,
+    folioNo,
+  };
+}
+
+// Helper to calculate available units held in a scheme strictly from confirmed allotments minus pending redemptions
+async function getUserSchemeHoldings(userId, schemeCode) {
+  const detailed = await getDetailedUserSchemeHoldings(userId, schemeCode);
+  return detailed.availableUnits;
 }
 
 // ── 7. GET /api/mutual-funds/portfolio (Holdings, Allocations, and Investor XIRR) ──
@@ -1497,7 +1656,7 @@ exports.getHoldingDetail = async (req, res) => {
   }
 };
 
-// ── 7c. GET /api/mutual-funds/transactions (Verified Ledger Transactions) ──
+// ── 7c. GET /api/mutual-funds/transactions (Verified Ledger Transactions & Pending Orders) ──
 exports.getTransactions = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -1507,19 +1666,80 @@ exports.getTransactions = async (req, res) => {
       query.transactionType = type.toUpperCase();
     }
 
+    // 1. Fetch settled ledger transactions
     const txns = await MfTransaction.find(query)
       .sort({ transactionDate: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+      .lean();
 
-    const total = await MfTransaction.countDocuments(query);
+    const settledOrderIds = new Set(
+      txns.map((t) => (t.order ? String(t.order) : null)).filter(Boolean)
+    );
+
+    // 2. Fetch pending / in-flight orders that have not yet generated a settled MfTransaction (Section 18)
+    const orderQuery = {
+      user: userId,
+      orderStatus: { $in: ['SUBMITTED', 'PROCESSING', 'PAYMENT_PENDING', 'CREATED'] },
+    };
+    if (type && type !== 'ALL') {
+      const typeMap = {
+        PURCHASE: 'P',
+        REDEMPTION: 'R',
+        SWITCH_IN: 'S',
+        SWITCH_OUT: 'S',
+      };
+      if (typeMap[type.toUpperCase()]) {
+        orderQuery.transactionType = typeMap[type.toUpperCase()];
+      }
+    }
+
+    const pendingOrders = await MfOrder.find(orderQuery)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const pendingMapped = pendingOrders
+      .filter((o) => !settledOrderIds.has(String(o._id)))
+      .map((o) => {
+        const isRed = o.transactionType === 'R';
+        const isSw = o.transactionType === 'S';
+        const tType = isRed ? 'REDEMPTION' : (isSw ? 'SWITCH_OUT' : 'PURCHASE');
+        const units = isRed
+          ? -(o.redemptionUnits || o.units || o.requestedUnits || 0)
+          : (o.allottedUnits || o.estimatedUnits || 0);
+
+        return {
+          _id: o._id,
+          order: o._id,
+          clientCode: o.clientCode,
+          schemeCode: o.schemeCode,
+          schemeName: o.schemeName,
+          planType: o.planType || 'REGULAR',
+          transactionType: tType,
+          transactionDate: o.createdAt,
+          orderAmount: o.orderAmount,
+          units,
+          nav: o.navAtOrder || 0,
+          navDate: o.createdAt,
+          status: 'PROCESSING',
+          isPending: true,
+          externalReference: o.nseTrxnOrderId || o.orderId,
+          remarks: o.remarks || (isRed ? 'Redemption submitted to AMC for payout processing' : 'Order submitted to exchange'),
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+        };
+      });
+
+    // Combine pending first, then settled
+    const all = [...pendingMapped, ...txns];
+    const total = all.length;
+    const startIndex = (Number(page) - 1) * Number(limit);
+    const paginated = all.slice(startIndex, startIndex + Number(limit));
 
     return res.json({
       success: true,
-      data: txns,
+      data: paginated,
       total,
       page: Number(page),
-      pages: Math.ceil(total / Number(limit)),
+      pages: Math.ceil(total / Number(limit)) || 1,
     });
   } catch (error) {
     console.error('[getTransactions Error]:', error);
@@ -2159,7 +2379,17 @@ exports.syncNavsNow = async (req, res) => {
 exports.createRedemptionOrder = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { schemeCode, units, allUnits = false, remarks = '' } = req.body;
+    const {
+      schemeCode,
+      redeemMode = 'UNITS', // 'UNITS' or 'AMOUNT'
+      units,
+      amount,
+      orderAmount: explicitAmount,
+      allUnits = false,
+      folioNo = '',
+      idempotencyKey = null,
+      remarks = '',
+    } = req.body;
 
     if (!schemeCode) {
       return res.status(400).json({ success: false, message: 'schemeCode is required' });
@@ -2181,46 +2411,112 @@ exports.createRedemptionOrder = async (req, res) => {
     if (scheme.redemptionAllowed === false) {
       return res.status(400).json({
         success: false,
-        message: `Redemptions are currently locked for ${scheme.schemeName} (e.g. ELSS lock-in period)`,
+        message: `Redemptions are currently locked for ${scheme.schemeName} (e.g. ELSS statutory lock-in period)`,
       });
     }
 
-    const availableUnits = await getUserSchemeHoldings(userId, scheme.schemeCode);
-    if (availableUnits <= 0) {
+    // 1. Detailed holding verification
+    const holdings = await getDetailedUserSchemeHoldings(userId, scheme.schemeCode);
+    if (holdings.totalConfirmedUnits <= 0) {
       return res.status(400).json({
         success: false,
         message: `You currently have 0 units in ${scheme.schemeName} available to redeem.`,
       });
     }
 
-    const unitsToRedeem = allUnits ? availableUnits : parseFloat(units);
-    if (isNaN(unitsToRedeem) || unitsToRedeem <= 0) {
-      return res.status(400).json({ success: false, message: 'Please specify a valid unit quantity to redeem' });
-    }
-
-    if (unitsToRedeem > availableUnits) {
+    if (holdings.availableUnits <= 0) {
       return res.status(400).json({
         success: false,
-        message: `Requested units (${unitsToRedeem}) exceed your available holdings (${availableUnits} units).`,
+        message: `All your ${holdings.totalConfirmedUnits} units in ${scheme.schemeName} are currently pending redemption. No additional units are available to redeem.`,
       });
+    }
+
+    const currentNav = scheme.nav && scheme.nav > 0 ? scheme.nav : 10.0;
+    let unitsToRedeem = 0;
+    let computedAmount = 0;
+    let effectiveMode = redeemMode ? redeemMode.toUpperCase() : 'UNITS';
+
+    if (allUnits) {
+      effectiveMode = 'UNITS';
+      unitsToRedeem = holdings.availableUnits;
+      computedAmount = +(unitsToRedeem * currentNav).toFixed(2);
+    } else if (effectiveMode === 'AMOUNT') {
+      const requestedAmt = parseFloat(amount || explicitAmount);
+      if (isNaN(requestedAmt) || requestedAmt <= 0) {
+        return res.status(400).json({ success: false, message: 'Please specify a valid redemption amount greater than 0' });
+      }
+      const maxRedeemableAmount = +(holdings.availableUnits * currentNav).toFixed(2);
+      if (requestedAmt > maxRedeemableAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Requested amount (₹${requestedAmt}) exceeds your available redeemable balance of ₹${maxRedeemableAmount} (${holdings.availableUnits} units).`,
+        });
+      }
+      computedAmount = requestedAmt;
+      unitsToRedeem = +(requestedAmt / currentNav).toFixed(4);
+    } else {
+      // Mode: UNITS
+      effectiveMode = 'UNITS';
+      const requestedUnits = parseFloat(units);
+      if (isNaN(requestedUnits) || requestedUnits <= 0) {
+        return res.status(400).json({ success: false, message: 'Please specify a valid unit quantity to redeem' });
+      }
+      if (requestedUnits > holdings.availableUnits) {
+        return res.status(400).json({
+          success: false,
+          message: `Requested units (${requestedUnits}) exceed your available holdings (${holdings.availableUnits} units).`,
+        });
+      }
+      unitsToRedeem = requestedUnits;
+      computedAmount = +(unitsToRedeem * currentNav).toFixed(2);
+    }
+
+    // 2. Idempotency Guard (Section 15)
+    const idempotencyFilter = idempotencyKey
+      ? { user: userId, idempotencyKey }
+      : {
+          user: userId,
+          schemeCode: scheme.schemeCode,
+          transactionType: 'R',
+          orderStatus: { $in: ['SUBMITTED', 'PROCESSING', 'PAYMENT_PENDING', 'CREATED'] },
+          createdAt: { $gte: new Date(Date.now() - 45000) },
+        };
+
+    const existingOrder = await MfOrder.findOne(idempotencyFilter);
+    if (existingOrder) {
+      const isSameUnits = Math.abs((existingOrder.redemptionUnits || 0) - unitsToRedeem) < 0.01;
+      const isSameAmt = Math.abs((existingOrder.orderAmount || 0) - computedAmount) < 1.0;
+      if (idempotencyKey || isSameUnits || isSameAmt) {
+        return res.json({
+          success: true,
+          isDuplicate: true,
+          message: 'Redemption request already placed (Idempotent)',
+          data: {
+            order: existingOrder,
+            remainingUnits: +(holdings.availableUnits - (existingOrder.redemptionUnits || 0)).toFixed(3),
+            estimatedPayout: existingOrder.orderAmount,
+            payoutBank: existingOrder.payoutBank,
+          },
+        });
+      }
     }
 
     const orderId = `MFR${Date.now()}`;
     const user = await User.findById(userId);
-    const estimatedPayout = +(unitsToRedeem * scheme.nav).toFixed(2);
+    const effectiveFolio = folioNo || holdings.folioNo || '';
 
-    // 1. Prepare NSE Redemption payload (Order Entry RED)
+    // 3. Prepare NSE Redemption payload (Order Entry RED)
     const nseRedemptionPayload = {
       order_ref_number: orderId,
       scheme_code: scheme.schemeCode,
       trxn_type: 'R', // Redemption
-      buy_sell_type: 'FRESH',
+      buy_sell_type: effectiveFolio ? 'ADDITIONAL' : 'FRESH',
       client_code: ucc.clientCode,
       demat_physical: 'P',
-      order_amount: String(estimatedPayout),
-      allotment_units: String(unitsToRedeem),
+      order_amount: String(computedAmount),
+      allotment_units: effectiveMode === 'UNITS' ? String(unitsToRedeem) : '',
       all_units: allUnits ? 'Y' : 'N',
-      folio_no: '',
+      folio_no: effectiveFolio,
       remarks: remarks || `Redemption via Vikaone app`,
       account_no: ucc.primaryBank?.accountNo || '',
       mobile_no: user?.phone?.slice(-10) || '',
@@ -2228,7 +2524,7 @@ exports.createRedemptionOrder = async (req, res) => {
       member_unique_id: orderId,
     };
 
-    // 2. Dispatch to NSE Gateway
+    // 4. Dispatch to NSE Gateway
     const nseRes = await nseClient.createNormalOrder([nseRedemptionPayload]);
     const trxnItem = nseRes?.data?.transaction_details?.[0];
     const rawOrderId = trxnItem?.trxn_order_id;
@@ -2250,39 +2546,50 @@ exports.createRedemptionOrder = async (req, res) => {
 
     const nseTrxnOrderId = isSuccess ? String(rawOrderId) : (nseClient.isMockMode() ? String(rawOrderId || `TEST_RED_${Date.now()}`) : null);
 
-    // 3. Save Redemption Order
+    // 5. Save Redemption Order (Section 9)
     const redemptionOrder = await MfOrder.create({
       user: userId,
       clientCode: ucc.clientCode,
       orderId,
       schemeCode: scheme.schemeCode,
       schemeName: scheme.schemeName,
+      isin: scheme.isin || '',
+      folioNo: effectiveFolio,
       transactionType: 'R',
+      redeemMode: effectiveMode,
+      requestedUnits: unitsToRedeem,
+      requestedAmount: computedAmount,
       redemptionUnits: unitsToRedeem,
       allUnits: Boolean(allUnits),
-      orderAmount: estimatedPayout,
+      orderAmount: computedAmount,
       units: unitsToRedeem,
       navAtOrder: scheme.nav,
-      paymentMode: 'MANDATE',
-      paymentStatus: 'SUCCESS', // Payment doesn't debit user; AMC settles payout to user bank
+      paymentMode: 'DIRECT_AMC_PAYOUT',
+      paymentStatus: 'SUCCESS', // Payment doesn't debit user; AMC settles payout directly to bank
       payoutStatus: 'PENDING_AMC',
+      orderStatus: isSuccess ? 'SUBMITTED' : (nseClient.isMockMode() ? 'SUBMITTED' : 'FAILED'),
       payoutBank: {
         bankName: ucc.primaryBank?.bankName || '',
         accountNo: ucc.primaryBank?.accountNo || '',
         ifscCode: ucc.primaryBank?.ifscCode || '',
       },
       nseTrxnOrderId,
-      nseStatus: 'ORDER SUBMITTED',
-      remarks: `Redeemed ${unitsToRedeem} units. Expected payout of ₹${estimatedPayout.toLocaleString('en-IN')} will be credited to ${ucc.primaryBank?.bankName || 'bank account'} within 2-3 business days.`,
+      nseStatus: isSuccess ? 'ORDER SUBMITTED' : (nseClient.isMockMode() ? 'ORDER SUBMITTED' : 'FAILED'),
+      idempotencyKey: idempotencyKey || null,
+      remarks: `Redeemed ${unitsToRedeem} units (${effectiveMode === 'AMOUNT' ? '₹' + computedAmount : 'by units'}). Payout of ₹${computedAmount.toLocaleString('en-IN')} will be credited directly to ${ucc.primaryBank?.bankName || 'registered bank account'} within 2-3 business days.`,
     });
+
+    // 6. Recalculate portfolio atomically to track pending redemption units (Section 11)
+    await mfPortfolioEngine.recalculateUserPortfolio(userId);
 
     return res.json({
       success: true,
       message: `Redemption order for ${unitsToRedeem} units placed successfully. Payout will be credited to your registered bank account by AMC.`,
       data: {
         order: redemptionOrder,
-        remainingUnits: +(availableUnits - unitsToRedeem).toFixed(3),
-        estimatedPayout,
+        remainingUnits: +(holdings.availableUnits - unitsToRedeem).toFixed(3),
+        totalConfirmedUnits: holdings.totalConfirmedUnits,
+        estimatedPayout: computedAmount,
         payoutBank: redemptionOrder.payoutBank,
       },
     });

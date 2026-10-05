@@ -117,8 +117,14 @@ async function recalculateUserPortfolio(userId) {
         totalUnits: 0,
         investedAmount: 0,
         pendingUnits: 0,
+        pendingRedemptionUnits: 0,
+        folioNo: ord.folioNo || '',
         ordersCount: 0,
       };
+    }
+
+    if (ord.folioNo && !holdingsMap[sCode].folioNo) {
+      holdingsMap[sCode].folioNo = ord.folioNo;
     }
 
     holdingsMap[sCode].ordersCount++;
@@ -162,6 +168,10 @@ async function recalculateUserPortfolio(userId) {
             });
           }
         }
+      } else if (!['CANCELLED', 'REJECTED', 'FAILED'].includes(ord.orderStatus)) {
+        // Pending redemption: tracked as pendingRedemptionUnits (Section 11: does NOT immediately reduce confirmed holdings)
+        const unitsPending = Math.abs(ord.redemptionUnits || ord.units || 0);
+        holdingsMap[sCode].pendingRedemptionUnits = (holdingsMap[sCode].pendingRedemptionUnits || 0) + unitsPending;
       }
     } else if (ord.transactionType === 'S') {
       // STRICT: Switch updates portfolio ONLY after authentic exchange allotment/settlement
@@ -281,6 +291,11 @@ async function recalculateUserPortfolio(userId) {
     categoryAllocations[category] = (categoryAllocations[category] || 0) + currentValue;
     amcAllocations[amcName] = (amcAllocations[amcName] || 0) + currentValue;
 
+    const totalUnits = +h.totalUnits.toFixed(3);
+    const pendingRedemptionUnits = +(h.pendingRedemptionUnits || 0).toFixed(3);
+    const availableUnits = Math.max(0, +(totalUnits - pendingRedemptionUnits).toFixed(3));
+    const isRedeemable = totalUnits > 0 && availableUnits > 0.0001;
+
     const holdingObj = {
       schemeCode: sCode,
       schemeName: schemeDoc?.schemeName || h.schemeName,
@@ -288,7 +303,11 @@ async function recalculateUserPortfolio(userId) {
       category,
       subCategory,
       planType: 'REGULAR',
-      totalUnits: +h.totalUnits.toFixed(3),
+      totalUnits,
+      availableUnits,
+      pendingRedemptionUnits,
+      folioNo: h.folioNo || '',
+      isRedeemable,
       investedAmount: invested,
       averageNav,
       currentNav,
@@ -317,6 +336,9 @@ async function recalculateUserPortfolio(userId) {
           subCategory,
           planType: 'REGULAR',
           totalUnits: holdingObj.totalUnits,
+          availableUnits: holdingObj.availableUnits,
+          pendingRedemptionUnits: holdingObj.pendingRedemptionUnits,
+          folioNo: holdingObj.folioNo,
           units: holdingObj.totalUnits,
           investedAmount: holdingObj.investedAmount,
           averageNav: holdingObj.averageNav,

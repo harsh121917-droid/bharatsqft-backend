@@ -198,6 +198,8 @@ class NseClient {
     }
 
     if (endpoint.includes('ORDER_STATUS')) {
+      const orderRef = payload.order_ref_number || '';
+      const orderStatus = payload.mockStatus || 'SUCCESS';
       return {
         success: true,
         status: 200,
@@ -205,9 +207,12 @@ class NseClient {
           status: '100',
           orders: [
             {
-              order_status: 'SUCCESS',
-              allotted_units: '12.450',
-              nav: '84.18',
+              order_ref_number: orderRef,
+              order_status: orderStatus,
+              status: orderStatus,
+              allotted_units: orderStatus === 'ALLOTTED' ? '100.000' : '0.000',
+              nav: '100.00',
+              rejection_reason: orderStatus === 'REJECTED' ? 'Payment timed out or rejected by bank' : '',
             },
           ],
         },

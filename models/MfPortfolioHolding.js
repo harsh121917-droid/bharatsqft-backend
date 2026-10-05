@@ -49,6 +49,18 @@ const MfPortfolioHoldingSchema = new mongoose.Schema(
       required: true,
       default: 0, // Confirmed allotted units only
     },
+    availableUnits: {
+      type: Number,
+      default: 0, // Units currently unencumbered and available to redeem
+    },
+    pendingRedemptionUnits: {
+      type: Number,
+      default: 0, // Units in submitted/processing redemptions awaiting settlement
+    },
+    folioNo: {
+      type: String,
+      default: '',
+    },
     units: {
       type: Number,
       default: 0,
