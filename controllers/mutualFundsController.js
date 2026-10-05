@@ -21,6 +21,8 @@ const mfIntelligenceService = require('../services/mfIntelligenceService');
 const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
+const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
+const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -820,6 +822,17 @@ exports.registerUserUcc = async (req, res) => {
     // Generate unique client code e.g. VK + 6 digit user identifier
     const clientCode = `VK${user.phone ? user.phone.slice(-6) : user._id.toString().slice(-6).toUpperCase()}`;
 
+    // 0. Idempotency Check: if user already has an active UCC on NSE, return it
+    const existingActiveUcc = await MfClientUcc.findOne({ user: userId, nseStatus: 'ACTIVE' });
+    if (existingActiveUcc) {
+      return res.json({
+        success: true,
+        message: 'Investor UCC is already registered and active on NSE MFSS.',
+        data: existingActiveUcc,
+        isDuplicate: true,
+      });
+    }
+
     // 1. Prepare 183-Column payload for NSE CLIENTCOMMON183 API
     const nseUccPayload = {
       client_code: clientCode,
@@ -852,9 +865,18 @@ exports.registerUserUcc = async (req, res) => {
       nominee_1_applicable: '100',
     };
 
-    // 2. Call NSE Client if credentials available (or simulate success on UAT fallback)
+    // 2. Call NSE Client for CLIENTCOMMON183
     const nseRes = await nseClient.registerUcc([nseUccPayload]);
     console.log('[NSE UCC Response]:', nseRes);
+
+    const regDetail = nseRes?.data?.reg_details?.[0];
+    const isSuccess = Boolean(
+      (nseRes?.success && (regDetail?.status === 'SUCCESS' || regDetail?.status === '100')) ||
+      nseClient.isMockMode()
+    );
+
+    const nseStatus = isSuccess ? 'ACTIVE' : 'REJECTED';
+    const nseRemarks = regDetail?.message || nseRes?.message || (isSuccess ? 'APPROVED' : 'Exchange registration pending/rejected');
 
     // 3. Upsert client UCC record in MongoDB
     const uccRecord = await MfClientUcc.findOneAndUpdate(
@@ -880,11 +902,26 @@ exports.registerUserUcc = async (req, res) => {
           relation: nomineeRelation || '01',
           percentage: 100,
         },
-        nseStatus: 'ACTIVE',
+        nseStatus,
+        nseRemarks,
         fatcaUploaded: true,
       },
       { upsert: true, new: true }
     );
+
+    // If exchange rejected registration in non-mock mode, return controlled error
+    if (!isSuccess && !nseClient.isMockMode()) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_UCC_REGISTRATION_FAILED',
+        message: `NSE MFSS Exchange: ${nseRemarks}`,
+        data: {
+          exchangeStatus: regDetail?.status || 'FAILED',
+          exchangeRemark: nseRemarks,
+          clientCode,
+        },
+      });
+    }
 
     // Sync verified PAN to User/Kyc records if not set
     try {
@@ -937,13 +974,16 @@ exports.createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid schemeCode and orderAmount are required' });
     }
 
-    const ucc = await MfClientUcc.findOne({ user: userId });
-    if (!ucc) {
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(userId, 'PURCHASE');
+    if (!readiness.ready) {
       return res.status(400).json({
         success: false,
-        message: 'Please complete one-time investor onboarding (UCC) before placing mutual fund orders',
+        code: readiness.code,
+        message: readiness.message,
+        data: readiness.data || {},
       });
     }
+    const ucc = readiness.ucc;
 
     const searchCode = String(schemeCode || '').trim().toUpperCase();
     const scheme = await MutualFundScheme.findOne({
@@ -1085,8 +1125,26 @@ exports.createPurchaseOrder = async (req, res) => {
 
     if (!isSuccess && !nseClient.isMockMode()) {
       const errMsg = trxnItem?.trxn_remark || nseRes?.data?.message || nseRes?.error || 'NSE Exchange rejected purchase order';
+      
+      const isClientNotExist = /client does not exist/i.test(errMsg) || /client.*not.*found/i.test(errMsg);
+      if (isClientNotExist) {
+        await MfClientUcc.updateOne({ user: userId }, { $set: { nseStatus: 'PENDING', nseRemarks: 'Client does not exist on exchange' } });
+        return res.status(400).json({
+          success: false,
+          code: 'NSE_UCC_NOT_READY',
+          message: 'Your Mutual Fund account is not yet approved for investment. Please complete investor onboarding.',
+          data: {
+            exchangeStatus: trxnItem?.trxn_status || 'FAILED',
+            exchangeRemark: trxnItem?.trxn_remark || 'Client does not exist.',
+            clientCode: ucc.clientCode,
+            schemeCode: scheme.schemeCode,
+          },
+        });
+      }
+
       return res.status(400).json({
         success: false,
+        code: 'NSE_ORDER_REJECTED',
         message: `NSE MFSS Exchange: ${errMsg}`,
         data: {
           exchangeStatus: trxnItem?.trxn_status || 'FAILED',
@@ -1272,13 +1330,17 @@ exports.registerSipOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid schemeCode and installmentAmount required' });
     }
 
-    const ucc = await MfClientUcc.findOne({ user: userId });
-    if (!ucc) {
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(userId, 'SIP');
+    if (!readiness.ready) {
       return res.status(400).json({
         success: false,
-        message: 'Please complete one-time investor onboarding (UCC) before setting up a SIP',
+        code: readiness.code,
+        message: readiness.message,
+        data: readiness.data || {},
       });
     }
+    const ucc = readiness.ucc;
+    const mandate = readiness.mandate;
 
     const searchCode = String(schemeCode || '').trim().toUpperCase();
     const scheme = await MutualFundScheme.findOne({
@@ -1304,10 +1366,48 @@ exports.registerSipOrder = async (req, res) => {
       targetNseCode = scheme.schemeCode;
     }
 
-    if (installmentAmount < scheme.minSipAmount) {
+    const normFreq = (frequency || 'MONTHLY').trim().toUpperCase();
+    let sipMaster = await MfSipSchemeMaster.findOne({
+      schemeCode: targetNseCode,
+      sipFrequency: normFreq,
+      sipStatus: '1',
+    });
+    if (!sipMaster) {
+      sipMaster = await MfSipSchemeMaster.findOne({
+        schemeCode: targetNseCode,
+        sipStatus: '1',
+      });
+    }
+    if (!sipMaster) {
+      sipMaster = await MfSipSchemeMaster.findOne({
+        isin: scheme.isin,
+        sipFrequency: normFreq,
+        sipStatus: '1',
+      });
+    }
+    if (!sipMaster) {
+      sipMaster = await MfSipSchemeMaster.findOne({
+        isin: scheme.isin,
+        sipStatus: '1',
+      });
+    }
+
+    if (!sipMaster || scheme.sipAllowed === false) {
       return res.status(400).json({
         success: false,
-        message: `Minimum SIP amount for ${scheme.schemeName} is ₹${scheme.minSipAmount}`,
+        code: 'NSE_SIP_SCHEME_UNAVAILABLE',
+        message: 'SIP is currently unavailable for this mutual fund.',
+      });
+    }
+
+    const authoritativeAmcCode = sipMaster.amcCode;
+    const authoritativeNseCode = sipMaster.schemeCode || targetNseCode;
+
+    const minAllowedAmount = sipMaster.minInstallmentAmount || scheme.minSipAmount || 500;
+    if (installmentAmount < minAllowedAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum SIP amount for ${scheme.schemeName} is ₹${minAllowedAmount}`,
       });
     }
 
@@ -1318,17 +1418,17 @@ exports.registerSipOrder = async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const dateFormatted = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`;
 
-    const effectiveMandateId = req.body.mandateId || ucc.defaultMandateId || '';
+    const effectiveMandateId = mandate.mandateId;
 
-    // 1. Prepare NSE XSIP payload
+    // 1. Prepare NSE XSIP payload with authoritative exchange codes
     const nseXsipPayload = {
-      amc_code: scheme.amcCode || 'NSE_MF',
-      sch_code: targetNseCode || scheme.schemeCode,
+      amc_code: authoritativeAmcCode,
+      sch_code: authoritativeNseCode,
       client_code: ucc.clientCode,
       trans_mode: 'P', // Physical/Folio
-      dp_txn_mode: 'P',
+      dp_txn_mode: sipMaster.sipTransactionMode || 'DP',
       start_date: dateFormatted,
-      frequency_type: frequency.toUpperCase(),
+      frequency_type: normFreq,
       frequency_allowed: '1',
       installment_amount: String(installmentAmount),
       status: '1',
@@ -1368,12 +1468,29 @@ exports.registerSipOrder = async (req, res) => {
     if (!isSuccess && !nseClient.isMockMode()) {
       const nseMsg = regItem?.reg_remark || regItem?.message || nseRes?.data?.message || 'NSE Exchange rejected SIP registration';
       console.warn(`[registerSipOrder] NSE rejected SIP registration: ${nseMsg}`);
+      
+      let errorCode = 'NSE_SIP_REGISTRATION_FAILED';
+      let userMsg = `NSE MFSS Exchange: ${nseMsg}`;
+
+      if (/client does not exist/i.test(nseMsg) || /client.*not.*found/i.test(nseMsg)) {
+        errorCode = 'NSE_UCC_NOT_READY';
+        userMsg = 'Your Mutual Fund account is not yet approved for investment. Please complete investor onboarding.';
+        await MfClientUcc.updateOne({ user: userId }, { $set: { nseStatus: 'PENDING', nseRemarks: 'Client does not exist on exchange' } });
+      } else if (/amc does not exist/i.test(nseMsg) || /amc.*not.*found/i.test(nseMsg)) {
+        errorCode = 'NSE_AMC_NOT_ENABLED';
+        userMsg = 'The selected AMC is not enabled for SIP transactions with your broker account.';
+      } else if (/mandate/i.test(nseMsg) || /umrn/i.test(nseMsg)) {
+        errorCode = 'NSE_MANDATE_NOT_READY';
+        userMsg = 'Your bank mandate is not yet authorized. Please complete mandate authorization before starting a SIP.';
+      }
+
       return res.status(400).json({
         success: false,
-        message: `NSE MFSS Exchange: ${nseMsg}. Please verify investor UCC approval or eNACH mandate authorization.`,
+        code: errorCode,
+        message: userMsg,
         data: {
-          exchangeStatus: regItem?.reg_status || regItem?.status || 'REJECTED',
-          exchangeMessage: nseMsg,
+          exchangeStatus: regItem?.reg_status || regItem?.status || 'REG_FAILED',
+          exchangeMessage: regItem?.reg_remark || nseMsg,
           clientCode: ucc.clientCode,
           schemeCode: scheme.schemeCode,
         },
@@ -2910,18 +3027,34 @@ exports.registerSwpOrder = async (req, res) => {
 exports.getOnboardingStatus = async (req, res) => {
   try {
     const userId = req.user._id;
+    const user = await User.findById(userId);
     const ucc = await MfClientUcc.findOne({ user: userId });
 
-    if (!ucc) {
+    const isKycApproved = Boolean(
+      user &&
+      (user.isKycVerified === true || user.kycStatus === 'approved' || user.kycStatus === 'verified')
+    );
+    const isUccActive = Boolean(ucc && ucc.clientCode && ucc.nseStatus === 'ACTIVE');
+    const isBankVerified = Boolean(
+      ucc?.primaryBank?.accountNo &&
+      ucc?.primaryBank?.accountNo.length >= 9 &&
+      ucc?.primaryBank?.ifsc &&
+      ucc?.primaryBank?.ifsc.length === 11
+    );
+
+    const isLumpSumReady = isKycApproved && isUccActive && isBankVerified;
+
+    if (!ucc || !isUccActive || !isKycApproved || !isBankVerified) {
       return res.json({
         success: true,
         data: {
           step: 1,
           title: 'Complete Investor Account (Step 1 of 2)',
-          subtitle: 'SEBI requires a one-time profile (PAN, Bank, Nominee) before investing on NSE MFSS.',
-          clientCode: null,
-          hasUcc: false,
-          uccStatus: 'NOT_REGISTERED',
+          subtitle: 'SEBI requires a one-time profile (PAN, Bank, Nominee) and approved KYC before investing on NSE MFSS.',
+          clientCode: ucc ? ucc.clientCode : null,
+          hasUcc: isUccActive,
+          uccStatus: ucc ? ucc.nseStatus : 'NOT_REGISTERED',
+          kycStatus: user ? user.kycStatus : 'pending',
           hasMandate: false,
           mandateStatus: 'NONE',
           isSipReady: false,
@@ -2931,9 +3064,10 @@ exports.getOnboardingStatus = async (req, res) => {
     }
 
     const mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
-    const isMandateApproved = !!(
+    const isMandateApproved = Boolean(
       mandate &&
-      (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE')
+      (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE') &&
+      ((typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) || nseClient.isMockMode())
     );
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
@@ -2949,7 +3083,7 @@ exports.getOnboardingStatus = async (req, res) => {
           clientCode: ucc.clientCode,
           hasUcc: true,
           uccStatus: ucc.nseStatus || 'ACTIVE',
-          hasMandate: !!mandate,
+          hasMandate: Boolean(mandate),
           mandateStatus: mandate ? mandate.status : 'NONE',
           mandateId: mandate ? mandate.mandateId : null,
           authUrl,
