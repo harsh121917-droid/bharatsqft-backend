@@ -21,21 +21,24 @@ exports.createEnquiry = async (req, res, next) => {
     const safePhone = (phone && phone.trim()) || req.user?.phone || "";
     const safeEmail = (email && email.trim()) || req.user?.email || (safePhone ? `${safePhone.replace(/[^0-9]/g, '')}@vikadrx.com` : `lead_${Date.now()}@vikadrx.com`);
     const isLead = type === "full_ownership_lead" || (preferredDate && preferredTime);
+    const validPropId = propertyId && /^[a-f0-9]{24}$/i.test(String(propertyId)) ? propertyId : null;
+    const allowedTypes = ["property", "full_ownership_lead", "mutual_fund", "general", "gold_silver", "other"];
+    const finalMessage = String(message || `Customer scheduled a call for ${propertyTitle || 'property'}${preferredDate ? ` on ${preferredDate}` : ''}${preferredTime ? ` at ${preferredTime}` : ''}.`).slice(0, 1000);
 
     const enquiry = await Enquiry.create({
       name: safeName,
       email: safeEmail.toLowerCase(),
       phone: safePhone,
       subject: subject || (propertyTitle ? `Full Ownership Lead: ${propertyTitle}` : "Full Ownership Enquiry"),
-      message: message || `Customer scheduled a call for ${propertyTitle || 'property'}${preferredDate ? ` on ${preferredDate}` : ''}${preferredTime ? ` at ${preferredTime}` : ''}.`,
-      type: type || (isLead ? "full_ownership_lead" : "general"),
+      message: finalMessage,
+      type: allowedTypes.includes(type) ? type : (isLead ? "full_ownership_lead" : "general"),
       propertyRef: propertyRef || propertyId || "",
       propertyTitle: propertyTitle || "",
-      propertyId: propertyId || null,
+      propertyId: validPropId,
       preferredDate: preferredDate || "",
       preferredTime: preferredTime || "",
       status: isLead ? "scheduled" : "new",
-      source: source || "app",
+      source: ["website", "app", "whatsapp", "phone", "other"].includes(source) ? source : "app",
       userId: req.user?._id || null,
     });
 

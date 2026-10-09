@@ -11,6 +11,43 @@ let currentPropertyDocuments = []; // { url, title, type, uploadedAt }
 let currentSpvEscrowPdf = "";
 let currentSpvTrusteePdf = "";
 
+// Optional per-property custom app text: input id -> model field (blank = app default)
+const CUSTOM_TEXT_FIELDS = {
+    "prop-spv-escrow-account-name": "spvEscrowAccountName",
+    "prop-spv-escrow-account-type": "spvEscrowAccountType",
+    "prop-spv-escrow-division": "spvEscrowDivision",
+    "prop-spv-escrow-note": "spvEscrowNote",
+    "prop-spv-escrow-safeguards": "spvEscrowSafeguards",
+    "prop-spv-trustee-short": "spvTrusteeShortName",
+    "prop-spv-trustee-tagline": "spvTrusteeTagline",
+    "prop-spv-trustee-regno": "spvTrusteeRegNo",
+    "prop-spv-trustee-beneficiaries": "spvTrusteeBeneficiaries",
+    "prop-spv-trustee-cert-text": "spvTrusteeCertificateText",
+    "prop-spv-trustee-roles": "spvTrusteeRoles",
+    "prop-schedule-title": "scheduleAdvisorTitle",
+    "prop-schedule-subtitle": "scheduleAdvisorSubtitle",
+    "prop-schedule-image": "scheduleAdvisorImage",
+    "prop-schedule-slots": "scheduleTimeSlots",
+};
+
+function fillCustomTextFields(p) {
+    Object.entries(CUSTOM_TEXT_FIELDS).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = (p && p[key]) ? p[key] : "";
+    });
+    const days = document.getElementById("prop-schedule-days");
+    if (days) days.value = (p && p.scheduleDaysAhead) ? p.scheduleDaysAhead : "";
+}
+
+function readCustomTextFields() {
+    const out = {};
+    Object.entries(CUSTOM_TEXT_FIELDS).forEach(([id, key]) => {
+        out[key] = document.getElementById(id)?.value.trim() || "";
+    });
+    out.scheduleDaysAhead = Number(document.getElementById("prop-schedule-days")?.value) || 0;
+    return out;
+}
+
 // ── Load Properties ───────────────────────────────────────────
 async function loadProperties() {
     const body = document.getElementById("properties-body");
@@ -214,6 +251,7 @@ function openPropertyModal() {
     if (document.getElementById("prop-spv-liquidity")) document.getElementById("prop-spv-liquidity").value = "";
     renderSpvEscrowPdfPreview();
     renderSpvTrusteePdfPreview();
+    fillCustomTextFields(null);
 
     modal.style.display = "flex";
 }
@@ -662,7 +700,8 @@ async function saveProperty() {
         spvTrusteeName,
         spvTrusteeAddress,
         spvTrusteeCertificateUrl: currentSpvTrusteePdf || "",
-        spvLiquidityPolicy
+        spvLiquidityPolicy,
+        ...readCustomTextFields()
     };
 
     try {
@@ -792,6 +831,7 @@ function populatePropertyModal(p) {
         try { renderSpvTrusteePdfPreview(); } catch (e) { console.warn(e); }
 
         setVal("prop-spv-liquidity", p.spvLiquidityPolicy || "");
+        fillCustomTextFields(p);
     } catch (err) {
         console.error("Error populating property fields:", err);
     }

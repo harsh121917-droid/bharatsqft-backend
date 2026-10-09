@@ -97,6 +97,28 @@ const PropertySchema = new mongoose.Schema(
         spvTrusteeCertificateUrl: { type: String, trim: true, default: "" },
         spvLiquidityPolicy: { type: String, default: "" },
 
+    // ── Escrow customisation (empty = app default text) ──
+    spvEscrowAccountName: { type: String, trim: true, default: "" },   // default: spvName
+    spvEscrowAccountType: { type: String, trim: true, default: "" },   // default: "Current / Escrow Account"
+    spvEscrowDivision: { type: String, trim: true, default: "" },      // default: "Escrow Division"
+    spvEscrowNote: { type: String, trim: true, default: "" },          // "Certified: ..." line
+    spvEscrowSafeguards: { type: String, default: "" },                // one bullet per line
+
+    // ── Trustee customisation (empty = app default text) ──
+    spvTrusteeShortName: { type: String, trim: true, default: "" },    // default: "Universal Trustee"
+    spvTrusteeTagline: { type: String, trim: true, default: "" },      // default: "SEBI Registered Custodian & Trustee"
+    spvTrusteeRegNo: { type: String, trim: true, default: "" },        // default: "SEBI Regn. No. IND000000570"
+    spvTrusteeBeneficiaries: { type: String, trim: true, default: "" },// default: "All registered unit holders of <title>"
+    spvTrusteeCertificateText: { type: String, default: "" },          // certificate paragraph
+    spvTrusteeRoles: { type: String, default: "" },                    // one bullet per line
+
+    // ── Schedule-a-call sheet customisation ──
+    scheduleAdvisorTitle: { type: String, trim: true, default: "" },   // default: "Call with advisor"
+    scheduleAdvisorSubtitle: { type: String, trim: true, default: "" },
+    scheduleAdvisorImage: { type: String, trim: true, default: "" },
+    scheduleTimeSlots: { type: String, trim: true, default: "" },      // comma separated, e.g. "10:00 AM, 11:00 AM"
+    scheduleDaysAhead: { type: Number, default: 0 },                   // 0 = default 7 days
+
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
