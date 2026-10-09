@@ -476,7 +476,9 @@ exports.getUserById = async (req, res, next) => {
             };
         });
 
-        const totalInvested = +(goldInvested + silverInvested + copperInvested + propTotalInvested).toFixed(2);
+        const digiInvested = +(goldInvested + silverInvested + copperInvested).toFixed(2);
+        const propInvested = +propTotalInvested.toFixed(2);
+        const totalInvested = +(digiInvested + propInvested).toFixed(2);
         const totalCurrentVal = +(goldCurrentVal + silverCurrentVal + copperCurrentVal + propTotalInvested).toFixed(2);
         const totalReturns = +(totalCurrentVal - totalInvested).toFixed(2);
         const returnsPct = totalInvested > 0 ? +((totalReturns / totalInvested) * 100).toFixed(2) : 0;
@@ -585,6 +587,7 @@ exports.getUserById = async (req, res, next) => {
                     copperInvested,
                     copperAvgPrice,
                     copperProfitLoss,
+                    digiInvested,
                     propertyBricks: propTotalBricks,
                     propertyInvested: propTotalInvested,
                     propertyItems: propItems,
@@ -1520,11 +1523,15 @@ exports.resetUserDrxSavings = async (req, res, next) => {
     try {
         const userId = req.params.id;
 
-        const deletedCount = await Saving.deleteMany({ user: userId });
+        // Strictly delete real estate savings plans (Digi Gold savings are never touched)
+        const deletedCount = await Saving.deleteMany({
+            user: userId,
+            targetProperty: { $exists: true, $ne: null }
+        });
 
         res.json({
             success: true,
-            message: `Cleared ${deletedCount.deletedCount || 0} DRX savings plan(s) and cycle records.`,
+            message: `Cleared ${deletedCount.deletedCount || 0} DRX property savings plan(s). Digi Gold savings are untouched.`,
             data: { deletedSavings: deletedCount.deletedCount || 0 }
         });
     } catch (err) { next(err); }
@@ -1572,12 +1579,15 @@ exports.resetUserDrxAll = async (req, res, next) => {
         }
         await Investment.deleteMany({ user: userId });
 
-        // 5. Delete Savings
-        await Saving.deleteMany({ user: userId });
+        // 5. Delete DRX Real Estate Savings only (Digi Gold savings are untouched)
+        await Saving.deleteMany({
+            user: userId,
+            targetProperty: { $exists: true, $ne: null }
+        });
 
         res.json({
             success: true,
-            message: "Complete DRX Wipe successful! DRX Wallet (₹0), Reward Cash, Property Bricks, and Savings have been reset."
+            message: "Complete DRX Wipe successful! DRX Wallet (₹0), Reward Cash, Property Bricks, and Savings have been reset. Digi Gold is 100% safe."
         });
     } catch (err) { next(err); }
 };

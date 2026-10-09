@@ -1181,6 +1181,7 @@ function buildFallbackOverview(u) {
         copperInvested: copperInvested,
         copperAvgPrice: copperGrams > 0 ? +(copperInvested / copperGrams).toFixed(2) : 0,
         copperProfitLoss: +(copperWorth - copperInvested).toFixed(2),
+        digiInvested: +(goldInvested + silverInvested + copperInvested).toFixed(2),
         propertyBricks: propBricks,
         propertyInvested: propInvested,
         propertyItems: propItems,
@@ -1418,7 +1419,9 @@ function renderUserDetailsContent(u) {
     const copperGrams = ov.copperBalance !== undefined ? ov.copperBalance : (u.copperInvestments?.grams || 0);
     const propBricks = ov.propertyBricks !== undefined ? ov.propertyBricks : (u.propertyInvestments?.totalBricks || (u.propertyInvestments?.items?.reduce((s, i) => s + (i.bricks || 0), 0)) || 0);
     const walletBal = u.walletBalance !== undefined ? u.walletBalance : (ov.walletBalance !== undefined ? ov.walletBalance : (u.wallet?.balance || 0));
-    const totalInvested = ov.totalInvested !== undefined ? ov.totalInvested : (u.totalInvested || 0);
+    const digiInvested = ov.digiInvested !== undefined ? ov.digiInvested : ((ov.goldInvested || 0) + (ov.silverInvested || 0) + (ov.copperInvested || 0));
+    const propInvested = ov.propertyInvested !== undefined ? ov.propertyInvested : 0;
+    const totalInvested = ov.totalInvested !== undefined ? ov.totalInvested : (digiInvested + propInvested);
     const totalReturns = ov.totalReturns !== undefined ? ov.totalReturns : 0;
 
     udSetText("ud-ov-gold", formatGrams(goldGrams));
@@ -1426,6 +1429,8 @@ function renderUserDetailsContent(u) {
     udSetText("ud-ov-copper", formatGrams(copperGrams));
     udSetText("ud-ov-bricks", `${propBricks} Bricks`);
     udSetText("ud-ov-wallet", formatINR(walletBal));
+    udSetText("ud-ov-digi-invested", formatINR(digiInvested));
+    udSetText("ud-ov-drx-invested", formatINR(propInvested));
     udSetText("ud-ov-invested", formatINR(totalInvested));
     udSetText("ud-ov-returns", `${totalReturns >= 0 ? '+' : ''}${formatINR(totalReturns)}`);
     udSetText("ud-ov-referral", u.referralCode || "—");
@@ -1462,11 +1467,11 @@ function renderUserDetailsContent(u) {
     }
 
     udSetText("ud-kpi-property-bricks", `${propBricks} Bricks`);
-    udSetText("ud-kpi-property-worth", `${formatINR(ov.propertyInvested || 0)} Invested`);
+    udSetText("ud-kpi-property-worth", `${formatINR(propInvested)} Invested`);
     udSetText("ud-kpi-property-count", `${ov.propertyItems?.length || 0} Properties`);
 
     udSetText("ud-kpi-total-invested", formatINR(totalInvested));
-    udSetText("ud-kpi-invested-breakdown", `Gold: ${formatINR(ov.goldInvested || 0)} · Silver: ${formatINR(ov.silverInvested || 0)} · Copper: ${formatINR(ov.copperInvested || 0)}`);
+    udSetText("ud-kpi-invested-breakdown", `Digi Bullion: ${formatINR(digiInvested)} (Gold: ${formatINR(ov.goldInvested || 0)} · Silver: ${formatINR(ov.silverInvested || 0)}) · DRX: ${formatINR(propInvested)}`);
 
     udSetText("ud-kpi-total-returns", `${totalReturns >= 0 ? '+' : ''}${formatINR(totalReturns)}`);
     const retPctEl = document.getElementById("ud-kpi-returns-pct");
