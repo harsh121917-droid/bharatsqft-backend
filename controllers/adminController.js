@@ -1442,6 +1442,146 @@ exports.resetUserRewards = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ── 1. DRX Reset Wallet (Deposited, Reward Cash, Locked, and DRX Txns) ──
+exports.resetUserDrxWallet = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const RewardCredit = require("../models/RewardCredit");
+
+        // 1. Reset DRX wallet partition fields
+        const wallet = await Wallet.findOne({ user: userId });
+        if (wallet) {
+            wallet.drxBalance = 0;
+            wallet.drxRewardBalance = 0;
+            wallet.drxLockedBalance = 0;
+            wallet.drxTotalAdded = 0;
+            wallet.drxTotalWithdrawn = 0;
+            await wallet.save();
+        }
+
+        // 2. Delete/clear DRX wallet transactions
+        await WalletTxn.deleteMany({
+            user: userId,
+            $or: [
+                { appSource: "vikadrx" },
+                { type: { $in: ["drx_deposit", "drx_withdraw", "reward_credit", "reward_expired", "reward_used", "brick_buy", "brick_yield"] } }
+            ]
+        });
+
+        // 3. Clear DRX promotional RewardCredits
+        await RewardCredit.deleteMany({ user: userId });
+
+        res.json({
+            success: true,
+            message: "User DRX Wallet (Deposited ₹0, Reward Cash ₹0, Locked ₹0) and transaction logs have been reset.",
+            data: { drxBalance: 0, drxRewardBalance: 0, drxLockedBalance: 0 }
+        });
+    } catch (err) { next(err); }
+};
+
+// ── 2. DRX Reset Bricks (Property Investments & Sold Counters) ──
+exports.resetUserDrxBricks = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+
+        // 1. Fetch user's property investments
+        const userInvestments = await Investment.find({ user: userId });
+
+        // 2. Adjust property soldBricks counters for paid investments
+        for (const inv of userInvestments) {
+            if (inv.property && inv.bricks > 0 && inv.status === "paid") {
+                const prop = await Property.findById(inv.property);
+                if (prop) {
+                    prop.soldBricks = Math.max(0, (prop.soldBricks || 0) - inv.bricks);
+                    await prop.save();
+                }
+            }
+        }
+
+        // 3. Delete user's investment records
+        const deletedCount = await Investment.deleteMany({ user: userId });
+
+        // 4. Delete brick-related wallet logs
+        await WalletTxn.deleteMany({
+            user: userId,
+            type: { $in: ["brick_buy", "brick_yield"] }
+        });
+
+        res.json({
+            success: true,
+            message: `Cleared ${deletedCount.deletedCount || 0} property brick investment(s) and restored property counters.`,
+            data: { deletedInvestments: deletedCount.deletedCount || 0 }
+        });
+    } catch (err) { next(err); }
+};
+
+// ── 3. DRX Reset Saving (DRX Real Estate Savings / Plans) ──
+exports.resetUserDrxSavings = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+
+        const deletedCount = await Saving.deleteMany({ user: userId });
+
+        res.json({
+            success: true,
+            message: `Cleared ${deletedCount.deletedCount || 0} DRX savings plan(s) and cycle records.`,
+            data: { deletedSavings: deletedCount.deletedCount || 0 }
+        });
+    } catch (err) { next(err); }
+};
+
+// ── 4. DRX All Reset (Wipes all DRX Wallet, Reward Credits, Bricks, and Savings) ──
+exports.resetUserDrxAll = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const RewardCredit = require("../models/RewardCredit");
+
+        // 1. Reset DRX Wallet
+        const wallet = await Wallet.findOne({ user: userId });
+        if (wallet) {
+            wallet.drxBalance = 0;
+            wallet.drxRewardBalance = 0;
+            wallet.drxLockedBalance = 0;
+            wallet.drxTotalAdded = 0;
+            wallet.drxTotalWithdrawn = 0;
+            await wallet.save();
+        }
+
+        // 2. Clear DRX Wallet transactions
+        await WalletTxn.deleteMany({
+            user: userId,
+            $or: [
+                { appSource: "vikadrx" },
+                { type: { $in: ["drx_deposit", "drx_withdraw", "reward_credit", "reward_expired", "reward_used", "brick_buy", "brick_yield"] } }
+            ]
+        });
+
+        // 3. Clear DRX Reward Credits
+        await RewardCredit.deleteMany({ user: userId });
+
+        // 4. Restore Property Sold Counters & Delete Investments
+        const userInvestments = await Investment.find({ user: userId });
+        for (const inv of userInvestments) {
+            if (inv.property && inv.bricks > 0 && inv.status === "paid") {
+                const prop = await Property.findById(inv.property);
+                if (prop) {
+                    prop.soldBricks = Math.max(0, (prop.soldBricks || 0) - inv.bricks);
+                    await prop.save();
+                }
+            }
+        }
+        await Investment.deleteMany({ user: userId });
+
+        // 5. Delete Savings
+        await Saving.deleteMany({ user: userId });
+
+        res.json({
+            success: true,
+            message: "Complete DRX Wipe successful! DRX Wallet (₹0), Reward Cash, Property Bricks, and Savings have been reset."
+        });
+    } catch (err) { next(err); }
+};
+
 exports.resetAllUserData = async (req, res, next) => {
     try {
         const userId = req.params.id;

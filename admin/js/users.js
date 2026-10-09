@@ -861,6 +861,100 @@ async function resetAllUserTestingData(paramId) {
     }
 }
 
+// ── DRX Reset Functions (Wallet, Bricks, Savings, All) ─────────────────────
+
+async function resetUserDrxWallet(paramId) {
+    const id = paramId || activeUserId || document.getElementById("user-id")?.value;
+    if (!id) return toast("No user selected", "warning");
+
+    if (!confirm("⚠️ RESET DRX WALLET:\n\nAre you sure you want to reset this user's DRX Wallet?\n\n• Deposited Balance → ₹0.00\n• Reward Cash → ₹0.00\n• Locked Balance → ₹0.00\n• DRX Ledger & Reward Credits → Cleared\n\n(Gold balances & bullion are unaffected).")) {
+        return;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-drx-wallet`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "DRX Wallet reset to ₹0 successfully ✓", "success");
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+            if (typeof refreshIfUserDetailsActive === "function") refreshIfUserDetailsActive();
+        } else {
+            toast(data.message || "Failed to reset DRX wallet", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting DRX wallet", "danger");
+    }
+}
+
+async function resetUserDrxBricks(paramId) {
+    const id = paramId || activeUserId || document.getElementById("user-id")?.value;
+    if (!id) return toast("No user selected", "warning");
+
+    if (!confirm("⚠️ RESET DRX BRICKS:\n\nAre you sure you want to clear all Property Bricks investments for this user?\n\n• All Bricks Holdings → 0 Bricks\n• Property Sold Counters → Automatically Decremented & Restored\n• Brick Transactions & Yield Records → Cleared\n\nThis action cannot be undone.")) {
+        return;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-drx-bricks`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "DRX Bricks reset successfully ✓", "success");
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+            if (typeof refreshIfUserDetailsActive === "function") refreshIfUserDetailsActive();
+        } else {
+            toast(data.message || "Failed to reset DRX bricks", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting DRX bricks", "danger");
+    }
+}
+
+async function resetUserDrxSavings(paramId) {
+    const id = paramId || activeUserId || document.getElementById("user-id")?.value;
+    if (!id) return toast("No user selected", "warning");
+
+    if (!confirm("⚠️ RESET DRX SAVINGS:\n\nAre you sure you want to reset all DRX Real Estate Savings plans for this user?\n\n• All Savings Goals & Plans → Deleted\n• Cycle records & installments → Cleared.")) {
+        return;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-drx-savings`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "DRX Savings reset successfully ✓", "success");
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+            if (typeof refreshIfUserDetailsActive === "function") refreshIfUserDetailsActive();
+        } else {
+            toast(data.message || "Failed to reset DRX savings", "danger");
+        }
+    } catch (err) {
+        toast("Network error resetting DRX savings", "danger");
+    }
+}
+
+async function resetUserDrxAll(paramId) {
+    const id = paramId || activeUserId || document.getElementById("user-id")?.value;
+    if (!id) return toast("No user selected", "warning");
+
+    if (!confirm("🔥 FULL DRX WIPE CONFIRMATION:\n\nAre you sure you want to wipe ALL DRX data for this user?\n\n1. DRX Wallet → ₹0 (Deposited, Reward Cash & Locked)\n2. Reward Credits → Purged\n3. Property Bricks Holdings → 0 (Property counters restored)\n4. DRX Savings Plans & Cycles → Deleted\n5. DRX Transaction History → Cleared\n\n(Gold, Silver, Copper, Mutual Funds, and User Account are safe & untouched).\n\nProceed?")) {
+        return;
+    }
+
+    try {
+        const data = await api(`/admin/users/${id}/reset-drx-all`, { method: "POST" });
+        if (data.success) {
+            toast(data.message || "All DRX user data wiped successfully ✓", "success");
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+            if (typeof loadUserInvestments === "function") loadUserInvestments();
+            if (typeof refreshIfUserDetailsActive === "function") refreshIfUserDetailsActive();
+        } else {
+            toast(data.message || "Failed to wipe DRX data", "danger");
+        }
+    } catch (err) {
+        toast("Network error wiping DRX data", "danger");
+    }
+}
+
 function cleanActiveUserMutualFunds(paramId) {
     const id = paramId || activeUserId || document.getElementById("user-id")?.value;
     const name = document.getElementById("ud-header-name")?.textContent?.trim() || 

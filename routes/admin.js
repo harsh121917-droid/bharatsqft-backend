@@ -28,6 +28,10 @@ const {
   resetUserVault,
   resetUserWallet,
   resetUserRewards,
+  resetUserDrxWallet,
+  resetUserDrxBricks,
+  resetUserDrxSavings,
+  resetUserDrxAll,
   resetAllUserData,
   verifyTransactionWithGateway,
   manuallyApproveTransaction,
@@ -71,6 +75,10 @@ router.post("/users/:id/recalculate-vault", recalculateVaultBalance);
 router.post("/users/:id/reset-vault", resetUserVault);
 router.post("/users/:id/reset-wallet", resetUserWallet);
 router.post("/users/:id/reset-rewards", resetUserRewards);
+router.post("/users/:id/reset-drx-wallet", resetUserDrxWallet);
+router.post("/users/:id/reset-drx-bricks", resetUserDrxBricks);
+router.post("/users/:id/reset-drx-savings", resetUserDrxSavings);
+router.post("/users/:id/reset-drx-all", resetUserDrxAll);
 router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
