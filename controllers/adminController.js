@@ -3485,4 +3485,144 @@ exports.updateJewelleryOrder = async (req, res, next) => {
         await order.save();
         res.json({ success: true, message: "Order updated successfully and inventory synchronized", data: order });
     } catch (err) { next(err); }
+};
+
+// ── GET /api/admin/rewards/credits ───────────────────────────────────────────
+exports.getRewardCredits = async (req, res, next) => {
+    try {
+        const RewardCredit = require("../models/RewardCredit");
+        const User = require("../models/User");
+
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.status && req.query.status !== "all") {
+            filter.status = req.query.status;
+        }
+
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, "i");
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: searchRegex },
+                    { email: searchRegex },
+                    { phone: searchRegex },
+                ],
+            }).select("_id");
+            const userIds = matchingUsers.map((u) => u._id);
+            filter.$or = [
+                { user: { $in: userIds } },
+                { description: searchRegex },
+            ];
+        }
+
+        const [credits, total, activeAgg, expiredAgg] = await Promise.all([
+            RewardCredit.find(filter)
+                .populate("user", "name email phone referralCode")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            RewardCredit.countDocuments(filter),
+            RewardCredit.aggregate([
+                { $match: { status: "active" } },
+                { $group: { _id: null, totalActive: { $sum: "$remainingAmount" } } },
+            ]),
+            RewardCredit.aggregate([
+                { $match: { status: "expired" } },
+                { $group: { _id: null, totalExpired: { $sum: "$remainingAmount" } } },
+            ]),
+        ]);
+
+        res.json({
+            success: true,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            data: credits,
+            summary: {
+                totalActiveCash: activeAgg[0]?.totalActive || 0,
+                totalExpiredCash: expiredAgg[0]?.totalExpired || 0,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── POST /api/admin/rewards/credit-user ──────────────────────────────────────
+exports.grantUserRewardCredit = async (req, res, next) => {
+    try {
+        const { userId, amount, expiryDays, description, sourceType } = req.body;
+        const numAmount = parseFloat(amount);
+        if (!userId) {
+            return res.status(400).json({ success: false, message: "User is required" });
+        }
+        if (!numAmount || numAmount <= 0) {
+            return res.status(400).json({ success: false, message: "A positive reward amount is required" });
+        }
+
+        const User = require("../models/User");
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const RewardCredit = require("../models/RewardCredit");
+        const { Wallet, WalletTxn } = require("../models/Wallet");
+
+        const days = parseInt(expiryDays, 10) > 0 ? parseInt(expiryDays, 10) : 30;
+        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+        const desc = (description && description.trim().length > 0) ? description.trim() : "Reward Cash Bonus";
+        const src = sourceType || "admin_credit";
+
+        let wallet = await Wallet.findOne({ user: userId });
+        if (!wallet) wallet = await Wallet.create({ user: userId });
+
+        const prevRewardBal = wallet.drxRewardBalance || 0;
+        wallet.drxRewardBalance = parseFloat((prevRewardBal + numAmount).toFixed(2));
+        await wallet.save();
+
+        const credit = await RewardCredit.create({
+            user: userId,
+            amount: numAmount,
+            remainingAmount: numAmount,
+            creditedAt: new Date(),
+            expiresAt,
+            isExpired: false,
+            description: desc,
+            sourceType: src,
+            status: "active",
+            adminId: req.user?._id,
+            adminName: req.user?.name || "Super Admin",
+        });
+
+        await WalletTxn.create({
+            user: userId,
+            appSource: "vikadrx",
+            entryType: "credit",
+            type: "reward_credit",
+            amount: numAmount,
+            balanceBefore: (wallet.drxBalance || 0) + prevRewardBal,
+            balanceAfter: (wallet.drxBalance || 0) + wallet.drxRewardBalance,
+            reason: "Reward Cash Grant",
+            note: `Granted ₹${numAmount} reward cash (Expires in ${days} days: ${desc})`,
+            adminId: req.user?._id,
+            adminName: req.user?.name || "Admin",
+            status: "success",
+        });
+
+        res.json({
+            success: true,
+            message: `Successfully granted ₹${numAmount} reward cash to ${user.name || user.email || "user"}. Valid for ${days} days.`,
+            data: {
+                credit,
+                newRewardBalance: wallet.drxRewardBalance,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
 };

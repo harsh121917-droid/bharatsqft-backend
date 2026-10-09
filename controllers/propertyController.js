@@ -153,6 +153,15 @@ exports.createProperty = async (req, res, next) => {
         if (!body.status) {
             body.status = "published";
         }
+        if (body.targetXirr !== undefined) {
+            body.targetXirr = Number(body.targetXirr) || 0;
+        }
+        if (body.expectedRentalYield !== undefined) {
+            body.expectedRentalYield = Number(body.expectedRentalYield) || 0;
+        }
+        if (body.expectedAppreciation !== undefined) {
+            body.expectedAppreciation = Number(body.expectedAppreciation) || 0;
+        }
 
         const property = await Property.create({
             ...body,

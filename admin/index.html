@@ -2418,6 +2418,10 @@
                     <button class="reward-segmented-btn" id="tab-btn-rules" onclick="switchRewardTab('rules')">
                         <i class="fas fa-sliders-h"></i> Reward Rules & Rates
                     </button>
+                    <button class="reward-segmented-btn" id="tab-btn-wallet-rewards"
+                        onclick="switchRewardTab('wallet-rewards')">
+                        <i class="fas fa-wallet"></i> DRX Wallet Rewards & Expiry Ledger
+                    </button>
                 </div>
 
                 <!-- ── TAB 1: REFERRAL TRACKING ─────────────────────────────────── -->
@@ -2630,6 +2634,80 @@
                             </div>
                         </div>
 
+                    </div>
+                </div>
+
+                <!-- ── TAB 4: DRX WALLET REWARDS & MONTHLY EXPIRY LEDGER ──────────────── -->
+                <div id="panel-reward-wallet-rewards" style="display:none">
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+                        <div class="search-box" style="flex:1;max-width:380px">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="form-control" id="drx-reward-search"
+                                placeholder="Search customer name, email, phone or promo..."
+                                oninput="debounceDrxRewardSearch(this.value)" />
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <select class="form-control" id="drx-reward-status-filter" style="width:140px"
+                                onchange="onDrxRewardFilterChange()">
+                                <option value="all">All Status</option>
+                                <option value="active" selected>Active Credits</option>
+                                <option value="expired">Expired Credits</option>
+                                <option value="exhausted">Exhausted</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" onclick="runRewardExpirySweep()" style="gap:6px">
+                                <i class="fas fa-bolt" style="color:var(--gold)"></i> Run Expiry Sweep Now
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="openGrantRewardModal()" style="gap:6px">
+                                <i class="fas fa-gift"></i> Grant Reward Cash
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-bottom:1rem">
+                        <div
+                            style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius-md);padding:12px 16px">
+                            <div
+                                style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">
+                                Active DRX Reward Cash</div>
+                            <div style="font-size:20px;font-weight:800;color:#10b981;margin-top:4px"
+                                id="drx-active-reward-sum">₹0</div>
+                        </div>
+                        <div
+                            style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius-md);padding:12px 16px">
+                            <div
+                                style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">
+                                Total Expired Reward Cash</div>
+                            <div style="font-size:20px;font-weight:800;color:#f43f5e;margin-top:4px"
+                                id="drx-expired-reward-sum">₹0</div>
+                        </div>
+                        <div
+                            style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius-md);padding:12px 16px">
+                            <div
+                                style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">
+                                Security Rule</div>
+                            <div style="font-size:12px;font-weight:600;color:#38bdf8;margin-top:4px"><i
+                                    class="fas fa-shield-alt"></i> Deposited funds never expire</div>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <div id="drx-rewards-table-body">
+                            <div class="loading-box">
+                                <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                                <div>Loading reward credits ledger...</div>
+                            </div>
+                        </div>
+                        <div class="pagination" id="drx-rewards-pagination">
+                            <span id="drx-rewards-pagination-info">Showing reward credits...</span>
+                            <div class="pagination-controls">
+                                <button class="btn btn-secondary btn-sm" id="btn-prev-drx-rewards"
+                                    onclick="prevDrxRewardsPage()"><i class="fas fa-chevron-left"></i> Prev</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-next-drx-rewards"
+                                    onclick="nextDrxRewardsPage()">Next <i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4889,28 +4967,46 @@
                                     </button>
                                 </div>
                             </div>
-                            <div style="font-size:11px;color:#f97316;font-weight:700;margin:10px 0 6px">Custom App Text (leave blank to use default)</div>
+                            <div style="font-size:11px;color:#f97316;font-weight:700;margin:10px 0 6px">Custom App Text
+                                (leave blank to use default)</div>
                             <div class="form-grid-3" style="margin-bottom:8px">
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Account Name</label>
-                                    <input class="form-control" id="prop-spv-escrow-account-name" placeholder="Default: SPV Entity Name" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Account
+                                        Name</label>
+                                    <input class="form-control" id="prop-spv-escrow-account-name"
+                                        placeholder="Default: SPV Entity Name" style="font-size:12px" />
                                 </div>
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Account Type</label>
-                                    <input class="form-control" id="prop-spv-escrow-account-type" placeholder="Current / Escrow Account" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Account
+                                        Type</label>
+                                    <input class="form-control" id="prop-spv-escrow-account-type"
+                                        placeholder="Current / Escrow Account" style="font-size:12px" />
                                 </div>
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Division Label</label>
-                                    <input class="form-control" id="prop-spv-escrow-division" placeholder="Escrow Division" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Division
+                                        Label</label>
+                                    <input class="form-control" id="prop-spv-escrow-division"
+                                        placeholder="Escrow Division" style="font-size:12px" />
                                 </div>
                             </div>
                             <div style="margin-bottom:8px">
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Certified Note</label>
-                                <input class="form-control" id="prop-spv-escrow-note" placeholder="Certified: All incoming investor capital is held in this segregated escrow account under Universal Trustee instructions." style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Certified
+                                    Note</label>
+                                <input class="form-control" id="prop-spv-escrow-note"
+                                    placeholder="Certified: All incoming investor capital is held in this segregated escrow account under Universal Trustee instructions."
+                                    style="font-size:12px" />
                             </div>
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Key Escrow Safeguards (one per line)</label>
-                                <textarea class="form-control" id="prop-spv-escrow-safeguards" rows="3" placeholder="Leave blank to show the default 3 safeguards" style="font-size:12px"></textarea>
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Key
+                                    Escrow Safeguards (one per line)</label>
+                                <textarea class="form-control" id="prop-spv-escrow-safeguards" rows="3"
+                                    placeholder="Leave blank to show the default 3 safeguards"
+                                    style="font-size:12px"></textarea>
                             </div>
                         </div>
 
@@ -4968,32 +5064,52 @@
                                     </button>
                                 </div>
                             </div>
-                            <div style="font-size:11px;color:#3b82f6;font-weight:700;margin:10px 0 6px">Custom App Text (leave blank to use default)</div>
+                            <div style="font-size:11px;color:#3b82f6;font-weight:700;margin:10px 0 6px">Custom App Text
+                                (leave blank to use default)</div>
                             <div class="form-grid-3" style="margin-bottom:8px">
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Short / Card Title</label>
-                                    <input class="form-control" id="prop-spv-trustee-short" placeholder="Universal Trustee" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Short
+                                        / Card Title</label>
+                                    <input class="form-control" id="prop-spv-trustee-short"
+                                        placeholder="Universal Trustee" style="font-size:12px" />
                                 </div>
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Tagline</label>
-                                    <input class="form-control" id="prop-spv-trustee-tagline" placeholder="SEBI Registered Custodian & Trustee" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Tagline</label>
+                                    <input class="form-control" id="prop-spv-trustee-tagline"
+                                        placeholder="SEBI Registered Custodian & Trustee" style="font-size:12px" />
                                 </div>
                                 <div>
-                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Registration No.</label>
-                                    <input class="form-control" id="prop-spv-trustee-regno" placeholder="SEBI Regn. No. IND000000570" style="font-size:12px" />
+                                    <label
+                                        style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Registration
+                                        No.</label>
+                                    <input class="form-control" id="prop-spv-trustee-regno"
+                                        placeholder="SEBI Regn. No. IND000000570" style="font-size:12px" />
                                 </div>
                             </div>
                             <div style="margin-bottom:8px">
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Beneficiaries</label>
-                                <input class="form-control" id="prop-spv-trustee-beneficiaries" placeholder="All registered unit holders of <property title>" style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Beneficiaries</label>
+                                <input class="form-control" id="prop-spv-trustee-beneficiaries"
+                                    placeholder="All registered unit holders of <property title>"
+                                    style="font-size:12px" />
                             </div>
                             <div style="margin-bottom:8px">
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Certificate Text</label>
-                                <textarea class="form-control" id="prop-spv-trustee-cert-text" rows="2" placeholder="This is to certify that <Trustee Name> has been formally appointed as the Independent Trustee for <SPV>." style="font-size:12px"></textarea>
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Certificate
+                                    Text</label>
+                                <textarea class="form-control" id="prop-spv-trustee-cert-text" rows="2"
+                                    placeholder="This is to certify that <Trustee Name> has been formally appointed as the Independent Trustee for <SPV>."
+                                    style="font-size:12px"></textarea>
                             </div>
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Role of the Trustee (one per line)</label>
-                                <textarea class="form-control" id="prop-spv-trustee-roles" rows="3" placeholder="Leave blank to show the default 3 roles" style="font-size:12px"></textarea>
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Role
+                                    of the Trustee (one per line)</label>
+                                <textarea class="form-control" id="prop-spv-trustee-roles" rows="3"
+                                    placeholder="Leave blank to show the default 3 roles"
+                                    style="font-size:12px"></textarea>
                             </div>
                         </div>
 
@@ -5012,33 +5128,54 @@
                     </div>
 
                     <!-- Schedule a Call (Request Callback sheet) -->
-                    <div class="form-group" style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.3);border-radius:var(--radius-md);padding:16px;margin-top:16px">
-                        <label class="form-label" style="font-weight:700;color:#818cf8;display:flex;align-items:center;gap:8px;font-size:14px">
+                    <div class="form-group"
+                        style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.3);border-radius:var(--radius-md);padding:16px;margin-top:16px">
+                        <label class="form-label"
+                            style="font-weight:700;color:#818cf8;display:flex;align-items:center;gap:8px;font-size:14px">
                             <i class="fas fa-phone-alt"></i> Schedule a Call / Request Callback (App Sheet)
                         </label>
-                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">Leave blank to use defaults. Callback requests appear under <strong>Enquiries → Full Ownership Leads</strong>.</div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">Leave blank to use
+                            defaults. Callback requests appear under <strong>Enquiries → Full Ownership Leads</strong>.
+                        </div>
                         <div class="form-grid-2" style="margin-bottom:8px">
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Title</label>
-                                <input class="form-control" id="prop-schedule-title" placeholder="Call with advisor" style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor
+                                    Title</label>
+                                <input class="form-control" id="prop-schedule-title" placeholder="Call with advisor"
+                                    style="font-size:12px" />
                             </div>
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Photo URL</label>
-                                <input class="form-control" id="prop-schedule-image" placeholder="https://... (default: advisor icon)" style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor
+                                    Photo URL</label>
+                                <input class="form-control" id="prop-schedule-image"
+                                    placeholder="https://... (default: advisor icon)" style="font-size:12px" />
                             </div>
                         </div>
                         <div style="margin-bottom:8px">
-                            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Subtitle</label>
-                            <input class="form-control" id="prop-schedule-subtitle" placeholder="Know how you can maximise your earnings with VikaDrx." style="font-size:12px" />
+                            <label
+                                style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor
+                                Subtitle</label>
+                            <input class="form-control" id="prop-schedule-subtitle"
+                                placeholder="Know how you can maximise your earnings with VikaDrx."
+                                style="font-size:12px" />
                         </div>
                         <div class="form-grid-2">
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Time Slots (comma separated)</label>
-                                <input class="form-control" id="prop-schedule-slots" placeholder="10:00 AM, 11:00 AM, 12:00 PM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM, 5:00 PM, 6:00 PM" style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Time
+                                    Slots (comma separated)</label>
+                                <input class="form-control" id="prop-schedule-slots"
+                                    placeholder="10:00 AM, 11:00 AM, 12:00 PM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM, 5:00 PM, 6:00 PM"
+                                    style="font-size:12px" />
                             </div>
                             <div>
-                                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Days Shown Ahead</label>
-                                <input class="form-control" type="number" min="0" max="30" id="prop-schedule-days" placeholder="7" style="font-size:12px" />
+                                <label
+                                    style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Days
+                                    Shown Ahead</label>
+                                <input class="form-control" type="number" min="0" max="30" id="prop-schedule-days"
+                                    placeholder="7" style="font-size:12px" />
                             </div>
                         </div>
                     </div>
@@ -5826,6 +5963,72 @@
         </div>
     </div>
 
+    <!-- Grant DRX Reward Modal -->
+    <div class="modal-overlay" id="grant-reward-modal" style="display:none">
+        <div class="modal" style="max-width:520px;width:95%">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div
+                        style="width:36px;height:36px;border-radius:10px;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;color:#10b981">
+                        <i class="fas fa-gift"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#fff">Grant DRX Reward Cash</div>
+                        <div style="font-size:11px;color:var(--text-muted)">Credit promotional reward money with
+                            automated monthly expiry</div>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeGrantRewardModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem">
+                <div class="form-group" style="margin-bottom:1rem">
+                    <label class="form-label">Select Customer <span style="color:#ef4444">*</span></label>
+                    <select class="form-control" id="grant-reward-user-select" style="width:100%">
+                        <option value="">Loading customers...</option>
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1rem">
+                    <div class="form-group">
+                        <label class="form-label">Reward Amount (₹) <span style="color:#ef4444">*</span></label>
+                        <input type="number" class="form-control" id="grant-reward-amount" min="1"
+                            placeholder="e.g. 500" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Validity / Expiry (Days) <span style="color:#ef4444">*</span></label>
+                        <input type="number" class="form-control" id="grant-reward-days" min="1" max="365" value="30"
+                            placeholder="30" required />
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:1rem">
+                    <label class="form-label">Campaign / Purpose Description</label>
+                    <input type="text" class="form-control" id="grant-reward-desc"
+                        placeholder="e.g. Festive Bonus / Launch Offer" value="Festive Reward Bonus" />
+                </div>
+                <div class="form-group" style="margin-bottom:1rem">
+                    <label class="form-label">Source Type</label>
+                    <select class="form-control" id="grant-reward-source">
+                        <option value="admin_credit">Admin Direct Credit</option>
+                        <option value="festive_bonus">Festive / Launch Bonus</option>
+                        <option value="referral_cash">Referral Cash Award</option>
+                        <option value="signup_bonus">Signup Bonus</option>
+                        <option value="cashback">Promotional Cashback</option>
+                    </select>
+                </div>
+                <div
+                    style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:10px 14px;font-size:11.5px;color:#93c5fd;line-height:1.4">
+                    <i class="fas fa-shield-alt"></i> <strong>Protection Guarantee:</strong> Credits promotional reward
+                    balance only. Deposited funds (<code>drxBalance</code>) are strictly isolated and never expire.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGrantRewardModal()">Cancel</button>
+                <button class="btn btn-primary" id="btn-submit-grant-reward" onclick="submitGrantReward()">
+                    <i class="fas fa-check"></i> Grant Reward Now
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Payment Gateway Modal -->
     <div class="modal-overlay" id="gateway-modal" style="display:none">
         <div class="modal">
@@ -6106,7 +6309,7 @@
             <script src="js/transactions.js"></script>
             <script src="js/jewellery.js"></script>
             <script src="js/gateways.js?v=2.1"></script>
-            <script src="js/rewards.js"></script>
+            <script src="js/rewards.js?v=2.0"></script>
             <script src="js/notifications.js"></script>
             <script src="js/coupons.js"></script>
             <script src="js/legalpolicies.js?v=1.0"></script>

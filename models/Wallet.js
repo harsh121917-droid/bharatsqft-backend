@@ -11,7 +11,8 @@ const WalletSchema = new mongoose.Schema(
         totalWithdrawn: { type: Number, default: 0 },        // lifetime ₹ withdrawn
 
         // ── Vika DRX Wallet Partition (Real Estate & Bricks) ──
-        drxBalance: { type: Number, default: 0, min: 0 },    // available ₹ for Vika DRX
+        drxBalance: { type: Number, default: 0, min: 0 },    // available ₹ for Vika DRX (Deposited funds - NEVER EXPIRES)
+        drxRewardBalance: { type: Number, default: 0, min: 0 }, // promotional/reward money (subject to monthly expiry)
         drxLockedBalance: { type: Number, default: 0 },      // ₹ locked in DRX
         drxTotalAdded: { type: Number, default: 0 },         // lifetime ₹ added in DRX
         drxTotalWithdrawn: { type: Number, default: 0 },     // lifetime ₹ withdrawn in DRX
@@ -48,6 +49,9 @@ const WalletTxnSchema = new mongoose.Schema(
                 "brick_yield",   // rental yield / returns credited
                 "drx_deposit",   // deposit to DRX wallet
                 "drx_withdraw",  // withdrawal from DRX wallet
+                "reward_credit", // reward cash credited
+                "reward_expired",// expired reward cash deducted
+                "reward_used",   // reward cash spent
             ],
             required: true
         },

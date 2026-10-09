@@ -93,27 +93,71 @@ exports.getWallet = async (req, res, next) => {
         const wallet = await getOrCreateWallet(req.user._id);
 
         if (isDrx) {
+            // Automatic on-access sweep for any expired reward credits of this user
+            try {
+                const { expireOverdueRewardCredits } = require("./rewardController");
+                if (typeof expireOverdueRewardCredits === "function") {
+                    await expireOverdueRewardCredits(req.user._id);
+                }
+            } catch (swpErr) {
+                console.error("DRX wallet on-access expiry sweep notice:", swpErr.message);
+            }
+
+            // Fresh wallet instance
+            const freshWallet = await Wallet.findOne({ user: req.user._id });
+            const w = freshWallet || wallet;
+
             const drxTxns = await WalletTxn.find({
                 user: req.user._id,
                 $or: [
                     { appSource: "vikadrx" },
-                    { type: { $in: ["add", "drx_deposit", "deposit", "withdraw", "drx_withdraw", "brick_buy", "brick_yield"] } }
+                    { type: { $in: ["add", "drx_deposit", "deposit", "withdraw", "drx_withdraw", "brick_buy", "brick_yield", "reward_credit", "reward_expired", "reward_used"] } }
                 ]
             }).sort({ createdAt: -1 }).limit(50);
 
-            const balance = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : (wallet.balance || 0);
-            const locked = (wallet.drxLockedBalance && wallet.drxLockedBalance > 0) ? wallet.drxLockedBalance : (wallet.lockedBalance || 0);
-            const available = Math.max(0, balance - locked);
+            // Deposited funds (strictly protected, never expires)
+            const depositedBalance = (w.drxBalance && w.drxBalance > 0) ? w.drxBalance : 0;
+            // Reward funds (promotional, subject to monthly expiry)
+            const rewardBalance = (w.drxRewardBalance && w.drxRewardBalance > 0) ? w.drxRewardBalance : 0;
+            const locked = (w.drxLockedBalance && w.drxLockedBalance > 0) ? w.drxLockedBalance : (w.lockedBalance || 0);
+            const available = Math.max(0, depositedBalance + rewardBalance - locked);
+
+            // Fetch earliest upcoming expiring active reward credit
+            let expiringReward = null;
+            try {
+                const RewardCredit = require("../models/RewardCredit");
+                const nextExpiring = await RewardCredit.findOne({
+                    user: req.user._id,
+                    status: "active",
+                    remainingAmount: { $gt: 0 },
+                    expiresAt: { $gt: new Date() },
+                }).sort({ expiresAt: 1 });
+
+                if (nextExpiring) {
+                    const diffMs = new Date(nextExpiring.expiresAt).getTime() - Date.now();
+                    const daysLeft = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                    expiringReward = {
+                        amount: nextExpiring.remainingAmount,
+                        expiresAt: nextExpiring.expiresAt,
+                        daysLeft,
+                        description: nextExpiring.description,
+                    };
+                }
+            } catch (expErr) {
+                console.error("Error reading next expiring reward credit:", expErr.message);
+            }
 
             return res.json({
                 success: true,
                 data: {
-                    balance,
+                    balance: depositedBalance, // Protected deposited money
+                    rewardBalance,             // Active unexpired promotional rewards
                     lockedBalance: locked,
-                    pendingCredit: wallet.pendingCredit || 0,
-                    availableBalance: available,
-                    totalAdded: (wallet.drxTotalAdded && wallet.drxTotalAdded > 0) ? wallet.drxTotalAdded : (wallet.totalAdded || 0),
-                    totalWithdrawn: (wallet.drxTotalWithdrawn && wallet.drxTotalWithdrawn > 0) ? wallet.drxTotalWithdrawn : (wallet.totalWithdrawn || 0),
+                    pendingCredit: w.pendingCredit || 0,
+                    availableBalance: available, // Total usable funds
+                    totalAdded: (w.drxTotalAdded && w.drxTotalAdded > 0) ? w.drxTotalAdded : (w.totalAdded || 0),
+                    totalWithdrawn: (w.drxTotalWithdrawn && w.drxTotalWithdrawn > 0) ? w.drxTotalWithdrawn : (w.totalWithdrawn || 0),
+                    expiringReward,
                     transactions: drxTxns,
                 },
             });

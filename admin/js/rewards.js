@@ -17,22 +17,27 @@ function switchRewardTab(tab) {
     const refTabBtn = document.getElementById("tab-btn-referrals");
     const ptsTabBtn = document.getElementById("tab-btn-points");
     const rulesTabBtn = document.getElementById("tab-btn-rules");
+    const walletTabBtn = document.getElementById("tab-btn-wallet-rewards");
 
     const refPanel = document.getElementById("panel-reward-referrals");
     const ptsPanel = document.getElementById("panel-reward-points");
     const rulesPanel = document.getElementById("panel-reward-rules");
+    const walletPanel = document.getElementById("panel-reward-wallet-rewards");
 
     if (refTabBtn) refTabBtn.classList.toggle("active", tab === "referrals");
     if (ptsTabBtn) ptsTabBtn.classList.toggle("active", tab === "points");
     if (rulesTabBtn) rulesTabBtn.classList.toggle("active", tab === "rules");
+    if (walletTabBtn) walletTabBtn.classList.toggle("active", tab === "wallet-rewards");
 
     if (refPanel) refPanel.style.display = tab === "referrals" ? "block" : "none";
     if (ptsPanel) ptsPanel.style.display = tab === "points" ? "block" : "none";
     if (rulesPanel) rulesPanel.style.display = tab === "rules" ? "block" : "none";
+    if (walletPanel) walletPanel.style.display = tab === "wallet-rewards" ? "block" : "none";
 
     if (tab === "referrals") loadAdminReferrals(1);
     else if (tab === "points") loadRewardHistory(1);
     else if (tab === "rules") loadRewardSettings();
+    else if (tab === "wallet-rewards") loadWalletRewardCredits(1);
 }
 
 // ── 1. Summary KPIs ────────────────────────────────────────────
@@ -464,5 +469,263 @@ function loadRewardsPage() {
         loadAdminReferrals(1);
     } else if (activeRewardTab === "points") {
         loadRewardHistory(1);
+    } else if (activeRewardTab === "wallet-rewards") {
+        loadWalletRewardCredits(1);
+    }
+}
+
+// ── 4. DRX Wallet Reward Credits & Monthly Expiry ─────────────
+let drxRewardsPage = 1;
+let drxRewardsFilter = "all";
+let drxRewardsSearch = "";
+let drxRewardSearchTimer = null;
+let allUsersCache = [];
+
+function debounceDrxRewardSearch(val) {
+    clearTimeout(drxRewardSearchTimer);
+    drxRewardSearchTimer = setTimeout(() => {
+        drxRewardsSearch = (val || "").trim();
+        loadWalletRewardCredits(1);
+    }, 350);
+}
+
+function onDrxRewardFilterChange() {
+    drxRewardsFilter = document.getElementById("drx-reward-status-filter")?.value || "all";
+    loadWalletRewardCredits(1);
+}
+
+function prevDrxRewardsPage() {
+    if (drxRewardsPage > 1) loadWalletRewardCredits(drxRewardsPage - 1);
+}
+
+function nextDrxRewardsPage() {
+    loadWalletRewardCredits(drxRewardsPage + 1);
+}
+
+async function loadWalletRewardCredits(page = 1) {
+    drxRewardsPage = page;
+    const bodyEl = document.getElementById("drx-rewards-table-body");
+    if (!bodyEl) return;
+
+    bodyEl.innerHTML = `
+        <div class="loading-box">
+            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+            <div>Loading DRX reward credits ledger...</div>
+        </div>`;
+
+    try {
+        const queryParams = new URLSearchParams({
+            page,
+            limit: 20,
+            status: drxRewardsFilter,
+            search: drxRewardsSearch,
+        });
+
+        const res = await api(`/admin/rewards/credits?${queryParams.toString()}`);
+        if (!res.success || !res.data) {
+            bodyEl.innerHTML = `<div class="empty-box"><i class="fas fa-exclamation-circle"></i> Failed to load reward credits</div>`;
+            return;
+        }
+
+        const credits = res.data;
+        const total = res.total || 0;
+        const pages = res.pages || 1;
+        const summary = res.summary || {};
+
+        setElText("drx-active-reward-sum", formatINR(summary.totalActiveCash || 0));
+        setElText("drx-expired-reward-sum", formatINR(summary.totalExpiredCash || 0));
+
+        setElText("drx-rewards-pagination-info", `Page ${page} of ${pages} (${total} total credits)`);
+        const prevBtn = document.getElementById("btn-prev-drx-rewards");
+        const nextBtn = document.getElementById("btn-next-drx-rewards");
+        if (prevBtn) prevBtn.disabled = page <= 1;
+        if (nextBtn) nextBtn.disabled = page >= pages;
+
+        if (credits.length === 0) {
+            bodyEl.innerHTML = `
+                <div class="empty-box" style="padding:2.5rem;text-align:center;color:var(--text-muted)">
+                    <i class="fas fa-gift" style="font-size:32px;margin-bottom:10px;color:rgba(255,255,255,0.2)"></i>
+                    <div>No reward credits matching filter criteria</div>
+                </div>`;
+            return;
+        }
+
+        const rowsHtml = credits.map(c => {
+            const u = c.user || {};
+            const userName = u.name || "Unknown";
+            const userContact = u.phone || u.email || "No contact";
+
+            const creditedDate = c.creditedAt ? new Date(c.creditedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+            const expiresDate = c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Never";
+
+            let daysBadge = "";
+            if (c.status === "active" && c.expiresAt) {
+                const diffDays = Math.ceil((new Date(c.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+                if (diffDays <= 3) {
+                    daysBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.2);color:#ef4444;font-weight:700">${diffDays}d left</span>`;
+                } else {
+                    daysBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.2);color:#10b981;font-weight:700">${diffDays}d left</span>`;
+                }
+            }
+
+            let statusBadge = "";
+            if (c.status === "active") {
+                statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3)">Active</span>`;
+            } else if (c.status === "expired" || c.isExpired) {
+                statusBadge = `<span class="badge" style="background:rgba(244,63,94,0.15);color:#f43f5e;border:1px solid rgba(244,63,94,0.3)">Expired</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.3)">Exhausted</span>`;
+            }
+
+            const expiredAmount = (c.status === "expired" || c.isExpired) ? c.remainingAmount : Math.max(0, c.amount - c.remainingAmount);
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight:700;color:#fff">${escapeHtml(userName)}</div>
+                        <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(userContact)}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:800;color:#10b981;font-size:14px">${formatINR(c.amount)}</div>
+                        <div style="font-size:11px;color:var(--text-muted)">Rem: ${formatINR(c.remainingAmount)}</div>
+                    </td>
+                    <td style="font-size:12px;color:var(--text-muted)">
+                        <div>${creditedDate}</div>
+                    </td>
+                    <td>
+                        <div style="font-size:12px;color:#fff;display:flex;align-items:center;gap:6px">
+                            ${expiresDate} ${daysBadge}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:12px;font-weight:700;color:${(c.status === 'expired' || c.isExpired) ? '#f43f5e' : 'var(--text-muted)'}">
+                            ${formatINR(expiredAmount)}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml(c.description || "Reward Grant")}</div>
+                        <div style="font-size:10px;color:var(--text-muted)">Type: ${escapeHtml(c.sourceType || "admin_credit")}</div>
+                    </td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+        }).join("");
+
+        bodyEl.innerHTML = `
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Credit Amount</th>
+                        <th>Credited On</th>
+                        <th>Expires On</th>
+                        <th>Expired / Used</th>
+                        <th>Campaign / Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>`;
+    } catch (e) {
+        bodyEl.innerHTML = `<div class="empty-box"><i class="fas fa-exclamation-triangle"></i> Network error loading ledger</div>`;
+    }
+}
+
+async function openGrantRewardModal() {
+    const modal = document.getElementById("grant-reward-modal");
+    if (!modal) return;
+    modal.style.display = "flex";
+
+    const sel = document.getElementById("grant-reward-user-select");
+    if (sel && sel.options.length <= 1) {
+        sel.innerHTML = `<option value="">Loading customer list...</option>`;
+        try {
+            const res = await api("/admin/users?limit=1000");
+            if (res.success && res.data) {
+                const users = res.data;
+                allUsersCache = users;
+                sel.innerHTML = `<option value="">Select customer...</option>` +
+                    users.map(u => `<option value="${u._id}">${escapeHtml(u.name || "User")} — ${escapeHtml(u.phone || u.email || u._id)}</option>`).join("");
+            }
+        } catch (e) {
+            sel.innerHTML = `<option value="">Failed to load customers</option>`;
+        }
+    }
+}
+
+function closeGrantRewardModal() {
+    const modal = document.getElementById("grant-reward-modal");
+    if (modal) modal.style.display = "none";
+}
+
+async function submitGrantReward() {
+    const userId = document.getElementById("grant-reward-user-select")?.value;
+    const amount = Number(document.getElementById("grant-reward-amount")?.value);
+    const expiryDays = Number(document.getElementById("grant-reward-days")?.value || 30);
+    const description = document.getElementById("grant-reward-desc")?.value || "Reward Cash Bonus";
+    const sourceType = document.getElementById("grant-reward-source")?.value || "admin_credit";
+
+    if (!userId) {
+        toast("Please select a customer", "danger");
+        return;
+    }
+    if (!amount || amount <= 0) {
+        toast("Please enter a valid reward amount in ₹", "danger");
+        return;
+    }
+    if (expiryDays <= 0) {
+        toast("Validity days must be at least 1", "danger");
+        return;
+    }
+
+    const btn = document.getElementById("btn-submit-grant-reward");
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await api("/admin/rewards/credit-user", {
+            method: "POST",
+            body: JSON.stringify({
+                userId,
+                amount,
+                expiryDays,
+                description,
+                sourceType,
+            }),
+        });
+
+        if (res.success) {
+            toast(res.message || "Reward cash granted successfully!", "success");
+            closeGrantRewardModal();
+            loadWalletRewardCredits(1);
+            loadRewardsSummary();
+            const amtInput = document.getElementById("grant-reward-amount");
+            if (amtInput) amtInput.value = "";
+        } else {
+            toast(res.message || "Failed to grant reward", "danger");
+        }
+    } catch (e) {
+        toast("Network error granting reward cash", "danger");
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function runRewardExpirySweep() {
+    if (!confirm("Run automated monthly expiry sweep now? This will check all overdue reward credits and expire unspent promotional cash. (Deposited funds are never touched).")) {
+        return;
+    }
+
+    try {
+        toast("Running global reward expiry sweep...", "info");
+        const res = await api("/admin/rewards/run-expiry-check", { method: "POST" });
+        if (res.success) {
+            const d = res.data || {};
+            toast(d.message || "Expiry sweep completed successfully!", "success");
+            loadWalletRewardCredits(drxRewardsPage);
+            loadRewardsSummary();
+        } else {
+            toast(res.message || "Expiry sweep failed", "danger");
+        }
+    } catch (e) {
+        toast("Network error during expiry sweep", "danger");
     }
 }

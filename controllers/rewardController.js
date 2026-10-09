@@ -72,11 +72,96 @@ async function processExpiredPoints(userId) {
     }
 }
 
+// ── Helper to expire overdue DRX reward cash credits ──────────────────────────
+async function expireOverdueRewardCredits(userId = null) {
+    try {
+        const RewardCredit = require("../models/RewardCredit");
+        const { Wallet, WalletTxn } = require("../models/Wallet");
+        const now = new Date();
+
+        const query = {
+            status: "active",
+            remainingAmount: { $gt: 0 },
+            expiresAt: { $lte: now },
+        };
+        if (userId) {
+            query.user = userId;
+        }
+
+        const expiredCredits = await RewardCredit.find(query);
+        if (!expiredCredits || expiredCredits.length === 0) {
+            return { count: 0, totalExpiredAmount: 0 };
+        }
+
+        // Group by user
+        const userMap = {};
+        for (const c of expiredCredits) {
+            const uId = c.user.toString();
+            if (!userMap[uId]) userMap[uId] = [];
+            userMap[uId].push(c);
+        }
+
+        let totalExpiredAmount = 0;
+        let totalCreditsCount = 0;
+
+        for (const [uId, credits] of Object.entries(userMap)) {
+            let userDeduction = 0;
+            for (const c of credits) {
+                userDeduction += c.remainingAmount;
+                c.isExpired = true;
+                c.status = "expired";
+                c.expiredAt = now;
+                await c.save();
+                totalCreditsCount++;
+            }
+
+            if (userDeduction > 0) {
+                totalExpiredAmount += userDeduction;
+                const wallet = await Wallet.findOne({ user: uId });
+                if (wallet) {
+                    const prevRewardBal = wallet.drxRewardBalance || 0;
+                    // Deduct strictly from reward balance, NEVER touch drxBalance (deposited funds)
+                    wallet.drxRewardBalance = Math.max(0, parseFloat((prevRewardBal - userDeduction).toFixed(2)));
+                    await wallet.save();
+
+                    await WalletTxn.create({
+                        user: uId,
+                        appSource: "vikadrx",
+                        entryType: "debit",
+                        type: "reward_expired",
+                        amount: userDeduction,
+                        balanceBefore: (wallet.drxBalance || 0) + prevRewardBal,
+                        balanceAfter: (wallet.drxBalance || 0) + wallet.drxRewardBalance,
+                        reason: "Reward Cash Expired",
+                        note: `Monthly expiration of ₹${userDeduction.toFixed(2)} unspent DRX reward cash`,
+                        status: "success",
+                    });
+                }
+            }
+        }
+
+        return { count: totalCreditsCount, totalExpiredAmount };
+    } catch (err) {
+        console.error("Error in expireOverdueRewardCredits:", err);
+        return { count: 0, totalExpiredAmount: 0, error: err.message };
+    }
+}
+
 // Global expiry sweep across all users (used by admin or cron)
 exports.runGlobalExpirySweep = async () => {
+    const drxSweep = await expireOverdueRewardCredits();
+
     const settings = await RewardSettings.findOne({ isActive: true });
     if (!settings || !settings.expiryEnabled || settings.expiryType === "never") {
-        return { sweptUsers: 0, totalPointsExpired: 0, message: "Rewards expiry is currently disabled." };
+        return {
+            sweptUsers: 0,
+            totalPointsExpired: 0,
+            drxCreditsExpired: drxSweep.count,
+            totalRewardCashExpired: drxSweep.totalExpiredAmount,
+            message: drxSweep.totalExpiredAmount > 0
+                ? `Expired ₹${drxSweep.totalExpiredAmount} DRX reward cash. Reward points expiry is currently disabled.`
+                : "Rewards expiry is currently disabled.",
+        };
     }
 
     const now = new Date();
@@ -86,49 +171,47 @@ exports.runGlobalExpirySweep = async () => {
         expiresAt: { $exists: true, $ne: null, $lte: now },
     });
 
-    if (!expiredTxns || expiredTxns.length === 0) {
-        return { sweptUsers: 0, totalPointsExpired: 0, message: "No expired points found." };
-    }
-
-    // Group by user
-    const userMap = {};
-    for (const tx of expiredTxns) {
-        const uId = tx.user.toString();
-        if (!userMap[uId]) userMap[uId] = [];
-        userMap[uId].push(tx);
-    }
-
     let totalPoints = 0;
     let userCount = 0;
 
-    for (const [uId, txns] of Object.entries(userMap)) {
-        let userExpired = 0;
-        for (const tx of txns) {
-            userExpired += tx.points;
-            tx.isExpired = true;
-            tx.expiredAt = now;
-            await tx.save();
+    if (expiredTxns && expiredTxns.length > 0) {
+        // Group by user
+        const userMap = {};
+        for (const tx of expiredTxns) {
+            const uId = tx.user.toString();
+            if (!userMap[uId]) userMap[uId] = [];
+            userMap[uId].push(tx);
         }
 
-        if (userExpired > 0) {
-            const user = await User.findById(uId);
-            if (user) {
-                user.rewardPoints = Math.max(0, (user.rewardPoints || 0) - userExpired);
-                await user.save();
+        for (const [uId, txns] of Object.entries(userMap)) {
+            let userExpired = 0;
+            for (const tx of txns) {
+                userExpired += tx.points;
+                tx.isExpired = true;
+                tx.expiredAt = now;
+                await tx.save();
+            }
 
-                await RewardTxn.create({
-                    user: uId,
-                    type: "expired",
-                    points: -userExpired,
-                    description: `Expired ${userExpired} reward points past validity period`,
-                    extra: {
-                        expiredTxnIds: txns.map((t) => t._id),
-                        expiredAt: now,
-                    },
-                });
+            if (userExpired > 0) {
+                const user = await User.findById(uId);
+                if (user) {
+                    user.rewardPoints = Math.max(0, (user.rewardPoints || 0) - userExpired);
+                    await user.save();
 
-                totalPoints += userExpired;
-                userCount++;
+                    await RewardTxn.create({
+                        user: uId,
+                        type: "expired",
+                        points: -userExpired,
+                        description: `Expired ${userExpired} reward points past validity period`,
+                        extra: {
+                            expiredTxnIds: txns.map((t) => t._id),
+                            expiredAt: now,
+                        },
+                    });
+
+                    totalPoints += userExpired;
+                    userCount++;
+                }
             }
         }
     }
@@ -136,12 +219,15 @@ exports.runGlobalExpirySweep = async () => {
     return {
         sweptUsers: userCount,
         totalPointsExpired: totalPoints,
-        message: `Successfully expired ${totalPoints} points across ${userCount} users.`,
+        drxCreditsExpired: drxSweep.count,
+        totalRewardCashExpired: drxSweep.totalExpiredAmount,
+        message: `Successfully expired ${totalPoints} points and ₹${drxSweep.totalExpiredAmount} DRX reward cash across users.`,
     };
 };
 
 exports.calculateExpiresAt = calculateExpiresAt;
 exports.processExpiredPoints = processExpiredPoints;
+exports.expireOverdueRewardCredits = expireOverdueRewardCredits;
 
 // ── GET /api/rewards/balance ─────────────────────────────────────────────────
 exports.getRewardBalance = async (req, res, next) => {

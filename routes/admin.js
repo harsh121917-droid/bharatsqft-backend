@@ -14,6 +14,8 @@ const {
   getAllRewardHistory,
   getAdminReferrals,
   getAdminRewardsSummary,
+  getRewardCredits,
+  grantUserRewardCredit,
   getAdminCoins, createCoin, updateCoin, deleteCoin, uploadCoinImage,
   getAppConfig, updateAppConfig,
   getJewelleryOrders, updateJewelleryOrder,
@@ -151,6 +153,8 @@ router.get("/rewards/history", getAllRewardHistory);
 router.get("/rewards/summary", getAdminRewardsSummary);
 router.get("/rewards/referrals", getAdminReferrals);
 router.get("/referrals", getAdminReferrals);
+router.get("/rewards/credits", getRewardCredits);
+router.post("/rewards/credit-user", grantUserRewardCredit);
 
 // Coin Catalog Management
 router.get("/coins", getAdminCoins);
