@@ -174,6 +174,8 @@ function openPropertyModal() {
     if (document.getElementById("prop-pincode")) document.getElementById("prop-pincode").value = "";
     if (document.getElementById("prop-sold-bricks")) document.getElementById("prop-sold-bricks").value = "0";
     if (document.getElementById("prop-appreciation")) document.getElementById("prop-appreciation").value = "8.5";
+    if (document.getElementById("prop-target-xirr")) document.getElementById("prop-target-xirr").value = "";
+    if (document.getElementById("prop-growth-projections")) document.getElementById("prop-growth-projections").value = "";
 
     const ytInput = document.getElementById("prop-youtube-url");
     if (ytInput) ytInput.value = "";
@@ -595,6 +597,8 @@ async function saveProperty() {
     const pincode = document.getElementById("prop-pincode")?.value.trim() || "";
     const soldBricks = Number(document.getElementById("prop-sold-bricks")?.value) || 0;
     const expectedAppreciation = Number(document.getElementById("prop-appreciation")?.value) || 8.5;
+    const targetXirr = Number(document.getElementById("prop-target-xirr")?.value) || 0;
+    const growthProjections = document.getElementById("prop-growth-projections")?.value.trim() || "";
 
     // SPV & Escrow fields
     const spvName = document.getElementById("prop-spv-name")?.value.trim() || "VIKAONE REALTY SERIES 001 LLP";
@@ -631,6 +635,8 @@ async function saveProperty() {
         },
         expectedRentalYield: rentalYield || 3,
         expectedAppreciation,
+        targetXirr,
+        growthProjections,
         purchaseMode,
         youtubeUrl,
         investmentEnabled: true,
@@ -704,6 +710,8 @@ async function editProperty(id) {
             if (document.getElementById("prop-sold-bricks")) document.getElementById("prop-sold-bricks").value = p.soldBricks ?? 0;
             document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
             if (document.getElementById("prop-appreciation")) document.getElementById("prop-appreciation").value = p.expectedAppreciation ?? 8.5;
+            if (document.getElementById("prop-target-xirr")) document.getElementById("prop-target-xirr").value = p.targetXirr ?? "";
+            if (document.getElementById("prop-growth-projections")) document.getElementById("prop-growth-projections").value = p.growthProjections || "";
 
             const ytInput = document.getElementById("prop-youtube-url");
             if (ytInput) ytInput.value = p.youtubeUrl || (p.videos?.[0]?.url || "");
@@ -790,13 +798,27 @@ async function deleteProperty(id) {
     }
 }
 
-// ── Enquiries ─────────────────────────────────────────────────
+// ── Enquiries & Full Ownership Lead Tracking ──────────────────
 let allEnquiries = [];
+let currentEnquiryTab = "all";
+
+function setEnquiryTab(tab) {
+    currentEnquiryTab = tab;
+    const btnAll = document.getElementById("btn-enquiry-all");
+    const btnLeads = document.getElementById("btn-enquiry-leads");
+    const btnGen = document.getElementById("btn-enquiry-general");
+
+    if (btnAll) btnAll.className = `btn btn-sm ${tab === 'all' ? 'btn-primary' : 'btn-secondary'}`;
+    if (btnLeads) btnLeads.className = `btn btn-sm ${tab === 'leads' ? 'btn-primary' : 'btn-secondary'}`;
+    if (btnGen) btnGen.className = `btn btn-sm ${tab === 'general' ? 'btn-primary' : 'btn-secondary'}`;
+
+    filterEnquiries(document.querySelector("#page-enquiries .search-bar")?.value || "");
+}
 
 async function loadEnquiries() {
     const body = document.getElementById("enquiries-body");
     if (!body) return;
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading customer enquiries...</div></div>`;
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading customer enquiries & leads...</div></div>`;
 
     try {
         const res = await api("/admin/enquiries");
@@ -806,20 +828,38 @@ async function loadEnquiries() {
         }
 
         allEnquiries = res.data || [];
-        renderEnquiryTable(allEnquiries);
+        const leadsCount = allEnquiries.filter(e => e.type === "full_ownership_lead" || e.preferredDate).length;
+        const badge = document.getElementById("leads-count-badge");
+        if (badge) badge.textContent = leadsCount;
+
+        filterEnquiries(document.querySelector("#page-enquiries .search-bar")?.value || "");
     } catch (err) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading enquiries</div></div>`;
     }
 }
 
 function filterEnquiries(query) {
     const q = (query || "").toLowerCase();
-    const filtered = allEnquiries.filter(e =>
-        (e.name || "").toLowerCase().includes(q) ||
-        (e.email || "").toLowerCase().includes(q) ||
-        (e.phone || "").toLowerCase().includes(q) ||
-        (e.message || "").toLowerCase().includes(q)
-    );
+    let filtered = allEnquiries.filter(e => {
+        if (currentEnquiryTab === "leads") {
+            return e.type === "full_ownership_lead" || !!e.preferredDate;
+        } else if (currentEnquiryTab === "general") {
+            return e.type !== "full_ownership_lead" && !e.preferredDate;
+        }
+        return true;
+    });
+
+    if (q) {
+        filtered = filtered.filter(e =>
+            (e.name || "").toLowerCase().includes(q) ||
+            (e.email || "").toLowerCase().includes(q) ||
+            (e.phone || "").toLowerCase().includes(q) ||
+            (e.propertyTitle || "").toLowerCase().includes(q) ||
+            (e.property?.title || "").toLowerCase().includes(q) ||
+            (e.preferredDate || "").toLowerCase().includes(q) ||
+            (e.message || "").toLowerCase().includes(q)
+        );
+    }
     renderEnquiryTable(filtered);
 }
 
@@ -828,7 +868,7 @@ function renderEnquiryTable(enquiries) {
     if (!body) return;
 
     if (!enquiries || enquiries.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-inbox" style="font-size:32px;color:var(--text-dim)"></i><div>No enquiries found</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-inbox" style="font-size:32px;color:var(--text-dim)"></i><div>No enquiries or leads found in this view</div></div>`;
         return;
     }
 
@@ -837,9 +877,10 @@ function renderEnquiryTable(enquiries) {
         <table>
             <thead>
                 <tr>
-                    <th>Customer</th>
-                    <th>Subject / Property</th>
-                    <th>Message</th>
+                    <th>Customer Details</th>
+                    <th>Type & Property</th>
+                    <th>Scheduled Callback</th>
+                    <th>Notes / Message</th>
                     <th>Received</th>
                     <th>Status</th>
                     <th style="text-align:right">Action</th>
@@ -848,26 +889,64 @@ function renderEnquiryTable(enquiries) {
             <tbody>`;
 
     enquiries.forEach(e => {
-        let badgeClass = "badge-new";
-        if (e.status === "resolved") badgeClass = "badge-success";
-        if (e.status === "in_progress") badgeClass = "badge-pending";
+        const isFullOwnership = e.type === "full_ownership_lead" || !!e.preferredDate;
+        let badgeColor = "#6b7280";
+        if (e.status === "scheduled") badgeColor = "#8b5cf6";
+        if (e.status === "contacted") badgeColor = "#3b82f6";
+        if (e.status === "deal_in_progress") badgeColor = "#f59e0b";
+        if (e.status === "resolved") badgeColor = "#10b981";
+        if (e.status === "new") badgeColor = "#ec4899";
 
         html += `
-        <tr>
+        <tr style="${isFullOwnership ? 'background:rgba(99,102,241,0.04);' : ''}">
             <td>
-                <div style="font-weight:600;color:#fff">${e.name || '—'}</div>
-                <div style="font-size:12px;color:var(--text-dim)">${e.email || ''} • ${e.phone || ''}</div>
+                <div style="font-weight:700;color:#fff">${e.name || 'Anonymous User'}</div>
+                <div style="font-size:12px;color:var(--text-dim)">
+                    <a href="tel:${e.phone || ''}" style="color:var(--gold);text-decoration:none">📞 ${e.phone || '—'}</a>
+                    ${e.email ? ` • <span style="color:var(--text-dim)">${e.email}</span>` : ''}
+                </div>
             </td>
-            <td style="font-weight:500">${e.property?.title || e.subject || 'General Enquiry'}</td>
-            <td style="max-width:280px;font-size:12.5px;color:var(--text-muted)">${e.message || '—'}</td>
-            <td style="font-size:12px;color:var(--text-dim)">${formatDateTime(e.createdAt)}</td>
-            <td><span class="badge ${badgeClass}">${e.status}</span></td>
+            <td>
+                ${isFullOwnership ? `
+                    <span class="badge" style="background:rgba(99,102,241,0.25);color:#818cf8;border:1px solid rgba(99,102,241,0.4);font-size:11px;font-weight:700">
+                        <i class="fas fa-crown"></i> Full Ownership Lead
+                    </span>
+                ` : `
+                    <span class="badge" style="background:rgba(255,255,255,0.08);color:var(--text-dim);font-size:11px">General Enquiry</span>
+                `}
+                <div style="font-size:12.5px;font-weight:600;color:var(--text-main);margin-top:4px">
+                    🏢 ${e.propertyTitle || e.property?.title || e.subject || 'General'}
+                </div>
+            </td>
+            <td>
+                ${(e.preferredDate || e.preferredTime) ? `
+                    <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:4px 8px;display:inline-block">
+                        <div style="font-weight:700;color:#10b981;font-size:11.5px">
+                            <i class="fas fa-calendar-alt"></i> ${e.preferredDate || 'Any Date'}
+                        </div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:2px">
+                            <i class="fas fa-clock"></i> ${e.preferredTime || 'Any Time'}
+                        </div>
+                    </div>
+                ` : `<span style="color:var(--text-dim);font-size:12px">—</span>`}
+            </td>
+            <td style="max-width:240px;font-size:12px;color:var(--text-muted);word-break:break-word">
+                ${e.message || '—'}
+            </td>
+            <td style="font-size:12px;color:var(--text-dim);white-space:nowrap">${formatDateTime(e.createdAt)}</td>
+            <td>
+                <select class="form-control" onchange="updateEnquiryStatus('${e._id}', this.value)" style="font-size:11px;padding:3px 6px;height:auto;font-weight:700;color:${badgeColor};border-color:${badgeColor}">
+                    <option value="new" ${e.status === 'new' ? 'selected' : ''}>New</option>
+                    <option value="scheduled" ${e.status === 'scheduled' ? 'selected' : ''}>📅 Scheduled</option>
+                    <option value="contacted" ${e.status === 'contacted' ? 'selected' : ''}>📞 Contacted</option>
+                    <option value="deal_in_progress" ${e.status === 'deal_in_progress' ? 'selected' : ''}>💼 In Progress</option>
+                    <option value="resolved" ${e.status === 'resolved' ? 'selected' : ''}>✅ Resolved</option>
+                    <option value="closed" ${e.status === 'closed' ? 'selected' : ''}>Closed</option>
+                </select>
+            </td>
             <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px">
-                    <button class="btn btn-sm btn-secondary" onclick="updateEnquiryStatus('${e._id}', '${e.status === 'resolved' ? 'new' : 'resolved'}')">
-                        <i class="fas ${e.status === 'resolved' ? 'fa-undo' : 'fa-check'}"></i> ${e.status === 'resolved' ? 'Reopen' : 'Resolve'}
-                    </button>
-                    <button class="btn-icon" onclick="deleteEnquiry('${e._id}')">
+                    <button class="btn-icon" title="Delete enquiry" onclick="deleteEnquiry('${e._id}')">
                         <i class="fas fa-trash" style="color:var(--danger)"></i>
                     </button>
                 </div>
@@ -886,16 +965,16 @@ async function updateEnquiryStatus(id, status) {
             body: JSON.stringify({ status })
         });
         if (res.success) {
-            toast(`Enquiry marked as ${status}`, "success");
+            toast(`Lead status updated to ${status}`, "success");
             loadEnquiries();
         }
     } catch (e) {
-        toast("Network error", "danger");
+        toast("Network error updating status", "danger");
     }
 }
 
 async function deleteEnquiry(id) {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Are you sure you want to delete this enquiry/lead?")) return;
     try {
         const res = await api(`/admin/enquiries/${id}`, { method: "DELETE" });
         if (res.success) {
@@ -903,6 +982,6 @@ async function deleteEnquiry(id) {
             loadEnquiries();
         }
     } catch (e) {
-        toast("Network error", "danger");
+        toast("Network error deleting enquiry", "danger");
     }
 }

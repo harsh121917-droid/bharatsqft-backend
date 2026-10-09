@@ -27,15 +27,31 @@ const EnquirySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["property", "mutual_fund", "general", "gold_silver", "other"],
+      enum: ["property", "full_ownership_lead", "mutual_fund", "general", "gold_silver", "other"],
       default: "general",
     },
     propertyRef: {
       type: String, // property ID or name (for future DB ref)
     },
+    propertyTitle: {
+      type: String,
+      trim: true,
+    },
+    propertyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Property",
+    },
+    preferredDate: {
+      type: String, // e.g. "2026-10-10" or "Fri 09 OCT"
+      trim: true,
+    },
+    preferredTime: {
+      type: String, // e.g. "11:00 AM"
+      trim: true,
+    },
     status: {
       type: String,
-      enum: ["new", "in_progress", "resolved", "closed"],
+      enum: ["new", "scheduled", "contacted", "deal_in_progress", "in_progress", "resolved", "closed"],
       default: "new",
     },
     assignedTo: {
@@ -47,7 +63,7 @@ const EnquirySchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["website", "whatsapp", "phone", "other"],
+      enum: ["website", "app", "whatsapp", "phone", "other"],
       default: "website",
     },
     // Link to registered user if they're logged in

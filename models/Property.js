@@ -60,6 +60,8 @@ const PropertySchema = new mongoose.Schema(
         investmentEnabled: { type: Boolean, default: true }, // toggle on/off
         expectedAppreciation: { type: Number, default: 8 },  // % per year, capital growth
         expectedRentalYield: { type: Number, default: 3 },  // % per year, rental income
+        targetXirr: { type: Number, default: 0 },          // % Target XIRR / IRR displayed on cards and details
+        growthProjections: { type: String, trim: true, default: "" }, // Custom growth drivers & infrastructure narrative
         purchaseMode: {
             type: String,
             enum: ["both", "bricks", "direct"],

@@ -3323,12 +3323,21 @@
             <div class="page" id="page-enquiries">
                 <div class="section-header">
                     <div>
-                        <div class="section-title"><i class="fas fa-envelope" style="color:var(--info)"></i> Enquiries
+                        <div class="section-title"><i class="fas fa-phone-alt" style="color:#6366f1"></i> Inbound Enquiries & Advisory Leads
                         </div>
-                        <div class="section-subtitle">Inbound inquiries from mobile app and web visitors</div>
+                        <div class="section-subtitle">View and track customer callbacks, scheduled advisory calls, and property leads</div>
                     </div>
-                    <input class="search-bar" placeholder="🔍 Search enquiries..." oninput="filterEnquiries(this.value)"
-                        style="max-width:280px" />
+                    <div style="display:flex;gap:10px;align-items:center">
+                        <div style="display:flex;gap:6px;background:rgba(255,255,255,0.05);padding:4px;border-radius:var(--radius-sm)">
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-enquiry-all" onclick="setEnquiryTab('all')">All</button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-enquiry-leads" onclick="setEnquiryTab('leads')" style="display:flex;align-items:center;gap:5px">
+                                <i class="fas fa-calendar-check" style="color:#10b981"></i> Full Ownership Calls <span id="leads-count-badge" class="badge" style="background:#6366f1;color:#fff;font-size:10px">0</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-enquiry-general" onclick="setEnquiryTab('general')">General</button>
+                        </div>
+                        <input class="search-bar" placeholder="🔍 Search customer / property..." oninput="filterEnquiries(this.value)"
+                            style="max-width:260px" />
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <div id="enquiries-body">
@@ -4201,16 +4210,21 @@
                             <input class="form-control" type="number" id="prop-sold-bricks" placeholder="0" />
                         </div>
                     </div>
-                    <div class="form-grid-2">
+                    <div class="form-grid-3">
                         <div class="form-group">
                             <label class="form-label">Expected Rental Yield (%)</label>
                             <input class="form-control" type="number" step="0.1" id="prop-rental-yield"
                                 placeholder="8.5" required />
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Expected Capital Appreciation (%)</label>
+                            <label class="form-label">Capital Growth (%)</label>
                             <input class="form-control" type="number" step="0.1" id="prop-appreciation"
                                 placeholder="10.2" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="color:var(--gold);font-weight:700">Target XIRR / IRR (%)</label>
+                            <input class="form-control" type="number" step="0.1" id="prop-target-xirr"
+                                placeholder="e.g. 18.5" style="border-color:rgba(234,179,8,0.5);background:rgba(234,179,8,0.05);font-weight:700" />
                         </div>
                     </div>
                     <div class="form-group" style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
@@ -4230,6 +4244,13 @@
                         <label class="form-label">Description</label>
                         <textarea class="form-control" id="prop-desc" rows="3"
                             placeholder="Detailed property overview..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="display:flex;align-items:center;gap:6px">
+                            <i class="fas fa-chart-line" style="color:#10b981"></i> Growth Projections & Micro-Market Narrative
+                        </label>
+                        <textarea class="form-control" id="prop-growth-projections" rows="2"
+                            placeholder="Enter micro-market growth drivers (e.g. upcoming metro, airport corridor, lease indexation rates)..."></textarea>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Amenities</label>

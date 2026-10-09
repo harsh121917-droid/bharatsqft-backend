@@ -167,11 +167,25 @@ exports.createProperty = async (req, res, next) => {
 exports.updateProperty = async (req, res, next) => {
     try {
         const body = { ...req.body };
-        if (body.totalInvestmentRequired && (!body.price || !body.price.amount)) {
-            body["price.amount"] = body.totalInvestmentRequired;
-            if (!body.price) body.price = { amount: body.totalInvestmentRequired, currency: "INR", label: "onwards" };
-        } else if (body.price?.amount && !body.totalInvestmentRequired) {
-            body.totalInvestmentRequired = body.price.amount;
+        if (body.totalInvestmentRequired) {
+            body.totalInvestmentRequired = Number(body.totalInvestmentRequired);
+            if (!body.price) {
+                body.price = { amount: body.totalInvestmentRequired, currency: "INR", label: "onwards" };
+            } else {
+                body.price.amount = body.totalInvestmentRequired;
+            }
+        } else if (body.price?.amount) {
+            body.totalInvestmentRequired = Number(body.price.amount);
+        }
+
+        if (body.targetXirr !== undefined) {
+            body.targetXirr = Number(body.targetXirr) || 0;
+        }
+        if (body.expectedRentalYield !== undefined) {
+            body.expectedRentalYield = Number(body.expectedRentalYield) || 0;
+        }
+        if (body.expectedAppreciation !== undefined) {
+            body.expectedAppreciation = Number(body.expectedAppreciation) || 0;
         }
 
         const property = await Property.findByIdAndUpdate(
