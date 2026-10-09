@@ -4,7 +4,7 @@ const {
   getAllUsers, getUserById, getUserTransactions, updateUser, deleteUser, clearUserLocation,
   getAllEnquiries, updateEnquiry, deleteEnquiry,
   getDashboard,
-  getWithdrawals, completeWithdrawal,
+  getWithdrawals, completeWithdrawal, rejectWithdrawal,
   getSellApprovals, approveSellPayout,
   getSellSettings, updateSellSettings,
   getSchemeEnrollments,
@@ -134,6 +134,7 @@ router.patch("/kyc/:id/bank", updateKycBank);
 // Withdrawals
 router.get("/withdrawals", getWithdrawals);
 router.patch("/withdrawals/:id/complete", completeWithdrawal);
+router.patch("/withdrawals/:id/reject", rejectWithdrawal);
 
 // Sell Payout Approvals (gold + silver + copper)
 router.get("/sell-approvals", getSellApprovals);

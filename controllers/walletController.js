@@ -104,8 +104,41 @@ exports.getWallet = async (req, res, next) => {
             }
 
             // Fresh wallet instance
-            const freshWallet = await Wallet.findOne({ user: req.user._id });
-            const w = freshWallet || wallet;
+            let freshWallet = await Wallet.findOne({ user: req.user._id });
+            let w = freshWallet || wallet;
+
+            // Auto-repair check: If user had an invalid drx_withdraw that tried to withdraw reward cash or exceeded deposited drxBalance, cancel it and release lock!
+            try {
+                const invalidDrxWithdraws = await WalletTxn.find({
+                    user: req.user._id,
+                    type: "drx_withdraw",
+                    status: "pending",
+                });
+                if (invalidDrxWithdraws.length > 0) {
+                    const deposited = (w.drxBalance && w.drxBalance > 0) ? w.drxBalance : 0;
+                    let repaired = false;
+                    for (const iw of invalidDrxWithdraws) {
+                        if (iw.amount > deposited || deposited === 0) {
+                            iw.status = "cancelled";
+                            iw.note = "Withdrawal cancelled: Promotional reward cash is not withdrawable to bank.";
+                            await iw.save();
+                            repaired = true;
+                        }
+                    }
+                    if (repaired) {
+                        const remaining = await WalletTxn.find({
+                            user: req.user._id,
+                            type: "drx_withdraw",
+                            status: "pending",
+                        });
+                        const validLocked = remaining.reduce((sum, item) => sum + (item.amount || 0), 0);
+                        w.drxLockedBalance = validLocked;
+                        await w.save();
+                    }
+                }
+            } catch (autoErr) {
+                console.error("DRX wallet withdrawal auto-repair notice:", autoErr.message);
+            }
 
             const drxTxns = await WalletTxn.find({
                 user: req.user._id,
@@ -562,22 +595,29 @@ exports.initiateWithdraw = async (req, res, next) => {
         const parsedAmount = parseFloat(amount);
 
         if (isDrx) {
-            const drxBal = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : (wallet.balance || 0);
-            const drxLocked = (wallet.drxLockedBalance && wallet.drxLockedBalance > 0) ? wallet.drxLockedBalance : (wallet.lockedBalance || 0);
-            const available = Math.max(0, drxBal - drxLocked);
-            if (parsedAmount > available) {
+            // Strictly deposited capital only. Promotional reward cash CANNOT be withdrawn to bank.
+            const depositedBal = (wallet.drxBalance && wallet.drxBalance > 0) ? wallet.drxBalance : 0;
+            const drxLocked = (wallet.drxLockedBalance && wallet.drxLockedBalance > 0) ? wallet.drxLockedBalance : 0;
+            const withdrawable = Math.max(0, parseFloat((depositedBal - drxLocked).toFixed(2)));
+
+            if (parsedAmount > withdrawable) {
+                const rewardBal = (wallet.drxRewardBalance && wallet.drxRewardBalance > 0) ? wallet.drxRewardBalance : 0;
+                let errMsg = `Insufficient withdrawable balance. Available deposited funds: ₹${withdrawable.toFixed(2)}`;
+                if (rewardBal > 0) {
+                    errMsg = `Promotional reward cash (₹${rewardBal.toFixed(2)}) cannot be withdrawn to a bank account. Only deposited funds (Withdrawable: ₹${withdrawable.toFixed(2)}) can be withdrawn. Reward cash is reserved for property investments.`;
+                }
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient balance. Available: ₹${available.toFixed(2)}`,
+                    message: errMsg,
                 });
             }
-            const balBefore = drxBal;
+
+            const balBefore = depositedBal;
             wallet.drxLockedBalance = parseFloat((drxLocked + parsedAmount).toFixed(2));
-            wallet.lockedBalance = parseFloat(((wallet.lockedBalance || 0) + parsedAmount).toFixed(2));
             await wallet.save();
 
             const walletTxn = await recordTxn(
-                req.user._id, "drx_withdraw", parsedAmount, balBefore, drxBal,
+                req.user._id, "drx_withdraw", parsedAmount, balBefore, depositedBal,
                 { appSource: "vikadrx", note: `Withdraw ₹${parsedAmount} from Vika DRX to bank`, status: "pending" }
             );
 
@@ -586,7 +626,7 @@ exports.initiateWithdraw = async (req, res, next) => {
                 message: "Withdrawal initiated. Will reach your bank within 24 hours.",
                 data: {
                     amount: parsedAmount, bankAccountId,
-                    walletBalance: drxBal,
+                    walletBalance: depositedBal,
                     lockedBalance: wallet.drxLockedBalance,
                     releaseTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 },

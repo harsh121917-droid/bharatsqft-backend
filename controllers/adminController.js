@@ -2205,7 +2205,7 @@ exports.getDashboard = async (req, res, next) => {
 exports.getWithdrawals = async (req, res, next) => {
     try {
         const { status = "pending", page = 1, limit = 30 } = req.query;
-        const filter = { type: "withdraw" };
+        const filter = { type: { $in: ["withdraw", "drx_withdraw"] } };
         if (status !== "all") filter.status = status;
 
         const [txns, total] = await Promise.all([
@@ -2226,11 +2226,10 @@ exports.getWithdrawals = async (req, res, next) => {
 };
 
 // PATCH /api/admin/withdrawals/:id/complete  — manually release a pending withdrawal
-// (does the exact same thing the 24h cron does, just triggered on-demand by admin)
 exports.completeWithdrawal = async (req, res, next) => {
     try {
         const wtxn = await WalletTxn.findById(req.params.id);
-        if (!wtxn || wtxn.type !== "withdraw") {
+        if (!wtxn || !["withdraw", "drx_withdraw"].includes(wtxn.type)) {
             return res.status(404).json({ success: false, message: "Withdrawal request not found" });
         }
         if (wtxn.status !== "pending") {
@@ -2239,6 +2238,19 @@ exports.completeWithdrawal = async (req, res, next) => {
 
         const wallet = await Wallet.findOne({ user: wtxn.user });
         if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
+
+        if (wtxn.type === "drx_withdraw" || wtxn.appSource === "vikadrx") {
+            wallet.drxBalance = Math.max(0, parseFloat(((wallet.drxBalance || 0) - wtxn.amount).toFixed(2)));
+            wallet.drxLockedBalance = Math.max(0, parseFloat(((wallet.drxLockedBalance || 0) - wtxn.amount).toFixed(2)));
+            wallet.drxTotalWithdrawn = parseFloat(((wallet.drxTotalWithdrawn || 0) + wtxn.amount).toFixed(2));
+            await wallet.save();
+
+            wtxn.status = "success";
+            wtxn.balanceAfter = wallet.drxBalance;
+            wtxn.note = `₹${wtxn.amount} withdrawn from DRX to bank (marked complete by admin)`;
+            await wtxn.save();
+            return res.json({ success: true, message: "DRX Withdrawal marked complete", data: wtxn });
+        }
 
         wallet.balance = parseFloat((wallet.balance - wtxn.amount).toFixed(2));
         wallet.lockedBalance = parseFloat((wallet.lockedBalance - wtxn.amount).toFixed(2));
@@ -2251,6 +2263,37 @@ exports.completeWithdrawal = async (req, res, next) => {
         await wtxn.save();
 
         res.json({ success: true, message: "Withdrawal marked complete", data: wtxn });
+    } catch (err) { next(err); }
+};
+
+// PATCH /api/admin/withdrawals/:id/reject  — reject pending withdrawal and unlock funds
+exports.rejectWithdrawal = async (req, res, next) => {
+    try {
+        const { reason } = req.body || {};
+        const wtxn = await WalletTxn.findById(req.params.id);
+        if (!wtxn || !["withdraw", "drx_withdraw"].includes(wtxn.type)) {
+            return res.status(404).json({ success: false, message: "Withdrawal request not found" });
+        }
+        if (wtxn.status !== "pending") {
+            return res.status(400).json({ success: false, message: `Already ${wtxn.status}` });
+        }
+
+        const wallet = await Wallet.findOne({ user: wtxn.user });
+        if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
+
+        if (wtxn.type === "drx_withdraw" || wtxn.appSource === "vikadrx") {
+            wallet.drxLockedBalance = Math.max(0, parseFloat(((wallet.drxLockedBalance || 0) - wtxn.amount).toFixed(2)));
+            await wallet.save();
+        } else {
+            wallet.lockedBalance = Math.max(0, parseFloat(((wallet.lockedBalance || 0) - wtxn.amount).toFixed(2)));
+            await wallet.save();
+        }
+
+        wtxn.status = "cancelled";
+        wtxn.note = `Withdrawal rejected by admin. ${reason ? "Reason: " + reason : ""}`;
+        await wtxn.save();
+
+        res.json({ success: true, message: "Withdrawal rejected and funds unlocked", data: wtxn });
     } catch (err) { next(err); }
 };
 
