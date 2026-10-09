@@ -61,7 +61,7 @@ function renderProperties(props) {
                     <th>Total Value</th>
                     <th>Bricks</th>
                     <th>Funded</th>
-                    <th>Rental Yield</th>
+                    <th style="min-width:130px">Yield & Returns</th>
                     <th>Status / Visibility</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
@@ -107,7 +107,13 @@ function renderProperties(props) {
                     <div style="width:${Math.min(fundedPct, 100)}%;height:100%;background:var(--success)"></div>
                 </div>
             </td>
-            <td style="font-weight:600;color:var(--success)">${p.expectedRentalYield || 0}%</td>
+            <td>
+                <div style="font-weight:700;color:var(--success);font-size:12.5px">${p.expectedRentalYield ?? 0}% Yield</div>
+                <div style="font-size:11px;color:var(--text-dim);margin-top:2px">
+                    <span>${p.expectedAppreciation ?? 8.5}% Growth</span>
+                    ${p.targetXirr ? ` · <strong style="color:var(--gold)">${p.targetXirr}% XIRR</strong>` : ''}
+                </div>
+            </td>
             <td>
                 <div style="display:inline-flex;align-items:center;gap:8px">
                     <label class="switch" title="${isPublished ? 'Published in App (Click to unpublish)' : 'Draft / Hidden from App (Click to publish)'}">
@@ -633,9 +639,9 @@ async function saveProperty() {
             currency: "INR",
             label: "onwards"
         },
-        expectedRentalYield: rentalYield || 3,
-        expectedAppreciation,
-        targetXirr,
+        expectedRentalYield: isNaN(rentalYield) ? 3 : rentalYield,
+        expectedAppreciation: isNaN(expectedAppreciation) ? 8.5 : expectedAppreciation,
+        targetXirr: isNaN(targetXirr) ? 0 : targetXirr,
         growthProjections,
         purchaseMode,
         youtubeUrl,
@@ -685,85 +691,147 @@ async function saveProperty() {
     }
 }
 
-async function editProperty(id) {
-    editingPropertyId = id;
+function populatePropertyModal(p) {
+    const modal = document.getElementById("prop-modal");
+    if (!modal) {
+        console.error("prop-modal element not found in DOM!");
+        toast("Property modal element not found in DOM", "danger");
+        return;
+    }
+
+    // 1. Immediately display the modal overlay so user gets instant visual response
+    modal.style.display = "flex";
+
+    if (!p) return;
+    editingPropertyId = p._id ? String(p._id) : editingPropertyId;
+
     try {
-        const res = await api(`/admin/properties/${id}`);
-        if (res.success && res.data) {
-            const p = res.data;
-            document.getElementById("prop-modal-title").textContent = "Edit Property Listing";
-            document.getElementById("prop-title").value = p.title || "";
-            document.getElementById("prop-desc").value = p.description || "";
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = (val !== undefined && val !== null) ? val : "";
+        };
 
-            // Specifications
-            if (document.getElementById("prop-type")) document.getElementById("prop-type").value = p.propertyType || "commercial";
-            if (document.getElementById("prop-bhk")) document.getElementById("prop-bhk").value = p.bhk || "";
-            if (document.getElementById("prop-area")) document.getElementById("prop-area").value = p.area || "";
-            if (document.getElementById("prop-address")) document.getElementById("prop-address").value = p.location?.address || "";
-            document.getElementById("prop-city").value = p.location?.city || "";
-            document.getElementById("prop-state").value = p.location?.state || "";
-            if (document.getElementById("prop-pincode")) document.getElementById("prop-pincode").value = p.location?.pincode || "";
+        const setText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
 
-            const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : "");
-            document.getElementById("prop-total-investment").value = totalVal || "";
-            document.getElementById("prop-total-bricks").value = p.totalBricks || "";
-            if (document.getElementById("prop-sold-bricks")) document.getElementById("prop-sold-bricks").value = p.soldBricks ?? 0;
-            document.getElementById("prop-rental-yield").value = p.expectedRentalYield || "";
-            if (document.getElementById("prop-appreciation")) document.getElementById("prop-appreciation").value = p.expectedAppreciation ?? 8.5;
-            if (document.getElementById("prop-target-xirr")) document.getElementById("prop-target-xirr").value = p.targetXirr ?? "";
-            if (document.getElementById("prop-growth-projections")) document.getElementById("prop-growth-projections").value = p.growthProjections || "";
+        setText("prop-modal-title", "Edit Property Listing");
+        setVal("prop-title", p.title || "");
+        setVal("prop-desc", p.description || "");
 
-            const ytInput = document.getElementById("prop-youtube-url");
-            if (ytInput) ytInput.value = p.youtubeUrl || (p.videos?.[0]?.url || "");
-            const modeSelect = document.getElementById("prop-purchase-mode");
-            if (modeSelect) modeSelect.value = p.purchaseMode || "both";
-            handlePropPurchaseModeChange();
-            currentAmenities = p.amenities || [];
-            uploadedImages = (p.images || []).map(img => typeof img === 'string' ? { url: img, isCover: false } : { url: img.url, isCover: !!img.isCover });
-            if (uploadedImages.length > 0 && !uploadedImages.some(i => i.isCover)) {
-                uploadedImages[0].isCover = true;
-            }
-            renderAmenityTags();
-            renderImagesGrid();
+        // Specifications
+        setVal("prop-type", p.propertyType || "commercial");
+        setVal("prop-bhk", p.bhk || "");
+        setVal("prop-area", p.area || "");
+        setVal("prop-address", p.location?.address || "");
+        setVal("prop-city", p.location?.city || "");
+        setVal("prop-state", p.location?.state || "");
+        setVal("prop-pincode", p.location?.pincode || "");
 
-            // Load Valuation Report
-            currentValuationReport = {
-                url: p.valuationReportUrl || "",
-                title: p.valuationReportTitle || "Valuation & Audit Report"
-            };
-            renderValuationReportPreview();
+        const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : "");
+        setVal("prop-total-investment", totalVal);
+        setVal("prop-total-bricks", p.totalBricks || "");
+        setVal("prop-sold-bricks", p.soldBricks ?? 0);
+        setVal("prop-rental-yield", p.expectedRentalYield ?? "");
+        setVal("prop-appreciation", p.expectedAppreciation ?? 8.5);
+        setVal("prop-target-xirr", p.targetXirr ?? "");
+        setVal("prop-growth-projections", p.growthProjections || "");
 
-            // Load Property Documents
-            currentPropertyDocuments = (p.documents || []).map(d => ({
+        setVal("prop-youtube-url", p.youtubeUrl || (p.videos?.[0]?.url || ""));
+        setVal("prop-purchase-mode", p.purchaseMode || "both");
+        try { handlePropPurchaseModeChange(); } catch (e) { console.warn(e); }
+
+        currentAmenities = Array.isArray(p.amenities) ? [...p.amenities] : [];
+
+        // Safely map uploaded images
+        uploadedImages = [];
+        if (Array.isArray(p.images)) {
+            uploadedImages = p.images.filter(Boolean).map(img => {
+                if (typeof img === 'string') return { url: img, isCover: false };
+                return { url: img.url || "", isCover: !!img.isCover };
+            }).filter(img => !!img.url);
+        }
+        if (uploadedImages.length > 0 && !uploadedImages.some(i => i.isCover)) {
+            uploadedImages[0].isCover = true;
+        }
+        try { renderAmenityTags(); } catch (e) { console.warn(e); }
+        try { renderImagesGrid(); } catch (e) { console.warn(e); }
+
+        // Load Valuation Report
+        currentValuationReport = {
+            url: p.valuationReportUrl || "",
+            title: p.valuationReportTitle || "Valuation & Audit Report"
+        };
+        try { renderValuationReportPreview(); } catch (e) { console.warn(e); }
+
+        // Load Property Documents
+        currentPropertyDocuments = [];
+        if (Array.isArray(p.documents)) {
+            currentPropertyDocuments = p.documents.filter(Boolean).map(d => ({
                 title: d.title || "",
                 type: d.type || "Other",
                 url: d.url || "",
                 uploadedAt: d.uploadedAt
             }));
-            renderPropertyDocumentsList();
-
-            // Load SPV & Escrow Protection details
-            if (document.getElementById("prop-spv-name")) document.getElementById("prop-spv-name").value = p.spvName || "VIKAONE REALTY SERIES 001 LLP";
-            if (document.getElementById("prop-spv-bank")) document.getElementById("prop-spv-bank").value = p.spvEscrowBank || "ICICI Bank";
-            if (document.getElementById("prop-spv-account-no")) document.getElementById("prop-spv-account-no").value = p.spvEscrowAccountNo || "705105000036";
-            if (document.getElementById("prop-spv-ifsc")) document.getElementById("prop-spv-ifsc").value = p.spvEscrowIfsc || "ICIC0007051";
-            if (document.getElementById("prop-spv-branch")) document.getElementById("prop-spv-branch").value = p.spvEscrowBranch || "ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018";
-            currentSpvEscrowPdf = p.spvEscrowCertificateUrl || "";
-            renderSpvEscrowPdfPreview();
-
-            if (document.getElementById("prop-spv-trustee-name")) document.getElementById("prop-spv-trustee-name").value = p.spvTrusteeName || "Universal Trusteeship Services Limited";
-            if (document.getElementById("prop-spv-trustee-address")) document.getElementById("prop-spv-trustee-address").value = p.spvTrusteeAddress || "Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021";
-            currentSpvTrusteePdf = p.spvTrusteeCertificateUrl || "";
-            renderSpvTrusteePdfPreview();
-
-            if (document.getElementById("prop-spv-liquidity")) document.getElementById("prop-spv-liquidity").value = p.spvLiquidityPolicy || "";
-
-            document.getElementById("prop-modal").style.display = "flex";
         }
-    } catch (e) {
-        toast("Error fetching property details", "danger");
+        try { renderPropertyDocumentsList(); } catch (e) { console.warn(e); }
+
+        // Load SPV & Escrow Protection details
+        setVal("prop-spv-name", p.spvName || "VIKAONE REALTY SERIES 001 LLP");
+        setVal("prop-spv-bank", p.spvEscrowBank || "ICICI Bank");
+        setVal("prop-spv-account-no", p.spvEscrowAccountNo || "705105000036");
+        setVal("prop-spv-ifsc", p.spvEscrowIfsc || "ICIC0007051");
+        setVal("prop-spv-branch", p.spvEscrowBranch || "ICICI Bank Ltd, Shop No 12,13,14, Ground Floor, B Block Market, South City II, Sohna Road, Gurgaon, Haryana - 122018");
+        currentSpvEscrowPdf = p.spvEscrowCertificateUrl || "";
+        try { renderSpvEscrowPdfPreview(); } catch (e) { console.warn(e); }
+
+        setVal("prop-spv-trustee-name", p.spvTrusteeName || "Universal Trusteeship Services Limited");
+        setVal("prop-spv-trustee-address", p.spvTrusteeAddress || "Premises No. 74, 7th Floor, Sakhar Bhavan, Nariman Point, Mumbai 400 021");
+        currentSpvTrusteePdf = p.spvTrusteeCertificateUrl || "";
+        try { renderSpvTrusteePdfPreview(); } catch (e) { console.warn(e); }
+
+        setVal("prop-spv-liquidity", p.spvLiquidityPolicy || "");
+    } catch (err) {
+        console.error("Error populating property fields:", err);
     }
 }
+
+async function editProperty(id) {
+    if (!id) return;
+    editingPropertyId = String(id);
+    const modal = document.getElementById("prop-modal");
+
+    // 1. Immediately open modal with instant visual response
+    if (modal) {
+        modal.style.display = "flex";
+    }
+
+    // 2. Instant population from client cache
+    const cached = allProperties.find(p => String(p._id) === String(id));
+    if (cached) {
+        populatePropertyModal(cached);
+    }
+
+    // 3. Background fresh details fetch
+    try {
+        const res = await api(`/admin/properties/${id}`);
+        if (res && res.success && res.data) {
+            populatePropertyModal(res.data);
+        }
+    } catch (e) {
+        console.warn("Could not fetch remote property details, kept local state:", e);
+        if (!cached) {
+            toast("Error loading property details from server", "danger");
+            if (modal) modal.style.display = "none";
+        }
+    }
+}
+
+window.editProperty = editProperty;
+window.populatePropertyModal = populatePropertyModal;
+window.openPropertyModal = openPropertyModal;
+window.closePropertyModal = closePropertyModal;
 
 async function togglePublish(id, inputEl) {
     try {
