@@ -76,7 +76,12 @@ const PropertySchema = new mongoose.Schema(
         }],
         youtubeUrl: { type: String, trim: true, default: "" },
         valuationReportUrl: { type: String, trim: true, default: "" },
-        valuationReportTitle: { type: String, trim: true, default: "Valuation & Audit Report" },
+        valuationReportTitle: { type: String, trim: true, default: "Certified Valuation & Audit Report" },
+        valuationReportDate: { type: String, trim: true, default: "" },
+        valuationAuthority: { type: String, trim: true, default: "Independent RICS & IBBI Registered Valuer" },
+        valuationMethodology: { type: String, trim: true, default: "Discounted Cash Flow (DCF) + Comparable Sales Approach" },
+        valuationSummary: { type: String, trim: true, default: "" },
+        reraNumber: { type: String, trim: true, default: "" },
         videos: [{ url: String, title: String }],
         documents: [{
             url: { type: String, default: "" },
@@ -86,7 +91,7 @@ const PropertySchema = new mongoose.Schema(
         }],
 
         // SPV & Escrow Investor Protection (Screenshots 1-4 Feature)
-        spvName: { type: String, trim: true, default: "VIKAONE REALTY SERIES 001 LLP" },
+        spvName: { type: String, trim: true, default: "VIKADRX REALTY SERIES 001 LLP" },
         spvEscrowBank: { type: String, trim: true, default: "ICICI Bank" },
         spvEscrowAccountNo: { type: String, trim: true, default: "705105000036" },
         spvEscrowIfsc: { type: String, trim: true, default: "ICIC0007051" },

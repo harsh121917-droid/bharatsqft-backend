@@ -158,8 +158,9 @@ const pageTitles = {
     gateways: "Payment Gateways Config",
     appversion: "App Version Management",
 
-    // 3. Real Estate
+    // 3. Real Estate & Business
     properties: "Property Listings",
+    business: "Business Opportunities Management",
     investments: "Real Estate Brick Investments",
     enquiries: "Customer Enquiries",
     legalpolicies: "Real Estate Legal Policies & Agreements",
@@ -254,6 +255,9 @@ function showPage(pageId) {
             break;
         case "properties":
             loadProperties();
+            break;
+        case "business":
+            loadBusiness();
             break;
         case "investments":
             if (typeof backToAllInvestors === "function") {

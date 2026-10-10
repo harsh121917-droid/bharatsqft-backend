@@ -89,7 +89,7 @@ function renderStandardPolicyEditor(container, policy) {
                         <span class="badge" style="background:rgba(99,102,241,0.15);color:#818cf8;font-size:11px;font-weight:700">${policy.version || 'v1.0'}</span>
                     </div>
                     <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
-                        <i class="far fa-clock"></i> Last updated: ${lastUpdatedFormatted} · Synced live to Vikaone mobile app
+                        <i class="far fa-clock"></i> Last updated: ${lastUpdatedFormatted} · Synced live to VikaDrx mobile app
                     </div>
                 </div>
                 <button type="button" class="btn btn-primary" onclick="saveCurrentPolicy('${policy.slug}')" id="btn-save-policy" style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px">
@@ -191,7 +191,7 @@ function renderHelpSupportEditor(container, policy) {
             <div class="form-grid-3" style="margin-bottom:16px">
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600">Support Email</label>
-                    <input class="form-control" id="support-email" value="${policy.supportEmail || 'support@vikaone.com'}" placeholder="support@vikaone.com" />
+                    <input class="form-control" id="support-email" value="${policy.supportEmail || 'support@vikadrx.com'}" placeholder="support@vikadrx.com" />
                 </div>
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600">Phone Hotline</label>
@@ -210,7 +210,7 @@ function renderHelpSupportEditor(container, policy) {
                 </div>
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600">Registered Office Address</label>
-                    <input class="form-control" id="support-address" value="${policy.officeAddress || 'Vikaone Realty Private Limited, Nariman Point, Mumbai, Maharashtra 400021'}" placeholder="Office address..." />
+                    <input class="form-control" id="support-address" value="${policy.officeAddress || 'VikaDrx Realty Private Limited, Nariman Point, Mumbai, Maharashtra 400021'}" placeholder="Office address..." />
                 </div>
             </div>
 

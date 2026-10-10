@@ -27,7 +27,7 @@ const EnquirySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["property", "full_ownership_lead", "mutual_fund", "general", "gold_silver", "other"],
+      enum: ["property", "full_ownership_lead", "business_lead", "mutual_fund", "general", "gold_silver", "other"],
       default: "general",
     },
     propertyRef: {
@@ -40,6 +40,14 @@ const EnquirySchema = new mongoose.Schema(
     propertyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Property",
+    },
+    businessTitle: {
+      type: String,
+      trim: true,
+    },
+    businessId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BusinessOpportunity",
     },
     preferredDate: {
       type: String, // e.g. "2026-10-10" or "Fri 09 OCT"

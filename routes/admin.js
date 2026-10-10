@@ -230,9 +230,21 @@ router.post("/mutual-funds/reconciliation/run", adminMfController.triggerReconci
 router.post("/mutual-funds/reconciliation/resolve/:discrepancyId", adminMfController.resolveDiscrepancy);
 router.post("/mutual-funds/orders/:id/payout-status", adminMfController.updateMfOrderPayoutStatus);
 
-// NSE MF II Master Data & RTA Reconciliation (Section 5 & 22)
-router.post("/mutual-funds/master/reconcile", adminMfController.reconcileNseMaster);
-router.get("/mutual-funds/master/audit", adminMfController.getNseMasterAudit);
-router.get("/mutual-funds/audit-logs", adminMfController.getAuditLogs);
+// Business Opportunities Management
+const {
+  getAllBusinessForAdmin,
+  getBusinessByIdForAdmin,
+  createBusinessOpportunity,
+  updateBusinessOpportunity,
+  toggleBusinessStatus,
+  deleteBusinessOpportunity,
+} = require("../controllers/businessController");
+
+router.get("/business", getAllBusinessForAdmin);
+router.get("/business/:id", getBusinessByIdForAdmin);
+router.post("/business", createBusinessOpportunity);
+router.put("/business/:id", updateBusinessOpportunity);
+router.patch("/business/:id/toggle-status", toggleBusinessStatus);
+router.delete("/business/:id", deleteBusinessOpportunity);
 
 module.exports = router;

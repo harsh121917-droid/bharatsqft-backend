@@ -139,10 +139,10 @@ function renderUsersTable(users) {
             segmentBadge = `
             <div>
                 <span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-weight:700;font-size:11px;display:inline-flex;align-items:center;gap:4px">
-                    <i class="fas fa-building"></i> Vikaone (Real Estate)
+                    <i class="fas fa-building"></i> VikaDrx (Real Estate)
                 </span>
                 <div style="font-size:10px;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:4px">
-                    <i class="fas fa-city"></i> <span>${u.lastLoginPlatform || 'Vikaone App / Web'}</span>
+                    <i class="fas fa-city"></i> <span>${u.lastLoginPlatform || 'VikaDrx App / Web'}</span>
                 </div>
             </div>`;
         } else {
@@ -1361,7 +1361,7 @@ function renderUserDetailsContent(u) {
             segBadge.style.background = "rgba(59,130,246,0.18)";
             segBadge.style.color = "#60a5fa";
             segBadge.style.border = "1px solid rgba(59,130,246,0.4)";
-            segBadge.innerHTML = `<i class="fas fa-building"></i> Real Estate / Vikaone`;
+            segBadge.innerHTML = `<i class="fas fa-building"></i> Real Estate / VikaDrx`;
         } else {
             segBadge.style.background = "rgba(245,158,11,0.18)";
             segBadge.style.color = "#fbbf24";
@@ -1373,8 +1373,8 @@ function renderUserDetailsContent(u) {
     const loginPill = document.getElementById("ud-header-login-source");
     if (loginPill) {
         const logins = Array.isArray(u.loginPlatforms) && u.loginPlatforms.length > 0
-            ? u.loginPlatforms.map(p => p === 'goldvikaone' ? 'GoldVikaone' : (p === 'vikaone' ? 'Vikaone' : p)).join(" & ")
-            : (u.lastLoginPlatform || (seg === 'vikaone' ? 'Vikaone App' : 'GoldVikaone App'));
+            ? u.loginPlatforms.map(p => p === 'goldvikaone' ? 'GoldVikaone' : (p === 'vikaone' ? 'VikaDrx' : p)).join(" & ")
+            : (u.lastLoginPlatform || (seg === 'vikaone' ? 'VikaDrx App' : 'GoldVikaone App'));
         loginPill.innerHTML = `<i class="fas fa-mobile-alt"></i> ${logins}`;
     }
 
@@ -1842,11 +1842,11 @@ function renderUdDeviceInfo(u) {
     const seg = (u.ecosystemSegment || 'goldvikaone').toLowerCase();
     const segText = seg === 'both'
         ? '🌟 Both (DigiGold Bullion + Real Estate Bricks)'
-        : (seg === 'vikaone' ? '🏢 Vikaone (Vika DRX Real Estate)' : '🪙 GoldVikaone (DigiGold Bullion)');
+        : (seg === 'vikaone' ? '🏢 VikaDrx (Real Estate)' : '🪙 GoldVikaone (DigiGold Bullion)');
     udSetText("ud-dev-segment", segText);
 
     const logins = Array.isArray(u.loginPlatforms) && u.loginPlatforms.length > 0
-        ? u.loginPlatforms.map(p => p === 'goldvikaone' ? '📱 GoldVikaone App' : (p === 'vikaone' ? '🏢 Vikaone App' : p)).join(' & ')
+        ? u.loginPlatforms.map(p => p === 'goldvikaone' ? '📱 GoldVikaone App' : (p === 'vikaone' ? '🏢 VikaDrx App' : p)).join(' & ')
         : (u.lastLoginPlatform || 'GoldVikaone Mobile App');
     udSetText("ud-dev-platform", logins);
 }

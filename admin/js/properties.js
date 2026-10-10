@@ -230,7 +230,13 @@ function openPropertyModal() {
 
     // Reset Valuation Report inputs & UI
     const valTitle = document.getElementById("prop-valuation-title");
-    if (valTitle) valTitle.value = "Valuation & Audit Report";
+    if (valTitle) valTitle.value = "Certified Valuation & Audit Report";
+    setVal("prop-valuation-date", "");
+    setVal("prop-valuation-authority", "Independent RICS & IBBI Registered Valuer");
+    setVal("prop-rera-number", "");
+    setVal("prop-valuation-methodology", "Discounted Cash Flow (DCF) + Comparable Sales Approach");
+    setVal("prop-valuation-summary", "");
+    currentValuationReport = { url: "", title: "Certified Valuation & Audit Report" };
     renderValuationReportPreview();
 
     // Reset Documents list & UI
@@ -241,7 +247,7 @@ function openPropertyModal() {
     renderPropertyDocumentsList();
 
     // Reset SPV & Escrow Protection details to defaults
-    if (document.getElementById("prop-spv-name")) document.getElementById("prop-spv-name").value = "VIKAONE REALTY SERIES 001 LLP";
+    if (document.getElementById("prop-spv-name")) document.getElementById("prop-spv-name").value = "VIKADRX REALTY SERIES 001 LLP";
     if (document.getElementById("prop-spv-bank")) document.getElementById("prop-spv-bank").value = "ICICI Bank";
     if (document.getElementById("prop-spv-account-no")) document.getElementById("prop-spv-account-no").value = "705105000036";
     if (document.getElementById("prop-spv-ifsc")) document.getElementById("prop-spv-ifsc").value = "ICIC0007051";
@@ -384,7 +390,7 @@ async function handleValuationReportUpload(e) {
         const res = await api("/upload/document", { method: "POST", body: formData });
         if (res.success && res.url) {
             const titleInput = document.getElementById("prop-valuation-title");
-            const title = titleInput?.value.trim() || "Valuation & Audit Report";
+            const title = titleInput?.value.trim() || "Certified Valuation & Audit Report";
             currentValuationReport = {
                 url: res.url,
                 title: title
@@ -402,7 +408,7 @@ async function handleValuationReportUpload(e) {
 function removeValuationReport() {
     currentValuationReport = { url: "", title: "" };
     const titleInput = document.getElementById("prop-valuation-title");
-    if (titleInput) titleInput.value = "Valuation & Audit Report";
+    if (titleInput) titleInput.value = "Certified Valuation & Audit Report";
     renderValuationReportPreview();
     toast("Valuation report removed", "info");
 }
@@ -689,9 +695,14 @@ async function saveProperty() {
         amenities: currentAmenities,
         images: uploadedImages.map(img => ({ url: img.url, isCover: !!img.isCover })),
         valuationReportUrl: currentValuationReport.url || "",
-        valuationReportTitle: document.getElementById("prop-valuation-title")?.value.trim() || currentValuationReport.title || "Valuation & Audit Report",
+        valuationReportTitle: document.getElementById("prop-valuation-title")?.value.trim() || currentValuationReport.title || "Certified Valuation & Audit Report",
+        valuationReportDate: document.getElementById("prop-valuation-date")?.value.trim() || "",
+        valuationAuthority: document.getElementById("prop-valuation-authority")?.value.trim() || "",
+        valuationMethodology: document.getElementById("prop-valuation-methodology")?.value.trim() || "",
+        valuationSummary: document.getElementById("prop-valuation-summary")?.value.trim() || "",
+        reraNumber: document.getElementById("prop-rera-number")?.value.trim() || "",
         documents: currentPropertyDocuments,
-        spvName,
+        spvName: document.getElementById("prop-spv-name")?.value.trim() || "VIKADRX REALTY SERIES 001 LLP",
         spvEscrowBank,
         spvEscrowAccountNo,
         spvEscrowIfsc,
@@ -800,8 +811,14 @@ function populatePropertyModal(p) {
         // Load Valuation Report
         currentValuationReport = {
             url: p.valuationReportUrl || "",
-            title: p.valuationReportTitle || "Valuation & Audit Report"
+            title: p.valuationReportTitle || "Certified Valuation & Audit Report"
         };
+        setVal("prop-valuation-title", p.valuationReportTitle || "Certified Valuation & Audit Report");
+        setVal("prop-valuation-date", p.valuationReportDate || "");
+        setVal("prop-valuation-authority", p.valuationAuthority || "");
+        setVal("prop-rera-number", p.reraNumber || "");
+        setVal("prop-valuation-methodology", p.valuationMethodology || "");
+        setVal("prop-valuation-summary", p.valuationSummary || "");
         try { renderValuationReportPreview(); } catch (e) { console.warn(e); }
 
         // Load Property Documents
@@ -817,7 +834,7 @@ function populatePropertyModal(p) {
         try { renderPropertyDocumentsList(); } catch (e) { console.warn(e); }
 
         // Load SPV & Escrow Protection details
-        setVal("prop-spv-name", p.spvName || "VIKAONE REALTY SERIES 001 LLP");
+        setVal("prop-spv-name", p.spvName || "VIKADRX REALTY SERIES 001 LLP");
         setVal("prop-spv-bank", p.spvEscrowBank || "ICICI Bank");
         setVal("prop-spv-account-no", p.spvEscrowAccountNo || "705105000036");
         setVal("prop-spv-ifsc", p.spvEscrowIfsc || "ICIC0007051");

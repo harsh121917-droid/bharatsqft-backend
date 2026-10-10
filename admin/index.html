@@ -172,6 +172,10 @@
                 <div class="nav-item-icon"><i class="fas fa-building"></i></div>
                 <span class="nav-item-label">Properties</span>
             </div>
+            <div class="nav-item" onclick="showPage('business')" id="nav-business">
+                <div class="nav-item-icon"><i class="fas fa-briefcase" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">Business Opportunities</span>
+            </div>
             <div class="nav-item" onclick="showPage('investments')" id="nav-investments">
                 <div class="nav-item-icon"><i class="fas fa-cubes"></i></div>
                 <span class="nav-item-label">Investments</span>
@@ -804,7 +808,7 @@
                             <option value="">🌐 All Platforms / Apps</option>
                             <option value="both">🌟 Both (Gold + Real Estate)</option>
                             <option value="goldvikaone">🪙 GoldVikaone (DigiGold)</option>
-                            <option value="vikaone">🏢 Vikaone (Real Estate)</option>
+                            <option value="vikaone">🏢 VikaDrx (Real Estate)</option>
                         </select>
                         <select class="form-control" id="user-active-filter" onchange="resetAndLoadUsers()"
                             style="width:130px">
@@ -3364,6 +3368,65 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════
+                 REAL ESTATE / COMMERCIAL: BUSINESS OPPORTUNITIES
+                 ══════════════════════════════════════════════════ -->
+            <div class="page" id="page-business">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fas fa-briefcase" style="color:#00D09C"></i> Business Opportunities</div>
+                        <div class="section-subtitle">Manage commercial investments, franchise ventures & industrial projects</div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <select id="biz-filter-category" class="form-control" onchange="filterBusinessCategory()" style="width:210px;background:rgba(255,255,255,0.06);color:#EDF0FF;border-color:rgba(255,255,255,0.15)">
+                            <option value="All">All Categories</option>
+                            <option value="Warehouses & Logistics">🏭 Warehouses & Logistics</option>
+                            <option value="Petrol Pumps">⛽ Petrol Pumps</option>
+                            <option value="Dairy Farms">🥛 Dairy Farms</option>
+                            <option value="Hotels & Hospitality">🏨 Hotels & Hospitality</option>
+                            <option value="CBG (Compressed Biogas) Plants">🌿 CBG Plants</option>
+                            <option value="Other Business Opportunities">💼 Other Opportunities</option>
+                        </select>
+                        <select id="biz-filter-status" class="form-control" onchange="filterBusinessStatus()" style="width:130px;background:rgba(255,255,255,0.06);color:#EDF0FF;border-color:rgba(255,255,255,0.15)">
+                            <option value="All">All Status</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
+                        </select>
+                        <input class="search-bar" id="biz-search-input" placeholder="🔍 Search business..." oninput="filterBusinessSearch()" style="max-width:240px" />
+                        <button class="btn btn-primary" onclick="openBusinessModal()"><i class="fas fa-plus"></i> Add Business</button>
+                    </div>
+                </div>
+
+                <!-- KPI Metrics Summary Row -->
+                <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px">
+                    <div class="stat-card" style="background:linear-gradient(135deg,rgba(0,208,156,0.12),rgba(0,208,156,0.02));border:1px solid rgba(0,208,156,0.25);border-radius:12px;padding:16px">
+                        <div style="font-size:12px;color:#8A95B0;text-transform:uppercase;font-weight:600">Total Listings</div>
+                        <div id="biz-stat-total" style="font-size:26px;font-weight:800;color:#EDF0FF;margin-top:4px">0</div>
+                    </div>
+                    <div class="stat-card" style="background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.02));border:1px solid rgba(59,130,246,0.25);border-radius:12px;padding:16px">
+                        <div style="font-size:12px;color:#8A95B0;text-transform:uppercase;font-weight:600">Active Opportunities</div>
+                        <div id="biz-stat-active" style="font-size:26px;font-weight:800;color:#3B82F6;margin-top:4px">0</div>
+                    </div>
+                    <div class="stat-card" style="background:linear-gradient(135deg,rgba(251,191,36,0.12),rgba(251,191,36,0.02));border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:16px">
+                        <div style="font-size:12px;color:#8A95B0;text-transform:uppercase;font-weight:600">Total Project Value</div>
+                        <div id="biz-stat-value" style="font-size:26px;font-weight:800;color:#fbbf24;margin-top:4px">₹0</div>
+                    </div>
+                    <div class="stat-card" style="background:linear-gradient(135deg,rgba(168,85,247,0.12),rgba(168,85,247,0.02));border:1px solid rgba(168,85,247,0.25);border-radius:12px;padding:16px">
+                        <div style="font-size:12px;color:#8A95B0;text-transform:uppercase;font-weight:600">Investor Enquiries</div>
+                        <div id="biz-stat-inquiries" style="font-size:26px;font-weight:800;color:#c084fc;margin-top:4px">0</div>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <div id="business-body">
+                        <div class="loading-box">
+                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                            <div>Loading business opportunities...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════
                  REAL ESTATE: 2. INVESTMENTS (BRICKS)
                  ══════════════════════════════════════════════════ -->
             <div class="page" id="page-investments">
@@ -3632,7 +3695,7 @@
                         <div class="section-title"><i class="fas fa-file-contract" style="color:var(--primary)"></i>
                             Legal Policies & Investor Agreements</div>
                         <div class="section-subtitle">Manage official legal documents, investor agreements, disclosure
-                            policies, and support channels for the Vikaone mobile app</div>
+                            policies, and support channels for the VikaDrx mobile app</div>
                     </div>
                 </div>
 
@@ -4830,8 +4893,8 @@
                                     style="font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px;display:block">Report
                                     Title / Description</label>
                                 <input class="form-control" id="prop-valuation-title"
-                                    placeholder="e.g. CBRE & JLL Independent Valuation Report"
-                                    value="Valuation & Audit Report" style="font-size:12.5px" />
+                                    placeholder="e.g. Certified Valuation & Audit Report"
+                                    value="Certified Valuation & Audit Report" style="font-size:12.5px" />
                             </div>
                             <div>
                                 <label
@@ -4841,6 +4904,43 @@
                                     accept=".pdf,application/pdf" onchange="handleValuationReportUpload(event)"
                                     style="font-size:12px" />
                             </div>
+                        </div>
+                        <div class="form-grid-3" style="margin-bottom:8px">
+                            <div>
+                                <label
+                                    style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:3px;display:block">Report
+                                    Date</label>
+                                <input class="form-control" id="prop-valuation-date"
+                                    placeholder="e.g. October 2026" style="font-size:12px" />
+                            </div>
+                            <div>
+                                <label
+                                    style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:3px;display:block">Independent
+                                    Valuer / Authority</label>
+                                <input class="form-control" id="prop-valuation-authority"
+                                    placeholder="e.g. RICS & IBBI Registered Valuer" style="font-size:12px" />
+                            </div>
+                            <div>
+                                <label
+                                    style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:3px;display:block">RERA
+                                    Reg. Number</label>
+                                <input class="form-control" id="prop-rera-number"
+                                    placeholder="e.g. UPRERA / HRERA Number" style="font-size:12px;font-family:var(--font-mono)" />
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px">
+                            <label
+                                style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:3px;display:block">Valuation
+                                Methodology</label>
+                            <input class="form-control" id="prop-valuation-methodology"
+                                placeholder="e.g. Discounted Cash Flow (DCF) + Comparable Sales Approach" style="font-size:12px" />
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px">
+                            <label
+                                style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:3px;display:block">Executive
+                                Valuation Summary (Optional)</label>
+                            <textarea class="form-control" id="prop-valuation-summary" rows="2"
+                                placeholder="Custom executive summary narrative shown in mobile valuation modal..." style="font-size:12px"></textarea>
                         </div>
                         <div id="prop-valuation-preview"
                             style="display:none;background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:8px 12px;align-items:center;justify-content:space-between;margin-top:8px">
@@ -4963,7 +5063,7 @@
                                 (LLP / Company)
                             </label>
                             <input class="form-control" id="prop-spv-name"
-                                placeholder="e.g. VIKAONE REALTY SERIES 001 LLP" value="VIKAONE REALTY SERIES 001 LLP"
+                                placeholder="e.g. VIKADRX REALTY SERIES 001 LLP" value="VIKADRX REALTY SERIES 001 LLP"
                                 style="font-weight:600" />
                         </div>
 
@@ -5251,6 +5351,173 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closePropertyModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveProperty()">Save Property</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Business Opportunity Modal -->
+    <div class="modal-overlay" id="biz-modal" style="display:none">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div class="modal-title" id="biz-modal-title">Business Opportunity Listing</div>
+                <button class="modal-close" onclick="closeBusinessModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="biz-form" onsubmit="event.preventDefault()">
+                    <div class="form-group">
+                        <label class="form-label">Business Title / Project Name *</label>
+                        <input class="form-control" id="biz-form-title" placeholder="e.g. Delhi-NCR Cold Chain Logistics Hub" required />
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Category *</label>
+                            <select class="form-control" id="biz-form-category" required>
+                                <option value="Warehouses & Logistics">🏭 Warehouses & Logistics</option>
+                                <option value="Petrol Pumps">⛽ Petrol Pumps</option>
+                                <option value="Dairy Farms">🥛 Dairy Farms</option>
+                                <option value="Hotels & Hospitality">🏨 Hotels & Hospitality</option>
+                                <option value="CBG (Compressed Biogas) Plants">🌿 CBG (Compressed Biogas) Plants</option>
+                                <option value="Other Business Opportunities">💼 Other Business Opportunities</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">SPV / Operating Entity Name</label>
+                            <input class="form-control" id="biz-form-spv-name" placeholder="e.g. VIKADRX LOGISTICS SPV 001 LLP" />
+                        </div>
+                    </div>
+
+                    <div class="form-grid-4">
+                        <div class="form-group">
+                            <label class="form-label">City *</label>
+                            <input class="form-control" id="biz-form-city" placeholder="Gurugram" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">State *</label>
+                            <input class="form-control" id="biz-form-state" placeholder="Haryana" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pincode</label>
+                            <input class="form-control" id="biz-form-pincode" placeholder="122001" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Address / Landmark</label>
+                            <input class="form-control" id="biz-form-address" placeholder="Sector 37D, Industrial Corridor" />
+                        </div>
+                    </div>
+
+                    <!-- Financial Metrics -->
+                    <div style="background:rgba(0,208,156,0.04);border:1px solid rgba(0,208,156,0.2);border-radius:10px;padding:14px;margin-bottom:18px">
+                        <div style="font-weight:700;color:#00D09C;font-size:13px;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">
+                            <i class="fas fa-coins" style="margin-right:6px"></i> Financial Projections & Investment Parameters
+                        </div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Total Project Cost (₹) *</label>
+                                <input class="form-control" type="number" id="biz-form-total-cost" placeholder="e.g. 185000000" required />
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">e.g. 185000000 = ₹18.5 Cr</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Minimum Investment (₹) *</label>
+                                <input class="form-control" type="number" id="biz-form-min-investment" placeholder="e.g. 100000" required />
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Minimum ticket size per investor</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Investment Tenure *</label>
+                                <input class="form-control" id="biz-form-tenure" placeholder="e.g. 5 Years or 36 Months" required />
+                            </div>
+                        </div>
+                        <div class="form-grid-2" style="margin-top:6px">
+                            <div class="form-group">
+                                <label class="form-label">Expected Returns / Income *</label>
+                                <input class="form-control" id="biz-form-returns" placeholder="e.g. 19.5% Target IRR or 22% p.a." required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Payout Distribution Frequency</label>
+                                <select class="form-control" id="biz-form-payout">
+                                    <option value="Monthly">Monthly Distribution</option>
+                                    <option value="Quarterly">Quarterly Distribution</option>
+                                    <option value="Bi-Annually">Bi-Annually Distribution</option>
+                                    <option value="Annually">Annual Distribution</option>
+                                    <option value="At Exit">At Exit / Project Maturity</option>
+                                    <option value="Flexible">Flexible / Discretionary</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Project Description & Investment Thesis *</label>
+                        <textarea class="form-control" id="biz-form-description" rows="4" placeholder="Detailed description of the business model, commercial viability, tenant agreements, and revenue model..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Key Highlights / Investment Advantages (one bullet per line)</label>
+                        <textarea class="form-control" id="biz-form-highlights" rows="3" placeholder="e.g.&#10;Grade-A Pre-Leased with 9-Year Institutional Lock-in&#10;Prime location on Delhi-Mumbai Expressway feeder corridor&#10;Predictable 5% annual contractual rental escalation"></textarea>
+                    </div>
+
+                    <!-- Images Manager -->
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                            <label class="form-label" style="margin:0"><i class="fas fa-images"></i> Project Images (Click star to set Cover)</label>
+                            <div>
+                                <input type="file" id="biz-image-file-input" accept="image/*" style="display:none" onchange="handleBizImageUpload(event)" />
+                                <button type="button" class="btn btn-sm btn-secondary" id="btn-biz-upload-img" onclick="document.getElementById('biz-image-file-input').click()">
+                                    <i class="fas fa-upload"></i> Upload Image
+                                </button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px">
+                            <input class="form-control form-control-sm" id="biz-image-url-input" placeholder="Or paste direct image URL (https://...)" style="flex:1" />
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="addBizImageUrl()"><i class="fas fa-plus"></i> Add URL</button>
+                        </div>
+                        <div id="biz-images-list" style="display:flex;flex-wrap:wrap;min-height:40px;align-items:center"></div>
+                    </div>
+
+                    <!-- Documents Manager -->
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                            <label class="form-label" style="margin:0"><i class="fas fa-file-pdf"></i> Project Documents (DPR, Teasers, Financial Models, Legal)</label>
+                            <div>
+                                <input type="file" id="biz-doc-file-input" accept=".pdf,.doc,.docx" style="display:none" onchange="handleBizDocUpload(event)" />
+                                <button type="button" class="btn btn-sm btn-secondary" id="btn-biz-upload-doc" onclick="document.getElementById('biz-doc-file-input').click()">
+                                    <i class="fas fa-upload"></i> Upload PDF
+                                </button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px">
+                            <input class="form-control form-control-sm" id="biz-doc-title-input" placeholder="Document Title (e.g. Detailed Project Report)" style="width:240px" />
+                            <input class="form-control form-control-sm" id="biz-doc-url-input" placeholder="Or document URL (https://...)" style="flex:1" />
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="addBizDocUrl()"><i class="fas fa-plus"></i> Add Doc</button>
+                        </div>
+                        <div id="biz-docs-list"></div>
+                    </div>
+
+                    <!-- Status & Visibility -->
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Listing Status</label>
+                            <select class="form-control" id="biz-form-status">
+                                <option value="active">Active (Open for Investment)</option>
+                                <option value="upcoming">Upcoming (Coming Soon)</option>
+                                <option value="funded">Fully Funded</option>
+                                <option value="closed">Closed</option>
+                                <option value="inactive">Inactive / Hidden</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:center;padding-top:24px">
+                            <label class="switch" style="margin-right:10px">
+                                <input type="checkbox" id="biz-form-is-active" checked />
+                                <span class="slider round"></span>
+                            </label>
+                            <span style="font-size:13px;color:var(--text-primary);font-weight:600">Visible on App & Platform</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBusinessModal()">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-biz" onclick="saveBusiness()"><i class="fas fa-save"></i> Save Opportunity</button>
             </div>
         </div>
     </div>
@@ -6371,6 +6638,7 @@
             <script src="js/users.js?v=2.1"></script>
             <script src="js/kyc.js"></script>
             <script src="js/properties.js?v=2.4"></script>
+            <script src="js/business.js?v=1.0"></script>
             <script src="js/sip.js?v=1.0"></script>
             <script src="js/schemes.js"></script>
             <script src="js/transactions.js"></script>
