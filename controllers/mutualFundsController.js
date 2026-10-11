@@ -764,6 +764,17 @@ exports.registerUserUcc = async (req, res) => {
       });
     }
 
+    // 0. Idempotency Check: if user already has an active UCC on NSE, return it immediately
+    const existingActiveUcc = await MfClientUcc.findOne({ user: userId, nseStatus: 'ACTIVE' });
+    if (existingActiveUcc) {
+      return res.json({
+        success: true,
+        message: 'Investor UCC is already registered and active on NSE MFSS.',
+        data: existingActiveUcc,
+        isDuplicate: true,
+      });
+    }
+
     // Groww-Style Auto-Resolution: Bank details are auto-resolved from linked accounts
     let effAccountNo = accountNo ? String(accountNo).trim() : '';
     let effIfsc = ifsc ? String(ifsc).trim().toUpperCase() : '';
@@ -822,8 +833,76 @@ exports.registerUserUcc = async (req, res) => {
       }
     }
 
-    // Resolve investor's official name
-    const resolvedFullName = (fullName || user.name || 'Investor').trim();
+    // Resolve investor's authoritative legal name (no account nickname or generic "Investor" fallback)
+    let resolvedFullName = (fullName || '').trim();
+    if (!resolvedFullName) {
+      try {
+        const Kyc = require('../models/Kyc');
+        const userKyc = await Kyc.findOne({ user: userId });
+        if (userKyc && userKyc.panRegisteredName) {
+          resolvedFullName = userKyc.panRegisteredName.trim();
+        } else if (userKyc && userKyc.fullName && !['ACCOUNT HOLDER', 'INVESTOR'].includes(userKyc.fullName.trim().toUpperCase())) {
+          resolvedFullName = userKyc.fullName.trim();
+        }
+      } catch (_) {}
+    }
+
+    const isInvalidLegalName = !resolvedFullName ||
+      resolvedFullName.length < 3 ||
+      /^(investor|account holder|user)$/i.test(resolvedFullName);
+
+    if (isInvalidLegalName) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_LEGAL_NAME_REQUIRED',
+        message: 'Verified legal investor name (as per PAN / KRA records) is required for NSE UCC registration. Account nicknames and generic placeholders are not permitted.',
+      });
+    }
+
+    // Validate Bank Account Ownership against Verified Legal Name
+    try {
+      const BankAccount = require('../models/BankAccount');
+      const linkedBank = await BankAccount.findOne({ user: userId, accountNumber: effAccountNo });
+      if (linkedBank && linkedBank.accountHolder) {
+        const bankTokens = linkedBank.accountHolder.toUpperCase().split(/\s+/).filter(t => t.length > 2);
+        const nameTokens = resolvedFullName.toUpperCase().split(/\s+/).filter(t => t.length > 2);
+        const hasTokenMatch = bankTokens.some(t => nameTokens.includes(t));
+        if (!hasTokenMatch && bankTokens.length > 0 && nameTokens.length > 0) {
+          return res.status(400).json({
+            success: false,
+            code: 'NSE_BANK_NAME_MISMATCH',
+            message: `Bank account belongs to '${linkedBank.accountHolder}', which does not match verified investor name '${resolvedFullName}'. SEBI regulations require mutual fund investments to originate from the investor's own verified bank account.`,
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Resolve Date of Birth (strictly required - zero synthetic 01/01/1990 fallback)
+    let effDob = (dob || '').toString().trim();
+    if (!effDob) {
+      try {
+        const Kyc = require('../models/Kyc');
+        const userKyc = await Kyc.findOne({ user: userId });
+        if (userKyc && userKyc.dob) {
+          const d = new Date(userKyc.dob);
+          if (!isNaN(d.getTime())) {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            effDob = `${day}/${month}/${year}`;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!effDob || !/^\d{2}\/\d{2}\/\d{4}$/.test(effDob)) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_DOB_REQUIRED',
+        message: 'Authoritative Date of Birth in DD/MM/YYYY format is required for NSE UCC registration. Synthetic or default dates are strictly prohibited.',
+      });
+    }
+
     const nameParts = resolvedFullName.split(/\s+/);
     const firstName = nameParts[0] || 'Investor';
     const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
@@ -831,17 +910,6 @@ exports.registerUserUcc = async (req, res) => {
 
     // Generate unique client code e.g. VK + 6 digit user identifier
     const clientCode = `VK${user.phone ? user.phone.slice(-6) : user._id.toString().slice(-6).toUpperCase()}`;
-
-    // 0. Idempotency Check: if user already has an active UCC on NSE, return it
-    const existingActiveUcc = await MfClientUcc.findOne({ user: userId, nseStatus: 'ACTIVE' });
-    if (existingActiveUcc) {
-      return res.json({
-        success: true,
-        message: 'Investor UCC is already registered and active on NSE MFSS.',
-        data: existingActiveUcc,
-        isDuplicate: true,
-      });
-    }
 
     // 0b. Address Resolution & Strict Non-Placeholder Validation
     let effAddress1 = (address1 || address?.line1 || address?.address1 || '').trim();
@@ -891,7 +959,7 @@ exports.registerUserUcc = async (req, res) => {
       primary_holder_last_name: lastName,
       tax_status: taxStatus,
       gender: gender,
-      primary_holder_dob_incorporation: dob || '01/01/1990',
+      primary_holder_dob_incorporation: effDob,
       occupation_code: occupationCode,
       holding_nature: holdingNature,
       primary_holder_pan_exempt: 'NO',
@@ -3400,6 +3468,24 @@ exports.verifyPanDetails = async (req, res) => {
           if (kycData.name || kycData.client_name) {
             registeredName = (kycData.name || kycData.client_name).trim().toUpperCase();
           }
+          if (userId && registeredName) {
+            try {
+              const Kyc = require('../models/Kyc');
+              await Kyc.findOneAndUpdate(
+                { user: userId },
+                {
+                  $set: {
+                    panNumber: panClean,
+                    panVerified: true,
+                    panRegisteredName: registeredName,
+                    kraName: kraName || 'ndmlkra',
+                    verificationSource: 'NSE_MFSS_KYC_VERIFY',
+                  },
+                },
+                { upsert: false }
+              );
+            } catch (_) {}
+          }
         } else if (kycStatus === 'F' || kycStatus === 'N') {
           console.warn(`[NSE MFSS] PAN ${panClean} reported NOT KYC compliant by exchange:`, nseRemark);
         }
@@ -3413,7 +3499,8 @@ exports.verifyPanDetails = async (req, res) => {
     const cfClientSecret = process.env.CASHFREE_VERIFICATION_CLIENT_SECRET;
     const cfEnv = process.env.CASHFREE_VERIFICATION_ENV || process.env.CASHFREE_ENV;
 
-    if (cfClientId && cfClientSecret && cfClientId !== 'your_cashfree_client_id') {
+    // Step 5: Cashfree PAN is strictly a fallback for fresh investors when not already verified by NSE/KRA
+    if (!isNseVerified && cfClientId && cfClientSecret && cfClientId !== 'your_cashfree_client_id') {
       try {
         const axios = require('axios');
         const cfUrl = (cfEnv === 'production')
@@ -3472,15 +3559,25 @@ exports.verifyPanDetails = async (req, res) => {
       }
     }
 
-    // 6. Cross-check existing approved KYC in DB ONLY IF PAN strictly matches
-    try {
-      const existingKyc = userId ? await Kyc.findOne({ user: userId, status: 'approved' }).catch(() => null) : null;
-      if (existingKyc && existingKyc.fullName && existingKyc.panNumber === panClean) {
-        if (!registeredName) registeredName = existingKyc.fullName.toUpperCase();
-        isKraVerified = true;
-        verifiedSource = verifiedSource || 'INTERNAL_APPROVED_KYC';
-      }
-    } catch (_) {}
+    // 6. Cross-check existing KYC with AUTHORITATIVE PROVENANCE ONLY (No bare flag trust, no hardcoded customer names)
+    if (!isNseVerified && !isKraVerified && userId) {
+      try {
+        const existingKyc = await Kyc.findOne({ user: userId, status: 'approved' }).catch(() => null);
+        if (existingKyc && existingKyc.panNumber === panClean) {
+          const validProvenance = ['NSE_MFSS_KYC_VERIFY', 'CASHFREE_GOVT_NSDL', 'CASHFREE_AADHAAR_OKYC'].includes(existingKyc.verificationSource);
+          const isPlaceholder = !existingKyc.address?.line1 ||
+            /document\s*photo\s*uploaded/i.test(existingKyc.address.line1) ||
+            /review\s*required/i.test(existingKyc.address.line1) ||
+            existingKyc.panImage?.url === 'cashfree_pan_verified';
+
+          if (validProvenance && !isPlaceholder && existingKyc.panRegisteredName) {
+            if (!registeredName) registeredName = existingKyc.panRegisteredName.toUpperCase();
+            isKraVerified = true;
+            verifiedSource = existingKyc.verificationSource;
+          }
+        }
+      } catch (_) {}
+    }
 
     // 7. Decision Gate: Existing KRA Investor vs Fresh First-Time Investor
     const isFreshInvestor = !isNseVerified && !isKraVerified;

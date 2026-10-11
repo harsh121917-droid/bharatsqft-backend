@@ -23,6 +23,11 @@ const MfClientUccSchema = new mongoose.Schema(
       uppercase: true,
       trim: true,
     },
+    fullName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     holdingNature: {
       type: String,
       default: 'SI', // SI: Single, JO: Joint, AS: Anyone or Survivor
@@ -57,6 +62,7 @@ const MfClientUccSchema = new mongoose.Schema(
     },
     address: {
       address1: { type: String, default: '' },
+      address2: { type: String, default: '' },
       city: { type: String, default: '' },
       state: { type: String, default: '' },
       pincode: { type: String, default: '' },

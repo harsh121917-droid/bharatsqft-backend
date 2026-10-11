@@ -78,12 +78,30 @@ const KycSchema = new mongoose.Schema(
             reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         },
 
-        // Verification status
+        // Verification status and authoritative provenance
         status: {
             type: String,
             enum: ["pending", "approved", "rejected", "revoked"],
             default: "pending",
         },
+        verificationSource: {
+            type: String,
+            enum: [
+                "NONE",
+                "NSE_MFSS_KYC_VERIFY",
+                "CASHFREE_GOVT_NSDL",
+                "UIDAI_XML",
+                "CASHFREE_AADHAAR_OKYC",
+                "ADMIN_DOCUMENT_VERIFIED",
+                "MOCK_TEST_VERIFIED"
+            ],
+            default: "NONE",
+        },
+        panVerified: { type: Boolean, default: false },
+        panRegisteredName: { type: String, trim: true, default: "" },
+        kraName: { type: String, trim: true, default: "" },
+        rawPanData: { type: mongoose.Schema.Types.Mixed, default: {} },
+        rawAadhaarData: { type: mongoose.Schema.Types.Mixed, default: {} },
         rejectionReason: { type: String, trim: true },
         revokedReason: { type: String, trim: true },
         reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

@@ -55,6 +55,7 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
       user: testUser._id,
       clientCode: 'VKP6TEST01',
       pan: 'ABCDE1234F',
+      fullName: 'P6 Test Investor',
       status: 'ACTIVE',
       nseStatus: 'ACTIVE',
       accountType: 'INDIVIDUAL',
@@ -66,6 +67,19 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
         accountType: 'SAVINGS',
         isDefault: true,
       },
+    });
+
+    const BankAccount = require('../models/BankAccount');
+    await BankAccount.deleteMany({ user: testUser._id });
+    await BankAccount.create({
+      user: testUser._id,
+      accountHolder: 'P6 Test Investor',
+      accountNumber: '123456789012',
+      ifsc: 'HDFC0001234',
+      bankName: 'HDFC Bank',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'P6 TEST INVESTOR',
     });
 
     // 3. Create Regular Scheme

@@ -10,6 +10,10 @@ const BankAccountSchema = new mongoose.Schema(
         accountType: { type: String, enum: ["savings", "current"], default: "savings" },
         isDefault: { type: Boolean, default: false },
         isVerified: { type: Boolean, default: false },
+        verifiedName: { type: String, trim: true, default: "" },
+        verificationSource: { type: String, default: "" },
+        accountStatus: { type: String, default: "" },
+        verifiedAt: { type: Date },
         // Razorpay contact/fund account IDs for payouts
         razorpayContactId: { type: String },
         razorpayFundAccountId: { type: String },

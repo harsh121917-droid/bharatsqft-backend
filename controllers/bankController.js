@@ -116,11 +116,26 @@ exports.verifyBankAccount = async (req, res, next) => {
         const cfClientSecret = process.env.CASHFREE_VERIFICATION_CLIENT_SECRET;
         const cfEnv = process.env.CASHFREE_VERIFICATION_ENV || process.env.CASHFREE_ENV;
 
-        let isVerified = true;
-        let verifiedName = cleanHolder;
-        let statusMessage = "Bank account verified successfully.";
+        const isMock = !cfClientId || cfClientId === "your_cashfree_client_id" ||
+                       !cfClientSecret || cfClientSecret === "your_cashfree_client_secret";
 
-        if (cfClientId && cfClientSecret && cfClientId !== "your_cashfree_client_id") {
+        let isVerified = false;
+        let verifiedName = cleanHolder;
+        let statusMessage = "Bank account verification pending.";
+
+        if (isMock) {
+            if (process.env.NODE_ENV !== "test") {
+                return res.status(503).json({
+                    success: false,
+                    isVerified: false,
+                    message: "Cashfree bank verification service credentials are not configured on this server."
+                });
+            }
+            // Test mock mode
+            isVerified = true;
+            verifiedName = cleanHolder;
+            statusMessage = "Test Mode: Bank account verified.";
+        } else {
             try {
                 const cfUrl = (cfEnv === "production")
                     ? "https://api.cashfree.com/verification/bank-account/sync"
@@ -152,6 +167,7 @@ exports.verifyBankAccount = async (req, res, next) => {
                 if (accStatus === "INVALID" || cfData.account_exists === false) {
                     return res.status(400).json({
                         success: false,
+                        isVerified: false,
                         message: "Bank account verification failed. Your bank reported this account number as invalid or inactive. Please verify the account number."
                     });
                 }
@@ -165,20 +181,39 @@ exports.verifyBankAccount = async (req, res, next) => {
                     if (cfData.name_match_result === "NO" || (!hasCommonToken && userTokens.length > 0)) {
                         return res.status(400).json({
                             success: false,
+                            isVerified: false,
                             message: `Name mismatch: Bank account belongs to '${nameAtBank}', which does not match your registered name '${cleanHolder}'. As per SEBI regulations, investments must originate from your own bank account.`
                         });
                     }
                     verifiedName = nameAtBank;
                 }
 
+                isVerified = true;
                 statusMessage = `₹1 deposited successfully! Account verified under ${verifiedName}.`;
+
+                // Update BankAccount in DB with authoritative provenance
+                await BankAccount.findOneAndUpdate(
+                    { user: req.user._id, accountNumber: cleanAcc },
+                    {
+                        isVerified: true,
+                        verifiedName,
+                        verificationSource: "CASHFREE_PENNY_DROP",
+                        accountStatus: accStatus,
+                        verifiedAt: new Date()
+                    }
+                );
             } catch (cfErr) {
                 console.warn("[Bank Verification Cashfree Warning]:", cfErr.response?.data?.message || cfErr.message);
+                return res.status(502).json({
+                    success: false,
+                    isVerified: false,
+                    message: cfErr.response?.data?.message || "Bank account verification failed with bank verification provider. Please try again."
+                });
             }
         }
 
         return res.json({
-            success: true,
+            success: isVerified,
             isVerified,
             message: statusMessage,
             data: {
@@ -247,7 +282,7 @@ exports.addAccount = async (req, res, next) => {
             bankName: resolvedBankName,
             accountType: accountType || "savings",
             isDefault,
-            isVerified: true,
+            isVerified: false,
         });
 
         // Sync to KYC & Mutual Funds profile

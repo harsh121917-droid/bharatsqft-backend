@@ -603,6 +603,12 @@ exports.initiateCashfreeOtp = async (req, res, next) => {
                        CASHFREE_VERIFICATION_CLIENT_SECRET === "your_cashfree_client_secret";
 
         if (isMock) {
+            if (process.env.NODE_ENV !== "test") {
+                return res.status(503).json({
+                    success: false,
+                    message: "Cashfree verification service credentials are not configured on this server."
+                });
+            }
             const mockRefId = `cf_ref_mock_${Math.random().toString(36).substr(2, 9)}`;
             return res.json({
                 success: true,
@@ -762,9 +768,9 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
             panImage: { url: "cashfree_verified", uploadedAt: new Date() },
             aadhaarFront: { url: "cashfree_verified", uploadedAt: new Date() },
             aadhaarBack: { url: "cashfree_verified", uploadedAt: new Date() },
+            verificationSource: "CASHFREE_AADHAAR_OKYC",
             status: "approved",
             submittedAt: new Date(),
-            reviewedBy: req.user._id,
             reviewedAt: new Date()
         };
 
@@ -797,21 +803,32 @@ exports.verifyCashfreePan = async (req, res, next) => {
             return res.status(400).json({ success: false, message: "Valid 10-character PAN number is required" });
         }
 
-        const isMock = !CASHFREE_VERIFICATION_CLIENT_ID || 
-                       CASHFREE_VERIFICATION_CLIENT_ID === "your_cashfree_client_id" || 
-                       CASHFREE_VERIFICATION_CLIENT_SECRET === "your_cashfree_client_secret";
+        const activeClientId = process.env.CASHFREE_VERIFICATION_CLIENT_ID || CASHFREE_VERIFICATION_CLIENT_ID;
+        const activeClientSecret = process.env.CASHFREE_VERIFICATION_CLIENT_SECRET || CASHFREE_VERIFICATION_CLIENT_SECRET;
+        const isMock = !activeClientId || 
+                       activeClientId === "your_cashfree_client_id" || 
+                       !activeClientSecret ||
+                       activeClientSecret === "your_cashfree_client_secret";
 
         if (isMock) {
-            const registeredName = name ? name.toUpperCase() : (req.user.name || "VERIFIED PAN USER");
+            if (process.env.NODE_ENV !== "test") {
+                return res.status(503).json({
+                    success: false,
+                    message: "Cashfree verification service credentials are not configured on this server."
+                });
+            }
+
+            const registeredName = name ? name.toUpperCase() : (req.user.name || "TEST INVESTOR");
             let kyc = await Kyc.findOne({ user: req.user._id });
             const kycPayload = {
                 user: req.user._id,
                 fullName: registeredName,
                 panNumber: panClean,
-                panImage: { url: "cashfree_pan_verified", uploadedAt: new Date() },
+                panVerified: true,
+                panRegisteredName: registeredName,
+                verificationSource: "MOCK_TEST_VERIFIED",
                 status: "approved",
                 submittedAt: new Date(),
-                reviewedBy: req.user._id,
                 reviewedAt: new Date()
             };
 
@@ -830,7 +847,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 valid: true,
                 registeredName,
                 data: kyc,
-                message: "PAN verified & KYC approved successfully!"
+                message: "PAN verified & KYC approved successfully (Test Mode)"
             });
         }
 
@@ -840,8 +857,8 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 { pan: panClean, name },
                 {
                     headers: {
-                        "x-client-id": CASHFREE_VERIFICATION_CLIENT_ID,
-                        "x-client-secret": CASHFREE_VERIFICATION_CLIENT_SECRET,
+                        "x-client-id": activeClientId,
+                        "x-client-secret": activeClientSecret,
                         "x-api-version": "2023-08-01",
                         "Content-Type": "application/json"
                     }
@@ -850,17 +867,19 @@ exports.verifyCashfreePan = async (req, res, next) => {
 
             const data = response.data || {};
             if (data.valid === true || data.pan_status === "VALID") {
-                const registeredName = data.registered_name || data.name_pan_card || name || req.user.name;
+                const registeredName = (data.registered_name || data.name_pan_card || name || req.user.name).trim().toUpperCase();
 
                 let kyc = await Kyc.findOne({ user: req.user._id });
                 const kycPayload = {
                     user: req.user._id,
                     fullName: registeredName,
                     panNumber: panClean,
-                    panImage: { url: "cashfree_pan_verified", uploadedAt: new Date() },
+                    panVerified: true,
+                    panRegisteredName: registeredName,
+                    verificationSource: "CASHFREE_GOVT_NSDL",
+                    rawPanData: data,
                     status: "approved",
                     submittedAt: new Date(),
-                    reviewedBy: req.user._id,
                     reviewedAt: new Date()
                 };
 
@@ -892,52 +911,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
             const errMsg = (errData && errData.message) ? errData.message : String(apiErr.message || "");
             console.error("Cashfree PAN API Error:", JSON.stringify(errData));
 
-            // If Cashfree IP is not whitelisted, fallback to format validation & approve KYC seamlessly
-            const isIpError = errMsg.toLowerCase().includes("ip not whitelisted") || 
-                              errMsg.toLowerCase().includes("ip whitelisting") ||
-                              (apiErr.response && apiErr.response.status === 403);
-
-            const isValidPanFormat = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panClean);
-
-            if (isIpError && isValidPanFormat) {
-                console.log(`[KYC Fallback] Bypassing Cashfree IP restriction for valid PAN: ${panClean}`);
-                const registeredName = (name && name.trim().length > 0) ? name.trim().toUpperCase() : (req.user.name || "VERIFIED PAN USER");
-
-                let kyc = await Kyc.findOne({ user: req.user._id });
-                const kycPayload = {
-                    user: req.user._id,
-                    fullName: registeredName,
-                    panNumber: panClean,
-                    panImage: { url: "cashfree_pan_verified", uploadedAt: new Date() },
-                    status: "approved",
-                    submittedAt: new Date(),
-                    reviewedBy: req.user._id,
-                    reviewedAt: new Date()
-                };
-
-                if (kyc) {
-                    kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true });
-                } else {
-                    kyc = await Kyc.create(kycPayload);
-                }
-
-                const User = require("../models/User");
-                await User.findByIdAndUpdate(req.user._id, { kycStatus: "approved", name: registeredName });
-                if (req.user) req.user.kycStatus = "approved";
-
-                return res.json({
-                    success: true,
-                    valid: true,
-                    registeredName,
-                    data: kyc,
-                    message: "PAN verified & KYC approved successfully!"
-                });
-            }
-
             return res.status(502).json({
                 success: false,
-                message: errData.message || "PAN verification failed via Cashfree. Please try again.",
-                debug: process.env.NODE_ENV !== "production" ? errData : undefined
+                message: errMsg || "PAN verification failed via Cashfree. Please try again."
             });
         }
     } catch (err) {
