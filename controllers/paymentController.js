@@ -72,8 +72,11 @@ exports.createOrder = async (req, res, next) => {
             }
         }
 
-        const totalAmount = bricks * property.brickPrice;
-        const amountPaise = totalAmount * 100;
+        const propertyPrice = bricks * property.brickPrice;
+        const platformFeePercent = 1; // 1% platform fee on property purchases
+        const platformFee = Math.round(propertyPrice * (platformFeePercent / 100) * 100) / 100;
+        const totalAmount = Math.round((propertyPrice + platformFee) * 100) / 100;
+
         let order;
         let keyId;
         try {
@@ -85,6 +88,9 @@ exports.createOrder = async (req, res, next) => {
                     type: isDirect ? "direct_buy" : "investment",
                     propertyId: String(property._id),
                     isDirectBuy: isDirect ? "true" : "false",
+                    propertyPrice: String(propertyPrice),
+                    platformFee: String(platformFee),
+                    platformFeePercent: String(platformFeePercent),
                 },
             });
             order = result.order;
@@ -99,6 +105,9 @@ exports.createOrder = async (req, res, next) => {
             property: propertyId,
             bricks,
             pricePerBrick: property.brickPrice,
+            propertyPrice,
+            platformFee,
+            platformFeePercent,
             totalAmount,
             razorpayOrderId: order.id,
             status: "pending",
@@ -113,6 +122,9 @@ exports.createOrder = async (req, res, next) => {
                 id: investment._id,
                 bricks,
                 pricePerBrick: property.brickPrice,
+                propertyPrice,
+                platformFee,
+                platformFeePercent,
                 totalAmount,
                 propertyTitle: property.title,
                 isDirectBuy: isDirect,

@@ -21,6 +21,17 @@ const InvestmentSchema = new mongoose.Schema(
             type: Number,
             required: true,
         },
+        propertyPrice: {
+            type: Number,
+        },
+        platformFee: {
+            type: Number,
+            default: 0,
+        },
+        platformFeePercent: {
+            type: Number,
+            default: 1,
+        },
         totalAmount: {
             type: Number,
             required: true,
