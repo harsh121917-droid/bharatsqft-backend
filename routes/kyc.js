@@ -24,6 +24,7 @@ router.post("/soldier/submit", (req, res, next) => {
 
 // Get my KYC status
 router.get("/me", getMyKyc);
+router.get("/status", getMyKyc);
 
 // Digio KYC endpoints
 router.post("/digio/initiate", initiateDigioKyc);
@@ -33,5 +34,6 @@ router.post("/digio/verify/:kycId", verifyDigioKyc);
 router.post("/cashfree/otp", initiateCashfreeOtp);
 router.post("/cashfree/verify", verifyCashfreeOtp);
 router.post("/cashfree/pan", verifyCashfreePan);
+router.post("/verify-pan", verifyCashfreePan);
 
 module.exports = router;

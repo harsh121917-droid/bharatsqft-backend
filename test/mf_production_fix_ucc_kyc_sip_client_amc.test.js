@@ -1403,6 +1403,7 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
       ifsc: 'BKID0001400',
       bankName: 'Bank of India',
       isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
     });
 
     const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
@@ -1454,5 +1455,826 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     } finally {
       nseClient.checkKycStatus = origCheckKyc;
     }
+  });
+
+  it('33. UCC registration with matching name and DOB against verified KYC -> succeeds without conflict', async () => {
+    const kycUser = await User.create({
+      name: 'Vikas Saini',
+      email: `ucc_match_${Date.now()}@vikaone.test`,
+      phone: `93${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: kycUser._id,
+      fullName: 'VIKAS SAINI',
+      panNumber: 'BNWPS8888F',
+      panVerified: true,
+      panRegisteredName: 'VIKAS SAINI',
+      dob: new Date('1995-08-15'),
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+    });
+
+    await BankAccount.create({
+      user: kycUser._id,
+      accountHolder: 'VIKAS SAINI',
+      accountNumber: '998811223344',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'VIKAS SAINI',
+    });
+
+    const { req, res } = mockReqRes(
+      {
+        pan: 'BNWPS8888F',
+        fullName: 'VIKAS SAINI',
+        dob: '15/08/1995',
+        accountNo: '998811223344',
+        ifsc: 'SBIN0000123',
+        address1: '112, Saniyan, Shahpur',
+        city: 'Muzaffarnagar',
+        state: 'Uttar Pradesh',
+        pincode: '251318',
+      },
+      {},
+      {},
+      kycUser
+    );
+
+    await mutualFundsController.registerUserUcc(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.fullName, 'VIKAS SAINI');
+
+    await User.deleteOne({ _id: kycUser._id });
+    await Kyc.deleteOne({ user: kycUser._id });
+    await BankAccount.deleteOne({ user: kycUser._id });
+    await MfClientUcc.deleteOne({ user: kycUser._id });
+  });
+
+  it('34. UCC registration with conflicting name against verified KYC -> rejected with NSE_IDENTITY_CONFLICT', async () => {
+    const kycUser = await User.create({
+      name: 'Vikas Saini',
+      email: `ucc_name_conflict_${Date.now()}@vikaone.test`,
+      phone: `92${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: kycUser._id,
+      fullName: 'VIKAS SAINI',
+      panNumber: 'BNWPS7777F',
+      panVerified: true,
+      panRegisteredName: 'VIKAS SAINI',
+      dob: new Date('1995-08-15'),
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+    });
+
+    await BankAccount.create({
+      user: kycUser._id,
+      accountHolder: 'VIKAS SAINI',
+      accountNumber: '998811223355',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'VIKAS SAINI',
+    });
+
+    const { req, res } = mockReqRes(
+      {
+        pan: 'BNWPS7777F',
+        fullName: 'JOHN DOE',
+        dob: '15/08/1995',
+        accountNo: '998811223355',
+        ifsc: 'SBIN0000123',
+        address1: '112, Saniyan, Shahpur',
+        city: 'Muzaffarnagar',
+        state: 'Uttar Pradesh',
+        pincode: '251318',
+      },
+      {},
+      {},
+      kycUser
+    );
+
+    await mutualFundsController.registerUserUcc(req, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.data.success, false);
+    assert.equal(res.data.code, 'NSE_IDENTITY_CONFLICT');
+    assert.match(res.data.message, /conflicts with authoritative verified KYC/i);
+
+    await User.deleteOne({ _id: kycUser._id });
+    await Kyc.deleteOne({ user: kycUser._id });
+    await BankAccount.deleteOne({ user: kycUser._id });
+  });
+
+  it('35. UCC registration with conflicting DOB against verified KYC -> rejected with NSE_IDENTITY_CONFLICT', async () => {
+    const kycUser = await User.create({
+      name: 'Vikas Saini',
+      email: `ucc_dob_conflict_${Date.now()}@vikaone.test`,
+      phone: `91${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: kycUser._id,
+      fullName: 'VIKAS SAINI',
+      panNumber: 'BNWPS6666F',
+      panVerified: true,
+      panRegisteredName: 'VIKAS SAINI',
+      dob: new Date('1995-08-15'),
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+    });
+
+    await BankAccount.create({
+      user: kycUser._id,
+      accountHolder: 'VIKAS SAINI',
+      accountNumber: '998811223366',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'VIKAS SAINI',
+    });
+
+    const { req, res } = mockReqRes(
+      {
+        pan: 'BNWPS6666F',
+        fullName: 'VIKAS SAINI',
+        dob: '01/01/1990', // Conflicting DOB
+        accountNo: '998811223366',
+        ifsc: 'SBIN0000123',
+        address1: '112, Saniyan, Shahpur',
+        city: 'Muzaffarnagar',
+        state: 'Uttar Pradesh',
+        pincode: '251318',
+      },
+      {},
+      {},
+      kycUser
+    );
+
+    await mutualFundsController.registerUserUcc(req, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.data.success, false);
+    assert.equal(res.data.code, 'NSE_IDENTITY_CONFLICT');
+    assert.match(res.data.message, /conflicts with authoritative verified KYC/i);
+
+    await User.deleteOne({ _id: kycUser._id });
+    await Kyc.deleteOne({ user: kycUser._id });
+    await BankAccount.deleteOne({ user: kycUser._id });
+  });
+
+  it('36. UCC registration outside test environment without verified KYC records -> rejected with NSE_VERIFIED_IDENTITY_REQUIRED', async () => {
+    const origEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      const unverifiedUser = await User.create({
+        name: 'Unverified Prod Investor',
+        email: `ucc_noprodkyc_${Date.now()}@vikaone.test`,
+        phone: `89${Date.now().toString().slice(-8)}`,
+        password: 'TestPassword123!',
+      });
+
+      const { req, res } = mockReqRes(
+        {
+          pan: 'BNWPS5555F',
+          fullName: 'Unverified Prod Investor',
+          dob: '15/08/1995',
+          accountNo: '998811223377',
+          ifsc: 'SBIN0000123',
+        },
+        {},
+        {},
+        unverifiedUser
+      );
+
+      await mutualFundsController.registerUserUcc(req, res);
+
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.data.success, false);
+      assert.equal(res.data.code, 'NSE_VERIFIED_IDENTITY_REQUIRED');
+
+      await User.deleteOne({ _id: unverifiedUser._id });
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  it('37. MOCK_TEST_VERIFIED provenance passes in test env but is strictly rejected in production', async () => {
+    const origEnv = process.env.NODE_ENV;
+    const testUser = await User.create({
+      name: 'Mock Provenance User',
+      email: `mock_prov_${Date.now()}@vikaone.test`,
+      phone: `88${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: testUser._id,
+      fullName: 'Mock Provenance User',
+      panNumber: 'BNWPS4444F',
+      status: 'approved',
+      verificationSource: 'MOCK_TEST_VERIFIED',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: testUser._id,
+      clientCode: `VK${testUser.phone.slice(-6)}`,
+      pan: 'BNWPS4444F',
+      fullName: 'Mock Provenance User',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223388',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    await BankAccount.create({
+      user: testUser._id,
+      accountHolder: 'Mock Provenance User',
+      accountNumber: '998811223388',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'MOCK PROVENANCE USER',
+    });
+
+    try {
+      // 1. In test environment, MOCK_TEST_VERIFIED passes readiness
+      process.env.NODE_ENV = 'test';
+      const testRes = await mfInvestorReadinessService.checkInvestorReady(testUser._id, 'PURCHASE');
+      assert.equal(testRes.ready, true);
+
+      // 2. In production environment, MOCK_TEST_VERIFIED is strictly blocked
+      process.env.NODE_ENV = 'production';
+      const prodRes = await mfInvestorReadinessService.checkInvestorReady(testUser._id, 'PURCHASE');
+      assert.equal(prodRes.ready, false);
+      assert.equal(prodRes.code, 'NSE_KYC_NOT_READY');
+    } finally {
+      process.env.NODE_ENV = origEnv;
+      await User.deleteOne({ _id: testUser._id });
+      await Kyc.deleteOne({ user: testUser._id });
+      await MfClientUcc.deleteOne({ user: testUser._id });
+      await BankAccount.deleteOne({ user: testUser._id });
+    }
+  });
+
+  it('38. Missing linked bank record blocks readiness with NSE_BANK_RECORD_MISSING', async () => {
+    const investor = await User.create({
+      name: 'No Linked Bank User',
+      email: `no_bank_rec_${Date.now()}@vikaone.test`,
+      phone: `87${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: investor._id,
+      fullName: 'No Linked Bank User',
+      panNumber: 'BNWPS3333F',
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: investor._id,
+      clientCode: `VK${investor.phone.slice(-6)}`,
+      pan: 'BNWPS3333F',
+      fullName: 'No Linked Bank User',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223399',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    // BankAccount record intentionally omitted from DB
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, 'NSE_BANK_RECORD_MISSING');
+
+    await User.deleteOne({ _id: investor._id });
+    await Kyc.deleteOne({ user: investor._id });
+    await MfClientUcc.deleteOne({ user: investor._id });
+  });
+
+  it('39. Linked bank account with isVerified: false blocks readiness with NSE_BANK_NOT_VERIFIED', async () => {
+    const investor = await User.create({
+      name: 'Unverified Bank User',
+      email: `unverified_bank_${Date.now()}@vikaone.test`,
+      phone: `86${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: investor._id,
+      fullName: 'Unverified Bank User',
+      panNumber: 'BNWPS2222F',
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: investor._id,
+      clientCode: `VK${investor.phone.slice(-6)}`,
+      pan: 'BNWPS2222F',
+      fullName: 'Unverified Bank User',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223300',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    await BankAccount.create({
+      user: investor._id,
+      accountHolder: 'Unverified Bank User',
+      accountNumber: '998811223300',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: false, // Explicitly unverified
+      verificationSource: 'NONE',
+    });
+
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, 'NSE_BANK_NOT_VERIFIED');
+
+    await User.deleteOne({ _id: investor._id });
+    await Kyc.deleteOne({ user: investor._id });
+    await MfClientUcc.deleteOne({ user: investor._id });
+    await BankAccount.deleteOne({ user: investor._id });
+  });
+
+  it('40. Bank account with untrusted verificationSource blocks readiness with NSE_BANK_NOT_VERIFIED', async () => {
+    const investor = await User.create({
+      name: 'Untrusted Source User',
+      email: `untrusted_src_${Date.now()}@vikaone.test`,
+      phone: `85${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: investor._id,
+      fullName: 'Untrusted Source User',
+      panNumber: 'BNWPS1111F',
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: investor._id,
+      clientCode: `VK${investor.phone.slice(-6)}`,
+      pan: 'BNWPS1111F',
+      fullName: 'Untrusted Source User',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223311',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    await BankAccount.create({
+      user: investor._id,
+      accountHolder: 'Untrusted Source User',
+      accountNumber: '998811223311',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'UNKNOWN_FABRICATED_SOURCE', // Untrusted provenance
+    });
+
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, 'NSE_BANK_NOT_VERIFIED');
+
+    await User.deleteOne({ _id: investor._id });
+    await Kyc.deleteOne({ user: investor._id });
+    await MfClientUcc.deleteOne({ user: investor._id });
+    await BankAccount.deleteOne({ user: investor._id });
+  });
+
+  it('41. Common-first-name false positive ("Harsh Sharma" vs "Harsh Verma") is strictly blocked with NSE_BANK_NAME_MISMATCH', async () => {
+    const investor = await User.create({
+      name: 'Harsh Sharma',
+      email: `harsh_sharma_${Date.now()}@vikaone.test`,
+      phone: `84${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: investor._id,
+      fullName: 'HARSH SHARMA',
+      panNumber: 'BNWPS0001F',
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: investor._id,
+      clientCode: `VK${investor.phone.slice(-6)}`,
+      pan: 'BNWPS0001F',
+      fullName: 'HARSH SHARMA',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223322',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    await BankAccount.create({
+      user: investor._id,
+      accountHolder: 'HARSH VERMA', // Shares first name "HARSH" but conflicting surname "VERMA"
+      accountNumber: '998811223322',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'HARSH VERMA',
+    });
+
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
+    assert.equal(readiness.ready, false);
+    assert.equal(readiness.code, 'NSE_BANK_NAME_MISMATCH');
+    assert.match(readiness.message, /does not match your registered name/i);
+
+    await User.deleteOne({ _id: investor._id });
+    await Kyc.deleteOne({ user: investor._id });
+    await MfClientUcc.deleteOne({ user: investor._id });
+    await BankAccount.deleteOne({ user: investor._id });
+  });
+
+  it('42. Transposed legitimate matching name ("Vikas Saini" vs "Saini Vikas") passes strong name matching', async () => {
+    const investor = await User.create({
+      name: 'Vikas Saini',
+      email: `vikas_trans_${Date.now()}@vikaone.test`,
+      phone: `83${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      isKycVerified: true,
+      kycStatus: 'approved',
+    });
+
+    await Kyc.create({
+      user: investor._id,
+      fullName: 'VIKAS SAINI',
+      panNumber: 'BNWPS0002F',
+      status: 'approved',
+      verificationSource: 'NSE_MFSS_KYC_VERIFY',
+      address: { line1: 'Valid Street 123', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+    });
+
+    await MfClientUcc.create({
+      user: investor._id,
+      clientCode: `VK${investor.phone.slice(-6)}`,
+      pan: 'BNWPS0002F',
+      fullName: 'VIKAS SAINI',
+      nseStatus: 'ACTIVE',
+      primaryBank: {
+        accountNo: '998811223333',
+        ifsc: 'SBIN0000123',
+        bankName: 'SBI',
+      },
+    });
+
+    await BankAccount.create({
+      user: investor._id,
+      accountHolder: 'SAINI VIKAS', // Transposed name order
+      accountNumber: '998811223333',
+      ifsc: 'SBIN0000123',
+      bankName: 'SBI',
+      isVerified: true,
+      verificationSource: 'CASHFREE_PENNY_DROP',
+      verifiedName: 'SAINI VIKAS',
+    });
+
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(investor._id, 'PURCHASE');
+    assert.equal(readiness.ready, true);
+
+    await User.deleteOne({ _id: investor._id });
+    await Kyc.deleteOne({ user: investor._id });
+    await MfClientUcc.deleteOne({ user: investor._id });
+    await BankAccount.deleteOne({ user: investor._id });
+  });
+
+  it('43. Sensitive KYC provider fields (rawPanData / rawAadhaarData) never appear in getMyKyc or verifyCashfreePan responses', async () => {
+    const kycController = require('../controllers/kycController');
+    const axios = require('axios');
+    const origPost = axios.post;
+
+    const sensitiveUser = await User.create({
+      name: 'Sensitive Test User',
+      email: `sens_${Date.now()}@vikaone.test`,
+      phone: `82${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+    });
+
+    await Kyc.create({
+      user: sensitiveUser._id,
+      fullName: 'Sensitive Test User',
+      panNumber: 'BNWPS0003F',
+      panVerified: true,
+      status: 'approved',
+      verificationSource: 'MOCK_TEST_VERIFIED',
+      rawPanData: { secretToken: 'SUPER_SECRET_123', fatherName: 'Private Father', fullTaxPayload: { data: 999 } },
+      rawAadhaarData: { uidaiXml: '<xml>SECRET_DATA</xml>' },
+    });
+
+    try {
+      // 1. Check getMyKyc response (GET /api/kyc/me or /api/kyc/status)
+      const reqStatus = mockReqRes({}, {}, {}, sensitiveUser);
+      await kycController.getMyKyc(reqStatus.req, reqStatus.res, () => {});
+
+      assert.equal(reqStatus.res.statusCode, 200);
+      assert.equal(reqStatus.res.data.success, true);
+      assert.equal(reqStatus.res.data.data.rawPanData, undefined);
+      assert.equal(reqStatus.res.data.data.rawAadhaarData, undefined);
+      assert.ok(reqStatus.res.data.data.panNumberMasked.includes('******'));
+
+      // 2. Mock Cashfree response containing raw provider payload
+      axios.post = async () => ({
+        data: {
+          valid: true,
+          pan_status: 'VALID',
+          registered_name: 'Sensitive Test User',
+          sensitiveRawToken: 'RAW_SECRET_TOKEN_DO_NOT_EXPOSE',
+          internalScore: 99.8,
+        },
+      });
+
+      const reqPan = mockReqRes({ pan: 'BNWPS0003F', name: 'Sensitive Test User' }, {}, {}, sensitiveUser);
+      await kycController.verifyCashfreePan(reqPan.req, reqPan.res, () => {});
+
+      assert.equal(reqPan.res.statusCode, 200);
+      assert.equal(reqPan.res.data.data.rawPanData, undefined);
+      assert.equal(reqPan.res.data.data.rawAadhaarData, undefined);
+      assert.equal(reqPan.res.data.data.sensitiveRawToken, undefined);
+      assert.equal(reqPan.res.data.data.internalScore, undefined);
+      assert.ok(reqPan.res.data.data.panNumberMasked.includes('******'));
+
+      // 3. Verify error responses also never leak raw provider payloads
+      axios.post = async () => {
+        const err = new Error('Provider error');
+        err.response = { status: 400, data: { message: 'Invalid PAN', rawInternalError: 'SECRET_PROVIDER_ERROR_BODY' } };
+        throw err;
+      };
+      const reqPanErr = mockReqRes({ pan: 'BNWPS0003F', name: 'Sensitive Test User' }, {}, {}, sensitiveUser);
+      await kycController.verifyCashfreePan(reqPanErr.req, reqPanErr.res, () => {});
+      assert.equal(reqPanErr.res.statusCode, 502);
+      assert.equal(reqPanErr.res.data.rawInternalError, undefined);
+      assert.equal(reqPanErr.res.data.rawPanData, undefined);
+    } finally {
+      axios.post = origPost;
+      await User.deleteOne({ _id: sensitiveUser._id });
+      await Kyc.deleteOne({ user: sensitiveUser._id });
+    }
+  });
+
+  it('44. Admin review with valid evidence approves KYC and records ADMIN_DOCUMENT_VERIFIED provenance', async () => {
+    const kycController = require('../controllers/kycController');
+    const adminUser = await User.create({
+      name: 'Authorized Admin',
+      email: `admin_${Date.now()}@vikaone.test`,
+      phone: `81${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'admin',
+    });
+
+    const regularUser = await User.create({
+      name: 'Manual Document User',
+      email: `manual_doc_${Date.now()}@vikaone.test`,
+      phone: `80${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'user',
+    });
+
+    const pendingKyc = await Kyc.create({
+      user: regularUser._id,
+      fullName: 'Manual Document User',
+      panNumber: 'BNWPS0004F',
+      status: 'pending',
+      panImage: { url: 'https://s3.amazonaws.com/kyc-docs/real_pan_card.jpg' },
+      verificationSource: 'NONE',
+    });
+
+    const { req, res } = mockReqRes(
+      { status: 'approved', evidenceReference: 'PAN_DOC_REF_9988' },
+      { id: pendingKyc._id.toString() },
+      {},
+      adminUser
+    );
+
+    await kycController.reviewKyc(req, res, () => {});
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.verificationSource, 'ADMIN_DOCUMENT_VERIFIED');
+
+    const updated = await Kyc.findById(pendingKyc._id);
+    assert.equal(updated.status, 'approved');
+    assert.equal(updated.verificationSource, 'ADMIN_DOCUMENT_VERIFIED');
+    assert.equal(updated.evidenceReference, 'PAN_DOC_REF_9988');
+    assert.equal(String(updated.reviewedBy), String(adminUser._id));
+
+    await User.deleteMany({ _id: { $in: [adminUser._id, regularUser._id] } });
+    await Kyc.deleteOne({ _id: pendingKyc._id });
+  });
+
+  it('45. Admin review without valid supporting evidence is rejected with KYC_EVIDENCE_MISSING', async () => {
+    const kycController = require('../controllers/kycController');
+    const adminUser = await User.create({
+      name: 'Authorized Admin',
+      email: `admin_no_ev_${Date.now()}@vikaone.test`,
+      phone: `79${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'admin',
+    });
+
+    const regularUser = await User.create({
+      name: 'No Doc User',
+      email: `nodoc_${Date.now()}@vikaone.test`,
+      phone: `78${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'user',
+    });
+
+    const pendingKyc = await Kyc.create({
+      user: regularUser._id,
+      fullName: 'No Doc User',
+      panNumber: 'BNWPS0005F',
+      status: 'pending',
+      panImage: { url: 'placeholder' },
+      verificationSource: 'NONE',
+    });
+
+    const { req, res } = mockReqRes(
+      { status: 'approved' }, // No evidenceReference and placeholder image URL
+      { id: pendingKyc._id.toString() },
+      {},
+      adminUser
+    );
+
+    await kycController.reviewKyc(req, res, () => {});
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.data.success, false);
+    assert.equal(res.data.code, 'KYC_EVIDENCE_MISSING');
+
+    await User.deleteMany({ _id: { $in: [adminUser._id, regularUser._id] } });
+    await Kyc.deleteOne({ _id: pendingKyc._id });
+  });
+
+  it('46. Non-admin user attempting KYC review is rejected with HTTP 403 ADMIN_AUTH_REQUIRED', async () => {
+    const kycController = require('../controllers/kycController');
+    const nonAdminUser = await User.create({
+      name: 'Normal User',
+      email: `nonadmin_${Date.now()}@vikaone.test`,
+      phone: `77${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'user',
+    });
+
+    const pendingKyc = await Kyc.create({
+      user: nonAdminUser._id,
+      fullName: 'Normal User',
+      panNumber: 'BNWPS0006F',
+      status: 'pending',
+      verificationSource: 'NONE',
+    });
+
+    const { req, res } = mockReqRes(
+      { status: 'approved', evidenceReference: 'HACK_ATTEMPT' },
+      { id: pendingKyc._id.toString() },
+      {},
+      nonAdminUser
+    );
+
+    await kycController.reviewKyc(req, res, () => {});
+
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.data.success, false);
+    assert.equal(res.data.code, 'ADMIN_AUTH_REQUIRED');
+
+    await User.deleteOne({ _id: nonAdminUser._id });
+    await Kyc.deleteOne({ _id: pendingKyc._id });
+  });
+
+  it('47. Admin attempting self-review of their own KYC is rejected with HTTP 403 SELF_REVIEW_PROHIBITED', async () => {
+    const kycController = require('../controllers/kycController');
+    const selfAdmin = await User.create({
+      name: 'Self Review Admin',
+      email: `self_admin_${Date.now()}@vikaone.test`,
+      phone: `76${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'admin',
+    });
+
+    const selfKyc = await Kyc.create({
+      user: selfAdmin._id,
+      fullName: 'Self Review Admin',
+      panNumber: 'BNWPS0007F',
+      status: 'pending',
+      panImage: { url: 'https://s3.amazonaws.com/kyc-docs/admin_pan.jpg' },
+      verificationSource: 'NONE',
+    });
+
+    const { req, res } = mockReqRes(
+      { status: 'approved', evidenceReference: 'SELF_APPROVAL_REF' },
+      { id: selfKyc._id.toString() },
+      {},
+      selfAdmin
+    );
+
+    await kycController.reviewKyc(req, res, () => {});
+
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.data.success, false);
+    assert.equal(res.data.code, 'SELF_REVIEW_PROHIBITED');
+
+    await User.deleteOne({ _id: selfAdmin._id });
+    await Kyc.deleteOne({ _id: selfKyc._id });
+  });
+
+  it('48. Admin rejection sets status to rejected and verificationSource to NONE', async () => {
+    const kycController = require('../controllers/kycController');
+    const adminUser = await User.create({
+      name: 'Authorized Admin 2',
+      email: `admin2_${Date.now()}@vikaone.test`,
+      phone: `75${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'admin',
+    });
+
+    const regularUser = await User.create({
+      name: 'Rejected User',
+      email: `rejected_${Date.now()}@vikaone.test`,
+      phone: `74${Date.now().toString().slice(-8)}`,
+      password: 'TestPassword123!',
+      role: 'user',
+    });
+
+    const pendingKyc = await Kyc.create({
+      user: regularUser._id,
+      fullName: 'Rejected User',
+      panNumber: 'BNWPS0008F',
+      status: 'pending',
+      verificationSource: 'NONE',
+    });
+
+    const { req, res } = mockReqRes(
+      { status: 'rejected', rejectionReason: 'Illegible document photo' },
+      { id: pendingKyc._id.toString() },
+      {},
+      adminUser
+    );
+
+    await kycController.reviewKyc(req, res, () => {});
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.status, 'rejected');
+    assert.equal(res.data.data.verificationSource, 'NONE');
+
+    const updated = await Kyc.findById(pendingKyc._id);
+    assert.equal(updated.status, 'rejected');
+    assert.equal(updated.rejectionReason, 'Illegible document photo');
+
+    await User.deleteMany({ _id: { $in: [adminUser._id, regularUser._id] } });
+    await Kyc.deleteOne({ _id: pendingKyc._id });
   });
 });

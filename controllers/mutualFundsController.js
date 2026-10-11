@@ -833,23 +833,60 @@ exports.registerUserUcc = async (req, res) => {
       }
     }
 
-    // Resolve investor's authoritative legal name (no account nickname or generic "Investor" fallback)
-    let resolvedFullName = (fullName || '').trim();
-    if (!resolvedFullName) {
-      try {
-        const Kyc = require('../models/Kyc');
-        const userKyc = await Kyc.findOne({ user: userId });
-        if (userKyc && userKyc.panRegisteredName) {
-          resolvedFullName = userKyc.panRegisteredName.trim();
-        } else if (userKyc && userKyc.fullName && !['ACCOUNT HOLDER', 'INVESTOR'].includes(userKyc.fullName.trim().toUpperCase())) {
-          resolvedFullName = userKyc.fullName.trim();
-        }
-      } catch (_) {}
+    // Resolve & Validate Authoritative KYC details
+    const Kyc = require('../models/Kyc');
+    const userKyc = await Kyc.findOne({ user: userId });
+    const isTestEnv = process.env.NODE_ENV === 'test';
+
+    // Authoritative name from KYC (panRegisteredName or verified fullName)
+    const authoritativeName = (userKyc?.panRegisteredName || (userKyc?.fullName && !['ACCOUNT HOLDER', 'INVESTOR', 'USER'].includes(userKyc.fullName.trim().toUpperCase()) ? userKyc.fullName : '')).trim().toUpperCase();
+
+    // Authoritative DOB from KYC
+    let authoritativeDob = '';
+    if (userKyc?.dob) {
+      const d = new Date(userKyc.dob);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        authoritativeDob = `${day}/${month}/${year}`;
+      }
+    }
+
+    // Require verified identity records outside isolated test mocks
+    const hasVerifiedKyc = Boolean(userKyc && (authoritativeName || authoritativeDob));
+    if (!hasVerifiedKyc && !isTestEnv) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_VERIFIED_IDENTITY_REQUIRED',
+        message: 'Verified KYC records are required before registering for NSE UCC. Please complete KYC verification first.',
+      });
+    }
+
+    // Resolve Legal Name and check for conflicts
+    const clientSubmittedName = (fullName || '').trim().toUpperCase();
+    let resolvedFullName = '';
+
+    if (authoritativeName) {
+      if (clientSubmittedName && clientSubmittedName !== authoritativeName) {
+        return res.status(400).json({
+          success: false,
+          code: 'NSE_IDENTITY_CONFLICT',
+          message: `Submitted full name '${fullName}' conflicts with authoritative verified KYC legal name '${authoritativeName}'. UCC registration requires exact match with verified KYC records.`,
+          data: {
+            submittedName: fullName,
+            verifiedName: authoritativeName,
+          },
+        });
+      }
+      resolvedFullName = authoritativeName;
+    } else {
+      resolvedFullName = clientSubmittedName;
     }
 
     const isInvalidLegalName = !resolvedFullName ||
       resolvedFullName.length < 3 ||
-      /^(investor|account holder|user)$/i.test(resolvedFullName);
+      /^(investor|account holder|user|user\d+)$/i.test(resolvedFullName);
 
     if (isInvalidLegalName) {
       return res.status(400).json({
@@ -859,40 +896,47 @@ exports.registerUserUcc = async (req, res) => {
       });
     }
 
-    // Validate Bank Account Ownership against Verified Legal Name
+    // Validate Bank Account Ownership against Verified Legal Name using strong name matching
     try {
       const BankAccount = require('../models/BankAccount');
       const linkedBank = await BankAccount.findOne({ user: userId, accountNumber: effAccountNo });
       if (linkedBank && linkedBank.accountHolder) {
-        const bankTokens = linkedBank.accountHolder.toUpperCase().split(/\s+/).filter(t => t.length > 2);
-        const nameTokens = resolvedFullName.toUpperCase().split(/\s+/).filter(t => t.length > 2);
-        const hasTokenMatch = bankTokens.some(t => nameTokens.includes(t));
-        if (!hasTokenMatch && bankTokens.length > 0 && nameTokens.length > 0) {
+        const { isStrongBankNameMatch } = require('../services/nameMatchingService');
+        const matchResult = isStrongBankNameMatch(resolvedFullName, linkedBank.accountHolder);
+        if (!matchResult.match) {
           return res.status(400).json({
             success: false,
             code: 'NSE_BANK_NAME_MISMATCH',
             message: `Bank account belongs to '${linkedBank.accountHolder}', which does not match verified investor name '${resolvedFullName}'. SEBI regulations require mutual fund investments to originate from the investor's own verified bank account.`,
+            data: {
+              bankAccountHolder: linkedBank.accountHolder,
+              investorLegalName: resolvedFullName,
+              reason: matchResult.reason,
+            },
           });
         }
       }
     } catch (_) {}
 
-    // Resolve Date of Birth (strictly required - zero synthetic 01/01/1990 fallback)
-    let effDob = (dob || '').toString().trim();
-    if (!effDob) {
-      try {
-        const Kyc = require('../models/Kyc');
-        const userKyc = await Kyc.findOne({ user: userId });
-        if (userKyc && userKyc.dob) {
-          const d = new Date(userKyc.dob);
-          if (!isNaN(d.getTime())) {
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = d.getFullYear();
-            effDob = `${day}/${month}/${year}`;
-          }
-        }
-      } catch (_) {}
+    // Resolve Date of Birth and check for conflicts
+    const clientSubmittedDob = (dob || '').toString().trim();
+    let effDob = '';
+
+    if (authoritativeDob) {
+      if (clientSubmittedDob && clientSubmittedDob !== authoritativeDob) {
+        return res.status(400).json({
+          success: false,
+          code: 'NSE_IDENTITY_CONFLICT',
+          message: `Submitted Date of Birth '${dob}' conflicts with authoritative verified KYC Date of Birth '${authoritativeDob}'. UCC registration requires exact match with verified KYC records.`,
+          data: {
+            submittedDob: dob,
+            verifiedDob: authoritativeDob,
+          },
+        });
+      }
+      effDob = authoritativeDob;
+    } else {
+      effDob = clientSubmittedDob;
     }
 
     if (!effDob || !/^\d{2}\/\d{2}\/\d{4}$/.test(effDob)) {

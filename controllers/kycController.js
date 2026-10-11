@@ -114,6 +114,32 @@ exports.submitKyc = async (req, res, next) => {
     }
 };
 
+function sanitizeKycDto(kyc) {
+    if (!kyc) return null;
+    const doc = kyc.toObject ? kyc.toObject() : { ...kyc };
+    const maskedPan = doc.panNumber && doc.panNumber.length === 10
+        ? `${doc.panNumber.slice(0, 2)}******${doc.panNumber.slice(-2)}`
+        : undefined;
+
+    return {
+        _id: doc._id,
+        fullName: doc.fullName,
+        panNumberMasked: maskedPan,
+        panVerified: Boolean(doc.panVerified),
+        status: doc.status,
+        verificationSource: doc.verificationSource || "NONE",
+        evidenceReference: doc.evidenceReference || undefined,
+        address: doc.address ? {
+            city: doc.address.city,
+            state: doc.address.state,
+            pincode: doc.address.pincode,
+        } : undefined,
+        submittedAt: doc.submittedAt,
+        reviewedAt: doc.reviewedAt,
+    };
+}
+exports.sanitizeKycDto = sanitizeKycDto;
+
 /* ─────────────────────────────────────────
    GET /api/kyc/me
    Get current user's KYC status
@@ -122,7 +148,7 @@ exports.getMyKyc = async (req, res, next) => {
     try {
         const User = require("../models/User");
         const [kyc, user] = await Promise.all([
-            Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber"),
+            Kyc.findOne({ user: req.user._id }),
             User.findById(req.user._id).select("isSoldierVerified soldierKycStatus kycStatus"),
         ]);
         if (!kyc) {
@@ -136,7 +162,7 @@ exports.getMyKyc = async (req, res, next) => {
         }
         res.json({
             success: true,
-            data: kyc,
+            data: sanitizeKycDto(kyc),
             status: kyc.status,
             isSoldierVerified: user?.isSoldierVerified || (kyc.soldierDetails?.status === "approved"),
             soldierKycStatus: user?.soldierKycStatus || kyc.soldierDetails?.status || "not_submitted",
@@ -236,10 +262,33 @@ exports.getKycById = async (req, res, next) => {
 ───────────────────────────────────────── */
 exports.reviewKyc = async (req, res, next) => {
     try {
-        const { status, rejectionReason } = req.body;
+        const { status, rejectionReason, evidenceReference } = req.body;
 
         if (!["approved", "rejected", "revoked", "pending"].includes(status)) {
             return res.status(400).json({ success: false, message: "Status must be 'approved', 'rejected', 'revoked', or 'pending'" });
+        }
+
+        // 1. Require authorized admin action
+        if (!req.user || req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                code: "ADMIN_AUTH_REQUIRED",
+                message: "Administrator authorization required to review and approve KYC."
+            });
+        }
+
+        const existingKyc = await Kyc.findById(req.params.id);
+        if (!existingKyc) {
+            return res.status(404).json({ success: false, message: "KYC document not found" });
+        }
+
+        // 2. Prevent self-review (Admin approving their own KYC)
+        if (String(existingKyc.user) === String(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                code: "SELF_REVIEW_PROHIBITED",
+                message: "Administrators cannot review or approve their own KYC submission."
+            });
         }
 
         const updateData = {
@@ -248,13 +297,41 @@ exports.reviewKyc = async (req, res, next) => {
             reviewedAt: new Date(),
         };
 
-        if (status === "rejected") {
+        if (status === "approved") {
+            // 3. Evidence requirement: auditable document evidence or reference must exist
+            const hasRealPanImage = existingKyc.panImage?.url &&
+                !["cashfree_verified", "cashfree_pan_verified", "placeholder"].includes(existingKyc.panImage.url);
+            const hasRealAadhaar = existingKyc.aadhaarFront?.url &&
+                !["cashfree_verified", "placeholder"].includes(existingKyc.aadhaarFront.url);
+            const hasEvidenceRef = Boolean(evidenceReference && String(evidenceReference).trim().length >= 4);
+
+            if (!hasRealPanImage && !hasRealAadhaar && !hasEvidenceRef) {
+                return res.status(400).json({
+                    success: false,
+                    code: "KYC_EVIDENCE_MISSING",
+                    message: "Valid supporting document evidence (uploaded PAN/Aadhaar document or auditable evidenceReference) is strictly required for manual KYC approval."
+                });
+            }
+
+            updateData.verificationSource = "ADMIN_DOCUMENT_VERIFIED";
+            if (hasEvidenceRef) {
+                updateData.evidenceReference = String(evidenceReference).trim();
+            }
+            updateData.panVerified = true;
+            if (!existingKyc.panRegisteredName && existingKyc.fullName) {
+                updateData.panRegisteredName = existingKyc.fullName.toUpperCase();
+            }
+            updateData.rejectionReason = undefined;
+            updateData.revokedReason = undefined;
+        } else if (status === "rejected") {
+            updateData.verificationSource = "NONE";
             updateData.rejectionReason = rejectionReason || "Rejected by Administrator";
         } else if (status === "revoked") {
+            updateData.verificationSource = "NONE";
             updateData.revokedReason = rejectionReason || "KYC verification revoked by Administrator";
-            updateData.rejectionReason = rejectionReason || "KYC verification revoked by Administrator";
             updateData.revokedAt = new Date();
-        } else if (status === "approved" || status === "pending") {
+        } else if (status === "pending") {
+            updateData.verificationSource = "NONE";
             updateData.rejectionReason = undefined;
             updateData.revokedReason = undefined;
         }
@@ -265,20 +342,18 @@ exports.reviewKyc = async (req, res, next) => {
             { new: true }
         ).populate("user", "name email phone");
 
-        if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
-
         if (kyc.user) {
             const User = require("../models/User");
             await User.findByIdAndUpdate(kyc.user._id, { kycStatus: status });
         }
 
         let actionMsg = "KYC status updated";
-        if (status === "approved") actionMsg = "KYC Approved successfully";
+        if (status === "approved") actionMsg = "KYC Approved successfully via Admin Document Review";
         else if (status === "rejected") actionMsg = "KYC Rejected";
         else if (status === "revoked") actionMsg = "KYC Verification Revoked";
         else if (status === "pending") actionMsg = "KYC Reset to Pending Review";
 
-        res.json({ success: true, message: actionMsg, data: kyc });
+        return res.json({ success: true, message: actionMsg, data: sanitizeKycDto(kyc) });
     } catch (err) { next(err); }
 };
 
@@ -846,7 +921,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 success: true,
                 valid: true,
                 registeredName,
-                data: kyc,
+                data: sanitizeKycDto(kyc),
                 message: "PAN verified & KYC approved successfully (Test Mode)"
             });
         }
@@ -897,7 +972,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     success: true,
                     valid: true,
                     registeredName,
-                    data: kyc,
+                    data: sanitizeKycDto(kyc),
                     message: "PAN verified & KYC approved successfully via Cashfree!"
                 });
             } else {

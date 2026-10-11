@@ -174,15 +174,16 @@ exports.verifyBankAccount = async (req, res, next) => {
 
                 // Name Match Security Gate (SEBI mandates investor's own bank account)
                 if (nameAtBank && cleanHolder) {
-                    const userTokens = cleanHolder.split(/\s+/).filter(Boolean);
-                    const bankTokens = nameAtBank.split(/\s+/).filter(Boolean);
-                    const hasCommonToken = userTokens.some(t => t.length > 2 && bankTokens.includes(t));
+                    const { isStrongBankNameMatch } = require('../services/nameMatchingService');
+                    const matchResult = isStrongBankNameMatch(cleanHolder, nameAtBank);
 
-                    if (cfData.name_match_result === "NO" || (!hasCommonToken && userTokens.length > 0)) {
+                    if (cfData.name_match_result === "NO" || !matchResult.match) {
                         return res.status(400).json({
                             success: false,
                             isVerified: false,
-                            message: `Name mismatch: Bank account belongs to '${nameAtBank}', which does not match your registered name '${cleanHolder}'. As per SEBI regulations, investments must originate from your own bank account.`
+                            code: 'BANK_NAME_MISMATCH',
+                            message: `Name mismatch: Bank account belongs to '${nameAtBank}', which does not match your registered name '${cleanHolder}'. As per SEBI regulations, investments must originate from your own bank account.`,
+                            reason: matchResult.reason
                         });
                     }
                     verifiedName = nameAtBank;

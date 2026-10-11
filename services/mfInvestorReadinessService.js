@@ -53,13 +53,36 @@ class MfInvestorReadinessService {
     );
 
     // 1b. Check authoritative verification provenance
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const authoritativeSources = [
+      'NSE_MFSS_KYC_VERIFY',
+      'CASHFREE_GOVT_NSDL',
+      'UIDAI_XML',
+      'CASHFREE_AADHAAR_OKYC',
+    ];
+
+    if (kycDoc?.verificationSource === 'ADMIN_DOCUMENT_VERIFIED') {
+      const isAuditedAdminReview = Boolean(
+        kycDoc.reviewedBy &&
+        String(kycDoc.reviewedBy) !== String(userId) &&
+        kycDoc.reviewedAt
+      );
+      if (isAuditedAdminReview) {
+        authoritativeSources.push('ADMIN_DOCUMENT_VERIFIED');
+      }
+    }
+
+    if (isTestEnv) {
+      authoritativeSources.push('MOCK_TEST_VERIFIED');
+    }
+
     const hasAuthoritativeProvenance = Boolean(
       kycDoc &&
-      ['NSE_MFSS_KYC_VERIFY', 'CASHFREE_GOVT_NSDL', 'UIDAI_XML', 'CASHFREE_AADHAAR_OKYC', 'ADMIN_DOCUMENT_VERIFIED', 'MOCK_TEST_VERIFIED'].includes(kycDoc.verificationSource)
+      authoritativeSources.includes(kycDoc.verificationSource)
     );
 
     // Check if test fixture in test environment
-    const isTestFixture = process.env.NODE_ENV === 'test' &&
+    const isTestFixture = isTestEnv &&
       (user.isKycVerified || user.kycStatus === 'approved') &&
       !isFalseApprovalSignature;
 
@@ -124,32 +147,63 @@ class MfInvestorReadinessService {
       };
     }
 
-    // 3b. Validate Bank Account Ownership & Name Match
-    try {
-      const BankAccount = mongoose.models.BankAccount || require('../models/BankAccount');
-      const userBank = await BankAccount.findOne({
-        user: userId,
-        accountNumber: ucc.primaryBank.accountNo.trim(),
-      });
+    // 3b. Validate Bank Account Record in Database
+    const BankAccount = mongoose.models.BankAccount || require('../models/BankAccount');
+    const userBank = await BankAccount.findOne({
+      user: userId,
+      accountNumber: ucc.primaryBank.accountNo.trim(),
+    });
 
-      const investorLegalName = (ucc.fullName || user?.name || '').trim();
-      if (userBank && userBank.accountHolder && investorLegalName) {
-        const bankTokens = userBank.accountHolder.toUpperCase().split(/\s+/).filter(t => t.length > 2);
-        const nameTokens = investorLegalName.toUpperCase().split(/\s+/).filter(t => t.length > 2);
-        const hasTokenMatch = bankTokens.some(t => nameTokens.includes(t));
-        if (!hasTokenMatch && bankTokens.length > 0 && nameTokens.length > 0) {
-          return {
-            ready: false,
-            code: 'NSE_BANK_NAME_MISMATCH',
-            message: `Bank account belongs to '${userBank.accountHolder}', which does not match your registered name '${investorLegalName}'. SEBI regulations require mutual fund investments to originate from your own verified bank account.`,
-            data: {
-              bankAccountHolder: userBank.accountHolder,
-              investorLegalName: investorLegalName,
-            },
-          };
-        }
-      }
-    } catch (_) {}
+    if (!userBank) {
+      return {
+        ready: false,
+        code: 'NSE_BANK_RECORD_MISSING',
+        message: 'Linked bank account record is missing. Please add and verify your bank account before investing.',
+        data: {
+          accountNumber: ucc.primaryBank.accountNo.trim(),
+        },
+      };
+    }
+
+    // 3c. Require isVerified: true and Trustworthy Verification Provenance
+    const trustedBankSources = ['CASHFREE_PENNY_DROP', 'MANUAL_PENNY_DROP'];
+    if (isTestEnv) {
+      trustedBankSources.push('MOCK_TEST_VERIFIED');
+    }
+
+    const hasTrustedBankProvenance = userBank.isVerified === true &&
+      trustedBankSources.includes(userBank.verificationSource);
+
+    if (!hasTrustedBankProvenance) {
+      return {
+        ready: false,
+        code: 'NSE_BANK_NOT_VERIFIED',
+        message: 'Your bank account has not been verified via penny-drop or lacks authoritative verification provenance.',
+        data: {
+          isVerified: Boolean(userBank.isVerified),
+          verificationSource: userBank.verificationSource || 'NONE',
+        },
+      };
+    }
+
+    // 3d. Strong Name Matching Gate (No single common-first-name false positives)
+    const { isStrongBankNameMatch } = require('./nameMatchingService');
+    const investorLegalName = (ucc.fullName || kycDoc?.panRegisteredName || '').trim();
+    const bankHolderName = (userBank.verifiedName || userBank.accountHolder || '').trim();
+
+    const nameMatchResult = isStrongBankNameMatch(investorLegalName, bankHolderName);
+    if (!nameMatchResult.match) {
+      return {
+        ready: false,
+        code: 'NSE_BANK_NAME_MISMATCH',
+        message: `Bank account belongs to '${bankHolderName}', which does not match your registered name '${investorLegalName}'. SEBI regulations require mutual fund investments to originate from your own verified bank account.`,
+        data: {
+          bankAccountHolder: bankHolderName,
+          investorLegalName,
+          reason: nameMatchResult.reason,
+        },
+      };
+    }
 
     // For Purchase / Redeem, KYC + UCC + Bank is sufficient
     if (mode === 'PURCHASE' || mode === 'REDEEM' || mode === 'SWITCH') {
