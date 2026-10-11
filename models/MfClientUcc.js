@@ -55,6 +55,13 @@ const MfClientUccSchema = new mongoose.Schema(
       percentage: { type: Number, default: 100 },
       pan: { type: String, default: '' },
     },
+    address: {
+      address1: { type: String, default: '' },
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      country: { type: String, default: 'INDIA' },
+    },
     nseStatus: {
       type: String,
       enum: ['PENDING', 'ACTIVE', 'REJECTED'],

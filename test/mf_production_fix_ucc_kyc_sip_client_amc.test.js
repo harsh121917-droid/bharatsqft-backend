@@ -272,6 +272,7 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     await MutualFundScheme.deleteMany({ schemeCode: /^TEST_/ });
     await MfOrder.deleteMany({ orderId: /^MFP_TESTFIX_/ });
     await MfSip.deleteMany({ sipRefNo: /^SIP_TESTFIX_/ });
+    await mongoose.disconnect();
   });
 
   beforeEach(() => {

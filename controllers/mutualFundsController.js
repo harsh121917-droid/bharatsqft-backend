@@ -749,6 +749,12 @@ exports.registerUserUcc = async (req, res) => {
       bankName,
       nomineeName,
       nomineeRelation,
+      address,
+      address1,
+      address2,
+      city,
+      state,
+      pincode,
     } = req.body;
 
     if (!pan) {
@@ -806,10 +812,14 @@ exports.registerUserUcc = async (req, res) => {
         } catch (_) {}
       }
 
-      // 3. Fallback for paperless instant onboarding (finalized in Mandate step)
-      effAccountNo = effAccountNo || `91${user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210'}`;
-      effIfsc = effIfsc || 'HDFC0000123';
-      effBankName = effBankName || 'Primary Savings Bank';
+      // Require verified bank details
+      if (!effAccountNo || !effIfsc) {
+        return res.status(400).json({
+          success: false,
+          code: 'NSE_BANK_NOT_VERIFIED',
+          message: 'Verified bank account details (valid account number and IFSC) are required for NSE UCC registration.',
+        });
+      }
     }
 
     // Resolve investor's official name
@@ -830,6 +840,46 @@ exports.registerUserUcc = async (req, res) => {
         message: 'Investor UCC is already registered and active on NSE MFSS.',
         data: existingActiveUcc,
         isDuplicate: true,
+      });
+    }
+
+    // 0b. Address Resolution & Strict Non-Placeholder Validation
+    let effAddress1 = (address1 || address?.line1 || address?.address1 || '').trim();
+    let effAddress2 = (address2 || address?.line2 || address?.address2 || '').trim();
+    let effCity = (city || address?.city || '').trim();
+    let effState = (state || address?.state || '').trim();
+    let effPincode = (pincode || address?.pincode || '').toString().trim();
+
+    if (!effAddress1 || !effCity || !effState || !effPincode) {
+      try {
+        const Kyc = require('../models/Kyc');
+        const userKyc = await Kyc.findOne({ user: userId });
+        if (userKyc && userKyc.address) {
+          if (!effAddress1 && userKyc.address.line1) effAddress1 = userKyc.address.line1.trim();
+          if (!effCity && userKyc.address.city) effCity = userKyc.address.city.trim();
+          if (!effState && userKyc.address.state) effState = userKyc.address.state.trim();
+          if (!effPincode && userKyc.address.pincode) effPincode = String(userKyc.address.pincode).trim();
+        }
+      } catch (_) {}
+    }
+
+    const isPlaceholderAddress = !effAddress1 ||
+      /document\s*photo\s*uploaded/i.test(effAddress1) ||
+      /review\s*required/i.test(effAddress1) ||
+      effAddress1.length < 5;
+
+    if (isPlaceholderAddress || !effCity || !effState || !effPincode) {
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_ADDRESS_NOT_VERIFIED',
+        message: 'A verified residential address (street/flat address, city, state, and 6-digit pincode) is required for NSE UCC registration. Placeholder addresses are not permitted.',
+        data: {
+          hasAddress: Boolean(effAddress1),
+          isPlaceholder: Boolean(isPlaceholderAddress),
+          hasCity: Boolean(effCity),
+          hasState: Boolean(effState),
+          hasPincode: Boolean(effPincode),
+        },
       });
     }
 
@@ -855,6 +905,12 @@ exports.registerUserUcc = async (req, res) => {
       default_bank_flag_1: 'YES',
       cheque_name: resolvedFullName,
       div_pay_mode: '02', // Direct Credit
+      address_1: effAddress1.slice(0, 40),
+      address_2: effAddress2 ? effAddress2.slice(0, 40) : '',
+      city: effCity.slice(0, 35),
+      state: effState,
+      pincode: effPincode.slice(0, 6),
+      country: 'INDIA',
       email: user.email || `${clientCode.toLowerCase()}@client.nseinvest.com`,
       communication_mode: 'ELECTRONIC',
       indian_mobile_no: user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210',
@@ -875,7 +931,7 @@ exports.registerUserUcc = async (req, res) => {
       nseClient.isMockMode()
     );
 
-    const nseStatus = isSuccess ? 'ACTIVE' : 'REJECTED';
+    const nseStatus = isSuccess ? 'ACTIVE' : 'PENDING';
     const nseRemarks = regDetail?.message || nseRes?.message || (isSuccess ? 'APPROVED' : 'Exchange registration pending/rejected');
 
     // 3. Upsert client UCC record in MongoDB
@@ -896,6 +952,14 @@ exports.registerUserUcc = async (req, res) => {
           ifsc: effIfsc.toUpperCase(),
           bankName: effBankName,
           accountType: 'SB',
+        },
+        address: {
+          address1: effAddress1,
+          address2: effAddress2,
+          city: effCity,
+          state: effState,
+          pincode: effPincode,
+          country: 'INDIA',
         },
         nominee: {
           name: nomineeName || '',
@@ -1905,7 +1969,8 @@ exports.getTransactions = async (req, res) => {
         const tType = isRed ? 'REDEMPTION' : (isSw ? 'SWITCH_OUT' : 'PURCHASE');
         const units = isRed
           ? -(o.redemptionUnits || o.units || o.requestedUnits || 0)
-          : (o.allottedUnits || o.estimatedUnits || 0);
+          : (o.allotmentStatus === 'ALLOTTED' ? (o.allottedUnits || o.units || 0) : 0);
+        const estimatedUnits = isRed ? null : (o.estimatedUnits || null);
 
         return {
           _id: o._id,
@@ -1918,6 +1983,8 @@ exports.getTransactions = async (req, res) => {
           transactionDate: o.createdAt,
           orderAmount: o.orderAmount,
           units,
+          allottedUnits: o.allottedUnits || 0,
+          estimatedUnits,
           nav: o.navAtOrder || 0,
           navDate: o.createdAt,
           status: 'PROCESSING',

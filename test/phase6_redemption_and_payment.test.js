@@ -46,6 +46,8 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
       password: 'testPassword123',
       isActive: true,
       role: 'user',
+      isKycVerified: true,
+      kycStatus: 'approved',
     });
 
     // 2. Create UCC with verified bank account
@@ -54,6 +56,7 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
       clientCode: 'VKP6TEST01',
       pan: 'ABCDE1234F',
       status: 'ACTIVE',
+      nseStatus: 'ACTIVE',
       accountType: 'INDIVIDUAL',
       taxStatus: 'RESIDENTIAL_INDIVIDUAL',
       primaryBank: {
@@ -104,6 +107,7 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
     await MfTransaction.deleteMany({ user: testUser._id });
     await MfPortfolioHolding.deleteMany({ user: testUser._id });
     nseClient.mockModeOverride = undefined;
+    await mongoose.disconnect();
   });
 
   // ── Helper to simulate Express req/res ──
