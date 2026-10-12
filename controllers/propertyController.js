@@ -29,6 +29,29 @@ exports.getPublicProperties = async (req, res, next) => {
 
         // Support both "published" and "active" status values
         const filter = { status: { $in: ["published", "active"] } };
+
+        // Category filter: "brick", "estate", "savings"
+        const category = req.query.category || req.query.listingCategory;
+        if (category === "estate") {
+            filter.listingCategory = "estate";
+        } else if (category === "savings") {
+            filter.listingCategory = "savings";
+        } else if (category === "brick") {
+            filter.$or = [
+                { listingCategory: "brick" },
+                { listingCategory: { $exists: false } },
+                { listingCategory: null }
+            ];
+        }
+
+        // Specific workflow status filters
+        if (req.query.estateStatus) {
+            filter.estateStatus = req.query.estateStatus;
+        }
+        if (req.query.brickStatus) {
+            filter.brickStatus = req.query.brickStatus;
+        }
+
         if (req.query.featured !== undefined) {
             filter.featured = req.query.featured === "true" || req.query.featured === true;
         }
@@ -42,19 +65,35 @@ exports.getPublicProperties = async (req, res, next) => {
             if (req.query.maxPrice) filter["price.amount"].$lte = +req.query.maxPrice;
         }
         if (req.query.search) {
+            const searchRegex = { $regex: req.query.search, $options: "i" };
             filter.$or = [
-                { title: { $regex: req.query.search, $options: "i" } },
-                { "location.city": { $regex: req.query.search, $options: "i" } },
-                { "location.address": { $regex: req.query.search, $options: "i" } },
+                { title: searchRegex },
+                { "location.city": searchRegex },
+                { "location.address": searchRegex },
+                { tagline: searchRegex },
             ];
         }
 
-        const [properties, total] = await Promise.all([
+        const [properties, total, estateAvailableCount, estateFundedCount, estateExitedCount] = await Promise.all([
             Property.find(filter).sort("-createdAt").skip(skip).limit(limit),
             Property.countDocuments(filter),
+            Property.countDocuments({ status: { $in: ["published", "active"] }, listingCategory: "estate", estateStatus: "available" }),
+            Property.countDocuments({ status: { $in: ["published", "active"] }, listingCategory: "estate", estateStatus: "funded" }),
+            Property.countDocuments({ status: { $in: ["published", "active"] }, listingCategory: "estate", estateStatus: "exited" }),
         ]);
 
-        res.json({ success: true, total, page, pages: Math.ceil(total / limit), data: properties });
+        res.json({
+            success: true,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            counts: {
+                available: estateAvailableCount,
+                funded: estateFundedCount,
+                exited: estateExitedCount,
+            },
+            data: properties
+        });
     } catch (err) { next(err); }
 };
 
@@ -89,12 +128,26 @@ exports.getAllProperties = async (req, res, next) => {
                 filter.status = req.query.status;
             }
         }
+        const category = req.query.category || req.query.listingCategory;
+        if (category === "estate") {
+            filter.listingCategory = "estate";
+        } else if (category === "savings") {
+            filter.listingCategory = "savings";
+        } else if (category === "brick") {
+            filter.$or = [
+                { listingCategory: "brick" },
+                { listingCategory: { $exists: false } },
+                { listingCategory: null }
+            ];
+        }
         const typeFilter = buildPropertyTypeFilter(req.query.type);
         if (typeFilter) filter.propertyType = typeFilter;
         if (req.query.search) {
+            const searchRegex = { $regex: req.query.search, $options: "i" };
             filter.$or = [
-                { title: { $regex: req.query.search, $options: "i" } },
-                { "location.city": { $regex: req.query.search, $options: "i" } },
+                { title: searchRegex },
+                { "location.city": searchRegex },
+                { tagline: searchRegex },
             ];
         }
 
@@ -108,7 +161,11 @@ exports.getAllProperties = async (req, res, next) => {
             const doc = p.toObject();
             doc.isPublished = doc.status === "published" || doc.status === "active";
             doc.totalInvestmentRequired = doc.totalInvestmentRequired || doc.price?.amount || (doc.brickPrice && doc.totalBricks ? doc.brickPrice * doc.totalBricks : 0);
-            doc.fundedPercentage = doc.totalBricks > 0 ? Math.round(((doc.soldBricks || 0) / doc.totalBricks) * 100) : 0;
+            if (doc.listingCategory === "estate" && doc.fundedPercentage !== undefined && doc.fundedPercentage !== null) {
+                // Keep the admin-configured fundedPercentage for Estates
+            } else {
+                doc.fundedPercentage = doc.totalBricks > 0 ? Math.round(((doc.soldBricks || 0) / doc.totalBricks) * 100) : 0;
+            }
             return doc;
         });
 

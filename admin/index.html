@@ -3357,6 +3357,12 @@
                             Property</button>
                     </div>
                 </div>
+                <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+                    <button class="btn btn-sm btn-primary prop-cat-btn" id="prop-cat-all" onclick="filterPropertyCategory('all')">All Listings</button>
+                    <button class="btn btn-sm btn-secondary prop-cat-btn" id="prop-cat-brick" onclick="filterPropertyCategory('brick')">🧱 Bricks</button>
+                    <button class="btn btn-sm btn-secondary prop-cat-btn" id="prop-cat-estate" onclick="filterPropertyCategory('estate')">🏰 Pre-Launch / Estates</button>
+                    <button class="btn btn-sm btn-secondary prop-cat-btn" id="prop-cat-savings" onclick="filterPropertyCategory('savings')">🏖️ Savings</button>
+                </div>
                 <div class="table-wrap">
                     <div id="properties-body">
                         <div class="loading-box">
@@ -4723,10 +4729,34 @@
             </div>
             <div class="modal-body">
                 <form id="prop-form" onsubmit="event.preventDefault()">
-                    <div class="form-group">
-                        <label class="form-label">Property Title</label>
-                        <input class="form-control" id="prop-title" placeholder="e.g. Prestige Highline Commercial Hub"
-                            required />
+                    <div class="form-grid-2" style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius-md);padding:14px;margin-bottom:16px">
+                        <div class="form-group" style="margin-bottom:0">
+                            <label class="form-label" style="font-weight:700;color:#60A5FA"><i class="fas fa-layer-group"></i> Listing Category</label>
+                            <select class="form-control" id="prop-category" onchange="toggleCategorySpecificFields()">
+                                <option value="brick">🧱 Bricks (Fractional Real Estate)</option>
+                                <option value="estate">🏰 Pre-Launch / Estates (High-Yield Development)</option>
+                                <option value="savings">🏖️ Savings Opportunity (Location-based)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0">
+                            <label class="form-label" style="font-weight:700;color:#60A5FA"><i class="fas fa-traffic-light"></i> Workflow Status</label>
+                            <select class="form-control" id="prop-workflow-status">
+                                <option value="available">🟢 Available (Open for Investment)</option>
+                                <option value="funded">🟡 Funded (Target Reached)</option>
+                                <option value="invested">🔵 Invested (User Portfolio)</option>
+                                <option value="exited">⚪ Exited (Matured/Closed)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Property Title</label>
+                            <input class="form-control" id="prop-title" placeholder="e.g. Smartworld Sky Arc - 2" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tagline (Star / Green Banner)</label>
+                            <input class="form-control" id="prop-tagline" placeholder="e.g. Iconic Living For Icons" />
+                        </div>
                     </div>
                     <div class="form-grid-3">
                         <div class="form-group">
@@ -4826,6 +4856,342 @@
                             property outright at 100% valuation.
                         </div>
                     </div>
+                    <!-- ══════════════════════════════════════════════════
+                         PRE-LAUNCH / ESTATE & SAVINGS SUITE
+                         ══════════════════════════════════════════════════ -->
+                    <div id="prop-estate-suite" style="background:rgba(37,99,235,0.04);border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius-md);padding:16px;margin-bottom:16px">
+                        <div style="font-weight:800;color:#60A5FA;font-size:15px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <i class="fas fa-crown"></i> Pre-Launch (Estate) Details — Mapped to 4 Mobile App Tabs
+                            </div>
+                            <span class="badge" style="background:#2563EB;color:#fff;font-size:10px;padding:3px 8px;border-radius:6px">DRX Estate Flow</span>
+                        </div>
+
+                        <!-- 4 Interactive Sub-Tabs for the Admin -->
+                        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(15,23,42,0.6);padding:6px;border-radius:12px;border:1px solid rgba(255,255,255,0.1)">
+                            <button type="button" class="btn btn-sm estate-tab-btn active" id="tab-btn-overview" onclick="switchEstateAdminTab('overview')" style="flex:1;font-weight:700;font-size:12px;padding:8px 4px;border-radius:8px">
+                                📌 1. Overview
+                            </button>
+                            <button type="button" class="btn btn-sm estate-tab-btn" id="tab-btn-units" onclick="switchEstateAdminTab('units')" style="flex:1;font-weight:700;font-size:12px;padding:8px 4px;border-radius:8px">
+                                🏢 2. Units (<span id="admin-units-count-badge">2</span>)
+                            </button>
+                            <button type="button" class="btn btn-sm estate-tab-btn" id="tab-btn-developer" onclick="switchEstateAdminTab('developer')" style="flex:1;font-weight:700;font-size:12px;padding:8px 4px;border-radius:8px">
+                                🏗️ 3. About Developer
+                            </button>
+                            <button type="button" class="btn btn-sm estate-tab-btn" id="tab-btn-howitworks" onclick="switchEstateAdminTab('howitworks')" style="flex:1;font-weight:700;font-size:12px;padding:8px 4px;border-radius:8px">
+                                💡 4. How It Works
+                            </button>
+                        </div>
+
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <!-- SUB-TAB 1: OVERVIEW TAB DATA                                        -->
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <div id="estate-tab-overview" class="estate-tab-content" style="display:block">
+                            <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#93c5fd">
+                                📱 <strong>Mobile App Tab: Overview</strong> — Controls key stats, deal size, strategy pillars, construction-linked payment plan & Why City reasons.
+                            </div>
+
+                            <!-- 1. Key Metrics Strip -->
+                            <div class="form-grid-3" style="margin-bottom:12px">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Min Amount (₹)</label>
+                                    <input class="form-control" type="number" id="prop-min-amount" placeholder="500000" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Potential ROI (e.g. 40%-45%)</label>
+                                    <input class="form-control" id="prop-potential-roi" placeholder="40%-45%" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Exp. Tenure (e.g. 2-3 Years)</label>
+                                    <input class="form-control" id="prop-expected-tenure" placeholder="2-3 Years" style="font-size:12px" />
+                                </div>
+                            </div>
+
+                            <!-- 2. Deal Overview Stats Table Fields -->
+                            <div class="form-grid-3" style="margin-bottom:12px">
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Deal Size (e.g. 10.69 Cr)</label>
+                                    <input class="form-control" id="prop-deal-size" placeholder="10.69 Cr" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Price/sq ft (₹)</label>
+                                    <input class="form-control" type="number" id="prop-price-per-sqft" placeholder="18500" style="font-size:12px" />
+                                </div>
+                                <div>
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Funded Percentage (0-100%)</label>
+                                    <input class="form-control" type="number" id="prop-funded-pct" placeholder="29" min="0" max="100" style="font-size:12px" />
+                                </div>
+                            </div>
+
+                            <!-- 3. DRX Academy Video (Overview) -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
+                                <div style="font-weight:700;font-size:12px;color:#cbd5e1;margin-bottom:8px">🎓 DRX Academy Video (Overview Tab Card)</div>
+                                <div class="form-grid-3">
+                                    <div style="grid-column: span 2">
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Video Title</label>
+                                        <input class="form-control" id="prop-academy-title" placeholder="Understand the basics of fractional real estate." style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Duration (e.g. 1:19)</label>
+                                        <input class="form-control" id="prop-academy-duration" placeholder="1:19" style="font-size:12px" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Capital Growth Strategy -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
+                                <div style="font-weight:700;font-size:12px;color:#cbd5e1;margin-bottom:8px">📈 Strategy & 3 Key Pillars</div>
+                                <div class="form-grid-2" style="margin-bottom:8px">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Strategy Title</label>
+                                        <input class="form-control" id="prop-strategy-title" placeholder="Capital Growth" style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Strategy Subtitle</label>
+                                        <input class="form-control" id="prop-strategy-subtitle" placeholder="High appreciation potential in prime micromarket" style="font-size:12px" />
+                                    </div>
+                                </div>
+                                <div class="form-grid-3">
+                                    <div>
+                                        <input class="form-control" id="prop-strat-p1-title" placeholder="Prime Location" style="font-size:11px;margin-bottom:4px" />
+                                        <textarea class="form-control" id="prop-strat-p1-desc" rows="2" placeholder="Micromarket connectivity..." style="font-size:11px"></textarea>
+                                    </div>
+                                    <div>
+                                        <input class="form-control" id="prop-strat-p2-title" placeholder="Trusted Developer" style="font-size:11px;margin-bottom:4px" />
+                                        <textarea class="form-control" id="prop-strat-p2-desc" rows="2" placeholder="Grade-A execution record..." style="font-size:11px"></textarea>
+                                    </div>
+                                    <div>
+                                        <input class="form-control" id="prop-strat-p3-title" placeholder="World class Lifestyle Amenities" style="font-size:11px;margin-bottom:4px" />
+                                        <textarea class="form-control" id="prop-strat-p3-desc" rows="2" placeholder="Luxury amenities..." style="font-size:11px"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 5. Construction-Linked Payment Milestones & Exit -->
+                            <div class="form-grid-2">
+                                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px">
+                                    <div style="font-weight:700;font-size:12px;color:#cbd5e1;margin-bottom:4px">📅 Construction Payment Timeline</div>
+                                    <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">Milestone schedule JSON or description:</div>
+                                    <textarea class="form-control" id="prop-payment-plan-json" rows="4" placeholder='[{"date":"On Booking","title":"10% Booking Token","accountDetails":"Escrow Account"},{"date":"Month 6","title":"15% Excavation Complete"}]' style="font-size:11px;font-family:monospace"></textarea>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px">
+                                    <div style="font-weight:700;font-size:12px;color:#cbd5e1;margin-bottom:4px">🚪 Exit Options & Why Real Estate</div>
+                                    <input class="form-control" id="prop-exit-title" placeholder="LLP sells the property" style="font-size:11px;margin-bottom:6px" />
+                                    <textarea class="form-control" id="prop-exit-desc" rows="3" placeholder="Upon successful sale, proceeds are distributed pro-rata..." style="font-size:11px"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <!-- SUB-TAB 2: UNITS TAB DATA                                           -->
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <div id="estate-tab-units" class="estate-tab-content" style="display:none">
+                            <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#93c5fd">
+                                📱 <strong>Mobile App Tab: Units(2)</strong> — Controls the individual unit inventory cards shown in the mobile app.
+                            </div>
+
+                            <div id="admin-units-container" style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px">
+                                <!-- Dynamic Unit Cards inserted here by JS -->
+                            </div>
+
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAdminUnitCard()" style="font-weight:700;padding:8px 16px;border-radius:8px">
+                                <i class="fas fa-plus"></i> + Add Another Unit
+                            </button>
+                        </div>
+
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <!-- SUB-TAB 3: ABOUT DEVELOPER TAB DATA                                 -->
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <div id="estate-tab-developer" class="estate-tab-content" style="display:none">
+                            <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#93c5fd">
+                                📱 <strong>Mobile App Tab: About Developer</strong><br>
+                                <strong>1. First enter Developer Bio Text</strong>, then <strong>2. Enter Developer Website URL</strong> (opens when tapping "Learn more ->" in app), then <strong>3. Developer Stats</strong>, <strong>4. About Project & Map</strong>, and <strong>5. Downloadable Documents</strong>.
+                            </div>
+
+                            <!-- 1. Developer Name, Bio & Website URL -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                                <div style="font-weight:700;font-size:13px;color:#60A5FA;margin-bottom:10px">🏗️ Step 1: Developer Information & Website Link</div>
+                                
+                                <div class="form-group" style="margin-bottom:10px">
+                                    <label style="font-size:11.5px;color:var(--text-muted);display:block;margin-bottom:3px">Developer Company Name</label>
+                                    <input class="form-control" id="prop-developer-name" placeholder="e.g. Smartworld Developers" style="font-size:12.5px" />
+                                </div>
+
+                                <div class="form-group" style="margin-bottom:10px">
+                                    <label style="font-size:11.5px;color:var(--text-muted);display:block;margin-bottom:3px">
+                                        Developer Bio / Description <span style="color:#60A5FA">(First enter this text)</span>
+                                    </label>
+                                    <textarea class="form-control" id="prop-developer-desc" rows="4" placeholder="Smartworld is one of the country's leading real estate developers, known for delivering high-end residential, commercial..." style="font-size:12px"></textarea>
+                                </div>
+
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:11.5px;font-weight:700;color:#38bdf8;display:block;margin-bottom:3px">
+                                        🌐 Developer Official Website URL (Next enter URL for "Learn more ->")
+                                    </label>
+                                    <input class="form-control" id="prop-developer-url" placeholder="https://smartworlddevelopers.com" style="font-size:12.5px;border-color:rgba(56,189,248,0.5)" />
+                                    <div style="font-size:10.5px;color:#94a3b8;margin-top:3px">
+                                        💡 In the mobile app, when the user taps <strong>"Learn more ->"</strong>, it will automatically open this URL.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Developer Track Record 3 Stats -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:10px">📊 Step 2: Developer Track Record (3 Stats)</div>
+                                <div class="form-grid-3">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Projects Completed</label>
+                                        <input class="form-control" id="prop-developer-projects" placeholder="36" style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Sq ft developed</label>
+                                        <input class="form-control" id="prop-developer-sqft" placeholder="2,00,00,000" style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Avg project appreciation</label>
+                                        <input class="form-control" id="prop-developer-appreciation" placeholder="40%" style="font-size:12px" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. About Project & Location Map -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:10px">📍 Step 3: About Project & Location Map</div>
+                                <div class="form-group" style="margin-bottom:8px">
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Project Title</label>
+                                    <input class="form-control" id="prop-about-project-title" placeholder="Smartworld Sky Arc" style="font-size:12px" />
+                                </div>
+                                <div class="form-group" style="margin-bottom:8px">
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Project Description</label>
+                                    <textarea class="form-control" id="prop-about-project-desc" rows="3" placeholder="Smartworld Sky Arc is an iconic luxury residential development..." style="font-size:12px"></textarea>
+                                </div>
+                                <div class="form-grid-2">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Location Address</label>
+                                        <input class="form-control" id="prop-about-project-address" placeholder="Sector 69, Golf Course Extension Road, Gurugram" style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Map Image Preview URL</label>
+                                        <input class="form-control" id="prop-about-project-map" placeholder="https://..." style="font-size:12px" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Project Documents (RERA, One Pager, Cost Sheets) -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:10px">📄 Step 4: Project Documents (Downloadable on Mobile)</div>
+                                <div class="form-grid-3">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">RERA PDF URL</label>
+                                        <input class="form-control" id="prop-doc-rera" placeholder="https://.../rera.pdf" style="font-size:11px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">One Pager PDF URL</label>
+                                        <input class="form-control" id="prop-doc-onepager" placeholder="https://.../one-pager.pdf" style="font-size:11px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Cost Sheets PDF URL</label>
+                                        <input class="form-control" id="prop-doc-costsheets" placeholder="https://.../cost-sheets.pdf" style="font-size:11px" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 5. Call Your Advisor -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:10px">📞 Step 5: Dedicated Advisor Card</div>
+                                <div class="form-grid-2" style="margin-bottom:8px">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Name</label>
+                                        <input class="form-control" id="prop-advisor-name" placeholder="Neeraj Vishwakarma" style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Phone</label>
+                                        <input class="form-control" id="prop-advisor-phone" placeholder="+91 9876543210" style="font-size:12px" />
+                                    </div>
+                                </div>
+                                <div class="form-grid-2">
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Card Subtitle</label>
+                                        <input class="form-control" id="prop-advisor-subtitle" placeholder="Neeraj Vishwakarma is here for you anytime you need help." style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Advisor Photo URL</label>
+                                        <input class="form-control" id="prop-advisor-image" placeholder="https://..." style="font-size:12px" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <!-- SUB-TAB 4: HOW IT WORKS TAB DATA                                    -->
+                        <!-- ═════════════════════════════════════════════════════════════════════ -->
+                        <div id="estate-tab-howitworks" class="estate-tab-content" style="display:none">
+                            <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#93c5fd">
+                                📱 <strong>Mobile App Tab: How It Works</strong> — Controls Academy video and the 4 numbered steps of the investment process.
+                            </div>
+
+                            <!-- Academy Video -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:8px">🎓 Video Explanation Card</div>
+                                <div class="form-grid-3">
+                                    <div style="grid-column: span 2">
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Video Title</label>
+                                        <input class="form-control" id="prop-hiw-academy-title" placeholder="Learn about payment plan." style="font-size:12px" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Duration (e.g. 0:51)</label>
+                                        <input class="form-control" id="prop-hiw-academy-duration" placeholder="0:51" style="font-size:12px" />
+                                    </div>
+                                </div>
+                                <div style="margin-top:8px">
+                                    <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Video URL (e.g. YouTube or MP4)</label>
+                                    <input class="form-control" id="prop-hiw-academy-url" placeholder="https://www.youtube.com/watch?v=..." style="font-size:12px" />
+                                </div>
+                            </div>
+
+                            <!-- 4 Numbered Steps -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px">
+                                <div style="font-weight:700;font-size:13px;color:#cbd5e1;margin-bottom:10px">🔢 Investment Plan 4 Steps</div>
+                                
+                                <div style="margin-bottom:10px">
+                                    <div style="font-weight:700;font-size:11.5px;color:#60A5FA;margin-bottom:4px">Step 1</div>
+                                    <input class="form-control" id="prop-hiw-step1-title" placeholder="Token payment (EOI)" style="font-size:11px;margin-bottom:4px" />
+                                    <textarea class="form-control" id="prop-hiw-step1-desc" rows="2" placeholder="Express your interest in The opportunity..." style="font-size:11px"></textarea>
+                                </div>
+
+                                <div style="margin-bottom:10px">
+                                    <div style="font-weight:700;font-size:11.5px;color:#60A5FA;margin-bottom:4px">Step 2</div>
+                                    <input class="form-control" id="prop-hiw-step2-title" placeholder="Become a Partner" style="font-size:11px;margin-bottom:4px" />
+                                    <textarea class="form-control" id="prop-hiw-step2-desc" rows="2" placeholder="If the opportunity excites you, you can become a partner in the LLP..." style="font-size:11px"></textarea>
+                                </div>
+
+                                <div style="margin-bottom:10px">
+                                    <div style="font-weight:700;font-size:11.5px;color:#60A5FA;margin-bottom:4px">Step 3</div>
+                                    <input class="form-control" id="prop-hiw-step3-title" placeholder="Agreement Signing" style="font-size:11px;margin-bottom:4px" />
+                                    <textarea class="form-control" id="prop-hiw-step3-desc" rows="2" placeholder="Become a partner in the SPV by singing partnership agreement." style="font-size:11px"></textarea>
+                                </div>
+
+                                <div>
+                                    <div style="font-weight:700;font-size:11.5px;color:#60A5FA;margin-bottom:4px">Step 4</div>
+                                    <input class="form-control" id="prop-hiw-step4-title" placeholder="LLP buys the property" style="font-size:11px;margin-bottom:4px" />
+                                    <textarea class="form-control" id="prop-hiw-step4-desc" rows="2" placeholder="Once shareholders contribute 35% of the share value..." style="font-size:11px"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div id="prop-savings-suite" style="display:none;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-md);padding:16px;margin-bottom:16px">
+                        <div style="font-weight:800;color:#fbbf24;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                            <i class="fas fa-piggy-bank"></i> Savings Location Opportunity (Goa, Mumbai, Pune, Bangalore...)
+                        </div>
+                        <div class="form-grid-3">
+                            <input class="form-control" id="prop-savings-city" placeholder="City (e.g. Goa, Mumbai, Pune)" style="font-size:12px" />
+                            <input class="form-control" id="prop-savings-tagline" placeholder="Tagline (e.g. Holiday Homes)" style="font-size:12px" />
+                            <input class="form-control" id="prop-savings-code" placeholder="Code (e.g. GOHI, MSKY)" style="font-size:12px" />
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Description</label>
                         <textarea class="form-control" id="prop-desc" rows="3"

@@ -46,6 +46,146 @@ const PropertySchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        // Category: "brick" (Fractional Bricks), "estate" (Pre-Launch Estates), "savings" (Savings Location Opportunity)
+        listingCategory: {
+            type: String,
+            enum: ["brick", "estate", "savings"],
+            default: "brick",
+            index: true,
+        },
+        // Estate workflow status: "available", "funded", "exited"
+        estateStatus: {
+            type: String,
+            enum: ["available", "funded", "exited"],
+            default: "available",
+            index: true,
+        },
+        // Brick workflow status: "available", "invested", "exited"
+        brickStatus: {
+            type: String,
+            enum: ["available", "invested", "exited"],
+            default: "available",
+            index: true,
+        },
+
+        // Pre-Launch / Estate specific fields (Screenshots 1-5)
+        tagline: { type: String, trim: true, default: "" }, // e.g. "Iconic Living For Icons", "Rise Above the Ordinary"
+        minAmount: { type: Number, default: 500000 },       // min investment (e.g. 500000 -> ₹5 Lakh)
+        potentialRoi: { type: String, trim: true, default: "40%-45%" }, // e.g. "40%-45%"
+        expectedTenure: { type: String, trim: true, default: "2-3 Years" }, // e.g. "2-3 Years"
+        fundedPercentage: { type: Number, default: 0, min: 0, max: 100 }, // e.g. 29
+        dealSize: { type: String, trim: true, default: "" }, // e.g. "10.69 Cr"
+        pricePerSqFt: { type: Number, default: 0 },         // e.g. 18500 -> ₹18,500
+        reraApproved: { type: Boolean, default: true },
+
+        // DRX / Per Annum Academy Video
+        academyVideo: {
+            title: { type: String, trim: true, default: "Understand the basics of fractional real estate." },
+            duration: { type: String, trim: true, default: "1:19" },
+            videoUrl: { type: String, trim: true, default: "" },
+            thumbnailUrl: { type: String, trim: true, default: "" }
+        },
+
+        // About Developer
+        developerDetails: {
+            name: { type: String, trim: true, default: "" },
+            description: { type: String, trim: true, default: "" },
+            learnMoreUrl: { type: String, trim: true, default: "" },
+            projectsCompleted: { type: String, trim: true, default: "36" },
+            sqFtDeveloped: { type: String, trim: true, default: "2,00,00,000" },
+            avgAppreciation: { type: String, trim: true, default: "40%" }
+        },
+
+        // About Project (Screenshot 2-4)
+        aboutProject: {
+            title: { type: String, trim: true, default: "" },
+            description: { type: String, trim: true, default: "" },
+            mapImageUrl: { type: String, trim: true, default: "" },
+            locationAddress: { type: String, trim: true, default: "" },
+        },
+
+        // Project Documents (Screenshot 3-4)
+        estateDocuments: [{
+            title: { type: String, trim: true },
+            fileUrl: { type: String, trim: true },
+            fileType: { type: String, trim: true, default: "pdf" }
+        }],
+
+        // Pre-Launch Units (Screenshot 1: Units(2) Tab)
+        estateUnits: [{
+            unitName: { type: String, trim: true, default: "Unit 1" },
+            unitCode: { type: String, trim: true, default: "Unit no. A-3203" },
+            areaSqFt: { type: String, trim: true, default: "2690 sq. ft." },
+            description: { type: String, trim: true, default: "" },
+            features: [{ type: String, trim: true }],
+            unitCost: { type: String, trim: true, default: "5.41 Cr" },
+            initialPayment: { type: String, trim: true, default: "19587559" },
+            minContribution: { type: String, trim: true, default: "500000" }
+        }],
+
+        // How it works flow (Screenshot 5)
+        howItWorks: {
+            academyTitle: { type: String, trim: true, default: "Learn about payment plan." },
+            academyDuration: { type: String, trim: true, default: "0:51" },
+            academyVideoUrl: { type: String, trim: true, default: "" },
+            steps: [{
+                stepNumber: { type: Number, default: 1 },
+                title: { type: String, trim: true },
+                description: { type: String, trim: true }
+            }]
+        },
+
+        // Strategy (e.g. Capital Growth + Prime Location, Trusted Developer, World class Lifestyle Amenities)
+        strategy: {
+            title: { type: String, trim: true, default: "Capital Growth" },
+            subtitle: { type: String, trim: true, default: "High appreciation potential due to market trends." },
+            features: [{
+                title: { type: String, trim: true },
+                description: { type: String, trim: true }
+            }]
+        },
+
+        // Construction Linked Payment Plan timeline milestones
+        paymentPlan: [{
+            date: { type: String, trim: true },
+            title: { type: String, trim: true },
+            subtitle: { type: String, trim: true },
+            accountDetails: { type: String, trim: true }
+        }],
+
+        // Why [City] Real Estate? (3 numbered reasons)
+        cityWhyPoints: {
+            cityName: { type: String, trim: true, default: "Gurgaon" },
+            points: [{
+                title: { type: String, trim: true },
+                description: { type: String, trim: true }
+            }]
+        },
+
+        // Exit Options
+        exitOptions: {
+            title: { type: String, trim: true, default: "LLP sells the property" },
+            description: { type: String, trim: true, default: "Upon successful sale of the property, you'll receive payment post the deduction of brokerage, and taxes." }
+        },
+
+        // Call Your Advisor
+        advisor: {
+            name: { type: String, trim: true, default: "Neeraj Vishwakarma" },
+            phone: { type: String, trim: true, default: "+91 9876543210" },
+            title: { type: String, trim: true, default: "Call us now!" },
+            subtitle: { type: String, trim: true, default: "Neeraj Vishwakarma is here for you anytime you need help." },
+            imageUrl: { type: String, trim: true, default: "" }
+        },
+
+        // Savings Opportunity metadata (for location-based opportunities: Goa, Mumbai, Pune, etc.)
+        savingsOpportunity: {
+            city: { type: String, trim: true, default: "" },
+            tagline: { type: String, trim: true, default: "" },
+            code: { type: String, trim: true, default: "" },
+            iconName: { type: String, trim: true, default: "apartment" },
+            accentColor: { type: String, trim: true, default: "#2563EB" },
+            displayOrder: { type: Number, default: 0 }
+        },
         // SEO fields
         seo: {
             metaTitle: { type: String, trim: true },

@@ -1,3 +1,164 @@
+
+function toggleCategorySpecificFields() {
+    const cat = document.getElementById("prop-category")?.value || "brick";
+    const estateSuite = document.getElementById("prop-estate-suite");
+    const savingsSuite = document.getElementById("prop-savings-suite");
+    if (estateSuite) {
+        estateSuite.style.display = (cat === "estate" || cat === "brick") ? "block" : "none";
+    }
+    if (savingsSuite) {
+        savingsSuite.style.display = (cat === "savings") ? "block" : "none";
+    }
+}
+window.toggleCategorySpecificFields = toggleCategorySpecificFields;
+
+let currentAdminUnits = [];
+
+function switchEstateAdminTab(tab) {
+    document.querySelectorAll('.estate-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.estate-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = '#94a3b8';
+    });
+    const target = document.getElementById('estate-tab-' + tab);
+    const btn = document.getElementById('tab-btn-' + tab);
+    if (target) target.style.display = 'block';
+    if (btn) {
+        btn.classList.add('active');
+        btn.style.background = '#2563EB';
+        btn.style.color = '#ffffff';
+    }
+}
+window.switchEstateAdminTab = switchEstateAdminTab;
+
+function renderAdminUnits(units) {
+    currentAdminUnits = Array.isArray(units) && units.length > 0 ? [...units] : [
+        {
+            unitName: "Unit 1",
+            unitCode: "Unit no. A-3203",
+            areaSqFt: "2690 sq. ft.",
+            description: "2690 sq. ft. - This unit features modern architecture with Vastu-Compliant Design ensuring harmony and positive energy flow and natural light for a luxurious living experience. Where celestial elegance meets meticulous craftsmanship, Sky Arcs brings 5-star luxury homes— crafted with the premium materials and finishes to create a stellar experience.",
+            features: ["3 BHK + Utility", "Skyline View", "Spacious Layouts", "Iconic Address", "Strong Connectivity", "Luxury Living"],
+            unitCost: "5.41 Cr",
+            initialPayment: "19587559",
+            minContribution: "500000"
+        },
+        {
+            unitName: "Unit 2",
+            unitCode: "Unit no. D-2303",
+            areaSqFt: "2690 sq. ft.",
+            description: "2690 sq. ft. - This unit features modern architecture with Vastu-Compliant Design ensuring harmony and positive energy flow and natural light for a luxurious living experience. Where celestial elegance meets meticulous craftsmanship, Sky Arcs brings 5-star luxury homes— crafted with the premium materials and finishes to create a stellar experience.",
+            features: ["3 BHK + Utility", "Skyline View", "Spacious Layouts", "Iconic Address", "Strong Connectivity", "Luxury Living"],
+            unitCost: "5.41 Cr",
+            initialPayment: "19587559",
+            minContribution: "500000"
+        }
+    ];
+
+    const badge = document.getElementById("admin-units-count-badge");
+    if (badge) badge.textContent = currentAdminUnits.length;
+
+    const container = document.getElementById("admin-units-container");
+    if (!container) return;
+
+    container.innerHTML = currentAdminUnits.map((u, i) => `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;position:relative">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-weight:700;font-size:12px;color:#60A5FA">Unit #${i + 1}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAdminUnitCard(${i})" style="padding:2px 6px;font-size:10px">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </div>
+            <div class="form-grid-3" style="margin-bottom:6px">
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Unit Name</label>
+                    <input class="form-control admin-unit-name" value="${u.unitName || 'Unit ' + (i+1)}" style="font-size:11px" />
+                </div>
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Unit Code Pill</label>
+                    <input class="form-control admin-unit-code" value="${u.unitCode || 'Unit no. A-' + (3200 + i)}" style="font-size:11px" />
+                </div>
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Area (Sq. Ft.)</label>
+                    <input class="form-control admin-unit-sqft" value="${u.areaSqFt || '2690 sq. ft.'}" style="font-size:11px" />
+                </div>
+            </div>
+            <div style="margin-bottom:6px">
+                <label style="font-size:10px;color:var(--text-muted)">Description</label>
+                <textarea class="form-control admin-unit-desc" rows="2" style="font-size:11px">${u.description || ''}</textarea>
+            </div>
+            <div style="margin-bottom:6px">
+                <label style="font-size:10px;color:var(--text-muted)">Highlights / Features (comma-separated)</label>
+                <input class="form-control admin-unit-features" value="${(u.features || []).join(', ')}" placeholder="3 BHK + Utility, Skyline View, Spacious Layouts..." style="font-size:11px" />
+            </div>
+            <div class="form-grid-3">
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Unit Cost (e.g. 5.41 Cr)</label>
+                    <input class="form-control admin-unit-cost" value="${u.unitCost || '5.41 Cr'}" style="font-size:11px" />
+                </div>
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Initial Payment (₹)</label>
+                    <input class="form-control admin-unit-initpay" value="${u.initialPayment || '19587559'}" style="font-size:11px" />
+                </div>
+                <div>
+                    <label style="font-size:10px;color:var(--text-muted)">Min Contribution (₹)</label>
+                    <input class="form-control admin-unit-mincontrib" value="${u.minContribution || '500000'}" style="font-size:11px" />
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+window.renderAdminUnits = renderAdminUnits;
+
+function addAdminUnitCard() {
+    saveCurrentAdminUnitsFromInputs();
+    currentAdminUnits.push({
+        unitName: "Unit " + (currentAdminUnits.length + 1),
+        unitCode: "Unit no. " + String.fromCharCode(65 + currentAdminUnits.length) + "-10" + (currentAdminUnits.length + 1),
+        areaSqFt: "2690 sq. ft.",
+        description: "Luxurious modern apartment with panoramic view and premium finishes.",
+        features: ["3 BHK + Utility", "Skyline View", "Spacious Layouts", "Iconic Address", "Strong Connectivity", "Luxury Living"],
+        unitCost: "5.41 Cr",
+        initialPayment: "19587559",
+        minContribution: "500000"
+    });
+    renderAdminUnits(currentAdminUnits);
+}
+window.addAdminUnitCard = addAdminUnitCard;
+
+function removeAdminUnitCard(idx) {
+    saveCurrentAdminUnitsFromInputs();
+    currentAdminUnits.splice(idx, 1);
+    renderAdminUnits(currentAdminUnits);
+}
+window.removeAdminUnitCard = removeAdminUnitCard;
+
+function saveCurrentAdminUnitsFromInputs() {
+    const cards = document.querySelectorAll("#admin-units-container > div");
+    if (!cards || cards.length === 0) return;
+    const units = [];
+    cards.forEach(card => {
+        units.push({
+            unitName: card.querySelector(".admin-unit-name")?.value.trim() || "Unit 1",
+            unitCode: card.querySelector(".admin-unit-code")?.value.trim() || "Unit no. A-3203",
+            areaSqFt: card.querySelector(".admin-unit-sqft")?.value.trim() || "2690 sq. ft.",
+            description: card.querySelector(".admin-unit-desc")?.value.trim() || "",
+            features: (card.querySelector(".admin-unit-features")?.value || "").split(",").map(s => s.trim()).filter(Boolean),
+            unitCost: card.querySelector(".admin-unit-cost")?.value.trim() || "5.41 Cr",
+            initialPayment: card.querySelector(".admin-unit-initpay")?.value.trim() || "19587559",
+            minContribution: card.querySelector(".admin-unit-mincontrib")?.value.trim() || "500000"
+        });
+    });
+    currentAdminUnits = units;
+}
+
+function readAdminUnits() {
+    saveCurrentAdminUnitsFromInputs();
+    return currentAdminUnits;
+}
+window.readAdminUnits = readAdminUnits;
+
 /* ══════════════════════════════════════════════════════════════
    Payvika / Bharat SQFT — Properties & Enquiries Controller
    ══════════════════════════════════════════════════════════════ */
@@ -68,13 +229,39 @@ async function loadProperties() {
     }
 }
 
+let currentCategoryFilter = "all";
+
+function filterPropertyCategory(cat) {
+    currentCategoryFilter = cat;
+    document.querySelectorAll(".prop-cat-btn").forEach(b => {
+        b.classList.remove("btn-primary");
+        b.classList.add("btn-secondary");
+    });
+    const activeBtn = document.getElementById(`prop-cat-${cat}`);
+    if (activeBtn) {
+        activeBtn.classList.remove("btn-secondary");
+        activeBtn.classList.add("btn-primary");
+    }
+    applyPropertyFilters();
+}
+
 function filterProperties(query) {
-    const q = (query || "").toLowerCase();
-    const filtered = allProperties.filter(p =>
-        (p.title || "").toLowerCase().includes(q) ||
-        (p.location?.city || "").toLowerCase().includes(q) ||
-        (p.location?.state || "").toLowerCase().includes(q)
-    );
+    applyPropertyFilters(query);
+}
+
+function applyPropertyFilters(searchQuery) {
+    const q = (searchQuery ?? document.querySelector("#page-properties .search-bar")?.value ?? "").toLowerCase();
+    const filtered = allProperties.filter(p => {
+        const matchesCategory = currentCategoryFilter === "all" ||
+            (currentCategoryFilter === "brick" && (!p.listingCategory || p.listingCategory === "brick")) ||
+            p.listingCategory === currentCategoryFilter;
+        const matchesSearch = !q ||
+            (p.title || "").toLowerCase().includes(q) ||
+            (p.tagline || "").toLowerCase().includes(q) ||
+            (p.location?.city || "").toLowerCase().includes(q) ||
+            (p.location?.state || "").toLowerCase().includes(q);
+        return matchesCategory && matchesSearch;
+    });
     renderProperties(filtered);
 }
 
@@ -83,7 +270,7 @@ function renderProperties(props) {
     if (!body) return;
 
     if (!props || props.length === 0) {
-        body.innerHTML = `<div class="loading-box"><i class="fas fa-building" style="font-size:32px;color:var(--text-dim)"></i><div>No properties found</div></div>`;
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-building" style="font-size:32px;color:var(--text-dim)"></i><div>No properties found in this category</div></div>`;
         return;
     }
 
@@ -93,13 +280,13 @@ function renderProperties(props) {
             <thead>
                 <tr>
                     <th>Property</th>
+                    <th>Category</th>
                     <th>Location</th>
                     <th>Purchase Mode</th>
-                    <th>Total Value</th>
-                    <th>Bricks</th>
-                    <th>Funded</th>
+                    <th>Total Value / Deal</th>
+                    <th>Funded %</th>
                     <th style="min-width:130px">Yield & Returns</th>
-                    <th>Status / Visibility</th>
+                    <th>Workflow Status</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
@@ -108,8 +295,24 @@ function renderProperties(props) {
     props.forEach(p => {
         const coverImg = (p.images || []).find(i => i.isCover)?.url || (p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : ""));
         const isPublished = p.status === "published" || p.status === "active" || p.isPublished === true;
-        const totalVal = p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : 0);
-        const fundedPct = p.fundedPercentage ?? (p.totalBricks > 0 ? Math.round(((p.soldBricks || 0) / p.totalBricks) * 100) : 0);
+        const totalVal = p.dealSize ? p.dealSize : (p.totalInvestmentRequired || p.price?.amount || (p.brickPrice && p.totalBricks ? p.brickPrice * p.totalBricks : 0));
+        const fundedPct = p.fundedPercentage ?? (p.totalBricks > 0 ? Math.round(((p.soldBricks || 0) / doc.totalBricks) * 100) : 0);
+
+        const cat = p.listingCategory || "brick";
+        let catBadge = `<span class="badge" style="background:rgba(37,99,235,0.15);color:#60A5FA;border:1px solid rgba(37,99,235,0.3);font-size:10.5px"><i class="fas fa-cubes"></i> Bricks</span>`;
+        if (cat === "estate") {
+            catBadge = `<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399;border:1px solid rgba(16,185,129,0.3);font-size:10.5px"><i class="fas fa-crown"></i> Pre-Launch</span>`;
+        } else if (cat === "savings") {
+            catBadge = `<span class="badge" style="background:rgba(245,158,11,0.15);color:#FBBF24;border:1px solid rgba(245,158,11,0.3);font-size:10.5px"><i class="fas fa-piggy-bank"></i> Savings</span>`;
+        }
+
+        const workflowStatus = p.estateStatus || p.brickStatus || (isPublished ? "available" : "draft");
+        let workflowBadge = `<span class="badge badge-success" style="font-size:10.5px;text-transform:capitalize">${workflowStatus}</span>`;
+        if (workflowStatus === "funded") {
+            workflowBadge = `<span class="badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;font-size:10.5px">Funded</span>`;
+        } else if (workflowStatus === "exited") {
+            workflowBadge = `<span class="badge" style="background:rgba(148,163,184,0.2);color:#94a3b8;font-size:10.5px">Exited</span>`;
+        }
 
         const statusBadge = isPublished
             ? `<span class="badge badge-success" style="display:inline-flex;align-items:center;gap:4px"><i class="fas fa-check-circle"></i> Published</span>`
@@ -130,14 +333,15 @@ function renderProperties(props) {
                     ${coverImg ? `<img src="${coverImg}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--border)" />` : `<div style="width:48px;height:48px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text-dim)"><i class="fas fa-image"></i></div>`}
                     <div>
                         <div style="font-weight:600;color:#fff">${p.title || 'Untitled Property'}</div>
-                        <div style="font-size:11.5px;color:var(--text-dim)">ID: ${String(p._id).slice(-6)}</div>
+                        ${p.tagline ? `<div style="font-size:11px;color:#10b981;font-weight:600">★ ${p.tagline}</div>` : ''}
+                        <div style="font-size:11px;color:var(--text-dim)">ID: ${String(p._id).slice(-6)}</div>
                     </div>
                 </div>
             </td>
+            <td>${catBadge}</td>
             <td style="font-size:13px">${p.location?.city || '—'}, ${p.location?.state || '—'}</td>
             <td>${modeBadge}</td>
-            <td style="font-weight:700;color:var(--gold)">${formatPrice(totalVal)}</td>
-            <td style="font-family:var(--font-mono);font-size:13px">${p.totalBricks || 0}</td>
+            <td style="font-weight:700;color:var(--gold)">${typeof totalVal === 'number' ? formatPrice(totalVal) : totalVal}</td>
             <td>
                 <div style="font-weight:600">${fundedPct}%</div>
                 <div style="width:70px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:3px">
@@ -145,19 +349,22 @@ function renderProperties(props) {
                 </div>
             </td>
             <td>
-                <div style="font-weight:700;color:var(--success);font-size:12.5px">${p.expectedRentalYield ?? 0}% Yield</div>
+                <div style="font-weight:700;color:var(--success);font-size:12.5px">${p.potentialRoi ? p.potentialRoi + ' ROI' : (p.expectedRentalYield ?? 0) + '% Yield'}</div>
                 <div style="font-size:11px;color:var(--text-dim);margin-top:2px">
-                    <span>${p.expectedAppreciation ?? 8.5}% Growth</span>
+                    <span>${p.expectedTenure ? p.expectedTenure : (p.expectedAppreciation ?? 8.5) + '% Growth'}</span>
                     ${p.targetXirr ? ` · <strong style="color:var(--gold)">${p.targetXirr}% XIRR</strong>` : ''}
                 </div>
             </td>
             <td>
-                <div style="display:inline-flex;align-items:center;gap:8px">
-                    <label class="switch" title="${isPublished ? 'Published in App (Click to unpublish)' : 'Draft / Hidden from App (Click to publish)'}">
-                        <input type="checkbox" ${isPublished ? 'checked' : ''} onchange="togglePublish('${p._id}', this)">
-                        <span class="slider"></span>
-                    </label>
-                    ${statusBadge}
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    ${workflowBadge}
+                    <div style="display:inline-flex;align-items:center;gap:6px;margin-top:2px">
+                        <label class="switch" title="${isPublished ? 'Published in App' : 'Draft / Hidden'}">
+                            <input type="checkbox" ${isPublished ? 'checked' : ''} onchange="togglePublish('${p._id}', this)">
+                            <span class="slider"></span>
+                        </label>
+                        <span style="font-size:10px;color:var(--text-dim)">${isPublished ? 'Live' : 'Draft'}</span>
+                    </div>
                 </div>
             </td>
             <td style="text-align:right">
@@ -208,6 +415,68 @@ function openPropertyModal() {
 
     document.getElementById("prop-modal-title").textContent = "Add New Property Listing";
     document.getElementById("prop-form")?.reset();
+    setVal("prop-category", "brick");
+    setVal("prop-workflow-status", "available");
+    setVal("prop-tagline", "");
+    setVal("prop-min-amount", "500000");
+    setVal("prop-potential-roi", "40%-45%");
+    setVal("prop-expected-tenure", "2-3 Years");
+    setVal("prop-funded-pct", "0");
+    setVal("prop-deal-size", "");
+    setVal("prop-price-per-sqft", "");
+    setVal("prop-developer-name", "");
+    setVal("prop-developer-url", "");
+    setVal("prop-developer-desc", "");
+    setVal("prop-developer-projects", "36");
+    setVal("prop-developer-sqft", "2,00,00,000");
+    setVal("prop-developer-appreciation", "40%");
+    setVal("prop-about-project-title", "Smartworld Sky Arc");
+    setVal("prop-about-project-desc", "Smartworld Sky Arc is an iconic luxury residential development in Sector 69, Gurugram, featuring contemporary high-rise residences with panoramic skyline views.");
+    setVal("prop-about-project-address", "Sector 69, Golf Course Extension Road, Gurugram, Haryana");
+    setVal("prop-about-project-map", "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80");
+    setVal("prop-doc-rera", "https://smartworlddevelopers.com/rera.pdf");
+    setVal("prop-doc-onepager", "https://smartworlddevelopers.com/one-pager.pdf");
+    setVal("prop-doc-costsheets", "https://smartworlddevelopers.com/cost-sheets.pdf");
+    setVal("prop-hiw-academy-title", "Learn about payment plan.");
+    setVal("prop-hiw-academy-duration", "0:51");
+    setVal("prop-hiw-academy-url", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    setVal("prop-hiw-step1-title", "Token payment (EOI)");
+    setVal("prop-hiw-step1-desc", "Express your interest in The opportunity to receive the complete set of details about the deal.");
+    setVal("prop-hiw-step2-title", "Become a Partner");
+    setVal("prop-hiw-step2-desc", "If the opportunity excites you, you can become a partner in the LLP by making a payment towards the booking amount.");
+    setVal("prop-hiw-step3-title", "Agreement Signing");
+    setVal("prop-hiw-step3-desc", "Become a partner in the SPV by singing partnership agreement.");
+    setVal("prop-hiw-step4-title", "LLP buys the property");
+    setVal("prop-hiw-step4-desc", "Once shareholders contribute 35% of the share value, the LLP will purchase the property and secure ownership. The...");
+    renderAdminUnits([]);
+    switchEstateAdminTab('overview');
+    setVal("prop-strategy-title", "Capital Growth");
+    setVal("prop-strategy-subtitle", "High appreciation potential due to market trends.");
+    setVal("prop-strat-p1-title", "Prime Location");
+    setVal("prop-strat-p1-desc", "");
+    setVal("prop-strat-p2-title", "Trusted Developer");
+    setVal("prop-strat-p2-desc", "");
+    setVal("prop-strat-p3-title", "World class Lifestyle Amenities");
+    setVal("prop-strat-p3-desc", "");
+    setVal("prop-payment-plan-json", "");
+    setVal("prop-why-city", "");
+    setVal("prop-why-p1-title", "Consistent Growth");
+    setVal("prop-why-p1-desc", "");
+    setVal("prop-why-p2-title", "Demand from HNIs and NRIs");
+    setVal("prop-why-p2-desc", "");
+    setVal("prop-why-p3-title", "Supply Crunch in NCR region");
+    setVal("prop-why-p3-desc", "");
+    setVal("prop-exit-title", "LLP sells the property");
+    setVal("prop-exit-desc", "Upon successful sale of the property, you'll receive payment post the deduction of brokerage, and taxes.");
+    setVal("prop-advisor-name", "Neeraj Vishwakarma");
+    setVal("prop-advisor-phone", "+91 9876543210");
+    setVal("prop-advisor-image", "");
+    setVal("prop-academy-title", "Understand the basics of fractional real estate.");
+    setVal("prop-academy-duration", "1:19");
+    setVal("prop-savings-city", "");
+    setVal("prop-savings-tagline", "");
+    setVal("prop-savings-code", "");
+    try { toggleCategorySpecificFields(); } catch (_) {}
 
     // Default specifications & financials
     if (document.getElementById("prop-type")) document.getElementById("prop-type").value = "commercial";
@@ -660,8 +929,19 @@ async function saveProperty() {
     const spvTrusteeAddress = document.getElementById("prop-spv-trustee-address")?.value.trim() || "";
     const spvLiquidityPolicy = document.getElementById("prop-spv-liquidity")?.value.trim() || "";
 
-    if (!title || !totalInvestment || !totalBricks) {
-        toast("Please fill in all required property details (Title, Total Investment, Total Bricks)", "warning");
+    const listingCategory = document.getElementById("prop-category")?.value || "brick";
+    const workflowStatus = document.getElementById("prop-workflow-status")?.value || "available";
+
+    // For Estate / Pre-Launch, fallback totalBricks / totalInvestment if not explicitly required
+    const effectiveTotalBricks = totalBricks || (listingCategory === "estate" ? 100 : 1);
+    const effectiveTotalInvestment = totalInvestment || 10000000;
+
+    if (!title) {
+        toast("Please fill in the Property Title", "warning");
+        return;
+    }
+    if (listingCategory === "brick" && (!totalInvestment || !totalBricks)) {
+        toast("Please fill in Total Investment and Total Bricks for Fractional Bricks", "warning");
         return;
     }
 
@@ -674,8 +954,8 @@ async function saveProperty() {
         bhk,
         area,
         location: { address, city, state, pincode },
-        totalInvestmentRequired: totalInvestment,
-        totalBricks,
+        totalInvestmentRequired: effectiveTotalInvestment,
+        totalBricks: effectiveTotalBricks,
         soldBricks,
         brickPrice,
         price: {
@@ -712,7 +992,109 @@ async function saveProperty() {
         spvTrusteeAddress,
         spvTrusteeCertificateUrl: currentSpvTrusteePdf || "",
         spvLiquidityPolicy,
-        ...readCustomTextFields()
+        ...readCustomTextFields(),
+        listingCategory,
+        estateStatus: listingCategory === "estate" ? workflowStatus : (workflowStatus === "funded" ? "funded" : "available"),
+        brickStatus: listingCategory === "brick" ? workflowStatus : "available",
+        tagline: document.getElementById("prop-tagline")?.value.trim() || "",
+        minAmount: Number(document.getElementById("prop-min-amount")?.value) || 500000,
+        potentialRoi: document.getElementById("prop-potential-roi")?.value.trim() || "40%-45%",
+        expectedTenure: document.getElementById("prop-expected-tenure")?.value.trim() || "2-3 Years",
+        fundedPercentage: Number(document.getElementById("prop-funded-pct")?.value) || 0,
+        dealSize: document.getElementById("prop-deal-size")?.value.trim() || "",
+        pricePerSqFt: Number(document.getElementById("prop-price-per-sqft")?.value) || 0,
+        developerDetails: {
+            name: document.getElementById("prop-developer-name")?.value.trim() || "",
+            description: document.getElementById("prop-developer-desc")?.value.trim() || "",
+            learnMoreUrl: document.getElementById("prop-developer-url")?.value.trim() || "",
+            projectsCompleted: document.getElementById("prop-developer-projects")?.value.trim() || "36",
+            sqFtDeveloped: document.getElementById("prop-developer-sqft")?.value.trim() || "2,00,00,000",
+            avgAppreciation: document.getElementById("prop-developer-appreciation")?.value.trim() || "40%"
+        },
+        aboutProject: {
+            title: document.getElementById("prop-about-project-title")?.value.trim() || "",
+            description: document.getElementById("prop-about-project-desc")?.value.trim() || "",
+            locationAddress: document.getElementById("prop-about-project-address")?.value.trim() || "",
+            mapImageUrl: document.getElementById("prop-about-project-map")?.value.trim() || ""
+        },
+        estateDocuments: [
+            { title: "RERA", fileUrl: document.getElementById("prop-doc-rera")?.value.trim() || "", fileType: "pdf" },
+            { title: "One Pager", fileUrl: document.getElementById("prop-doc-onepager")?.value.trim() || "", fileType: "pdf" },
+            { title: "Cost Sheets", fileUrl: document.getElementById("prop-doc-costsheets")?.value.trim() || "", fileType: "pdf" }
+        ].filter(d => d.fileUrl.length > 0),
+        estateUnits: readAdminUnits(),
+        howItWorks: {
+            academyTitle: document.getElementById("prop-hiw-academy-title")?.value.trim() || "Learn about payment plan.",
+            academyDuration: document.getElementById("prop-hiw-academy-duration")?.value.trim() || "0:51",
+            academyVideoUrl: document.getElementById("prop-hiw-academy-url")?.value.trim() || "",
+            steps: [
+                {
+                    stepNumber: 1,
+                    title: document.getElementById("prop-hiw-step1-title")?.value.trim() || "Token payment (EOI)",
+                    description: document.getElementById("prop-hiw-step1-desc")?.value.trim() || ""
+                },
+                {
+                    stepNumber: 2,
+                    title: document.getElementById("prop-hiw-step2-title")?.value.trim() || "Become a Partner",
+                    description: document.getElementById("prop-hiw-step2-desc")?.value.trim() || ""
+                },
+                {
+                    stepNumber: 3,
+                    title: document.getElementById("prop-hiw-step3-title")?.value.trim() || "Agreement Signing",
+                    description: document.getElementById("prop-hiw-step3-desc")?.value.trim() || ""
+                },
+                {
+                    stepNumber: 4,
+                    title: document.getElementById("prop-hiw-step4-title")?.value.trim() || "LLP buys the property",
+                    description: document.getElementById("prop-hiw-step4-desc")?.value.trim() || ""
+                }
+            ]
+        },
+        strategy: {
+            title: document.getElementById("prop-strategy-title")?.value.trim() || "Capital Growth",
+            subtitle: document.getElementById("prop-strategy-subtitle")?.value.trim() || "High appreciation potential due to market trends.",
+            features: [
+                { title: document.getElementById("prop-strat-p1-title")?.value.trim() || "Prime Location", description: document.getElementById("prop-strat-p1-desc")?.value.trim() || "" },
+                { title: document.getElementById("prop-strat-p2-title")?.value.trim() || "Trusted Developer", description: document.getElementById("prop-strat-p2-desc")?.value.trim() || "" },
+                { title: document.getElementById("prop-strat-p3-title")?.value.trim() || "World class Lifestyle Amenities", description: document.getElementById("prop-strat-p3-desc")?.value.trim() || "" }
+            ]
+        },
+        paymentPlan: (() => {
+            try {
+                const raw = document.getElementById("prop-payment-plan-json")?.value.trim();
+                return raw ? JSON.parse(raw) : [];
+            } catch (_) { return []; }
+        })(),
+        cityWhyPoints: {
+            cityName: document.getElementById("prop-why-city")?.value.trim() || city || "Gurgaon",
+            points: [
+                { title: document.getElementById("prop-why-p1-title")?.value.trim() || "Consistent Growth", description: document.getElementById("prop-why-p1-desc")?.value.trim() || "" },
+                { title: document.getElementById("prop-why-p2-title")?.value.trim() || "Demand from HNIs and NRIs", description: document.getElementById("prop-why-p2-desc")?.value.trim() || "" },
+                { title: document.getElementById("prop-why-p3-title")?.value.trim() || "Supply Crunch in NCR region", description: document.getElementById("prop-why-p3-desc")?.value.trim() || "" }
+            ]
+        },
+        exitOptions: {
+            title: document.getElementById("prop-exit-title")?.value.trim() || "LLP sells the property",
+            description: document.getElementById("prop-exit-desc")?.value.trim() || "Upon successful sale of the property, you'll receive payment post the deduction of brokerage, and taxes."
+        },
+        advisor: {
+            name: document.getElementById("prop-advisor-name")?.value.trim() || "Neeraj Vishwakarma",
+            phone: document.getElementById("prop-advisor-phone")?.value.trim() || "+91 9876543210",
+            imageUrl: document.getElementById("prop-advisor-image")?.value.trim() || "",
+            title: "Call us now!",
+            subtitle: (document.getElementById("prop-advisor-name")?.value.trim() || "Neeraj Vishwakarma") + " is here for you anytime you need help."
+        },
+        academyVideo: {
+            title: document.getElementById("prop-academy-title")?.value.trim() || "Understand the basics of fractional real estate.",
+            duration: document.getElementById("prop-academy-duration")?.value.trim() || "1:19",
+            videoUrl: "",
+            thumbnailUrl: ""
+        },
+        savingsOpportunity: {
+            city: document.getElementById("prop-savings-city")?.value.trim() || city,
+            tagline: document.getElementById("prop-savings-tagline")?.value.trim() || "",
+            code: document.getElementById("prop-savings-code")?.value.trim() || "DRX"
+        }
     };
 
     try {
@@ -768,6 +1150,78 @@ function populatePropertyModal(p) {
 
         setText("prop-modal-title", "Edit Property Listing");
         setVal("prop-title", p.title || "");
+        setVal("prop-category", p.listingCategory || "brick");
+        setVal("prop-workflow-status", p.estateStatus || p.brickStatus || "available");
+        setVal("prop-tagline", p.tagline || "");
+        setVal("prop-min-amount", p.minAmount || "");
+        setVal("prop-potential-roi", p.potentialRoi || "40%-45%");
+        setVal("prop-expected-tenure", p.expectedTenure || "2-3 Years");
+        setVal("prop-funded-pct", p.fundedPercentage ?? 0);
+        setVal("prop-deal-size", p.dealSize || "");
+        setVal("prop-price-per-sqft", p.pricePerSqFt || "");
+        setVal("prop-developer-name", p.developerDetails?.name || "");
+        setVal("prop-developer-url", p.developerDetails?.learnMoreUrl || "");
+        setVal("prop-developer-desc", p.developerDetails?.description || "");
+        setVal("prop-developer-projects", p.developerDetails?.projectsCompleted || "36");
+        setVal("prop-developer-sqft", p.developerDetails?.sqFtDeveloped || "2,00,00,000");
+        setVal("prop-developer-appreciation", p.developerDetails?.avgAppreciation || "40%");
+        setVal("prop-about-project-title", p.aboutProject?.title || p.title || "Smartworld Sky Arc");
+        setVal("prop-about-project-desc", p.aboutProject?.description || "");
+        setVal("prop-about-project-address", p.aboutProject?.locationAddress || (p.location?.address ? (p.location.address + ", " + (p.location.city || '')) : "Sector 69, Golf Course Extension Road, Gurugram"));
+        setVal("prop-about-project-map", p.aboutProject?.mapImageUrl || "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80");
+        
+        // Documents
+        const reraDoc = (p.estateDocuments || []).find(d => /rera/i.test(d.title));
+        const onePagerDoc = (p.estateDocuments || []).find(d => /one pager|onepager/i.test(d.title));
+        const costSheetsDoc = (p.estateDocuments || []).find(d => /cost sheet/i.test(d.title));
+        setVal("prop-doc-rera", reraDoc?.fileUrl || "https://smartworlddevelopers.com/rera.pdf");
+        setVal("prop-doc-onepager", onePagerDoc?.fileUrl || "https://smartworlddevelopers.com/one-pager.pdf");
+        setVal("prop-doc-costsheets", costSheetsDoc?.fileUrl || "https://smartworlddevelopers.com/cost-sheets.pdf");
+
+        // How it works
+        setVal("prop-hiw-academy-title", p.howItWorks?.academyTitle || "Learn about payment plan.");
+        setVal("prop-hiw-academy-duration", p.howItWorks?.academyDuration || "0:51");
+        setVal("prop-hiw-academy-url", p.howItWorks?.academyVideoUrl || "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+        const steps = p.howItWorks?.steps || [];
+        setVal("prop-hiw-step1-title", steps[0]?.title || "Token payment (EOI)");
+        setVal("prop-hiw-step1-desc", steps[0]?.description || "Express your interest in The opportunity to receive the complete set of details about the deal.");
+        setVal("prop-hiw-step2-title", steps[1]?.title || "Become a Partner");
+        setVal("prop-hiw-step2-desc", steps[1]?.description || "If the opportunity excites you, you can become a partner in the LLP by making a payment towards the booking amount.");
+        setVal("prop-hiw-step3-title", steps[2]?.title || "Agreement Signing");
+        setVal("prop-hiw-step3-desc", steps[2]?.description || "Become a partner in the SPV by singing partnership agreement.");
+        setVal("prop-hiw-step4-title", steps[3]?.title || "LLP buys the property");
+        setVal("prop-hiw-step4-desc", steps[3]?.description || "Once shareholders contribute 35% of the share value, the LLP will purchase the property and secure ownership. The...");
+
+        // Render dynamic units list
+        renderAdminUnits(p.estateUnits || []);
+        switchEstateAdminTab('overview');
+        setVal("prop-strategy-title", p.strategy?.title || "Capital Growth");
+        setVal("prop-strategy-subtitle", p.strategy?.subtitle || "High appreciation potential due to market trends.");
+        setVal("prop-strat-p1-title", p.strategy?.features?.[0]?.title || "Prime Location");
+        setVal("prop-strat-p1-desc", p.strategy?.features?.[0]?.description || "");
+        setVal("prop-strat-p2-title", p.strategy?.features?.[1]?.title || "Trusted Developer");
+        setVal("prop-strat-p2-desc", p.strategy?.features?.[1]?.description || "");
+        setVal("prop-strat-p3-title", p.strategy?.features?.[2]?.title || "World class Lifestyle Amenities");
+        setVal("prop-strat-p3-desc", p.strategy?.features?.[2]?.description || "");
+        setVal("prop-payment-plan-json", Array.isArray(p.paymentPlan) && p.paymentPlan.length > 0 ? JSON.stringify(p.paymentPlan, null, 2) : "");
+        setVal("prop-why-city", p.cityWhyPoints?.cityName || p.location?.city || "");
+        setVal("prop-why-p1-title", p.cityWhyPoints?.points?.[0]?.title || "Consistent Growth");
+        setVal("prop-why-p1-desc", p.cityWhyPoints?.points?.[0]?.description || "");
+        setVal("prop-why-p2-title", p.cityWhyPoints?.points?.[1]?.title || "Demand from HNIs and NRIs");
+        setVal("prop-why-p2-desc", p.cityWhyPoints?.points?.[1]?.description || "");
+        setVal("prop-why-p3-title", p.cityWhyPoints?.points?.[2]?.title || "Supply Crunch in NCR region");
+        setVal("prop-why-p3-desc", p.cityWhyPoints?.points?.[2]?.description || "");
+        setVal("prop-exit-title", p.exitOptions?.title || "LLP sells the property");
+        setVal("prop-exit-desc", p.exitOptions?.description || "");
+        setVal("prop-advisor-name", p.advisor?.name || "Neeraj Vishwakarma");
+        setVal("prop-advisor-phone", p.advisor?.phone || "+91 9876543210");
+        setVal("prop-advisor-image", p.advisor?.imageUrl || "");
+        setVal("prop-academy-title", p.academyVideo?.title || "Understand the basics of fractional real estate.");
+        setVal("prop-academy-duration", p.academyVideo?.duration || "1:19");
+        setVal("prop-savings-city", p.savingsOpportunity?.city || "");
+        setVal("prop-savings-tagline", p.savingsOpportunity?.tagline || "");
+        setVal("prop-savings-code", p.savingsOpportunity?.code || "");
+        try { toggleCategorySpecificFields(); } catch (_) {}
         setVal("prop-desc", p.description || "");
 
         // Specifications
