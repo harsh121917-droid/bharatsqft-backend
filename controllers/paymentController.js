@@ -278,3 +278,36 @@ exports.handleRazorpayWebhook = async (req, res, next) => {
         return res.status(200).json({ status: "error", message: err.message });
     }
 };
+
+exports.createTokenOrder = async (req, res) => {
+    try {
+        const { propertyId, commitmentAmount, tokenAmount, phone } = req.body;
+        if (!tokenAmount || tokenAmount <= 0) {
+            return res.status(400).json({ success: false, message: "Valid token amount required" });
+        }
+        const property = await Property.findById(propertyId);
+
+        const result = await paymentGatewayService.createRazorpayOrder({
+            amount: tokenAmount,
+            purpose: "spot",
+            notes: {
+                userId: String(req.user ? req.user._id : 'guest'),
+                type: "token_reservation",
+                propertyId: property ? String(property._id) : String(propertyId || ''),
+                propertyTitle: property ? property.title : '',
+                commitmentAmount: String(commitmentAmount || ''),
+                tokenAmount: String(tokenAmount),
+                phone: String(phone || ''),
+            },
+        });
+
+        res.json({
+            success: true,
+            order: result.order,
+            key: result.keyId,
+        });
+    } catch (err) {
+        console.error("Token order creation error:", err);
+        res.status(500).json({ success: false, message: err.message || "Failed to create token order" });
+    }
+};
