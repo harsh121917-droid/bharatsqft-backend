@@ -1,4 +1,22 @@
 
+// ── Form Value Helpers ─────────────────────────────────────────
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox') {
+        el.checked = Boolean(val);
+    } else {
+        el.value = (val !== undefined && val !== null) ? val : "";
+    }
+}
+window.setVal = setVal;
+
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (text !== undefined && text !== null) ? text : "";
+}
+window.setText = setText;
+
 function toggleCategorySpecificFields() {
     const cat = document.getElementById("prop-category")?.value || "brick";
     const estateSuite = document.getElementById("prop-estate-suite");
@@ -1138,16 +1156,6 @@ function populatePropertyModal(p) {
     editingPropertyId = p._id ? String(p._id) : editingPropertyId;
 
     try {
-        const setVal = (id, val) => {
-            const el = document.getElementById(id);
-            if (el) el.value = (val !== undefined && val !== null) ? val : "";
-        };
-
-        const setText = (id, text) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = text;
-        };
-
         setText("prop-modal-title", "Edit Property Listing");
         setVal("prop-title", p.title || "");
         setVal("prop-category", p.listingCategory || "brick");
