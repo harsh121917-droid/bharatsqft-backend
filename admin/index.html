@@ -3313,9 +3313,15 @@
                         <div style="font-weight:700;color:#fff;font-size:14px;display:flex;align-items:center;gap:8px">
                             <i class="fas fa-history" style="color:#2563EB"></i> Notification Dispatch History
                         </div>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input class="form-control" id="notif-history-search" placeholder="🔍 Search logs by title..."
-                                oninput="filterNotifHistory(this.value)" style="width:220px;height:32px;font-size:12px" />
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <select class="form-control" id="notif-history-app-filter" onchange="changeNotifAppFilter(this.value)"
+                                style="width:180px;height:32px;font-size:12px;background:rgba(37,99,235,0.12);border-color:rgba(37,99,235,0.4);color:#93c5fd;font-weight:600">
+                                <option value="vikadrx" selected>🏢 Vika DRX (Estate/Bricks)</option>
+                                <option value="digigold">🪙 Digi Gold Logs</option>
+                                <option value="all">🌐 All Notification Logs</option>
+                            </select>
+                            <input class="form-control" id="notif-history-search" placeholder="🔍 Search logs..."
+                                oninput="filterNotifHistory(this.value)" style="width:180px;height:32px;font-size:12px" />
                             <button class="btn btn-secondary btn-sm" onclick="loadNotificationHistory(1)">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>

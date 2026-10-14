@@ -105,6 +105,12 @@ const UserSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    fcmTokensDrx: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     location: {
       latitude: { type: Number },
       longitude: { type: Number },

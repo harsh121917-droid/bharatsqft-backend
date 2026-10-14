@@ -20,6 +20,12 @@ const NotificationLogSchema = new mongoose.Schema(
       type: String,
       default: "home",
     },
+    app: {
+      type: String,
+      enum: ["vikadrx", "digigold", "all"],
+      default: "vikadrx",
+      index: true,
+    },
     targetType: {
       type: String,
       enum: ["all", "user", "kyc_verified"],

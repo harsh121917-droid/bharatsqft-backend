@@ -6,6 +6,12 @@ let notifHistory = [];
 let notifPage = 1;
 let uploadedNotifImageUrl = "";
 let cachedNotifUsers = [];
+let currentNotifApp = "vikadrx";
+
+function changeNotifAppFilter(app) {
+    currentNotifApp = app || "vikadrx";
+    loadNotificationHistory(1);
+}
 
 const NOTIF_TEMPLATES = {
     estate: {
@@ -275,6 +281,7 @@ async function sendPushNotification() {
     }
 
     const payload = {
+        app: "vikadrx",
         title,
         body,
         imageUrl: uploadedNotifImageUrl || "",
@@ -321,7 +328,8 @@ async function loadNotificationHistory(page = 1) {
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading dispatch logs...</div></div>`;
 
     try {
-        const res = await api(`/notifications/history?page=${page}&limit=20`);
+        const appParam = currentNotifApp ? `&app=${currentNotifApp}` : "";
+        const res = await api(`/notifications/history?page=${page}&limit=20${appParam}`);
         if (!res.success) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || "Failed to load notification logs"}</div></div>`;
             return;
@@ -435,7 +443,12 @@ function renderNotificationHistoryTable(logs) {
             </td>
             <td>
                 <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
-                    ${audienceBadge}
+                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                        ${l.app === 'vikadrx'
+                            ? `<span class="badge" style="background:rgba(37,99,235,0.18);color:#93c5fd;border:1px solid rgba(37,99,235,0.35);font-size:10px">🏢 Vika DRX</span>`
+                            : `<span class="badge" style="background:rgba(234,179,8,0.18);color:#fde047;border:1px solid rgba(234,179,8,0.35);font-size:10px">🪙 Digi Gold</span>`}
+                        ${audienceBadge}
+                    </div>
                     ${deepLinkPill}
                 </div>
             </td>

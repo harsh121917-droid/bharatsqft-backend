@@ -49,8 +49,10 @@ build/
 .DS_Store
 
 # Secret keys & service account files
-config/firebase-service-account.json
-*-service-account.json
+config/firebase-service-account*.json
+*service-account*.json
+*service_account*.json
+firebase-service-account*.json
 
 # Scratch and temporary scripts
 scratch/
