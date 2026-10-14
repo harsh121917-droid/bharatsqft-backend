@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Payvika / Bharat SQFT — Push Notifications Controller
+   Vika DRX — Push Notifications & In-App Alerts Controller
    ══════════════════════════════════════════════════════════════ */
 
 let notifHistory = [];
@@ -7,16 +7,74 @@ let notifPage = 1;
 let uploadedNotifImageUrl = "";
 let cachedNotifUsers = [];
 
+const NOTIF_TEMPLATES = {
+    estate: {
+        title: "🏰 Pre-Launch Opportunity Live: Smartworld Sky Arc - 2",
+        body: "Exclusive high-yield pre-launch estate is now open for booking! Reserve your spot with just 10% token payment.",
+        deepLink: "estate"
+    },
+    bricks: {
+        title: "🧱 New Fractional Commercial Asset Available!",
+        body: "Grade-A commercial brick opportunity with 20-22% projected return p.a. and monthly rental distributions.",
+        deepLink: "bricks"
+    },
+    savings: {
+        title: "🏖️ Keep Your Property Savings Active!",
+        body: "Small daily and monthly steps lead to prime property ownership. Check your active savings progress now.",
+        deepLink: "savings"
+    },
+    dividend: {
+        title: "💰 Monthly Rental Dividend Credited!",
+        body: "Your monthly rental dividend payout has been successfully credited to your Vika DRX wallet. Tap to view.",
+        deepLink: "wallet"
+    },
+    kyc: {
+        title: "🛡️ Complete Your KYC Verification",
+        body: "Verify your PAN & Aadhaar in under 2 minutes to start investing in fractional real estate and estates.",
+        deepLink: "kyc"
+    }
+};
+
+function applyNotifTemplate(key) {
+    const tpl = NOTIF_TEMPLATES[key];
+    if (!tpl) return;
+
+    const titleInput = document.getElementById("notif-title");
+    const bodyInput = document.getElementById("notif-body");
+    const linkInput = document.getElementById("notif-deeplink");
+
+    if (titleInput) titleInput.value = tpl.title;
+    if (bodyInput) bodyInput.value = tpl.body;
+    if (linkInput) linkInput.value = tpl.deepLink;
+
+    updateNotificationPreview();
+    toast(`Applied template: ${tpl.title.substring(0, 32)}...`, "info");
+}
+
 function selectNotificationTarget(target) {
     document.querySelectorAll('.notif-target-pill').forEach(p => p.classList.remove('active'));
     document.getElementById(`notif-target-${target}`)?.classList.add('active');
 
     const userSelectBox = document.getElementById("notif-user-select-box");
     const sendBtn = document.getElementById("btn-send-notif");
+    const indicator = document.getElementById("notif-target-indicator");
     
     if (userSelectBox) {
         userSelectBox.style.display = target === "single" ? "block" : "none";
         if (target === "single") populateNotifUserDropdown();
+    }
+
+    if (indicator) {
+        if (target === "single") {
+            indicator.textContent = "Direct: Single Customer";
+            indicator.style.color = "#c084fc";
+        } else if (target === "kyc") {
+            indicator.textContent = "Targeted: KYC Verified Only";
+            indicator.style.color = "#34d399";
+        } else {
+            indicator.textContent = "Broadcast: All Customers";
+            indicator.style.color = "#60a5fa";
+        }
     }
 
     if (sendBtn) {
@@ -75,7 +133,7 @@ function renderNotifUserDropdown(usersList) {
 
     let html = '<option value="">-- Choose a target customer (' + usersList.length + ' available) --</option>';
     usersList.forEach(u => {
-        const deviceCount = (u.fcmTokens && u.fcmTokens.length > 0) ? `📱 ${u.fcmTokens.length} active device(s)` : '⚠️ No FCM Token';
+        const deviceCount = (u.fcmTokens && u.fcmTokens.length > 0) ? `📱 ${u.fcmTokens.length} active device(s)` : '⚠️ In-App Inbox Only';
         html += `<option value="${u._id}" data-tokens="${(u.fcmTokens || []).length}">
             ${u.name || 'Customer'} (${u.phone || u.email || 'No Phone'}) — ${deviceCount}
         </option>`;
@@ -100,7 +158,7 @@ function onNotifUserSelected() {
     if (tokenCount > 0) {
         infoEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> User is registered on ${tokenCount} device(s). Notification will pop up on their screen immediately.</span>`;
     } else {
-        infoEl.innerHTML = `<span style="color:var(--warning)"><i class="fas fa-info-circle"></i> User hasn't registered device tokens yet. Notification will be stored in their In-App Inbox.</span>`;
+        infoEl.innerHTML = `<span style="color:#60a5fa"><i class="fas fa-info-circle"></i> User has no active push token. Alert will be delivered directly to their In-App Notification History.</span>`;
     }
 }
 
@@ -121,6 +179,21 @@ function updateNotificationPreview() {
         } else {
             imgPreview.style.display = "none";
         }
+    }
+
+    const deepLink = document.getElementById("notif-deeplink")?.value || "estate";
+    const deepLinkEl = document.getElementById("notif-preview-deeplink");
+    if (deepLinkEl) {
+        const labels = {
+            home: "Action: 🏠 Home / Dashboard",
+            estate: "Action: 🏰 Pre-Launch Estates",
+            bricks: "Action: 🧱 Fractional Bricks",
+            savings: "Action: 🏖️ Property Savings",
+            wallet: "Action: 💼 Vika DRX Wallet",
+            kyc: "Action: 🛡️ KYC Verification",
+            properties: "Action: 🔍 Explore Properties"
+        };
+        deepLinkEl.textContent = labels[deepLink] || `Action: ${deepLink}`;
     }
 }
 
@@ -188,6 +261,7 @@ async function sendPushNotification() {
     const targetPill = document.querySelector('.notif-target-pill.active');
     const targetKey = targetPill?.dataset.target || "all";
     const userId = document.getElementById("notif-user-dropdown")?.value;
+    const deepLink = document.getElementById("notif-deeplink")?.value || "estate";
     const sendBtn = document.getElementById("btn-send-notif");
 
     if (!title || !body) {
@@ -204,7 +278,7 @@ async function sendPushNotification() {
         title,
         body,
         imageUrl: uploadedNotifImageUrl || "",
-        deepLink: targetKey === "kyc_verified" ? "kyc" : "home",
+        deepLink: deepLink,
         targetType: targetKey === "single" ? "user" : (targetKey === "kyc_verified" ? "kyc_verified" : "all"),
         targetUserId: targetKey === "single" ? userId : null
     };
@@ -212,9 +286,9 @@ async function sendPushNotification() {
     try {
         if (sendBtn) {
             sendBtn.disabled = true;
-            sendBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatched to FCM...`;
+            sendBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatching Notification...`;
         }
-        toast("Dispatching push notification...", "info");
+        toast("Dispatching push notification & updating in-app inboxes...", "info");
 
         const res = await api("/notifications/send", {
             method: "POST",
@@ -222,7 +296,7 @@ async function sendPushNotification() {
         });
 
         if (res.success) {
-            toast(res.message || "Push notification dispatched successfully!", "success");
+            toast(res.message || "Notification dispatched successfully!", "success");
             document.getElementById("notif-title").value = "";
             document.getElementById("notif-body").value = "";
             clearNotifImage();
@@ -244,7 +318,7 @@ async function loadNotificationHistory(page = 1) {
     notifPage = page;
     const body = document.getElementById("notifications-history-body");
     if (!body) return;
-    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading broadcast history logs...</div></div>`;
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading dispatch logs...</div></div>`;
 
     try {
         const res = await api(`/notifications/history?page=${page}&limit=20`);
@@ -279,6 +353,27 @@ function nextNotifPage() {
     loadNotificationHistory(notifPage + 1);
 }
 
+function filterNotifHistory(query) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) {
+        renderNotificationHistoryTable(notifHistory);
+        return;
+    }
+
+    const filtered = notifHistory.filter(l => {
+        const titleMatch = (l.title || "").toLowerCase().includes(q);
+        const bodyMatch = (l.body || "").toLowerCase().includes(q);
+        const userMatch = l.targetUser ? (
+            (l.targetUser.name || "").toLowerCase().includes(q) ||
+            (l.targetUser.phone || "").toLowerCase().includes(q) ||
+            (l.targetUser.email || "").toLowerCase().includes(q)
+        ) : false;
+        return titleMatch || bodyMatch || userMatch;
+    });
+
+    renderNotificationHistoryTable(filtered);
+}
+
 function renderNotificationHistoryTable(logs) {
     const body = document.getElementById("notifications-history-body");
     if (!body) return;
@@ -287,8 +382,8 @@ function renderNotificationHistoryTable(logs) {
         body.innerHTML = `
         <div class="loading-box" style="padding:3.5rem 2rem">
             <i class="fas fa-bell-slash" style="font-size:36px;color:var(--text-dim);margin-bottom:10px"></i>
-            <div style="font-size:14px;font-weight:600;color:#fff">No push notifications broadcasted yet</div>
-            <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Compose a notification above to send marketing announcements or rate drop alerts.</div>
+            <div style="font-size:14px;font-weight:600;color:#fff">No notifications dispatched yet</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Compose a notification above or use a Quick Template to send alerts to your users.</div>
         </div>`;
         return;
     }
@@ -299,10 +394,10 @@ function renderNotificationHistoryTable(logs) {
             <thead>
                 <tr>
                     <th>Title & Message</th>
-                    <th>Audience Target</th>
+                    <th>Audience & Deep Link</th>
                     <th>Delivery Stats</th>
                     <th>Status</th>
-                    <th>Broadcasted At</th>
+                    <th>Dispatched At</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
@@ -316,31 +411,41 @@ function renderNotificationHistoryTable(logs) {
             statusBadge = `<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Failed</span>`;
         }
 
-        let audienceBadge = `<span class="badge badge-info"><i class="fas fa-bullhorn"></i> All Customers</span>`;
+        let audienceBadge = `<span class="badge badge-info"><i class="fas fa-bullhorn"></i> All Users</span>`;
         if (l.targetType === "user") {
             const userName = l.targetUser ? (l.targetUser.name || l.targetUser.phone || "User") : "Targeted Customer";
-            audienceBadge = `<span class="badge badge-purple"><i class="fas fa-user"></i> ${userName}</span>`;
+            const userPhone = l.targetUser && l.targetUser.phone ? ` (${l.targetUser.phone})` : "";
+            audienceBadge = `<span class="badge badge-purple" title="${userName}${userPhone}"><i class="fas fa-user"></i> ${userName}</span>`;
+        } else if (l.targetType === "kyc_verified") {
+            audienceBadge = `<span class="badge badge-success"><i class="fas fa-shield-alt"></i> KYC Verified</span>`;
         }
+
+        const deepLinkPill = `<span class="badge" style="background:rgba(37,99,235,0.18);color:#93c5fd;border:1px solid rgba(37,99,235,0.35);font-size:10.5px">🎯 ${l.deepLink || 'home'}</span>`;
 
         html += `
         <tr>
             <td>
                 <div style="display:flex;align-items:center;gap:10px">
-                    ${l.imageUrl ? `<img src="${l.imageUrl}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid rgba(255,255,255,0.1)" />` : ''}
+                    ${l.imageUrl ? `<img src="${l.imageUrl}" style="width:38px;height:38px;border-radius:6px;object-fit:cover;border:1px solid rgba(37,99,235,0.3)" />` : ''}
                     <div>
                         <div style="font-weight:700;color:#fff;font-size:13.5px">${l.title || 'Untitled Notification'}</div>
                         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;max-width:340px;line-height:1.35">${l.body || '—'}</div>
                     </div>
                 </div>
             </td>
-            <td>${audienceBadge}</td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+                    ${audienceBadge}
+                    ${deepLinkPill}
+                </div>
+            </td>
             <td>
                 <div style="font-family:var(--font-mono);font-weight:700;color:#fff">${l.sentCount || 0} Targeted</div>
                 <div style="font-size:11px;color:var(--success)">${l.successCount || 0} Delivered</div>
             </td>
             <td>${statusBadge}</td>
             <td>
-                <div style="font-size:12px;color:#fff">${formatDateTime(l.createdAt)}</div>
+                <div style="font-size:12px;color:#fff">${typeof formatDateTime === 'function' ? formatDateTime(l.createdAt) : new Date(l.createdAt).toLocaleString()}</div>
                 <div style="font-size:10.5px;color:var(--text-dim)">By ${l.sentBy || 'Admin'}</div>
             </td>
             <td style="text-align:right">

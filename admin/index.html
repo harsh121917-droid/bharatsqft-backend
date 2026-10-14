@@ -192,6 +192,10 @@
                 <div class="nav-item-icon"><i class="fab fa-youtube" style="color:#ef4444"></i></div>
                 <span class="nav-item-label">Home YouTube Videos</span>
             </div>
+            <div class="nav-item" onclick="showPage('notifications')" id="nav-notifications">
+                <div class="nav-item-icon"><i class="fas fa-bell" style="color:#2563EB"></i></div>
+                <span class="nav-item-label">Push Notifications</span>
+            </div>
 
             <!-- 4. Mutual Funds Management -->
             <div class="nav-section-label">Mutual Funds</div>
@@ -3141,64 +3145,115 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════
-                 DIGI GOLD: 9. PUSH NOTIFICATIONS
+                 VIKA DRX: PUSH NOTIFICATIONS & ALERTS HUB
                  ══════════════════════════════════════════════════ -->
             <div class="page" id="page-notifications">
                 <div class="section-header">
                     <div>
-                        <div class="section-title"><i class="fas fa-bell" style="color:var(--gold)"></i> Push
-                            Notifications</div>
-                        <div class="section-subtitle">Broadcast marketing messages or targeted updates to mobile users
+                        <div class="section-title"><i class="fas fa-bell" style="color:#2563EB"></i> Push Notifications & Alerts</div>
+                        <div class="section-subtitle">Broadcast real estate announcements, property updates, or targeted personal alerts to Vika DRX mobile users</div>
+                    </div>
+                </div>
+
+                <!-- Real Estate Quick Templates Banner -->
+                <div style="background:linear-gradient(135deg, rgba(37,99,235,0.12), rgba(29,78,216,0.06));border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+                        <div style="font-size:13px;font-weight:700;color:#93c5fd;display:flex;align-items:center;gap:6px">
+                            <i class="fas fa-magic"></i> <span>Vika DRX Quick Templates (1-Click Fill)</span>
                         </div>
+                        <span style="font-size:11px;color:var(--text-dim)">Click a template to auto-populate title, message & tap action</span>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('estate')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                            🏰 Pre-Launch Opportunity
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('bricks')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                            🧱 New Brick Asset
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('savings')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                            🏖️ Savings Deposit Reminder
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('dividend')" style="background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.4);color:#a7f3d0">
+                            💰 Monthly Dividend Credited
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('kyc')" style="background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.4);color:#fde68a">
+                            🛡️ KYC Verification Reminder
+                        </button>
                     </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:1.5rem;margin-bottom:2rem">
                     <!-- Composer -->
-                    <div
-                        style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
-                        <div style="font-weight:700;font-size:15px;color:#fff;margin-bottom:1rem">Compose Notification
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem">
+                        <div style="font-weight:700;font-size:15px;color:#fff;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between">
+                            <span>Compose Notification</span>
+                            <span id="notif-target-indicator" style="font-size:12px;color:#60a5fa;font-weight:600">Broadcast: All Customers</span>
                         </div>
+
+                        <!-- Target Audience Selector -->
                         <div class="form-group">
                             <label class="form-label">Target Audience</label>
-                            <div class="chart-pill-group" style="display:inline-flex">
+                            <div class="chart-pill-group" style="display:inline-flex;gap:4px">
                                 <button class="chart-pill-btn notif-target-pill active" id="notif-target-all"
-                                    data-target="all" onclick="selectNotificationTarget('all')">All Customers</button>
+                                    data-target="all" onclick="selectNotificationTarget('all')">
+                                    <i class="fas fa-bullhorn"></i> All Customers
+                                </button>
                                 <button class="chart-pill-btn notif-target-pill" id="notif-target-kyc"
-                                    data-target="kyc_verified" onclick="selectNotificationTarget('kyc')">KYC Verified
-                                    Only</button>
+                                    data-target="kyc_verified" onclick="selectNotificationTarget('kyc')">
+                                    <i class="fas fa-shield-alt"></i> KYC Verified Only
+                                </button>
                                 <button class="chart-pill-btn notif-target-pill" id="notif-target-single"
-                                    data-target="single" onclick="selectNotificationTarget('single')">Single
-                                    User</button>
+                                    data-target="single" onclick="selectNotificationTarget('single')">
+                                    <i class="fas fa-user-check"></i> Single Customer
+                                </button>
                             </div>
                         </div>
 
-                        <div class="form-group" id="notif-user-select-box" style="display:none">
-                            <label class="form-label">Target Customer</label>
-                            <input class="form-control" id="notif-user-search"
-                                placeholder="🔍 Type customer name, phone, or email to search..."
-                                oninput="filterNotifUsers(this.value)" style="margin-bottom:6px" />
+                        <!-- Customer Selection Box (For Single User) -->
+                        <div class="form-group" id="notif-user-select-box" style="display:none;background:rgba(255,255,255,0.02);border:1px dashed rgba(37,99,235,0.4);border-radius:8px;padding:12px">
+                            <label class="form-label" style="color:#93c5fd">Select Specific Customer</label>
+                            <div style="position:relative;margin-bottom:8px">
+                                <input class="form-control" id="notif-user-search"
+                                    placeholder="🔍 Type customer name, phone, or email to filter..."
+                                    oninput="filterNotifUsers(this.value)" />
+                            </div>
                             <select class="form-control" id="notif-user-dropdown"
                                 onchange="onNotifUserSelected()"></select>
-                            <div id="notif-user-fcm-info" style="font-size:11.5px;color:var(--text-dim);margin-top:4px">
-                            </div>
+                            <div id="notif-user-fcm-info" style="font-size:11.5px;color:var(--text-dim);margin-top:6px"></div>
                         </div>
 
+                        <!-- Tap Action / DeepLink -->
                         <div class="form-group">
-                            <label class="form-label">Title</label>
-                            <input class="form-control" id="notif-title" placeholder="e.g. 🌟 Gold Rate Drop Alert!"
+                            <label class="form-label">Tap Action (Deep Link Destination)</label>
+                            <select class="form-control" id="notif-deeplink" onchange="updateNotificationPreview()">
+                                <option value="home">🏠 Dashboard / Home Screen</option>
+                                <option value="estate" selected>🏰 Pre-Launch Estates (Smartworld Sky Arc, etc.)</option>
+                                <option value="bricks">🧱 Fractional Real Estate (Bricks)</option>
+                                <option value="savings">🏖️ Location-Based Property Savings</option>
+                                <option value="wallet">💼 Vika DRX Wallet & Bank Accounts</option>
+                                <option value="kyc">🛡️ KYC Verification Center</option>
+                                <option value="properties">🔍 Explore Properties Directory</option>
+                            </select>
+                        </div>
+
+                        <!-- Title -->
+                        <div class="form-group">
+                            <label class="form-label">Notification Title</label>
+                            <input class="form-control" id="notif-title" placeholder="e.g. 🏰 Pre-Launch Opportunity Live: Smartworld Sky Arc - 2"
                                 oninput="updateNotificationPreview()" />
                         </div>
 
+                        <!-- Message Body -->
                         <div class="form-group">
                             <label class="form-label">Message Body</label>
                             <textarea class="form-control" id="notif-body" rows="3"
-                                placeholder="Write your notification message here..."
+                                placeholder="e.g. Exclusive high-yield pre-launch estate is now open for booking! Reserve your spot with just 10% token."
                                 oninput="updateNotificationPreview()"></textarea>
                         </div>
 
+                        <!-- Banner Image -->
                         <div class="form-group">
-                            <label class="form-label">Banner Image (File Upload or Image URL)</label>
+                            <label class="form-label">Banner Image (Optional File Upload or Image URL)</label>
                             <div style="display:flex;gap:8px;flex-wrap:wrap">
                                 <input type="file" id="notif-file-input" class="form-control" accept="image/*"
                                     onchange="uploadNotificationImage(event)" style="flex:1;min-width:200px" />
@@ -3208,8 +3263,7 @@
                             </div>
                             <div id="notif-img-status"
                                 style="display:none;margin-top:8px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;font-size:12px;color:var(--success);align-items:center;gap:6px">
-                                <i class="fas fa-check-circle"></i> <span id="notif-img-status-text">Image
-                                    Attached</span>
+                                <i class="fas fa-check-circle"></i> <span id="notif-img-status-text">Image Attached</span>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="clearNotifImage()"
                                     style="margin-left:auto;padding:2px 8px;font-size:11px;color:var(--danger)">
                                     <i class="fas fa-times"></i> Remove
@@ -3217,45 +3271,55 @@
                             </div>
                         </div>
 
+                        <!-- Send Button -->
                         <button class="btn btn-primary" id="btn-send-notif" onclick="sendPushNotification()"
-                            style="width:100%;height:44px;margin-top:0.5rem">
-                            <i class="fas fa-paper-plane"></i> Send Push Broadcast
+                            style="width:100%;height:44px;margin-top:0.5rem;background:#2563EB;border-color:#1D4ED8;font-weight:700">
+                            <i class="fas fa-paper-plane"></i> Send Push Broadcast (All Users)
                         </button>
                     </div>
 
                     <!-- Live Mobile Preview -->
-                    <div
-                        style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center">
-                        <div
-                            style="font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem">
-                            Mobile Lockscreen Preview</div>
-                        <div
-                            style="width:280px;background:#000;border:2px solid var(--border);border-radius:24px;padding:16px 12px;box-shadow:0 10px 30px rgba(0,0,0,0.5)">
-                            <div
-                                style="background:rgba(255,255,255,0.1);backdrop-filter:blur(8px);border-radius:12px;padding:10px;border:1px solid rgba(255,255,255,0.15)">
+                    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                        <div style="font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem">
+                            Vika DRX Mobile Lockscreen Preview
+                        </div>
+                        <div style="width:280px;background:#060B16;border:2px solid #1E2D4A;border-radius:24px;padding:16px 12px;box-shadow:0 12px 35px rgba(0,0,0,0.6)">
+                            <div style="background:rgba(14,22,38,0.85);backdrop-filter:blur(8px);border-radius:14px;padding:12px;border:1px solid rgba(37,99,235,0.3)">
                                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                                    <div
-                                        style="width:16px;height:16px;border-radius:4px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">
-                                        <i class="fas fa-gem"></i>
+                                    <div style="width:18px;height:18px;border-radius:5px;background:#2563EB;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">
+                                        <i class="fas fa-building"></i>
                                     </div>
-                                    <span style="font-size:11px;font-weight:600;color:#fff">Payvika</span>
+                                    <span style="font-size:11.5px;font-weight:700;color:#EDF0FF">Vika DRX</span>
                                     <span style="font-size:10px;color:var(--text-dim);margin-left:auto">now</span>
                                 </div>
-                                <div id="notif-preview-title" style="font-weight:700;color:#fff;font-size:12.5px">
-                                    Notification Title</div>
-                                <div id="notif-preview-body"
-                                    style="font-size:11.5px;color:var(--text-muted);margin-top:2px">Notification message
-                                    content will appear here.</div>
-                                <img id="notif-preview-img" src=""
-                                    style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-top:6px;display:none" />
+                                <div id="notif-preview-title" style="font-weight:700;color:#fff;font-size:12.5px;line-height:1.3">
+                                    Notification Title
+                                </div>
+                                <div id="notif-preview-body" style="font-size:11.5px;color:#8A95B0;margin-top:3px;line-height:1.35">
+                                    Notification message content will appear here.
+                                </div>
+                                <img id="notif-preview-img" src="" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-top:8px;display:none;border:1px solid rgba(255,255,255,0.1)" />
+                                <div id="notif-preview-deeplink" style="margin-top:8px;display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(37,99,235,0.2);color:#93c5fd;border:1px solid rgba(37,99,235,0.35)">
+                                    Action: 🏰 Pre-Launch Estates
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Broadcast History Table -->
                 <div class="table-wrap">
-                    <div class="table-header">
-                        <div style="font-weight:700;color:#fff;font-size:14px">Broadcast History</div>
+                    <div class="table-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                        <div style="font-weight:700;color:#fff;font-size:14px;display:flex;align-items:center;gap:8px">
+                            <i class="fas fa-history" style="color:#2563EB"></i> Notification Dispatch History
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input class="form-control" id="notif-history-search" placeholder="🔍 Search logs by title..."
+                                oninput="filterNotifHistory(this.value)" style="width:220px;height:32px;font-size:12px" />
+                            <button class="btn btn-secondary btn-sm" onclick="loadNotificationHistory(1)">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
                     </div>
                     <div id="notifications-history-body">
                         <div class="loading-box">

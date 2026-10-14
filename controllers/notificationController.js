@@ -71,6 +71,41 @@ exports.sendNotification = async (req, res, next) => {
           note: "User has not registered device FCM token yet. Notification recorded for in-app inbox.",
         };
       }
+    } else if (targetType === "kyc_verified") {
+      // Broadcast to KYC verified users only
+      const kycUsersWithTokens = await User.find({
+        kycStatus: "approved",
+        "fcmTokens.0": { $exists: true }
+      }).select("fcmTokens");
+
+      const tokenSet = new Set();
+      kycUsersWithTokens.forEach((u) => {
+        (u.fcmTokens || []).forEach((t) => {
+          if (t && typeof t === "string" && t.trim().length > 10) {
+            tokenSet.add(t.trim());
+          }
+        });
+      });
+      const kycTokens = Array.from(tokenSet);
+
+      if (kycTokens.length > 0) {
+        fcmResult = await sendFcmMessage({
+          tokens: kycTokens,
+          title,
+          body,
+          imageUrl,
+          deepLink: deepLink || "kyc",
+        });
+      } else {
+        fcmResult = {
+          success: true,
+          simulated: false,
+          sentCount: 0,
+          successCount: 0,
+          failureCount: 0,
+          note: "No active FCM tokens found for KYC-verified users. Recorded for in-app inbox.",
+        };
+      }
     } else {
       // Broadcast to all users:
       // 1. Gather all unique FCM device tokens from registered users
@@ -107,12 +142,13 @@ exports.sendNotification = async (req, res, next) => {
     }
 
     // Create Notification Log entry in database
+    const resolvedTargetType = targetType === "user" ? "user" : (targetType === "kyc_verified" ? "kyc_verified" : "all");
     const log = await NotificationLog.create({
       title,
       body,
       imageUrl: imageUrl || "",
       deepLink: deepLink || "home",
-      targetType: targetType === "user" ? "user" : "all",
+      targetType: resolvedTargetType,
       targetUser: targetUserDoc ? targetUserDoc._id : null,
       sentBy: req.user?.name || "Admin",
       sentCount: fcmResult.sentCount || 0,

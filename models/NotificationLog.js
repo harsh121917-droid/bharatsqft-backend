@@ -22,7 +22,7 @@ const NotificationLogSchema = new mongoose.Schema(
     },
     targetType: {
       type: String,
-      enum: ["all", "user"],
+      enum: ["all", "user", "kyc_verified"],
       default: "all",
     },
     targetUser: {
