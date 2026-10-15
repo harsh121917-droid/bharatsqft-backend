@@ -626,14 +626,16 @@ exports.testNseConnection = async (req, res) => {
       outgoingIp = ipRes.data?.ip || 'Unknown';
     } catch (_) {}
 
-    // Verify TLS reachability
+    // Verify TLS reachability with Akamai required headers
     let reachabilityStatus = 'REACHABLE';
     let httpStatus = 200;
     try {
       const httpsAgent = nseEncryption.getHttpsAgent();
+      const headers = nseEncryption.generateAuthHeaders();
       const probeRes = await axios.get(baseUrl, {
+        headers,
         httpsAgent,
-        timeout: 8000,
+        timeout: 10000,
         maxRedirects: 0,
         validateStatus: () => true,
       });
@@ -642,8 +644,26 @@ exports.testNseConnection = async (req, res) => {
       reachabilityStatus = `UNREACHABLE (${probeErr.message})`;
     }
 
-    // Ping check via nseClient
-    const testCall = await nseClient.checkClientKycStatus('AAAPA1234A', config.memberCode);
+    // Ping check via nseClient (Doc page 169: pan_no and client_code are mutually exclusive)
+    const targetPan = req.body?.pan ? String(req.body.pan).trim().toUpperCase() : 'AAAPA1234A';
+    let testCall = await nseClient.checkClientKycStatus(targetPan);
+
+    // If 403, test fallback header with memberId = memberCode
+    if (!testCall.success && testCall.status === 403) {
+      try {
+        const fallbackHeaders = nseEncryption.generateAuthHeaders({ memberId: config.memberCode });
+        const httpsAgent = nseEncryption.getHttpsAgent();
+        const altRes = await axios.post(`${baseUrl}/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT`, { pan_no: targetPan }, {
+          headers: fallbackHeaders,
+          httpsAgent,
+          timeout: 15000,
+        });
+        if (altRes.status === 200) {
+          testCall = { success: true, status: altRes.status, data: altRes.data, authVariant: 'memberId_memberCode' };
+        }
+      } catch (_) {}
+    }
+
     const latency = Date.now() - startTime;
 
     const finalStatus = isMock ? 'SANDBOX_MOCKED' : (testCall.success ? 'ONLINE' : 'GATEWAY_ALERT');
