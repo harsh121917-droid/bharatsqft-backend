@@ -22,7 +22,50 @@ const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
-const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
+const STATE_CODE_MAP = {
+  'ANDAMAN & NICOBAR': 'AN', 'ANDAMAN AND NICOBAR': 'AN', 'AN': 'AN',
+  'ANDHRA PRADESH': 'AP', 'AP': 'AP',
+  'ARUNACHAL PRADESH': 'AR', 'AR': 'AR',
+  'ASSAM': 'AS', 'AS': 'AS',
+  'BIHAR': 'BH', 'BR': 'BH', 'BH': 'BH',
+  'CHANDIGARH': 'CH', 'CH': 'CH',
+  'CHHATTISGARH': 'CG', 'CG': 'CG',
+  'DADRA AND NAGAR HAVELI': 'DN', 'DN': 'DN',
+  'DAMAN AND DIU': 'DD', 'DD': 'DD',
+  'GOA': 'GO', 'GA': 'GO',
+  'GUJARAT': 'GU', 'GJ': 'GU',
+  'HARYANA': 'HA', 'HR': 'HA',
+  'HIMACHAL PRADESH': 'HP', 'HP': 'HP',
+  'JAMMU & KASHMIR': 'JM', 'JAMMU AND KASHMIR': 'JM', 'JK': 'JM', 'JM': 'JM',
+  'JHARKHAND': 'JK', 'JH': 'JK',
+  'KARNATAKA': 'KA', 'KA': 'KA',
+  'KERALA': 'KE', 'KL': 'KE',
+  'LAKSHADWEEP': 'LD', 'LD': 'LD',
+  'MADHYA PRADESH': 'MP', 'MP': 'MP',
+  'MAHARASHTRA': 'MA', 'MH': 'MA',
+  'MANIPUR': 'MN', 'MN': 'MN',
+  'MEGHALAYA': 'ME', 'ML': 'ME',
+  'MIZORAM': 'MI', 'MZ': 'MI',
+  'NAGALAND': 'NA', 'NL': 'NA',
+  'NEW DELHI': 'ND', 'DELHI': 'ND', 'DL': 'ND', 'ND': 'ND',
+  'ODISHA': 'OR', 'ORISSA': 'OR', 'OD': 'OR', 'OR': 'OR',
+  'PONDICHERRY': 'PO', 'PUDUCHERRY': 'PO', 'PY': 'PO', 'PO': 'PO',
+  'PUNJAB': 'PU', 'PB': 'PU',
+  'RAJASTHAN': 'RA', 'RJ': 'RA', 'RA': 'RA',
+  'SIKKIM': 'SI', 'SK': 'SI',
+  'TAMIL NADU': 'TN', 'TN': 'TN',
+  'TELANGANA': 'TG', 'TS': 'TG', 'TG': 'TG',
+  'TRIPURA': 'TR', 'TR': 'TR',
+  'UTTAR PRADESH': 'UP', 'UTTER PRADESH': 'UP', 'UP': 'UP',
+  'UTTARAKHAND': 'UL', 'UK': 'UL', 'UA': 'UL', 'UL': 'UL',
+  'WEST BENGAL': 'WB', 'WB': 'WB',
+};
+
+function getNseStateCode(stateName) {
+  if (!stateName) return 'MA';
+  const clean = String(stateName).trim().toUpperCase();
+  return STATE_CODE_MAP[clean] || (clean.length === 2 ? clean : 'MA');
+}
 
 // ── 1. GET /api/mutual-funds/schemes ──
 exports.getSchemes = async (req, res) => {
@@ -1001,12 +1044,12 @@ exports.registerUserUcc = async (req, res) => {
       primary_holder_first_name: firstName,
       primary_holder_middle_name: middleName,
       primary_holder_last_name: lastName,
-      tax_status: taxStatus,
-      gender: gender,
+      tax_status: taxStatus || '01',
+      gender: (gender || 'M').charAt(0).toUpperCase(),
       primary_holder_dob_incorporation: effDob,
-      occupation_code: occupationCode,
-      holding_nature: holdingNature,
-      primary_holder_pan_exempt: 'NO',
+      occupation_code: occupationCode || '01',
+      holding_nature: holdingNature || 'SI',
+      primary_holder_pan_exempt: 'N',
       primary_holder_pan: pan.toUpperCase(),
       client_type: 'NON DEMAT',
       pms: 'NO',
@@ -1014,29 +1057,29 @@ exports.registerUserUcc = async (req, res) => {
       account_type_1: 'SB',
       account_no_1: effAccountNo,
       ifsc_code_1: effIfsc.toUpperCase(),
-      default_bank_flag_1: 'YES',
+      default_bank_flag_1: 'Y',
       cheque_name: resolvedFullName,
       div_pay_mode: '02', // Direct Credit
       address_1: effAddress1.slice(0, 40),
       address_2: effAddress2 ? effAddress2.slice(0, 40) : '',
       city: effCity.slice(0, 35),
-      state: effState,
+      state: getNseStateCode(effState),
       pincode: effPincode.slice(0, 6),
       country: 'INDIA',
       email: user.email || `${clientCode.toLowerCase()}@client.nseinvest.com`,
       communication_mode: 'ELECTRONIC',
       indian_mobile_no: user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210',
       primary_holder_kyc_type: 'C',
-      aadhaar_updated: 'YES',
-      paperless_flag: 'Paper',
-      mobile_declaration_flag: 'Self',
-      email_declaration_flag: 'Self',
+      aadhaar_updated: 'Y',
+      paperless_flag: 'Z',
+      mobile_declaration_flag: 'SE',
+      email_declaration_flag: 'SE',
       nomination_opt: nomineeName ? 'Y' : 'N',
-      nomination_authentication: 'OTP',
+      nomination_authentication: nomineeName ? 'OTP' : 'O',
       nominee_1_name: nomineeName || '',
-      nominee_1_relationship: nomineeRelation || '01',
+      nominee_1_relationship: nomineeRelation || (nomineeName ? '01' : ''),
       nominee_1_applicable: nomineeName ? '100' : '',
-      nominee_1_minor_flag: nomineeName ? 'NO' : '',
+      nominee_1_minor_flag: nomineeName ? 'N' : '',
       nominee_soa: nomineeName ? 'N' : '',
     };
 
@@ -1055,7 +1098,7 @@ exports.registerUserUcc = async (req, res) => {
     );
 
     const nseStatus = isSuccess ? 'ACTIVE' : 'PENDING';
-    const nseRemarks = regDetail?.message || nseRes?.message || (isSuccess ? 'APPROVED' : 'Exchange registration pending/rejected');
+    const nseRemarks = regDetail?.reg_remark || regDetail?.message || nseRes?.data?.message || nseRes?.message || (isSuccess ? 'APPROVED' : 'Exchange registration pending/rejected');
 
     // 3. Upsert client UCC record in MongoDB
     const uccRecord = await MfClientUcc.findOneAndUpdate(
@@ -1091,6 +1134,7 @@ exports.registerUserUcc = async (req, res) => {
         },
         nseStatus,
         nseRemarks,
+        rawResponse: nseRes?.data || nseRes,
         fatcaUploaded: true,
       },
       { upsert: true, new: true }
@@ -1103,8 +1147,9 @@ exports.registerUserUcc = async (req, res) => {
         code: 'NSE_UCC_REGISTRATION_FAILED',
         message: `NSE MFSS Exchange: ${nseRemarks}`,
         data: {
-          exchangeStatus: regDetail?.status || 'FAILED',
+          exchangeStatus: regDetail?.reg_status || regDetail?.status || 'FAILED',
           exchangeRemark: nseRemarks,
+          exchangeData: regDetail || nseRes?.data || null,
           clientCode,
         },
       });

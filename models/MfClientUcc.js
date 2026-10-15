@@ -73,6 +73,13 @@ const MfClientUccSchema = new mongoose.Schema(
       enum: ['PENDING', 'ACTIVE', 'REJECTED'],
       default: 'ACTIVE',
     },
+    nseRemarks: {
+      type: String,
+      default: '',
+    },
+    rawResponse: {
+      type: mongoose.Schema.Types.Mixed,
+    },
     nseRegistrationDate: {
       type: Date,
       default: Date.now,

@@ -111,40 +111,36 @@ async function runStep1UccVerification() {
     primary_holder_last_name: 'SAINI',
     tax_status: '01', // Individual
     gender: 'M',
-    primary_holder_dob_incorporation: '15/08/1995',
+    primary_holder_dob_incorporation: process.env.TEST_DOB || '12/10/1991',
     occupation_code: '01', // Business
     holding_nature: 'SI', // Single
-    primary_holder_pan_exempt: 'NO',
+    primary_holder_pan_exempt: 'N',
     primary_holder_pan: testPan,
     client_type: 'NON DEMAT',
     pms: 'NO',
     default_dp: 'PHYS',
     account_type_1: 'SB',
-    account_no_1: '123456789012',
-    ifsc_code_1: 'HDFC0000060',
-    default_bank_flag_1: 'YES',
+    account_no_1: process.env.TEST_ACC || '123654852125',
+    ifsc_code_1: process.env.TEST_IFSC || 'BKID0001400',
+    default_bank_flag_1: 'Y',
     cheque_name: 'VIKAS SAINI',
     div_pay_mode: '02', // Direct Credit
     address_1: 'Flat 101, Green View Apartments',
     address_2: 'MG Road',
     city: 'MUMBAI',
-    state: 'MAHARASHTRA',
+    state: 'MA',
     pincode: '400001',
     country: 'INDIA',
-    email: 'investor@vikaone.com',
+    email: process.env.TEST_EMAIL || 'vikas121917@gmail.com',
     communication_mode: 'ELECTRONIC',
-    indian_mobile_no: '9876543210',
+    indian_mobile_no: process.env.TEST_MOBILE || '9997143005',
     primary_holder_kyc_type: 'C',
-    aadhaar_updated: 'YES',
-    paperless_flag: 'Paper',
-    mobile_declaration_flag: 'Self',
-    email_declaration_flag: 'Self',
-    nomination_opt: 'Y',
-    nomination_authentication: 'OTP',
-    nominee_1_name: 'PRIYA SAINI',
-    nominee_1_relationship: '20', // Spouse
-    nominee_1_applicable: '100',
-    nominee_1_minor_flag: 'NO',
+    aadhaar_updated: 'Y',
+    paperless_flag: 'Z',
+    mobile_declaration_flag: 'SE',
+    email_declaration_flag: 'SE',
+    nomination_opt: 'N',
+    nomination_authentication: 'O',
     nominee_soa: 'N',
   };
 
@@ -167,7 +163,7 @@ async function runStep1UccVerification() {
       console.log(`\n🎉 [SUCCESS: UCC ${sampleClientCode} SUCCESSFULLY VALIDATED & REGISTERED]`);
       console.log('   The investor profile is compliant with NSE MFSS NNF v1.9.8 specification.');
     } else {
-      console.log(`\n⚠️ [REGISTRATION RESPONSE]: ${uccResult.message || regItem?.message || 'Check response details above'}`);
+      console.log(`\n⚠️ [REGISTRATION RESPONSE]: ${regItem?.reg_remark || uccResult.message || regItem?.message || 'Check response details above'}`);
     }
   } catch (err) {
     console.error('   ❌ Registration Exception:', err.message);

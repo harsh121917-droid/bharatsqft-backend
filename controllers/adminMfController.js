@@ -664,6 +664,52 @@ exports.testNseConnection = async (req, res) => {
       } catch (_) {}
     }
 
+    let uccTestResult = null;
+    if (req.body?.testUcc) {
+      try {
+        const payload = req.body.uccPayload || {
+          client_code: 'VK' + Date.now().toString().slice(-6),
+          primary_holder_first_name: 'VIKAS',
+          primary_holder_last_name: 'SAINI',
+          tax_status: '01',
+          gender: 'M',
+          primary_holder_dob_incorporation: '12/10/1991',
+          occupation_code: '01',
+          holding_nature: 'SI',
+          primary_holder_pan_exempt: 'N',
+          primary_holder_pan: targetPan,
+          client_type: 'NON DEMAT',
+          pms: 'NO',
+          default_dp: 'PHYS',
+          account_type_1: 'SB',
+          account_no_1: '123654852125',
+          ifsc_code_1: 'BKID0001400',
+          default_bank_flag_1: 'Y',
+          cheque_name: 'VIKAS SAINI',
+          div_pay_mode: '02',
+          address_1: 'Flat 101, Main Market',
+          city: 'Mumbai',
+          state: 'MA',
+          pincode: '400001',
+          country: 'INDIA',
+          email: 'vikas121917@gmail.com',
+          communication_mode: 'ELECTRONIC',
+          indian_mobile_no: '9997143005',
+          primary_holder_kyc_type: 'C',
+          aadhaar_updated: 'Y',
+          paperless_flag: 'Z',
+          mobile_declaration_flag: 'SE',
+          email_declaration_flag: 'SE',
+          nomination_opt: 'N',
+          nomination_authentication: 'O',
+          nominee_soa: 'N',
+        };
+        uccTestResult = await nseClient.registerUcc([payload]);
+      } catch (uccErr) {
+        uccTestResult = { error: uccErr.message };
+      }
+    }
+
     const latency = Date.now() - startTime;
 
     const finalStatus = isMock ? 'SANDBOX_MOCKED' : (testCall.success ? 'ONLINE' : 'GATEWAY_ALERT');
@@ -690,6 +736,7 @@ exports.testNseConnection = async (req, res) => {
         httpStatus,
         reachability: reachabilityStatus,
         exchangeResponse: testCall,
+        uccTestResult,
         testedAt: config.lastTestedAt,
       },
     });
