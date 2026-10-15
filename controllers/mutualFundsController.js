@@ -1026,11 +1026,18 @@ exports.registerUserUcc = async (req, res) => {
       email: user.email || `${clientCode.toLowerCase()}@client.nseinvest.com`,
       communication_mode: 'ELECTRONIC',
       indian_mobile_no: user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210',
+      primary_holder_kyc_type: 'C',
+      aadhaar_updated: 'YES',
+      paperless_flag: 'Paper',
+      mobile_declaration_flag: 'Self',
+      email_declaration_flag: 'Self',
       nomination_opt: nomineeName ? 'Y' : 'N',
       nomination_authentication: 'OTP',
       nominee_1_name: nomineeName || '',
       nominee_1_relationship: nomineeRelation || '01',
-      nominee_1_applicable: '100',
+      nominee_1_applicable: nomineeName ? '100' : '',
+      nominee_1_minor_flag: nomineeName ? 'NO' : '',
+      nominee_soa: nomineeName ? 'N' : '',
     };
 
     // 2. Call NSE Client for CLIENTCOMMON183
@@ -1039,7 +1046,11 @@ exports.registerUserUcc = async (req, res) => {
 
     const regDetail = nseRes?.data?.reg_details?.[0];
     const isSuccess = Boolean(
-      (nseRes?.success && (regDetail?.status === 'SUCCESS' || regDetail?.status === '100')) ||
+      (nseRes?.success && (
+        regDetail?.status === 'SUCCESS' ||
+        regDetail?.status === '100' ||
+        regDetail?.reg_status === 'REG_SUCCESS'
+      )) ||
       nseClient.isMockMode()
     );
 
@@ -3477,10 +3488,11 @@ exports.verifyPanDetails = async (req, res) => {
     let isNseVerified = false;
     let isKraVerified = false;
     let verifiedSource = '';
+    let existingUcc = null;
 
     // 3. Check existing NSE UCC in Database
     try {
-      const existingUcc = await MfClientUcc.findOne({ 
+      existingUcc = await MfClientUcc.findOne({ 
         $or: [
           { pan: panClean },
           ...(userId ? [{ user: userId, pan: panClean }] : [])
@@ -3492,25 +3504,30 @@ exports.verifyPanDetails = async (req, res) => {
       }
     } catch (_) {}
 
-    // 4. Query Official NSE MFSS Utility KYC Status (/nsemfdesk/api/v2/utility/KYC_CHECK)
+    // 4. Query Official NSE MFSS Utility KYC Status (/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT)
     let nseRemark = '';
     let kraName = '';
+    let discoveredClientCode = '';
     try {
       const nseKycRes = await nseClient.checkKycStatus(panClean);
 
       if (nseKycRes && nseKycRes.success && nseKycRes.data) {
         const kycData = nseKycRes.data;
-        const kycStatus = String(kycData.kyc_status || '').toUpperCase();
-        nseRemark = kycData.kyc_status_remark || '';
-        kraName = kycData.kra_name || '';
+        const reportItem = Array.isArray(kycData.report_data) ? kycData.report_data[0] : null;
+        const rawStatus = String(reportItem?.kyc_status || kycData.kyc_status || '').toUpperCase();
+        const kycStatus = (rawStatus === 'S' || rawStatus === 'Y' || rawStatus === 'SUCCESS') ? 'S' : rawStatus;
+        nseRemark = reportItem?.status_remark || kycData.kyc_status_remark || '';
+        kraName = kycData.kra_name || 'ndmlkra';
+        discoveredClientCode = reportItem?.client_code || kycData.client_code || '';
 
-        // Status 'S' = Success (KYC REGISTERED / Validated), 'Y' = Compliant
+        // Status 'S' / 'Y' = Success (KYC REGISTERED / Validated on KRA/NSE)
         if (kycStatus === 'S' || kycStatus === 'Y') {
           isNseVerified = true;
           isKraVerified = true;
           verifiedSource = 'NSE_MFSS_KYC_VERIFY';
-          if (kycData.name || kycData.client_name) {
-            registeredName = (kycData.name || kycData.client_name).trim().toUpperCase();
+          const candidateName = (reportItem?.holder_name || kycData.name || kycData.client_name || '').trim().toUpperCase();
+          if (candidateName) {
+            registeredName = candidateName;
           }
           if (userId && registeredName) {
             try {
@@ -3529,6 +3546,24 @@ exports.verifyPanDetails = async (req, res) => {
                 { upsert: false }
               );
             } catch (_) {}
+
+            if (discoveredClientCode) {
+              try {
+                await MfClientUcc.findOneAndUpdate(
+                  { user: userId },
+                  {
+                    $set: {
+                      clientCode: discoveredClientCode,
+                      pan: panClean,
+                      fullName: registeredName,
+                      nseStatus: 'ACTIVE',
+                      nseRemarks: 'Pre-registered on NSE MFSS',
+                    },
+                  },
+                  { upsert: false }
+                );
+              } catch (_) {}
+            }
           }
         } else if (kycStatus === 'F' || kycStatus === 'N') {
           console.warn(`[NSE MFSS] PAN ${panClean} reported NOT KYC compliant by exchange:`, nseRemark);
@@ -3650,17 +3685,25 @@ exports.verifyPanDetails = async (req, res) => {
       registeredName = (req.body.name || req.body.fullName || 'INVESTOR').trim().toUpperCase();
     }
 
+    const isAlreadyRegistered = Boolean(discoveredClientCode || (existingUcc && existingUcc.nseStatus === 'ACTIVE'));
+    const finalClientCode = discoveredClientCode || existingUcc?.clientCode || null;
+
     return res.json({
       success: true,
       data: {
         pan: panClean,
         registeredName,
         isValid: true,
+        hasUcc: isAlreadyRegistered,
+        clientCode: finalClientCode,
+        alreadyRegistered: isAlreadyRegistered,
         nseKycStatus: isNseVerified ? 'VERIFIED' : 'Y',
         nseKycRemark: nseRemark || 'KYC REGISTERED',
         kra: kraName || 'cvlkra',
         source: verifiedSource || 'NSE_MFSS_KYC_VERIFY',
-        message: 'PAN verified successfully on NSE MFSS',
+        message: isAlreadyRegistered
+          ? `Investor is already registered on NSE MFSS with UCC: ${finalClientCode}. Account linked successfully.`
+          : 'PAN verified successfully on NSE MFSS',
       },
     });
   } catch (error) {

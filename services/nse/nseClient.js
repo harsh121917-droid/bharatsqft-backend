@@ -177,6 +177,8 @@ class NseClient {
           success: false,
           status: 400,
           data: {
+            response_status: 'F',
+            response_status_remarks: 'No Record Found!!',
             pan: pan,
             kyc_status: 'F',
             kyc_status_remark: 'NOT AVAILABLE / INVALID PAN',
@@ -189,10 +191,48 @@ class NseClient {
         success: true,
         status: 200,
         data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              client_code: payload.client_code || `VK${timestamp.toString().slice(-6)}`,
+              client_pan: pan,
+              holding_type: 'SI',
+              holder_name: 'INVESTOR',
+              holder_dob: '15/08/1995',
+              kyc_status: 'Y',
+              status_remark: 'KYC COMPLIANT',
+            },
+          ],
           pan: pan,
           kyc_status: 'S',
           kyc_status_remark: 'KYC REGISTERED',
           kra_name: 'cvlkra',
+        },
+      };
+    }
+
+    if (endpoint.includes('client_master_report')) {
+      const pan = String(payload.PAN || payload.pan || '').trim().toUpperCase();
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              member_code: this.memberCode || '1031616',
+              client_code: payload.client_code || `VK${timestamp.toString().slice(-6)}`,
+              primary_holder_first_name: 'INVESTOR',
+              primary_holder_pan: pan,
+              tax_status: '01',
+              gender: 'MALE',
+              primary_holder_dob_incorporation: '15/08/1995',
+              client_type: 'NON DEMAT',
+              dp_status: 'ACTIVE',
+            },
+          ],
         },
       };
     }
@@ -394,20 +434,28 @@ class NseClient {
     });
   }
 
-  // ── 13. Official NSE MFSS Utility KYC Check ──
-  async checkKycStatus(panNo) {
-    return this.post('/nsemfdesk/api/v2/utility/KYC_CHECK', {
-      pan_no: String(panNo || '').trim().toUpperCase(),
-    });
+  // ── 13. Official NSE MFSS Client KYC Status Report (Doc page 169) ──
+  async checkKycStatus(panNo, clientCode = '') {
+    return this.checkClientKycStatus(panNo, clientCode);
   }
 
-  // ── 13b. Client KYC Status Report ──
+  // ── 13b. Client KYC Status Report (NNF v1.9.8 Doc page 169) ──
   async checkClientKycStatus(panNo, clientCode = '') {
-    const payload = { pan_no: panNo };
-    if (clientCode && !panNo) {
+    const payload = { pan_no: String(panNo || '').trim().toUpperCase() };
+    if (clientCode) {
       payload.client_code = clientCode;
     }
     return this.post('/nsemfdesk/api/v2/reports/CLIENT_KYC_REPORT', payload);
+  }
+
+  // ── 13c. Client Master Report (Check Existing Registered UCC on NSE - Doc page 178) ──
+  async getClientMasterReport({ pan = '', clientCode = '', fromDate = '', toDate = '' } = {}) {
+    const payload = {};
+    if (clientCode) payload.client_code = clientCode;
+    if (pan) payload.PAN = pan.toUpperCase();
+    if (fromDate) payload.from_date = fromDate;
+    if (toDate) payload.to_date = toDate;
+    return this.post('/nsemfdesk/api/v2/reports/client_master_report', payload);
   }
 
   // ── 14. Order Cancellation ──

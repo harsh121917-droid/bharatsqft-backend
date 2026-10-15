@@ -114,13 +114,16 @@ class NseEncryption {
     const basicCred = `${loginUserId}:${encryptedPassword}`;
     const authorizationHeader = `Basic ${Buffer.from(basicCred, 'utf8').toString('base64')}`;
 
+    const memberId = overrides.memberId || this.memberId || '1';
+
     return {
       'Content-Type': 'application/json',
-      'memberId': String(memberCode),
+      'memberId': String(memberId),
       'Authorization': authorizationHeader,
       'User-Agent': 'PostmanRuntime/7.43.0',
       'Accept-Language': 'en-US',
       'Referer': 'www.google.com',
+      'Reference': 'https://www.nseinvest.com',
       'Accept': '',
       'Connection': 'keep-alive',
     };
