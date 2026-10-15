@@ -956,7 +956,7 @@ exports.registerUserUcc = async (req, res) => {
     const clientCode = `VK${user.phone ? user.phone.slice(-6) : user._id.toString().slice(-6).toUpperCase()}`;
 
     // 0b. Address Resolution & Strict Non-Placeholder Validation
-    let effAddress1 = (address1 || address?.line1 || address?.address1 || '').trim();
+    let effAddress1 = (address1 || (typeof address === 'string' ? address : (address?.line1 || address?.address1)) || '').trim();
     let effAddress2 = (address2 || address?.line2 || address?.address2 || '').trim();
     let effCity = (city || address?.city || '').trim();
     let effState = (state || address?.state || '').trim();

@@ -8,15 +8,20 @@ const https = require('https');
 
 class NseEncryption {
   constructor() {
-    this.memberId = process.env.NSE_MEMBER_ID || '1';
-    this.memberCode = process.env.NSE_MEMBER_CODE || '';
+    this.memberCode = process.env.NSE_MEMBER_CODE || '1031616';
+    this.memberId = (process.env.NSE_MEMBER_ID && process.env.NSE_MEMBER_ID !== '1')
+      ? process.env.NSE_MEMBER_ID
+      : (process.env.NSE_MEMBER_CODE || '1031616');
     this.loginUserId = process.env.NSE_LOGIN_USER_ID || '';
     this.apiSecret = process.env.NSE_API_SECRET || '';
     this.licenseKey = process.env.NSE_MEMBER_LICENSE_KEY || '';
   }
 
   syncConfig(config = {}) {
-    if (config.memberCode) this.memberCode = config.memberCode;
+    if (config.memberCode) {
+      this.memberCode = config.memberCode;
+      this.memberId = config.memberCode;
+    }
     if (config.loginUserId) this.loginUserId = config.loginUserId;
     if (config.apiSecret) this.apiSecret = config.apiSecret;
     if (config.licenseKey) this.licenseKey = config.licenseKey;
@@ -114,7 +119,7 @@ class NseEncryption {
     const basicCred = `${loginUserId}:${encryptedPassword}`;
     const authorizationHeader = `Basic ${Buffer.from(basicCred, 'utf8').toString('base64')}`;
 
-    const memberId = overrides.memberId || this.memberId || '1';
+    const memberId = overrides.memberId || overrides.memberCode || this.memberId || this.memberCode || process.env.NSE_MEMBER_CODE || '1031616';
 
     return {
       'Content-Type': 'application/json',
