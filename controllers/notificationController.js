@@ -47,143 +47,146 @@ exports.sendNotification = async (req, res, next) => {
       });
     }
 
-    // Default to 'vikadrx' when dispatched from DRX Admin panel
-    const targetApp = app === "digigold" ? "digigold" : "vikadrx";
-    const tokenField = targetApp === "vikadrx" ? "fcmTokensDrx" : "fcmTokens";
-    const defaultTopic = targetApp === "vikadrx" ? "vikadrx_all_users" : "all_users";
+    const appsToSend = app === "both" ? ["vikadrx", "digigold"] : [app === "digigold" ? "digigold" : "vikadrx"];
+    const results = [];
+    const logs = [];
 
-    let fcmResult;
     let targetUserDoc = null;
-
     if (targetType === "user" && targetUserId) {
       targetUserDoc = await User.findById(targetUserId);
       if (!targetUserDoc) {
         return res.status(404).json({ success: false, message: "Target user not found" });
       }
-
-      const tokens = targetUserDoc[tokenField] || [];
-      if (tokens.length > 0) {
-        fcmResult = await sendFcmMessage({
-          app: targetApp,
-          tokens,
-          title,
-          body,
-          imageUrl,
-          deepLink: deepLink || "home",
-        });
-      } else {
-        fcmResult = {
-          success: true,
-          simulated: false,
-          sentCount: 0,
-          successCount: 0,
-          failureCount: 0,
-          note: `User has not registered ${targetApp} device token yet. Notification recorded for in-app inbox.`,
-        };
-      }
-    } else if (targetType === "kyc_verified") {
-      // Broadcast to KYC verified users only
-      const kycUsersWithTokens = await User.find({
-        kycStatus: "approved",
-        [`${tokenField}.0`]: { $exists: true },
-      }).select(tokenField);
-
-      const tokenSet = new Set();
-      kycUsersWithTokens.forEach((u) => {
-        (u[tokenField] || []).forEach((t) => {
-          if (t && typeof t === "string" && t.trim().length > 10) {
-            tokenSet.add(t.trim());
-          }
-        });
-      });
-      const kycTokens = Array.from(tokenSet);
-
-      if (kycTokens.length > 0) {
-        fcmResult = await sendFcmMessage({
-          app: targetApp,
-          tokens: kycTokens,
-          title,
-          body,
-          imageUrl,
-          deepLink: deepLink || "kyc",
-        });
-      } else {
-        fcmResult = {
-          success: true,
-          simulated: false,
-          sentCount: 0,
-          successCount: 0,
-          failureCount: 0,
-          note: `No active FCM tokens found for KYC-verified ${targetApp} users. Recorded for in-app inbox.`,
-        };
-      }
-    } else {
-      // Broadcast to all users of target app:
-      const allUsersWithTokens = await User.find({ [`${tokenField}.0`]: { $exists: true } }).select(tokenField);
-      const tokenSet = new Set();
-      allUsersWithTokens.forEach((u) => {
-        (u[tokenField] || []).forEach((t) => {
-          if (t && typeof t === "string" && t.trim().length > 10) {
-            tokenSet.add(t.trim());
-          }
-        });
-      });
-      const allTokens = Array.from(tokenSet);
-
-      if (allTokens.length > 0) {
-        // Send directly to registered device tokens
-        fcmResult = await sendFcmMessage({
-          app: targetApp,
-          tokens: allTokens,
-          title,
-          body,
-          imageUrl,
-          deepLink: deepLink || "home",
-        });
-      } else {
-        // Fallback to topic broadcast if no individual device tokens exist
-        fcmResult = await sendFcmMessage({
-          app: targetApp,
-          topic: defaultTopic,
-          title,
-          body,
-          imageUrl,
-          deepLink: deepLink || "home",
-        });
-      }
     }
 
-    // Create Notification Log entry in database
-    const resolvedTargetType =
-      targetType === "user" ? "user" : targetType === "kyc_verified" ? "kyc_verified" : "all";
+    for (const targetApp of appsToSend) {
+      const tokenField = targetApp === "vikadrx" ? "fcmTokensDrx" : "fcmTokens";
+      const defaultTopic = targetApp === "vikadrx" ? "vikadrx_all_users" : "all_users";
 
-    const log = await NotificationLog.create({
-      app: targetApp,
-      title,
-      body,
-      imageUrl: imageUrl || "",
-      deepLink: deepLink || "home",
-      targetType: resolvedTargetType,
-      targetUser: targetUserDoc ? targetUserDoc._id : null,
-      sentBy: req.user?.name || "Admin",
-      sentCount: fcmResult.sentCount || 0,
-      successCount: fcmResult.successCount || 0,
-      failureCount: fcmResult.failureCount || 0,
-      status: fcmResult.simulated ? "simulated" : fcmResult.success ? "sent" : "failed",
-    });
+      let fcmResult;
+      if (targetType === "user" && targetUserDoc) {
+        const tokens = targetUserDoc[tokenField] || [];
+        if (tokens.length > 0) {
+          fcmResult = await sendFcmMessage({
+            app: targetApp,
+            tokens,
+            title,
+            body,
+            imageUrl,
+            deepLink: deepLink || "home",
+          });
+        } else {
+          fcmResult = {
+            success: true,
+            simulated: false,
+            sentCount: 0,
+            successCount: 0,
+            failureCount: 0,
+            note: `User has not registered ${targetApp} device token yet. Notification recorded for in-app inbox.`,
+          };
+        }
+      } else if (targetType === "kyc_verified") {
+        const kycUsersWithTokens = await User.find({
+          kycStatus: "approved",
+          [`${tokenField}.0`]: { $exists: true },
+        }).select(tokenField);
+
+        const tokenSet = new Set();
+        kycUsersWithTokens.forEach((u) => {
+          (u[tokenField] || []).forEach((t) => {
+            if (t && typeof t === "string" && t.trim().length > 10) {
+              tokenSet.add(t.trim());
+            }
+          });
+        });
+        const kycTokens = Array.from(tokenSet);
+
+        if (kycTokens.length > 0) {
+          fcmResult = await sendFcmMessage({
+            app: targetApp,
+            tokens: kycTokens,
+            title,
+            body,
+            imageUrl,
+            deepLink: deepLink || "kyc",
+          });
+        } else {
+          fcmResult = {
+            success: true,
+            simulated: false,
+            sentCount: 0,
+            successCount: 0,
+            failureCount: 0,
+            note: `No active FCM tokens found for KYC-verified ${targetApp} users. Recorded for in-app inbox.`,
+          };
+        }
+      } else {
+        const allUsersWithTokens = await User.find({ [`${tokenField}.0`]: { $exists: true } }).select(tokenField);
+        const tokenSet = new Set();
+        allUsersWithTokens.forEach((u) => {
+          (u[tokenField] || []).forEach((t) => {
+            if (t && typeof t === "string" && t.trim().length > 10) {
+              tokenSet.add(t.trim());
+            }
+          });
+        });
+        const allTokens = Array.from(tokenSet);
+
+        if (allTokens.length > 0) {
+          fcmResult = await sendFcmMessage({
+            app: targetApp,
+            tokens: allTokens,
+            title,
+            body,
+            imageUrl,
+            deepLink: deepLink || "home",
+          });
+        } else {
+          fcmResult = await sendFcmMessage({
+            app: targetApp,
+            topic: defaultTopic,
+            title,
+            body,
+            imageUrl,
+            deepLink: deepLink || "home",
+          });
+        }
+      }
+
+      const resolvedTargetType =
+        targetType === "user" ? "user" : targetType === "kyc_verified" ? "kyc_verified" : "all";
+
+      const log = await NotificationLog.create({
+        app: targetApp,
+        title,
+        body,
+        imageUrl: imageUrl || "",
+        deepLink: deepLink || "home",
+        targetType: resolvedTargetType,
+        targetUser: targetUserDoc ? targetUserDoc._id : null,
+        sentBy: req.user?.name || "Admin",
+        sentCount: fcmResult.sentCount || 0,
+        successCount: fcmResult.successCount || 0,
+        failureCount: fcmResult.failureCount || 0,
+        status: fcmResult.simulated ? "simulated" : fcmResult.success ? "sent" : "failed",
+      });
+
+      results.push({ app: targetApp, fcmResult });
+      logs.push(log);
+    }
 
     let message = "Push notification dispatched successfully!";
-    if (fcmResult.simulated) {
-      message = fcmResult.note || "Push notification processed (Simulation Mode)";
-    } else if (fcmResult.note) {
-      message = fcmResult.note;
+    if (results.every((r) => r.fcmResult.simulated)) {
+      message = "Push notification processed (Simulation Mode)";
     }
 
     res.json({
       success: true,
       message,
-      log,
-      fcmResult,
+      log: logs[0],
+      logs,
+      fcmResult: results[0].fcmResult,
+      results,
     });
   } catch (err) {
     next(err);

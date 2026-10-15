@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Vika DRX — Push Notifications & In-App Alerts Controller
+   Vika DRX & VikaOne — Push Notifications & In-App Alerts Controller
    ══════════════════════════════════════════════════════════════ */
 
 let notifHistory = [];
@@ -7,13 +7,14 @@ let notifPage = 1;
 let uploadedNotifImageUrl = "";
 let cachedNotifUsers = [];
 let currentNotifApp = "vikadrx";
+let selectedNotifApp = "vikadrx";
 
 function changeNotifAppFilter(app) {
     currentNotifApp = app || "vikadrx";
     loadNotificationHistory(1);
 }
 
-const NOTIF_TEMPLATES = {
+const NOTIF_TEMPLATES_DRX = {
     estate: {
         title: "🏰 Pre-Launch Opportunity Live: Smartworld Sky Arc - 2",
         body: "Exclusive high-yield pre-launch estate is now open for booking! Reserve your spot with just 10% token payment.",
@@ -41,8 +42,172 @@ const NOTIF_TEMPLATES = {
     }
 };
 
+const NOTIF_TEMPLATES_GOLD = {
+    schemes: {
+        title: "💰 Gold Savings Scheme Installment Due",
+        body: "Your 11+1 gold scheme monthly installment is due. Pay on time to claim your 1-month bonus bullion!",
+        deepLink: "schemes"
+    },
+    sip: {
+        title: "🪙 Daily Gold SIP Reminder",
+        body: "Build pure 24K 99.9% hallmarked gold daily from just ₹10. Accumulate wealth systematically.",
+        deepLink: "sip"
+    },
+    buy_gold: {
+        title: "✨ Special Gold Cashback Live",
+        body: "Get instant bonus bullion credits on all 24K 99.9% gold purchases above ₹1,000 this week!",
+        deepLink: "buy_gold"
+    },
+    rewards: {
+        title: "🎁 Referral Bonus Unlocked!",
+        body: "You've earned free gold reward points! Tap here to view and redeem your gold bullion balance.",
+        deepLink: "rewards"
+    },
+    kyc: {
+        title: "🛡️ Verify Your DigiGold Account",
+        body: "Complete instant 2-minute KYC to enable physical gold delivery and high-volume bullion sales.",
+        deepLink: "kyc"
+    }
+};
+
+function selectNotificationApp(app) {
+    selectedNotifApp = app || "vikadrx";
+
+    document.querySelectorAll('.notif-app-pill').forEach(p => p.classList.remove('active'));
+    document.getElementById(`notif-app-${selectedNotifApp}`)?.classList.add('active');
+
+    const appLabel = document.getElementById("notif-selected-app-label");
+    const tplTitle = document.getElementById("notif-templates-title");
+    const tplContainer = document.getElementById("notif-templates-container");
+    const deepLinkSelect = document.getElementById("notif-deeplink");
+
+    const prevDevice = document.getElementById("notif-preview-device-title");
+    const prevIcon = document.getElementById("notif-preview-app-icon");
+    const prevName = document.getElementById("notif-preview-app-name");
+
+    if (selectedNotifApp === "digigold") {
+        if (appLabel) appLabel.innerHTML = `🪙 VikaOne (DigiGold & SIP)`;
+        if (tplTitle) tplTitle.innerHTML = `VikaOne DigiGold Templates (1-Click Fill)`;
+        if (prevDevice) prevDevice.textContent = `VikaOne Mobile Lockscreen Preview`;
+        if (prevName) prevName.textContent = `VikaOne`;
+        if (prevIcon) {
+            prevIcon.style.background = "#f59e0b";
+            prevIcon.innerHTML = `<i class="fas fa-coins"></i>`;
+        }
+
+        if (tplContainer) {
+            tplContainer.innerHTML = `
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('schemes')" style="background:rgba(234,179,8,0.18);border-color:rgba(234,179,8,0.4);color:#fde047">
+                    💰 Scheme Due
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('sip')" style="background:rgba(234,179,8,0.18);border-color:rgba(234,179,8,0.4);color:#fde047">
+                    🪙 SIP Reminder
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('buy_gold')" style="background:rgba(234,179,8,0.18);border-color:rgba(234,179,8,0.4);color:#fde047">
+                    ✨ Cashback Offer
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('rewards')" style="background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.4);color:#a7f3d0">
+                    🎁 Reward Points
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('kyc')" style="background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.4);color:#fde68a">
+                    🛡️ KYC Reminder
+                </button>`;
+        }
+
+        if (deepLinkSelect) {
+            deepLinkSelect.innerHTML = `
+                <option value="home">🏠 VikaOne Dashboard</option>
+                <option value="buy_gold" selected>🪙 Buy DigiGold & 24K Bullion</option>
+                <option value="schemes">📜 11+1 Gold Savings Schemes</option>
+                <option value="sip">📈 Daily / Monthly Gold SIP</option>
+                <option value="wallet">💼 Gold Wallet & Passbook</option>
+                <option value="rewards">🎁 Gold Rewards & Referral Bonus</option>
+                <option value="kyc">🛡️ KYC Verification Center</option>
+                <option value="silver">🥈 Buy Pure Silver</option>
+                <option value="mutual_funds">📊 Mutual Funds & Portfolio</option>`;
+        }
+    } else if (selectedNotifApp === "both") {
+        if (appLabel) appLabel.innerHTML = `🌐 Dual Broadcast: Both Apps`;
+        if (tplTitle) tplTitle.innerHTML = `Universal Ecosystem Templates`;
+        if (prevDevice) prevDevice.textContent = `Dual Device Preview`;
+        if (prevName) prevName.textContent = `VikaOne & DRX`;
+        if (prevIcon) {
+            prevIcon.style.background = "#8b5cf6";
+            prevIcon.innerHTML = `<i class="fas fa-globe"></i>`;
+        }
+
+        if (tplContainer) {
+            tplContainer.innerHTML = `
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('kyc')" style="background:rgba(139,92,246,0.18);border-color:rgba(139,92,246,0.4);color:#c4b5fd">
+                    🛡️ KYC Verification
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('wallet')" style="background:rgba(139,92,246,0.18);border-color:rgba(139,92,246,0.4);color:#c4b5fd">
+                    💼 Wallet Credit
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('savings')" style="background:rgba(139,92,246,0.18);border-color:rgba(139,92,246,0.4);color:#c4b5fd">
+                    🏖️ Savings Reminder
+                </button>`;
+        }
+
+        if (deepLinkSelect) {
+            deepLinkSelect.innerHTML = `
+                <option value="home" selected>🏠 Dashboard / Home Screen</option>
+                <option value="wallet">💼 In-App Wallet</option>
+                <option value="kyc">🛡️ KYC Verification Center</option>
+                <option value="savings">🏖️ Savings Programs</option>`;
+        }
+    } else {
+        // Vika DRX
+        if (appLabel) appLabel.innerHTML = `🏢 Vika DRX (Real Estate)`;
+        if (tplTitle) tplTitle.innerHTML = `Vika DRX Quick Templates (1-Click Fill)`;
+        if (prevDevice) prevDevice.textContent = `Vika DRX Mobile Lockscreen Preview`;
+        if (prevName) prevName.textContent = `Vika DRX`;
+        if (prevIcon) {
+            prevIcon.style.background = "#2563EB";
+            prevIcon.innerHTML = `<i class="fas fa-building"></i>`;
+        }
+
+        if (tplContainer) {
+            tplContainer.innerHTML = `
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('estate')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                    🏰 Pre-Launch Opportunity
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('bricks')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                    🧱 New Brick Asset
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('savings')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
+                    🏖️ Savings Deposit Reminder
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('dividend')" style="background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.4);color:#a7f3d0">
+                    💰 Monthly Dividend Credited
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('kyc')" style="background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.4);color:#fde68a">
+                    🛡️ KYC Verification Reminder
+                </button>`;
+        }
+
+        if (deepLinkSelect) {
+            deepLinkSelect.innerHTML = `
+                <option value="home">🏠 Dashboard / Home Screen</option>
+                <option value="estate" selected>🏰 Pre-Launch Estates (Smartworld Sky Arc, etc.)</option>
+                <option value="bricks">🧱 Fractional Real Estate (Bricks)</option>
+                <option value="savings">🏖️ Location-Based Property Savings</option>
+                <option value="wallet">💼 Vika DRX Wallet & Bank Accounts</option>
+                <option value="kyc">🛡️ KYC Verification Center</option>
+                <option value="properties">🔍 Explore Properties Directory</option>`;
+        }
+    }
+
+    // Refresh customer dropdown with relevant tokens
+    if (cachedNotifUsers.length > 0) {
+        renderNotifUserDropdown(cachedNotifUsers);
+    }
+    updateNotificationPreview();
+}
+
 function applyNotifTemplate(key) {
-    const tpl = NOTIF_TEMPLATES[key];
+    const pool = selectedNotifApp === "digigold" ? NOTIF_TEMPLATES_GOLD : NOTIF_TEMPLATES_DRX;
+    const tpl = pool[key] || NOTIF_TEMPLATES_DRX[key] || NOTIF_TEMPLATES_GOLD[key];
     if (!tpl) return;
 
     const titleInput = document.getElementById("notif-title");
@@ -84,12 +249,13 @@ function selectNotificationTarget(target) {
     }
 
     if (sendBtn) {
+        const appLabel = selectedNotifApp === "digigold" ? "VikaOne (DigiGold)" : selectedNotifApp === "both" ? "Both Apps" : "Vika DRX";
         if (target === "single") {
-            sendBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Send Direct Push to Customer`;
+            sendBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Send Direct Push to Customer (${appLabel})`;
         } else if (target === "kyc") {
-            sendBtn.innerHTML = `<i class="fas fa-shield-alt"></i> Send to KYC-Verified Users`;
+            sendBtn.innerHTML = `<i class="fas fa-shield-alt"></i> Send to KYC-Verified Users (${appLabel})`;
         } else {
-            sendBtn.innerHTML = `<i class="fas fa-bullhorn"></i> Send Push Broadcast (All Users)`;
+            sendBtn.innerHTML = `<i class="fas fa-bullhorn"></i> Send Push Broadcast (${appLabel})`;
         }
     }
 }
@@ -139,9 +305,22 @@ function renderNotifUserDropdown(usersList) {
 
     let html = '<option value="">-- Choose a target customer (' + usersList.length + ' available) --</option>';
     usersList.forEach(u => {
-        const deviceCount = (u.fcmTokens && u.fcmTokens.length > 0) ? `📱 ${u.fcmTokens.length} active device(s)` : '⚠️ In-App Inbox Only';
-        html += `<option value="${u._id}" data-tokens="${(u.fcmTokens || []).length}">
-            ${u.name || 'Customer'} (${u.phone || u.email || 'No Phone'}) — ${deviceCount}
+        let tokenCount = 0;
+        let tokenLabel = "";
+
+        if (selectedNotifApp === "digigold") {
+            tokenCount = (u.fcmTokens || []).length;
+            tokenLabel = tokenCount > 0 ? `🪙 ${tokenCount} VikaOne device(s)` : '⚠️ In-App Inbox Only';
+        } else if (selectedNotifApp === "both") {
+            tokenCount = (u.fcmTokensDrx || []).length + (u.fcmTokens || []).length;
+            tokenLabel = tokenCount > 0 ? `📱 ${tokenCount} device(s) (DRX + VikaOne)` : '⚠️ In-App Inbox Only';
+        } else {
+            tokenCount = (u.fcmTokensDrx || []).length;
+            tokenLabel = tokenCount > 0 ? `🏢 ${tokenCount} Vika DRX device(s)` : '⚠️ In-App Inbox Only';
+        }
+
+        html += `<option value="${u._id}" data-tokens="${tokenCount}">
+            ${u.name || 'Customer'} (${u.phone || u.email || 'No Phone'}) — ${tokenLabel}
         </option>`;
     });
 
@@ -161,10 +340,12 @@ function onNotifUserSelected() {
     }
 
     const tokenCount = parseInt(selectedOpt.dataset.tokens || "0", 10);
+    const targetAppName = selectedNotifApp === "digigold" ? "VikaOne (DigiGold)" : selectedNotifApp === "both" ? "VikaOne & DRX" : "Vika DRX";
+
     if (tokenCount > 0) {
-        infoEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> User is registered on ${tokenCount} device(s). Notification will pop up on their screen immediately.</span>`;
+        infoEl.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> User has ${tokenCount} active ${targetAppName} device token(s). Notification will open ${targetAppName} directly.</span>`;
     } else {
-        infoEl.innerHTML = `<span style="color:#60a5fa"><i class="fas fa-info-circle"></i> User has no active push token. Alert will be delivered directly to their In-App Notification History.</span>`;
+        infoEl.innerHTML = `<span style="color:#60a5fa"><i class="fas fa-info-circle"></i> User has no registered ${targetAppName} device token. Notification will be stored in their In-App inbox.</span>`;
     }
 }
 
@@ -187,7 +368,7 @@ function updateNotificationPreview() {
         }
     }
 
-    const deepLink = document.getElementById("notif-deeplink")?.value || "estate";
+    const deepLink = document.getElementById("notif-deeplink")?.value || "home";
     const deepLinkEl = document.getElementById("notif-preview-deeplink");
     if (deepLinkEl) {
         const labels = {
@@ -195,9 +376,15 @@ function updateNotificationPreview() {
             estate: "Action: 🏰 Pre-Launch Estates",
             bricks: "Action: 🧱 Fractional Bricks",
             savings: "Action: 🏖️ Property Savings",
-            wallet: "Action: 💼 Vika DRX Wallet",
+            wallet: "Action: 💼 Wallet & Accounts",
             kyc: "Action: 🛡️ KYC Verification",
-            properties: "Action: 🔍 Explore Properties"
+            properties: "Action: 🔍 Explore Properties",
+            buy_gold: "Action: 🪙 Buy 24K DigiGold",
+            schemes: "Action: 📜 11+1 Gold Savings Schemes",
+            sip: "Action: 📈 Gold SIP Accumulation",
+            rewards: "Action: 🎁 Gold Rewards & Referrals",
+            silver: "Action: 🥈 Buy Pure Silver",
+            mutual_funds: "Action: 📊 Mutual Funds"
         };
         deepLinkEl.textContent = labels[deepLink] || `Action: ${deepLink}`;
     }
@@ -267,7 +454,7 @@ async function sendPushNotification() {
     const targetPill = document.querySelector('.notif-target-pill.active');
     const targetKey = targetPill?.dataset.target || "all";
     const userId = document.getElementById("notif-user-dropdown")?.value;
-    const deepLink = document.getElementById("notif-deeplink")?.value || "estate";
+    const deepLink = document.getElementById("notif-deeplink")?.value || "home";
     const sendBtn = document.getElementById("btn-send-notif");
 
     if (!title || !body) {
@@ -281,7 +468,7 @@ async function sendPushNotification() {
     }
 
     const payload = {
-        app: "vikadrx",
+        app: selectedNotifApp || "vikadrx",
         title,
         body,
         imageUrl: uploadedNotifImageUrl || "",
@@ -293,9 +480,9 @@ async function sendPushNotification() {
     try {
         if (sendBtn) {
             sendBtn.disabled = true;
-            sendBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatching Notification...`;
+            sendBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatching to [${selectedNotifApp}]...`;
         }
-        toast("Dispatching push notification & updating in-app inboxes...", "info");
+        toast(`Dispatching push notification to [${selectedNotifApp}]...`, "info");
 
         const res = await api("/notifications/send", {
             method: "POST",
@@ -446,7 +633,7 @@ function renderNotificationHistoryTable(logs) {
                     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
                         ${l.app === 'vikadrx'
                             ? `<span class="badge" style="background:rgba(37,99,235,0.18);color:#93c5fd;border:1px solid rgba(37,99,235,0.35);font-size:10px">🏢 Vika DRX</span>`
-                            : `<span class="badge" style="background:rgba(234,179,8,0.18);color:#fde047;border:1px solid rgba(234,179,8,0.35);font-size:10px">🪙 Digi Gold</span>`}
+                            : `<span class="badge" style="background:rgba(234,179,8,0.18);color:#fde047;border:1px solid rgba(234,179,8,0.35);font-size:10px">🪙 VikaOne</span>`}
                         ${audienceBadge}
                     </div>
                     ${deepLinkPill}
@@ -490,6 +677,7 @@ async function deleteNotification(id) {
 }
 
 function loadNotificationPage() {
+    selectNotificationApp('vikadrx');
     selectNotificationTarget('all');
     updateNotificationPreview();
     loadNotificationHistory(1);

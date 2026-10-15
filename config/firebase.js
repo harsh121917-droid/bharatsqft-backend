@@ -133,6 +133,7 @@ module.exports = {
   sendFcmMessage: async ({ app = "vikadrx", tokens, topic, title, body, imageUrl, deepLink }) => {
     // Resolve app instance
     const targetApp = app === "digigold" ? "digigold" : "vikadrx";
+    const targetPackage = targetApp === "digigold" ? "com.payvika.vikaone" : "com.vikaone.vikadrx";
     let instance = targetApp === "digigold" ? initDigiGold() : initVikaDrx();
 
     const payload = {
@@ -147,15 +148,19 @@ module.exports = {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         deepLink: deepLink || "home",
         appSource: targetApp,
+        targetPackage,
+        schemeUri: targetApp === "digigold" ? `vikaone://${deepLink || "home"}` : `vikadrx://${deepLink || "home"}`,
         ...(imageUrl && { imageUrl, image: imageUrl }),
       },
       android: {
         priority: "high",
+        restrictedPackageName: targetPackage,
         notification: {
           title,
           body,
           sound: "default",
           channelId: "high_importance_channel",
+          clickAction: "FLUTTER_NOTIFICATION_CLICK",
           ...(imageUrl && { imageUrl }),
         },
       },

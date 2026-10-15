@@ -317,6 +317,7 @@ exports.sendSchemeEnrollmentReminder = async (req, res, next) => {
         let fcmResult = { success: true, sentCount: 0 };
         if (user.fcmTokens && user.fcmTokens.length > 0) {
             fcmResult = await sendFcmMessage({
+                app: "digigold",
                 tokens: user.fcmTokens,
                 title,
                 body,
@@ -325,6 +326,7 @@ exports.sendSchemeEnrollmentReminder = async (req, res, next) => {
         }
 
         await NotificationLog.create({
+            app: "digigold",
             title,
             body,
             deepLink,
@@ -370,6 +372,7 @@ exports.sendBulkSchemeReminders = async (req, res, next) => {
 
             if (user.fcmTokens && user.fcmTokens.length > 0) {
                 await sendFcmMessage({
+                    app: "digigold",
                     tokens: user.fcmTokens,
                     title,
                     body,
@@ -378,6 +381,7 @@ exports.sendBulkSchemeReminders = async (req, res, next) => {
             }
 
             await NotificationLog.create({
+                app: "digigold",
                 title,
                 body,
                 deepLink,

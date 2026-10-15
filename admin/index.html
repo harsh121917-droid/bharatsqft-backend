@@ -3155,15 +3155,15 @@
                     </div>
                 </div>
 
-                <!-- Real Estate Quick Templates Banner -->
+                <!-- Application & Templates Banner -->
                 <div style="background:linear-gradient(135deg, rgba(37,99,235,0.12), rgba(29,78,216,0.06));border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.5rem">
                     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
                         <div style="font-size:13px;font-weight:700;color:#93c5fd;display:flex;align-items:center;gap:6px">
-                            <i class="fas fa-magic"></i> <span>Vika DRX Quick Templates (1-Click Fill)</span>
+                            <i class="fas fa-magic"></i> <span id="notif-templates-title">Vika DRX Quick Templates (1-Click Fill)</span>
                         </div>
                         <span style="font-size:11px;color:var(--text-dim)">Click a template to auto-populate title, message & tap action</span>
                     </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <div id="notif-templates-container" style="display:flex;gap:8px;flex-wrap:wrap">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="applyNotifTemplate('estate')" style="background:rgba(37,99,235,0.18);border-color:rgba(37,99,235,0.4);color:#bfdbfe">
                             🏰 Pre-Launch Opportunity
                         </button>
@@ -3190,19 +3190,41 @@
                             <span id="notif-target-indicator" style="font-size:12px;color:#60a5fa;font-weight:600">Broadcast: All Customers</span>
                         </div>
 
+                        <!-- Target App Selector -->
+                        <div class="form-group">
+                            <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+                                <span>Target Application (Redirection App)</span>
+                                <span id="notif-selected-app-label" style="font-size:11px;font-weight:700;color:#93c5fd">🏢 Vika DRX (Real Estate)</span>
+                            </label>
+                            <div class="chart-pill-group" style="display:inline-flex;gap:4px">
+                                <button type="button" class="chart-pill-btn notif-app-pill active" id="notif-app-vikadrx"
+                                    data-app="vikadrx" onclick="selectNotificationApp('vikadrx')">
+                                    <i class="fas fa-building"></i> 🏢 Vika DRX
+                                </button>
+                                <button type="button" class="chart-pill-btn notif-app-pill" id="notif-app-digigold"
+                                    data-app="digigold" onclick="selectNotificationApp('digigold')">
+                                    <i class="fas fa-coins"></i> 🪙 VikaOne (DigiGold)
+                                </button>
+                                <button type="button" class="chart-pill-btn notif-app-pill" id="notif-app-both"
+                                    data-app="both" onclick="selectNotificationApp('both')">
+                                    <i class="fas fa-globe"></i> 🌐 Both Apps
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Target Audience Selector -->
                         <div class="form-group">
                             <label class="form-label">Target Audience</label>
                             <div class="chart-pill-group" style="display:inline-flex;gap:4px">
-                                <button class="chart-pill-btn notif-target-pill active" id="notif-target-all"
+                                <button type="button" class="chart-pill-btn notif-target-pill active" id="notif-target-all"
                                     data-target="all" onclick="selectNotificationTarget('all')">
                                     <i class="fas fa-bullhorn"></i> All Customers
                                 </button>
-                                <button class="chart-pill-btn notif-target-pill" id="notif-target-kyc"
+                                <button type="button" class="chart-pill-btn notif-target-pill" id="notif-target-kyc"
                                     data-target="kyc_verified" onclick="selectNotificationTarget('kyc')">
                                     <i class="fas fa-shield-alt"></i> KYC Verified Only
                                 </button>
-                                <button class="chart-pill-btn notif-target-pill" id="notif-target-single"
+                                <button type="button" class="chart-pill-btn notif-target-pill" id="notif-target-single"
                                     data-target="single" onclick="selectNotificationTarget('single')">
                                     <i class="fas fa-user-check"></i> Single Customer
                                 </button>
@@ -3280,16 +3302,16 @@
 
                     <!-- Live Mobile Preview -->
                     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center">
-                        <div style="font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem">
+                        <div id="notif-preview-device-title" style="font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem">
                             Vika DRX Mobile Lockscreen Preview
                         </div>
                         <div style="width:280px;background:#060B16;border:2px solid #1E2D4A;border-radius:24px;padding:16px 12px;box-shadow:0 12px 35px rgba(0,0,0,0.6)">
                             <div style="background:rgba(14,22,38,0.85);backdrop-filter:blur(8px);border-radius:14px;padding:12px;border:1px solid rgba(37,99,235,0.3)">
                                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                                    <div style="width:18px;height:18px;border-radius:5px;background:#2563EB;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">
+                                    <div id="notif-preview-app-icon" style="width:18px;height:18px;border-radius:5px;background:#2563EB;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">
                                         <i class="fas fa-building"></i>
                                     </div>
-                                    <span style="font-size:11.5px;font-weight:700;color:#EDF0FF">Vika DRX</span>
+                                    <span id="notif-preview-app-name" style="font-size:11.5px;font-weight:700;color:#EDF0FF">Vika DRX</span>
                                     <span style="font-size:10px;color:var(--text-dim);margin-left:auto">now</span>
                                 </div>
                                 <div id="notif-preview-title" style="font-weight:700;color:#fff;font-size:12.5px;line-height:1.3">
