@@ -950,6 +950,39 @@ exports.executeClientAction = async (req, res) => {
       }
     }
 
+    if (action === 'UPDATE_BANK') {
+      try {
+        const bankPayload = {
+          client_code: clientCode,
+          action_type: 'ADD',
+          account_type: req.body.accountType || 'SB',
+          account_no: req.body.accountNo,
+          micr_no: req.body.micr || '',
+          ifsc_code: req.body.ifsc,
+          default_bank_flag: 'Y',
+        };
+        result.bankUpdate = await nseClient.updateClientBankDetail([bankPayload]);
+
+        // If update succeeded, sync to DB as well
+        if (result.bankUpdate?.success) {
+          const MfClientUcc = require('../models/MfClientUcc');
+          await MfClientUcc.findOneAndUpdate(
+            { clientCode },
+            {
+              $set: {
+                'primaryBank.accountNo': req.body.accountNo,
+                'primaryBank.ifsc': req.body.ifsc,
+                'primaryBank.bankName': req.body.bankName || 'Updated Primary Bank',
+                'primaryBank.accountType': req.body.accountType || 'SB',
+              },
+            }
+          );
+        }
+      } catch (bErr) {
+        result.bankUpdate = { error: bErr.message };
+      }
+    }
+
     return res.json({
       success: true,
       message: `Executed action ${action} for client ${clientCode}`,

@@ -136,6 +136,26 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('CLIENTBANKDTL')) {
+      const bankDtl = payload.bank_dtl || [];
+      return {
+        success: true,
+        status: 200,
+        data: {
+          bank_dtl: bankDtl.map((b) => ({
+            client_code: b.client_code,
+            action_type: b.action_type || 'ADD',
+            account_type: b.account_type || 'SB',
+            account_no: b.account_no,
+            micr_no: b.micr_no || '',
+            ifsc_code: b.ifsc_code,
+            status: 'SUCCESS',
+            error_remark: '',
+          })),
+        },
+      };
+    }
+
     if (endpoint.includes('FATCA')) {
       return {
         success: true,
@@ -644,6 +664,14 @@ class NseClient {
   // ── 20. eLOG Upload API (Doc page 95) ──
   async uploadElog(elogData) {
     return this.post('/nsemfdesk/api/v2/registration/eLOG', elogData);
+  }
+
+  // ── 21. Client Bank Detail API (ADD/DEL - Doc page 59) ──
+  async updateClientBankDetail(bankData) {
+    const list = Array.isArray(bankData) ? bankData : [bankData];
+    return this.post('/nsemfdesk/api/v2/registration/CLIENTBANKDTL', {
+      bank_dtl: list,
+    });
   }
 }
 

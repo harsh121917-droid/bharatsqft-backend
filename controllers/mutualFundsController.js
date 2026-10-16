@@ -3673,6 +3673,81 @@ exports.getMandateDetail = async (req, res) => {
   }
 };
 
+// ── 19d. POST /api/mutual-funds/ucc/bank/update ──
+exports.updateUserBank = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { accountNo, ifsc, bankName = 'Primary Bank', accountType = 'SB' } = req.body;
+
+    if (!accountNo || !ifsc) {
+      return res.status(400).json({ success: false, message: 'accountNo and ifsc are required' });
+    }
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(404).json({ success: false, message: 'Investor UCC profile not found' });
+    }
+
+    // Call NSE CLIENTBANKDTL
+    let nseBankRes = null;
+    if (!nseClient.isMockMode()) {
+      const bankPayload = {
+        client_code: ucc.clientCode,
+        action_type: 'ADD',
+        account_type: accountType,
+        account_no: String(accountNo).trim(),
+        micr_no: '',
+        ifsc_code: String(ifsc).trim().toUpperCase(),
+        default_bank_flag: 'Y',
+      };
+      nseBankRes = await nseClient.updateClientBankDetail([bankPayload]);
+    } else {
+      nseBankRes = { success: true, status: 200, data: { status: 'SUCCESS' } };
+    }
+
+    // Update UCC primaryBank in DB
+    ucc.primaryBank = {
+      accountNo: String(accountNo).trim(),
+      ifsc: String(ifsc).trim().toUpperCase(),
+      bankName,
+      accountType,
+    };
+    await ucc.save();
+
+    // Also update BankAccount model
+    try {
+      const BankAccount = require('../models/BankAccount');
+      await BankAccount.findOneAndUpdate(
+        { user: userId, accountNumber: String(accountNo).trim() },
+        {
+          $set: {
+            bankName,
+            accountNumber: String(accountNo).trim(),
+            ifscCode: String(ifsc).trim().toUpperCase(),
+            accountHolder: ucc.fullName,
+            isVerified: true,
+            verificationSource: 'USER_CONFIRMED',
+          },
+        },
+        { upsert: true, new: true }
+      );
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: 'Bank account updated successfully with NSE exchange',
+      data: {
+        clientCode: ucc.clientCode,
+        primaryBank: ucc.primaryBank,
+        nseResponse: nseBankRes?.data || nseBankRes,
+      },
+    });
+  } catch (error) {
+    console.error('[updateUserBank Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 20. POST /api/mutual-funds/pan/verify (Groww-style PAN Verification via NSE MFSS & KRA) ──
 exports.verifyPanDetails = async (req, res) => {
   try {
