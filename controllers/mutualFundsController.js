@@ -22,6 +22,7 @@ const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
+const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const STATE_CODE_MAP = {
   'ANDAMAN & NICOBAR': 'AN', 'ANDAMAN AND NICOBAR': 'AN', 'AN': 'AN',
   'ANDHRA PRADESH': 'AP', 'AP': 'AP',
@@ -3364,27 +3365,50 @@ exports.setupUserMandate = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please complete your investor profile (UCC) first.' });
     }
 
-    const { amount = 50000 } = req.body;
-    let mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
+    const { amount = 50000, forceNew = false } = req.body;
+    let mandate = null;
+
+    if (!forceNew) {
+      mandate = await MfMandate.findOne({
+        user: userId,
+        accountNo: ucc.primaryBank?.accountNo,
+        status: { $in: ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'PENDING_AUTH'] },
+      }).sort({ createdAt: -1 });
+    }
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
 
-    if (!mandate) {
+    if (!mandate || !mandate.authLink) {
       let mandateId = null;
       let authLink = null;
+      let rawResponse = null;
 
       if (!nseClient.isMockMode()) {
-        const nseRes = await nseClient.registerMandate([
-          {
-            client_code: ucc.clientCode,
-            mandate_type: 'E',
-            amount: String(amount),
-            acc_no: ucc.primaryBank?.accountNo,
-            ifsc_code: ucc.primaryBank?.ifsc,
-          },
-        ]);
+        const now = new Date();
+        const startDay = String(now.getDate()).padStart(2, '0');
+        const startMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const startYear = now.getFullYear();
+        const startDate = `${startDay}/${startMonth}/${startYear}`;
+        const endDate = '31/12/2050';
+        const memberMandateNo = `MND${Date.now().toString().slice(-10)}`;
+
+        const mandatePayload = {
+          client_code: ucc.clientCode,
+          amount: String(amount),
+          mandate_type: 'E',
+          account_no: ucc.primaryBank?.accountNo,
+          ac_type: ucc.primaryBank?.accountType || 'SB',
+          ifsc_code: ucc.primaryBank?.ifsc,
+          start_date: startDate,
+          end_date: endDate,
+          member_mandate_no: memberMandateNo,
+        };
+
+        const nseRes = await nseClient.registerMandate([mandatePayload]);
+        rawResponse = nseRes?.data || nseRes;
         const regItem = nseRes?.data?.reg_data?.[0];
         const liveMandateId = regItem?.mandate_id || regItem?.reg_id;
+
         if (!nseRes?.success || !liveMandateId || regItem?.reg_status === 'REG_FAILED') {
           const errMsg = regItem?.reg_remark || nseRes?.data?.message || 'NSE Exchange rejected mandate registration';
           return res.status(400).json({
@@ -3393,9 +3417,11 @@ exports.setupUserMandate = async (req, res) => {
             data: {
               status: regItem?.reg_status || 'FAILED',
               remark: regItem?.reg_remark || '',
+              exchangeDetails: regItem || nseRes?.data || null,
             },
           });
         }
+
         mandateId = String(liveMandateId);
         try {
           const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
@@ -3406,6 +3432,10 @@ exports.setupUserMandate = async (req, res) => {
       } else {
         mandateId = `TEST_MND_${Date.now()}`;
         authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
+      }
+
+      if (!authLink) {
+        authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=mandate_auth`;
       }
 
       mandate = await MfMandate.create({
@@ -3419,6 +3449,7 @@ exports.setupUserMandate = async (req, res) => {
         bankName: ucc.primaryBank?.bankName || '',
         status: 'PENDING_AUTH',
         authLink,
+        rawResponse,
       });
 
       ucc.defaultMandateId = mandate.mandateId;
@@ -3461,7 +3492,33 @@ exports.verifyUserMandate = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mandate record not found' });
     }
 
-    mandate.status = 'APPROVED';
+    let liveStatus = null;
+    let liveUmrn = null;
+    if (!nseClient.isMockMode()) {
+      try {
+        const statusRes = await nseClient.getMandateStatus({
+          mandateId: mandate.mandateId,
+          clientCode: mandate.clientCode,
+        });
+        const reportItem = statusRes?.data?.report_data?.[0];
+        if (reportItem) {
+          liveStatus = reportItem.status;
+          liveUmrn = reportItem.umrnNo;
+        }
+      } catch (_) {}
+    }
+
+    const newStatus = (liveStatus === 'APPROVED' || liveStatus === 'ACCEPTED_BY_BANK')
+      ? 'APPROVED'
+      : (req.body?.status || 'APPROVED');
+
+    mandate.status = newStatus;
+    if (liveUmrn || req.body?.umrn) {
+      mandate.umrn = (liveUmrn || req.body?.umrn).trim();
+    } else if (!mandate.umrn) {
+      mandate.umrn = `BKID${Date.now().toString().slice(-8)}`;
+    }
+    mandate.authorizedAt = new Date();
     await mandate.save();
 
     const ucc = await MfClientUcc.findOne({ user: userId });

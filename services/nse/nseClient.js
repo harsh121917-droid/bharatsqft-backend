@@ -136,7 +136,28 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('MANDATE_STATUS')) {
+      const mandateId = payload.mandate_id || `MND_TEST_${timestamp}`;
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              mandateId,
+              clientCode: payload.client_code || 'VK123456',
+              status: 'APPROVED',
+              umrnNo: `UMRN${timestamp}`,
+            },
+          ],
+        },
+      };
+    }
+
     if (endpoint.includes('MANDATE')) {
+      const mockMndId = `MND_TEST_${timestamp}`;
       return {
         success: true,
         status: 200,
@@ -145,8 +166,11 @@ class NseClient {
           message: 'Mandate registered successfully in Sandbox Mode',
           reg_data: [
             {
-              mandate_id: `MND_TEST_${timestamp}`,
+              mandate_id: mockMndId,
+              reg_id: mockMndId,
               status: 'SUCCESS',
+              reg_status: 'REG_SUCCESS',
+              reg_remark: '',
             },
           ],
         },
@@ -398,6 +422,17 @@ class NseClient {
     return this.post('/nsemfdesk/api/v2/registration/product/MANDATE', {
       reg_data: list,
     });
+  }
+
+  // ── 7b. Mandate Status Report (Doc page 70) ──
+  async getMandateStatus(filter = {}) {
+    const payload = {};
+    if (filter.mandateId) payload.mandate_id = String(filter.mandateId);
+    if (filter.clientCode) payload.client_code = filter.clientCode;
+    if (filter.fromDate) payload.from_date = filter.fromDate;
+    if (filter.toDate) payload.to_date = filter.toDate;
+    if (filter.memberMandateIds) payload.memberMandateIds = filter.memberMandateIds;
+    return this.post('/nsemfdesk/api/v2/reports/MANDATE_STATUS', payload);
   }
 
   // ── 8. Purchase Order Payment Execution ──

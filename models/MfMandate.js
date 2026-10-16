@@ -62,6 +62,9 @@ const MfMandateSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    rawResponse: {
+      type: mongoose.Schema.Types.Mixed,
+    },
   },
   { timestamps: true }
 );
