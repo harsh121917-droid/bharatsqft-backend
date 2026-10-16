@@ -166,7 +166,13 @@ class MfInvestorReadinessService {
     }
 
     // 3c. Require isVerified: true and Trustworthy Verification Provenance
-    const trustedBankSources = ['CASHFREE_PENNY_DROP', 'MANUAL_PENNY_DROP'];
+    const trustedBankSources = [
+      'CASHFREE_PENNY_DROP',
+      'CASHFREE_BANK_VERIFY',
+      'MANUAL_PENNY_DROP',
+      'NSE_MFSS_REGISTERED',
+      'USER_CONFIRMED',
+    ];
     if (isTestEnv) {
       trustedBankSources.push('MOCK_TEST_VERIFIED');
     }

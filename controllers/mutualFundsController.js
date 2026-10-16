@@ -1329,7 +1329,7 @@ exports.createPurchaseOrder = async (req, res) => {
     const orderId = `MFP${Date.now()}`;
     const user = await User.findById(userId);
 
-    // 1. Prepare NSE Order payload (Order Entry PUR)
+    // 1. Prepare NSE Order payload (Order Entry PUR - NNF v1.9.8 Doc page 8-9)
     const nseOrderPayload = {
       order_ref_number: orderId,
       scheme_code: targetNseCode,
@@ -1341,13 +1341,20 @@ exports.createPurchaseOrder = async (req, res) => {
       folio_no: folioNo,
       remarks: 'Invested via GoldVikaone',
       kyc_flag: 'Y',
+      sub_broker_code: '',
+      euin_number: '',
       euin_declaration: 'N',
+      min_redemption_flag: 'N',
       dpc_flag: 'Y',
       all_units: 'N',
+      redemption_units: '',
+      sub_broker_arn: '',
       bank_ref_no: '',
-      account_no: ucc.primaryBank.accountNo,
+      account_no: ucc.primaryBank?.accountNo || '',
       mobile_no: user.phone?.slice(-10) || '',
       email: user.email,
+      mandate_id: '',
+      filler1: '',
       member_unique_id: orderId,
     };
 
