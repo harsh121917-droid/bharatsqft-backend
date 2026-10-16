@@ -38,6 +38,8 @@ const {
   verifyPanDetails,
   setupUserMandate,
   verifyUserMandate,
+  getMyMandates,
+  getMandateDetail,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -54,6 +56,8 @@ router.use(protect);
 
 router.post('/pan/verify', verifyPanDetails);
 router.get('/onboarding-status', getOnboardingStatus);
+router.get('/mandates/my', getMyMandates);
+router.get('/mandates/:id', getMandateDetail);
 router.post('/mandates/setup', setupUserMandate);
 router.post('/mandates/:id/verify', verifyUserMandate);
 router.get('/ucc/me', getUserUcc);

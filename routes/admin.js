@@ -210,6 +210,7 @@ router.post("/mutual-funds/clean-all", adminMfController.cleanAllMfData);
 router.get("/mutual-funds/nse-config", adminMfController.getNseConfig);
 router.post("/mutual-funds/nse-config", adminMfController.updateNseConfig);
 router.post("/mutual-funds/nse-health-check", adminMfController.testNseConnection);
+router.post("/mutual-funds/client-action", adminMfController.executeClientAction);
 
 // Mandate (eNACH / AutoPay) Management
 router.get("/mutual-funds/mandates", adminMfController.getMfMandates);

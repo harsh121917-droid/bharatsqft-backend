@@ -3406,20 +3406,122 @@ exports.setupUserMandate = async (req, res) => {
 
         const nseRes = await nseClient.registerMandate([mandatePayload]);
         rawResponse = nseRes?.data || nseRes;
-        const regItem = nseRes?.data?.reg_data?.[0];
-        const liveMandateId = regItem?.mandate_id || regItem?.reg_id;
+        let liveMandateId = regItem?.mandate_id || regItem?.reg_id;
+        let clActLink = null;
 
         if (!nseRes?.success || !liveMandateId || regItem?.reg_status === 'REG_FAILED') {
           const errMsg = regItem?.reg_remark || nseRes?.data?.message || 'NSE Exchange rejected mandate registration';
-          return res.status(400).json({
-            success: false,
-            message: `NSE MFSS Mandate: ${errMsg}`,
-            data: {
-              status: regItem?.reg_status || 'FAILED',
-              remark: regItem?.reg_remark || '',
-              exchangeDetails: regItem || nseRes?.data || null,
-            },
-          });
+
+          // Auto-remediation for INACTIVE client code (FATCA & CL_ACT)
+          if (errMsg.toUpperCase().includes('INACTIVE')) {
+            console.log(`[setupUserMandate] Client ${ucc.clientCode} is INACTIVE on NSE. Attempting FATCA upload & CL_ACT link fetch...`);
+
+            // 1. Submit FATCA
+            try {
+              const fatcaPayload = {
+                pan_rp: ucc.pan,
+                pekrn: '',
+                inv_name: ucc.fullName,
+                dob: ucc.dob,
+                fr_name: '',
+                sp_name: '',
+                tax_status: ucc.taxStatus || '01',
+                data_src: 'E',
+                addr_type: '1',
+                po_bir_inc: ucc.address?.city || 'Mumbai',
+                co_bir_inc: 'IN',
+                tax_res1: 'IN',
+                tpin1: ucc.pan,
+                id1_type: 'C',
+                tax_res2: '',
+                tpin2: '',
+                id2_type: '',
+                tax_res3: '',
+                tpin3: '',
+                id3_type: '',
+                tax_res4: '',
+                tpin4: '',
+                id4_type: '',
+                srce_wealt: '01',
+                corp_servs: '',
+                inc_slab: '31',
+                net_worth: '',
+                nw_date: '',
+                pep_flag: 'N',
+                occ_code: ucc.occupationCode || '01',
+                occ_type: 'B',
+                exemp_code: '',
+                ffi_drnfe: '',
+                giin_no: '',
+                spr_entity: '',
+                giin_na: '',
+                giin_exemc: '',
+                nffe_catg: '',
+                act_nfe_sc: '',
+                nature_bus: '',
+                rel_listed: '',
+                exch_name: 'O',
+                ubo_appl: 'N',
+                ubo_count: '',
+                sdf_flag: 'Y',
+                ubo_df: 'N',
+                aadhaar_rp: '',
+                new_change: 'N',
+                log_name: ucc.fullName,
+                filler1: '',
+                filler2: '',
+              };
+              const fatcaRes = await nseClient.uploadFatca([fatcaPayload]);
+              console.log('[setupUserMandate] FATCA upload response:', JSON.stringify(fatcaRes));
+              if (fatcaRes?.success) {
+                ucc.fatcaUploaded = true;
+                await ucc.save();
+              }
+            } catch (fErr) {
+              console.error('[setupUserMandate] FATCA upload exception:', fErr.message);
+            }
+
+            // 2. Fetch UCC Registration Authorization link (CL_ACT)
+            try {
+              const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
+              if (linkRes?.success && linkRes?.data?.firstHolderLink) {
+                clActLink = linkRes.data.firstHolderLink;
+              }
+            } catch (_) {}
+
+            // 3. Trigger RESEND_COMM to dispatch SMS/Email OTP to investor
+            try {
+              await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+            } catch (_) {}
+
+            // 4. Retry Mandate Registration in case FATCA upload activated the client
+            try {
+              const retryRes = await nseClient.registerMandate([mandatePayload]);
+              const retryRegItem = retryRes?.data?.reg_data?.[0];
+              const retryLiveMandateId = retryRegItem?.mandate_id || retryRegItem?.reg_id;
+              if (retryRes?.success && retryLiveMandateId && retryRegItem?.reg_status !== 'REG_FAILED') {
+                liveMandateId = String(retryLiveMandateId);
+                rawResponse = retryRes?.data || retryRes;
+              }
+            } catch (_) {}
+          }
+
+          if (!liveMandateId) {
+            return res.status(400).json({
+              success: false,
+              code: errMsg.toUpperCase().includes('INACTIVE') ? 'NSE_CLIENT_ACTIVATION_PENDING' : 'NSE_MANDATE_REJECTED',
+              message: errMsg.toUpperCase().includes('INACTIVE')
+                ? 'Your UCC was registered on NSE and is awaiting client activation. Please complete the one-time OTP verification sent to your mobile/email.'
+                : `NSE MFSS Mandate: ${errMsg}`,
+              data: {
+                status: regItem?.reg_status || 'FAILED',
+                remark: regItem?.reg_remark || '',
+                exchangeDetails: regItem || nseRes?.data || null,
+                clientCode: ucc.clientCode,
+                clActLink: clActLink || null,
+              },
+            });
+          }
         }
 
         mandateId = String(liveMandateId);
@@ -3538,6 +3640,38 @@ exports.verifyUserMandate = async (req, res) => {
   }
 };
 
+// ── 19b. GET /api/mutual-funds/mandates/my ──
+exports.getMyMandates = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const mandates = await MfMandate.find({ user: userId }).sort({ createdAt: -1 });
+    return res.json({
+      success: true,
+      data: mandates,
+    });
+  } catch (error) {
+    console.error('[getMyMandates Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 19c. GET /api/mutual-funds/mandates/:id ──
+exports.getMandateDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const mandate = await MfMandate.findOne({
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { mandateId: id }],
+      user: userId,
+    });
+    if (!mandate) {
+      return res.status(404).json({ success: false, message: 'Mandate record not found' });
+    }
+    return res.json({ success: true, data: mandate });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 // ── 20. POST /api/mutual-funds/pan/verify (Groww-style PAN Verification via NSE MFSS & KRA) ──
 exports.verifyPanDetails = async (req, res) => {

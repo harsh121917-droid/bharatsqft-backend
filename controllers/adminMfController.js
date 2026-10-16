@@ -796,6 +796,171 @@ exports.testNseConnection = async (req, res) => {
   }
 };
 
+// ── 11b. POST /api/admin/mutual-funds/client-action ──
+exports.executeClientAction = async (req, res) => {
+  try {
+    const { action = 'RUN_ALL_STEP2', clientCode = 'VK766957', pan = 'BNWPS7663F', name = 'VIKAS SAINI' } = req.body;
+
+    const result = {
+      action,
+      clientCode,
+      pan,
+      name,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (action === 'FATCA' || action === 'RUN_ALL_STEP2') {
+      try {
+        const fatcaPayload = {
+          pan_rp: pan,
+          pekrn: '',
+          inv_name: name,
+          dob: '12/10/1991',
+          fr_name: '',
+          sp_name: '',
+          tax_status: '01',
+          data_src: 'E',
+          addr_type: '1',
+          po_bir_inc: 'Mumbai',
+          co_bir_inc: 'IN',
+          tax_res1: 'IN',
+          tpin1: pan,
+          id1_type: 'C',
+          tax_res2: '',
+          tpin2: '',
+          id2_type: '',
+          tax_res3: '',
+          tpin3: '',
+          id3_type: '',
+          tax_res4: '',
+          tpin4: '',
+          id4_type: '',
+          srce_wealt: '01',
+          corp_servs: '',
+          inc_slab: '31',
+          net_worth: '',
+          nw_date: '',
+          pep_flag: 'N',
+          occ_code: '01',
+          occ_type: 'B',
+          exemp_code: '',
+          ffi_drnfe: '',
+          giin_no: '',
+          spr_entity: '',
+          giin_na: '',
+          giin_exemc: '',
+          nffe_catg: '',
+          act_nfe_sc: '',
+          nature_bus: '',
+          rel_listed: '',
+          exch_name: 'O',
+          ubo_appl: 'N',
+          ubo_count: '',
+          sdf_flag: 'Y',
+          ubo_df: 'N',
+          aadhaar_rp: '',
+          new_change: 'N',
+          log_name: name,
+          filler1: '',
+          filler2: '',
+        };
+        result.fatca = await nseClient.uploadFatca([fatcaPayload]);
+      } catch (fErr) {
+        result.fatca = { error: fErr.message };
+      }
+    }
+
+    if (action === 'CL_ACT' || action === 'RUN_ALL_STEP2') {
+      try {
+        result.clActLink = await nseClient.getShortLink('CL_ACT', clientCode);
+      } catch (lErr) {
+        result.clActLink = { error: lErr.message };
+      }
+    }
+
+    if (action === 'RESEND_COMM' || action === 'RUN_ALL_STEP2') {
+      try {
+        result.resendComm = await nseClient.resendCommunication('CL_ACT', clientCode);
+      } catch (rErr) {
+        result.resendComm = { error: rErr.message };
+      }
+    }
+
+    if (action === 'CLIENT_DETAIL' || action === 'RUN_ALL_STEP2') {
+      try {
+        const now = new Date();
+        const toDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        const past = new Date(Date.now() - 6 * 24 * 3600 * 1000);
+        const fromDate = `${String(past.getDate()).padStart(2, '0')}-${String(past.getMonth() + 1).padStart(2, '0')}-${past.getFullYear()}`;
+        result.clientDetail = await nseClient.getClientDetailReport({
+          clientCode,
+          fromDate,
+          toDate,
+          authStatus: 'PENDING',
+        });
+      } catch (cdErr) {
+        result.clientDetail = { error: cdErr.message };
+      }
+    }
+
+    if (action === 'CLIENT_AUTH' || action === 'RUN_ALL_STEP2') {
+      try {
+        const now = new Date();
+        const toDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        const past = new Date(Date.now() - 6 * 24 * 3600 * 1000);
+        const fromDate = `${String(past.getDate()).padStart(2, '0')}-${String(past.getMonth() + 1).padStart(2, '0')}-${past.getFullYear()}`;
+        result.clientAuth = await nseClient.getClientAuthorizationReport({
+          clientCode,
+          fromDate,
+          toDate,
+        });
+      } catch (caErr) {
+        result.clientAuth = { error: caErr.message };
+      }
+    }
+
+    if (action === 'MANDATE_SETUP' || action === 'RUN_ALL_STEP2') {
+      try {
+        const now = new Date();
+        const startDay = String(now.getDate()).padStart(2, '0');
+        const startMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const startYear = now.getFullYear();
+        const startDate = `${startDay}/${startMonth}/${startYear}`;
+        const memberMandateNo = `MND${Date.now().toString().slice(-10)}`;
+
+        const mandatePayload = {
+          client_code: clientCode,
+          amount: String(req.body.amount || 50000),
+          mandate_type: 'E',
+          account_no: req.body.accountNo || '123654852125',
+          ac_type: req.body.accountType || 'SB',
+          ifsc_code: req.body.ifsc || 'BKID0001400',
+          start_date: startDate,
+          end_date: '31/12/2050',
+          member_mandate_no: memberMandateNo,
+        };
+        result.mandateSetup = await nseClient.registerMandate([mandatePayload]);
+        const regItem = result.mandateSetup?.data?.reg_data?.[0];
+        const mndId = regItem?.mandate_id || regItem?.reg_id;
+        if (mndId) {
+          result.mandateAuthLink = await nseClient.getShortLink('MANDATE_AUTH', mndId).catch(e => ({ error: e.message }));
+        }
+      } catch (mErr) {
+        result.mandateSetup = { error: mErr.message };
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Executed action ${action} for client ${clientCode}`,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[executeClientAction Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 12. GET /api/admin/mutual-funds/mandates ──
 exports.getMfMandates = async (req, res) => {
   try {

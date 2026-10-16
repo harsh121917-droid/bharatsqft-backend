@@ -136,6 +136,91 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('FATCA')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          status: '100',
+          message: 'FATCA uploaded successfully in Sandbox Mode',
+          reg_details: [
+            {
+              pan_rp: payload.reg_details?.[0]?.pan_rp || 'BNWPS7663F',
+              reg_id: `FATCA_${timestamp}`,
+              reg_status: 'REG_SUCCESS',
+              reg_remark: '',
+            },
+          ],
+        },
+      };
+    }
+
+    if (endpoint.includes('RESEND_COMM')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          productType: payload.productType || 'CL_ACT',
+          productRefId: payload.productRefId || 'VK766957',
+          response_status: 'S',
+          error_remark: '',
+        },
+      };
+    }
+
+    if (endpoint.includes('CLIENT_DETAIL_REPORT')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              client_code: payload.client_code || 'VK766957',
+              member_code: this.memberCode || '1031616',
+              ucc_status: 'Active',
+              ucc_remediation: '',
+              auth_status: 'SUCCESS',
+              auth_email_sent: 'Y',
+              bank1_status: 'ACTIVE',
+            },
+          ],
+        },
+      };
+    }
+
+    if (endpoint.includes('client_authorization')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              client_code: payload.client_code || 'VK766957',
+              member_code: this.memberCode || '1031616',
+              auth_status: 'SUCCESS',
+              auth_email_sent: 'Y',
+              first_holder_auth_status: 'SUCCESS',
+            },
+          ],
+        },
+      };
+    }
+
+    if (endpoint.includes('eLOG')) {
+      return {
+        success: true,
+        status: 200,
+        data: {
+          elog_status: '100',
+          elog_status_message: 'eLog Uploaded Successfully in Sandbox Mode',
+        },
+      };
+    }
+
     if (endpoint.includes('MANDATE_STATUS')) {
       const mandateId = payload.mandate_id || `MND_TEST_${timestamp}`;
       return {
@@ -513,10 +598,52 @@ class NseClient {
         {
           client_code: clientCode,
           xsip_reg_no: String(xsipRegNo),
-          remarks,
         },
       ],
     });
+  }
+
+  // ── 16. FATCA Upload (For Individual Only - Doc page 75) ──
+  async uploadFatca(fatcaData) {
+    const list = Array.isArray(fatcaData) ? fatcaData : [fatcaData];
+    return this.post('/nsemfdesk/api/v2/registration/FATCA', {
+      reg_details: list,
+    });
+  }
+
+  // ── 17. Resend Communication API (Doc page 73) ──
+  async resendCommunication(productType, productRefId) {
+    return this.post('/nsemfdesk/api/v2/registration/RESEND_COMM', {
+      productType, // 'CL_ACT', 'MANDATE_AUTH', 'PUR', etc.
+      productRefId: String(productRefId),
+    });
+  }
+
+  // ── 18. Client Detail Report API (Doc page 125) ──
+  async getClientDetailReport({ clientCode = '', fromDate = '', toDate = '', authStatus = 'PENDING', dateType = 'MODIFIED_DATE' } = {}) {
+    const payload = {};
+    if (clientCode) payload.client_code = clientCode;
+    if (fromDate) payload.from_date = fromDate;
+    if (toDate) payload.to_date = toDate;
+    if (authStatus) payload.auth_status = authStatus;
+    if (dateType) payload.date_type = dateType;
+    return this.post('/nsemfdesk/api/v2/reports/CLIENT_DETAIL_REPORT', payload);
+  }
+
+  // ── 19. Client Authorization Report API (Doc page 123) ──
+  async getClientAuthorizationReport({ clientCode = '', fromDate = '', toDate = '', authStatus = '', dateType = 'AUTH_SENT_DATE' } = {}) {
+    const payload = {};
+    if (clientCode) payload.client_code = clientCode;
+    if (fromDate) payload.from_date = fromDate;
+    if (toDate) payload.to_date = toDate;
+    if (authStatus) payload.auth_status = authStatus;
+    if (dateType) payload.date_type = dateType;
+    return this.post('/nsemfdesk/api/v2/reports/client_authorization', payload);
+  }
+
+  // ── 20. eLOG Upload API (Doc page 95) ──
+  async uploadElog(elogData) {
+    return this.post('/nsemfdesk/api/v2/registration/eLOG', elogData);
   }
 }
 

@@ -36,6 +36,8 @@ async function runStep2MandateVerification() {
   const memberCode = process.env.NSE_MEMBER_CODE || '1031616';
   const userId = process.env.NSE_LOGIN_USER_ID || 'ADMIN';
   const clientCode = process.env.TEST_CLIENT_CODE || 'VK766957';
+  const pan = process.env.TEST_PAN || 'BNWPS7663F';
+  const name = process.env.TEST_NAME || 'VIKAS SAINI';
   const accountNo = process.env.TEST_ACCOUNT_NO || '123654852125';
   const ifscCode = process.env.TEST_IFSC || 'BKID0001400';
   const amount = process.env.TEST_AMOUNT || '50000';
@@ -45,6 +47,7 @@ async function runStep2MandateVerification() {
   console.log(`   • Member Code:           ${memberCode}`);
   console.log(`   • User ID:               ${userId}`);
   console.log(`   • Client Code (UCC):     ${clientCode}`);
+  console.log(`   • Investor Name & PAN:   ${name} (${pan})`);
   console.log(`   • Bank Account:          ${accountNo} (${ifscCode})`);
   console.log(`   • Mandate Amount Limit:  ₹${amount}`);
 
@@ -56,9 +59,130 @@ async function runStep2MandateVerification() {
     console.log('   • Current Outbound IP:   Unable to resolve');
   }
 
-  // 2. Prepare Mandate Payload
-  console.log('\n2. Preparing Official Mandate Registration Payload (NNF v1.9.8 Doc page 61):');
+  // 2. Query Client Detail Report (Check Current UCC & Remediation Status)
+  console.log('\n2. Checking Live Client Detail Report (/nsemfdesk/api/v2/reports/CLIENT_DETAIL_REPORT):');
   const now = new Date();
+  const toDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+  const past = new Date(Date.now() - 6 * 24 * 3600 * 1000);
+  const fromDate = `${String(past.getDate()).padStart(2, '0')}-${String(past.getMonth() + 1).padStart(2, '0')}-${past.getFullYear()}`;
+
+  try {
+    const detailRes = await nseClient.getClientDetailReport({
+      clientCode,
+      fromDate,
+      toDate,
+      authStatus: 'PENDING',
+    });
+    console.log('   • Client Detail Report Response:');
+    console.log(JSON.stringify(detailRes, null, 2));
+
+    const item = detailRes?.data?.report_data?.[0];
+    if (item) {
+      console.log(`   • UCC Status:            ${item.ucc_status || 'UNKNOWN'}`);
+      console.log(`   • UCC Remediation:       ${item.ucc_remediation || 'NONE'}`);
+      console.log(`   • Auth Status:           ${item.auth_status || 'PENDING'}`);
+      console.log(`   • Bank 1 Status:         ${item.bank1_status || 'UNKNOWN'}`);
+    }
+  } catch (err) {
+    console.log('   ⚠️ Client Detail Report query error:', err.message);
+  }
+
+  // 3. Ensure FATCA Uploaded (NNF v1.9.8 Doc page 75)
+  console.log('\n3. Submitting FATCA Declaration (/nsemfdesk/api/v2/registration/FATCA):');
+  const fatcaPayload = {
+    pan_rp: pan,
+    pekrn: '',
+    inv_name: name,
+    dob: '12/10/1991',
+    fr_name: '',
+    sp_name: '',
+    tax_status: '01',
+    data_src: 'E',
+    addr_type: '1',
+    po_bir_inc: 'Mumbai',
+    co_bir_inc: 'IN',
+    tax_res1: 'IN',
+    tpin1: pan,
+    id1_type: 'C',
+    tax_res2: '',
+    tpin2: '',
+    id2_type: '',
+    tax_res3: '',
+    tpin3: '',
+    id3_type: '',
+    tax_res4: '',
+    tpin4: '',
+    id4_type: '',
+    srce_wealt: '01',
+    corp_servs: '',
+    inc_slab: '31',
+    net_worth: '',
+    nw_date: '',
+    pep_flag: 'N',
+    occ_code: '01',
+    occ_type: 'B',
+    exemp_code: '',
+    ffi_drnfe: '',
+    giin_no: '',
+    spr_entity: '',
+    giin_na: '',
+    giin_exemc: '',
+    nffe_catg: '',
+    act_nfe_sc: '',
+    nature_bus: '',
+    rel_listed: '',
+    exch_name: 'O',
+    ubo_appl: 'N',
+    ubo_count: '',
+    sdf_flag: 'Y',
+    ubo_df: 'N',
+    aadhaar_rp: '',
+    new_change: 'N',
+    log_name: name,
+    filler1: '',
+    filler2: '',
+  };
+
+  try {
+    const fatcaRes = await nseClient.uploadFatca([fatcaPayload]);
+    console.log('   • FATCA Upload Response:');
+    console.log(JSON.stringify(fatcaRes, null, 2));
+    const fatcaItem = fatcaRes?.data?.reg_details?.[0];
+    if (fatcaRes?.success && (fatcaItem?.reg_status === 'REG_SUCCESS' || !isLive)) {
+      console.log(`   ✅ FATCA Registered Successfully! Reg ID: ${fatcaItem?.reg_id || 'OK'}`);
+    } else {
+      console.log(`   ℹ️ FATCA Response: ${fatcaItem?.reg_status} (${fatcaItem?.reg_remark || fatcaRes?.data?.message || ''})`);
+    }
+  } catch (fErr) {
+    console.error('   ❌ FATCA Upload Exception:', fErr.message);
+  }
+
+  // 4. Generate UCC Client Activation Link & Trigger SMS (CL_ACT)
+  console.log('\n4. Fetching UCC Client Activation Link (GET_LINK: CL_ACT):');
+  try {
+    const clActRes = await nseClient.getShortLink('CL_ACT', clientCode);
+    console.log('   • CL_ACT Response:');
+    console.log(JSON.stringify(clActRes, null, 2));
+    if (clActRes?.success && clActRes?.data?.firstHolderLink) {
+      console.log(`   🔗 Investor UCC Activation URL: ${clActRes.data.firstHolderLink}`);
+    }
+  } catch (clErr) {
+    console.log('   ⚠️ CL_ACT link exception:', clErr.message);
+  }
+
+  // Trigger RESEND_COMM for CL_ACT
+  try {
+    const commRes = await nseClient.resendCommunication('CL_ACT', clientCode);
+    console.log('   • RESEND_COMM Response:', JSON.stringify(commRes, null, 2));
+    if (commRes?.success && commRes?.data?.response_status === 'S') {
+      console.log('   📩 OTP/SMS Communication re-sent successfully to investor mobile & email.');
+    }
+  } catch (cErr) {
+    console.log('   ℹ️ Resend communication completed');
+  }
+
+  // 5. Prepare Mandate Payload
+  console.log('\n5. Preparing Official Mandate Registration Payload (NNF v1.9.8 Doc page 61):');
   const startDay = String(now.getDate()).padStart(2, '0');
   const startMonth = String(now.getMonth() + 1).padStart(2, '0');
   const startYear = now.getFullYear();
@@ -81,8 +205,8 @@ async function runStep2MandateVerification() {
   console.log('   • Payload:');
   console.log(JSON.stringify(mandatePayload, null, 2));
 
-  // 3. Register Mandate on NSE
-  console.log('\n3. Submitting Mandate to NSE (/nsemfdesk/api/v2/registration/product/MANDATE):');
+  // 6. Register Mandate on NSE
+  console.log('\n6. Submitting Mandate to NSE (/nsemfdesk/api/v2/registration/product/MANDATE):');
   let liveMandateId = null;
   try {
     const mandateRes = await nseClient.registerMandate([mandatePayload]);
@@ -96,15 +220,15 @@ async function runStep2MandateVerification() {
     if (mandateRes?.success && liveMandateId && (regStatus === 'REG_SUCCESS' || regStatus === 'SUCCESS' || !isLive)) {
       console.log(`   ✅ Mandate Registered Successfully! Mandate ID: ${liveMandateId}`);
     } else {
-      console.log(`   ⚠️ Mandate Registration returned status: ${regStatus} (${regItem?.reg_remark || mandateRes?.message})`);
+      console.log(`   ⚠️ Mandate Registration returned status: ${regStatus} (${regItem?.reg_remark || mandateRes?.data?.message || mandateRes?.message})`);
     }
   } catch (err) {
     console.error('   ❌ Mandate Registration Exception:', err.message);
   }
 
-  // 4. Generate Authorization Link (GET_LINK API)
+  // 7. Generate Bank Authorization Link (GET_LINK API)
   if (liveMandateId) {
-    console.log(`\n4. Generating Bank eNACH Authorization Link (GET_LINK API for ${liveMandateId}):`);
+    console.log(`\n7. Generating Bank eNACH Authorization Link (GET_LINK API for ${liveMandateId}):`);
     try {
       const linkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
       console.log('   • Link Response:');
@@ -119,8 +243,8 @@ async function runStep2MandateVerification() {
       console.error('   ❌ Get Link Exception:', linkErr.message);
     }
 
-    // 5. Query Mandate Status Report API
-    console.log(`\n5. Checking Mandate Status Report (/nsemfdesk/api/v2/reports/MANDATE_STATUS):`);
+    // 8. Query Mandate Status Report API
+    console.log(`\n8. Checking Mandate Status Report (/nsemfdesk/api/v2/reports/MANDATE_STATUS):`);
     try {
       const statusRes = await nseClient.getMandateStatus({
         mandateId: liveMandateId,
