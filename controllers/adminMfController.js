@@ -710,6 +710,36 @@ exports.testNseConnection = async (req, res) => {
       }
     }
 
+    let clientDetailResult = null;
+    if (req.body?.checkClientDetail) {
+      try {
+        const clientCode = req.body.clientCode || 'VK766957';
+        const now = new Date();
+        const toDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        const past = new Date(Date.now() - 6 * 24 * 3600 * 1000);
+        const fromDate = `${String(past.getDate()).padStart(2, '0')}-${String(past.getMonth() + 1).padStart(2, '0')}-${past.getFullYear()}`;
+        clientDetailResult = await nseClient.post('/nsemfdesk/api/v2/reports/CLIENT_DETAIL_REPORT', {
+          client_code: clientCode,
+          from_date: fromDate,
+          to_date: toDate,
+          auth_status: 'PENDING',
+        });
+      } catch (cdErr) {
+        clientDetailResult = { error: cdErr.message };
+      }
+    }
+
+    let linkResult = null;
+    if (req.body?.getLink) {
+      try {
+        const pType = req.body.productType || 'CL_ACT';
+        const pRef = req.body.productRefId || 'VK766957';
+        linkResult = await nseClient.getShortLink(pType, pRef);
+      } catch (lErr) {
+        linkResult = { error: lErr.message };
+      }
+    }
+
     const latency = Date.now() - startTime;
 
     const finalStatus = isMock ? 'SANDBOX_MOCKED' : (testCall.success ? 'ONLINE' : 'GATEWAY_ALERT');
@@ -737,6 +767,8 @@ exports.testNseConnection = async (req, res) => {
         reachability: reachabilityStatus,
         exchangeResponse: testCall,
         uccTestResult,
+        clientDetailResult,
+        linkResult,
         testedAt: config.lastTestedAt,
       },
     });
