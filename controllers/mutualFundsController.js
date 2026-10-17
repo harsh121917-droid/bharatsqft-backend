@@ -3413,6 +3413,7 @@ exports.setupUserMandate = async (req, res) => {
 
         const nseRes = await nseClient.registerMandate([mandatePayload]);
         rawResponse = nseRes?.data || nseRes;
+        const regItem = nseRes?.data?.reg_data?.[0];
         let liveMandateId = regItem?.mandate_id || regItem?.reg_id;
         let clActLink = null;
 
