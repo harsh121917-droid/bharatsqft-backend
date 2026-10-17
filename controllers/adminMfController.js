@@ -466,32 +466,50 @@ exports.cleanUserMfData = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: 'userId parameter is required' });
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ success: false, message: 'Valid user ID or client code is required' });
     }
 
-    const ucc = await MfClientUcc.findOne({ user: userId });
+    let ucc = null;
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      ucc = await MfClientUcc.findOne({ user: userId });
+      if (!ucc) ucc = await MfClientUcc.findById(userId);
+    }
+    if (!ucc) {
+      ucc = await MfClientUcc.findOne({
+        $or: [{ clientCode: userId }, { clientCode: userId.toUpperCase() }],
+      });
+    }
+
     const clientCode = ucc?.clientCode;
+    const targetUserId = ucc?.user || (userId.match(/^[0-9a-fA-F]{24}$/) ? userId : null);
 
-    const userOrClient = clientCode
-      ? { $or: [{ user: userId }, { clientCode: clientCode }] }
-      : { user: userId };
+    const userOrClient = [];
+    if (targetUserId) userOrClient.push({ user: targetUserId });
+    if (clientCode) userOrClient.push({ clientCode: clientCode });
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) userOrClient.push({ _id: userId });
 
-    const [ordersDel, sipsDel, uccDel, mandateDel] = await Promise.all([
-      MfOrder.deleteMany(userOrClient),
-      MfSip.deleteMany(userOrClient),
-      MfClientUcc.deleteMany({ user: userId }),
-      MfMandate.deleteMany(userOrClient),
+    const query = userOrClient.length > 1 ? { $or: userOrClient } : (userOrClient[0] || { user: targetUserId });
+
+    const [ordersDel, sipsDel, uccDel, mandateDel, holdingsDel] = await Promise.all([
+      MfOrder.deleteMany(query),
+      MfSip.deleteMany(query),
+      clientCode
+        ? MfClientUcc.deleteMany({ $or: [{ user: targetUserId }, { clientCode }, ...(userId.match(/^[0-9a-fA-F]{24}$/) ? [{ _id: userId }] : [])] })
+        : MfClientUcc.deleteMany(query),
+      MfMandate.deleteMany(query),
+      MfPortfolioHolding.deleteMany(query),
     ]);
 
     return res.json({
       success: true,
-      message: 'Mutual Funds data (UCC, SIPs, Orders, Mandates) cleared successfully for user.',
+      message: 'Mutual Funds data (UCC, SIPs, Orders, Mandates, Holdings) cleared successfully.',
       data: {
         ordersDeleted: ordersDel.deletedCount,
         sipsDeleted: sipsDel.deletedCount,
         uccDeleted: uccDel.deletedCount,
         mandatesDeleted: mandateDel.deletedCount,
+        holdingsDeleted: holdingsDel.deletedCount,
       },
     });
   } catch (error) {
@@ -1649,30 +1667,78 @@ exports.syncMandateWithNse = async (req, res) => {
 exports.getMfUserFullProfile = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ success: false, message: 'Valid user ID, client code, or UCC ID is required' });
+    }
+
     let user = null;
     let ucc = null;
 
     if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      // 1. Check if it is a User ID
       user = await User.findById(userId).select('-password');
-      ucc = await MfClientUcc.findOne({ user: userId });
+      if (user) {
+        ucc = await MfClientUcc.findOne({ user: user._id });
+      }
+      // 2. Check if it is a MfClientUcc ID
+      if (!ucc) {
+        ucc = await MfClientUcc.findById(userId).populate('user', '-password');
+        if (ucc && ucc.user && !user) user = ucc.user;
+      }
     }
+
+    // 3. Check if it is a Client Code or PAN
     if (!ucc) {
-      ucc = await MfClientUcc.findOne({ clientCode: userId }).populate('user', '-password');
-      if (ucc && !user) user = ucc.user;
+      ucc = await MfClientUcc.findOne({
+        $or: [
+          { clientCode: userId },
+          { clientCode: userId.toUpperCase() },
+          { pan: userId.toUpperCase() },
+        ],
+      }).populate('user', '-password');
+      if (ucc && ucc.user && !user) user = ucc.user;
+    }
+
+    // 4. Check if User can be found by email or phone
+    if (!user && !ucc) {
+      user = await User.findOne({
+        $or: [{ email: userId }, { phone: userId }],
+      }).select('-password');
+      if (user) {
+        ucc = await MfClientUcc.findOne({ user: user._id });
+      }
     }
 
     if (!ucc && !user) {
       return res.status(404).json({ success: false, message: 'Investor not found' });
     }
 
-    const actualUserId = user?._id || ucc?.user;
+    // If UCC exists but User was detached/unlinked in DB, construct fallback profile
+    if (!user && ucc) {
+      user = {
+        _id: ucc._id,
+        name: ucc.fullName || `Investor (${ucc.clientCode})`,
+        email: ucc.email || '—',
+        phone: ucc.mobile || '—',
+        pan: ucc.pan,
+        isDetachedUcc: true,
+      };
+    }
+
+    const actualUserId = user?._id || ucc?.user || ucc?._id;
+    const clientCode = ucc?.clientCode;
+
+    const userOrClientQuery = clientCode
+      ? { $or: [{ user: actualUserId }, { clientCode: clientCode }] }
+      : { user: actualUserId };
 
     const [mandates, sips, holdings, orders, auditLogs] = await Promise.all([
-      MfMandate.find({ user: actualUserId }).sort({ createdAt: -1 }),
-      MfSip.find({ user: actualUserId }).sort({ createdAt: -1 }),
-      MfPortfolioHolding.find({ user: actualUserId }),
-      MfOrder.find({ user: actualUserId }).sort({ createdAt: -1 }).limit(20),
-      MfAuditLog.find({ user: actualUserId }).sort({ createdAt: -1 }).limit(20),
+      MfMandate.find(userOrClientQuery).sort({ createdAt: -1 }),
+      MfSip.find(userOrClientQuery).sort({ createdAt: -1 }),
+      MfPortfolioHolding.find({ $or: [{ user: actualUserId }, ...(clientCode ? [{ clientCode }] : [])] }),
+      MfOrder.find(userOrClientQuery).sort({ createdAt: -1 }).limit(20),
+      MfAuditLog.find(userOrClientQuery).sort({ createdAt: -1 }).limit(20),
     ]);
 
     const totalInvested = holdings.reduce((sum, h) => sum + (h.investedAmount || 0), 0);
@@ -1709,12 +1775,19 @@ exports.getMfUserFullProfile = async (req, res) => {
 exports.syncUccWithNse = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ success: false, message: 'Valid user ID, client code, or UCC ID is required' });
+    }
+
     let ucc = null;
     if (userId.match(/^[0-9a-fA-F]{24}$/)) {
       ucc = await MfClientUcc.findOne({ user: userId });
+      if (!ucc) ucc = await MfClientUcc.findById(userId);
     }
     if (!ucc) {
-      ucc = await MfClientUcc.findOne({ clientCode: userId });
+      ucc = await MfClientUcc.findOne({
+        $or: [{ clientCode: userId }, { clientCode: userId.toUpperCase() }],
+      });
     }
     if (!ucc) {
       return res.status(404).json({ success: false, message: 'UCC record not found' });
@@ -1777,12 +1850,19 @@ exports.syncUccWithNse = async (req, res) => {
 exports.resendUccAuth = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ success: false, message: 'Valid user ID, client code, or UCC ID is required' });
+    }
+
     let ucc = null;
     if (userId.match(/^[0-9a-fA-F]{24}$/)) {
       ucc = await MfClientUcc.findOne({ user: userId });
+      if (!ucc) ucc = await MfClientUcc.findById(userId);
     }
     if (!ucc) {
-      ucc = await MfClientUcc.findOne({ clientCode: userId });
+      ucc = await MfClientUcc.findOne({
+        $or: [{ clientCode: userId }, { clientCode: userId.toUpperCase() }],
+      });
     }
     if (!ucc) {
       return res.status(404).json({ success: false, message: 'UCC record not found' });

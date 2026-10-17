@@ -2639,9 +2639,9 @@ async function loadUserMutualFundsModalSection(userId, containerEl) {
                     <div>Valuation: <strong style="font-family:var(--font-mono);color:#00D09C">${formatINR(mfData.currentValuation || mfData.totalInvested || 0)}</strong></div>
                 </div>
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                    <button type="button" class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${userId}')" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C"><i class="fas fa-eye"></i> Investor 360°</button>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${userId || mfData.clientCode}')" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C"><i class="fas fa-eye"></i> Investor 360°</button>
                     <button type="button" class="btn btn-sm btn-outline" onclick="showPage('mfsips')" style="font-size:11px;padding:3px 8px">View SIPs</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="cleanUserMutualFunds('${userId}')" style="font-size:11px;padding:3px 8px"><i class="fas fa-broom"></i> Clean MF Data</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="cleanUserMutualFunds('${userId || mfData.clientCode}')" style="font-size:11px;padding:3px 8px"><i class="fas fa-broom"></i> Clean MF Data</button>
                 </div>
             </div>`;
             containerEl.insertAdjacentHTML('beforeend', mfHtml);

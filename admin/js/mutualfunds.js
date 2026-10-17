@@ -279,28 +279,35 @@ async function loadMfInvestors(page = 1) {
             const stats = u.stats || {};
             const isNseActive = u.nseStatus === 'ACTIVE';
 
+            // Resolve target identifier: prefer user ID, else clientCode, else UCC _id
+            const investorId = (userObj && userObj._id) ? userObj._id : (u.clientCode || u._id);
+            const investorName = userObj.name || (u.clientCode ? `Investor (${u.clientCode})` : 'Investor');
+            const displayName = userObj.name || (u.clientCode ? `Investor (${u.clientCode})` : 'Unnamed Investor');
+            const displayContact = userObj.phone || userObj.email || (u.pan ? `PAN: ${u.pan}` : '—');
+            const avatarChar = (displayName.replace(/^Investor \(/i, '')[0] || 'U').toUpperCase();
+
             html += `
             <tr>
                 <td>
                     <div style="display:flex;align-items:center;gap:10px">
                         <div style="width:36px;height:36px;border-radius:10px;background:rgba(0,208,156,0.15);color:#00D09C;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px">
-                            ${(userObj.name || 'U')[0].toUpperCase()}
+                            ${avatarChar}
                         </div>
                         <div>
-                            <div style="font-weight:700;color:#fff;font-size:13.5px">${userObj.name || 'Unnamed Investor'}</div>
-                            <div style="font-size:11px;color:var(--text-dim)">${userObj.phone || userObj.email || '—'}</div>
+                            <div style="font-weight:700;color:#fff;font-size:13.5px">${displayName}</div>
+                            <div style="font-size:11px;color:var(--text-dim)">${displayContact}</div>
                         </div>
                     </div>
                 </td>
                 <td>
-                    <code style="background:var(--subBg,#0d1410);padding:4px 8px;border-radius:6px;font-size:12px;color:#00D09C;font-family:monospace;border:1px solid #1E2533">${u.clientCode}</code>
+                    <code style="background:var(--subBg,#0d1410);padding:4px 8px;border-radius:6px;font-size:12px;color:#00D09C;font-family:monospace;border:1px solid #1E2533">${u.clientCode || '—'}</code>
                 </td>
                 <td>
                     <span style="font-family:monospace;font-weight:600;color:#fff">${u.pan || '—'}</span>
                 </td>
                 <td>
                     <div style="font-size:12.5px;color:#fff">${bank.bankName || 'Bank'}</div>
-                    <div style="font-size:11px;color:var(--text-dim);font-family:monospace">A/C: ${bank.accountNo ? '••••' + bank.accountNo.slice(-4) : '—'} | IFSC: ${bank.ifsc || '—'}</div>
+                    <div style="font-size:11px;color:var(--text-dim);font-family:monospace">A/C: ${bank.accountNo ? '••••' + String(bank.accountNo).slice(-4) : '—'} | IFSC: ${bank.ifsc || '—'}</div>
                 </td>
                 <td>
                     <span class="badge ${stats.activeSips > 0 ? 'badge-success' : 'badge-secondary'}" style="font-size:12px;font-weight:700">
@@ -317,10 +324,10 @@ async function loadMfInvestors(page = 1) {
                     <span class="badge ${isNseActive ? 'badge-success' : 'badge-warning'}">${u.nseStatus || 'ACTIVE'}</span>
                 </td>
                 <td style="text-align:right">
-                    <button class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${userObj._id}')" style="color:#00D09C;border-color:#00D09C;padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer;margin-right:6px" title="View 360° Profile, Live UCC Status, Bank & Portfolio">
+                    <button class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${investorId}')" style="color:#00D09C;border-color:#00D09C;padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer;margin-right:6px" title="View 360° Profile, Live UCC Status, Bank & Portfolio">
                         <i class="fas fa-eye"></i> View 360°
                     </button>
-                    <button class="btn btn-sm" onclick="cleanUserMutualFunds('${userObj._id}', '${(userObj.name || 'Investor').replace(/'/g, "\\'")}')" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer" title="Clean all MF data, UCC, orders, and SIPs for this user">
+                    <button class="btn btn-sm" onclick="cleanUserMutualFunds('${investorId}', '${investorName.replace(/'/g, "\\'")}')" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer" title="Clean all MF data, UCC, orders, and SIPs for this user">
                         <i class="fas fa-broom"></i> Clean MF
                     </button>
                 </td>
@@ -867,8 +874,8 @@ function renderMfPagination(curr, total, funcName) {
 
 // ── 5. Clean & Reset User Mutual Funds Data ──
 async function cleanUserMutualFunds(userId, userName = 'Investor') {
-    if (!userId) {
-        toast('User ID is required to clean MF data', 'warning');
+    if (!userId || userId === 'undefined' || userId === 'null') {
+        toast('User ID or Client Code is required to clean MF data', 'warning');
         return;
     }
 
@@ -876,7 +883,7 @@ async function cleanUserMutualFunds(userId, userName = 'Investor') {
     if (!confirm(confirmMsg)) return;
 
     try {
-        const res = await api(`/admin/mutual-funds/users/${userId}/clean`, { method: 'POST' });
+        const res = await api(`/admin/mutual-funds/users/${encodeURIComponent(userId)}/clean`, { method: 'POST' });
         if (res && res.success) {
             toast(res.message || `Mutual Funds data cleared for ${userName} ✓`, 'success');
             if (typeof loadMfInvestors === 'function') loadMfInvestors(mfInvestorsCurrentPage || 1);
@@ -1582,7 +1589,10 @@ let currentInvestorProfileData = null;
 let currentInvestorActiveTab = 'portfolio';
 
 async function openMfInvestorDrawer(userId) {
-    if (!userId) return;
+    if (!userId || userId === 'undefined' || userId === 'null') {
+        toast('Investor identifier is missing', 'warning');
+        return;
+    }
     const modal = document.getElementById('mf-investor-modal');
     const body = document.getElementById('mf-inv-modal-body');
     if (!modal || !body) return;
@@ -1591,7 +1601,7 @@ async function openMfInvestorDrawer(userId) {
     body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading investor 360° profile...</div></div>`;
 
     try {
-        const res = await api(`/admin/mutual-funds/users/${userId}/details`);
+        const res = await api(`/admin/mutual-funds/users/${encodeURIComponent(userId)}/details`);
         if (!res || !res.success || !res.data) {
             body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res?.message || 'Failed to load investor profile'}</div></div>`;
             return;
@@ -1607,17 +1617,18 @@ async function openMfInvestorDrawer(userId) {
         const contactEl = document.getElementById('mf-inv-contact');
         const avatarEl = document.getElementById('mf-inv-avatar');
 
-        if (nameEl) nameEl.textContent = u.name || ucc.fullName || 'Investor Profile';
-        if (uccEl) uccEl.textContent = ucc.clientCode || '—';
-        if (panEl) panEl.textContent = ucc.pan || '—';
-        if (contactEl) contactEl.textContent = `${u.phone || '—'} · ${u.email || '—'}`;
-        if (avatarEl) avatarEl.textContent = (u.name || ucc.fullName || 'U')[0].toUpperCase();
+        if (nameEl) nameEl.textContent = u.name || ucc.fullName || (ucc.clientCode ? `Investor (${ucc.clientCode})` : 'Investor Profile');
+        if (uccEl) uccEl.textContent = ucc.clientCode || '— (No UCC yet)';
+        if (panEl) panEl.textContent = ucc.pan || u.pan || '—';
+        if (contactEl) contactEl.textContent = `${u.phone || ucc.mobile || '—'} · ${u.email || ucc.email || '—'}`;
+        const rawInitial = (u.name || ucc.fullName || ucc.clientCode || 'U').replace(/^Investor \(/i, '');
+        if (avatarEl) avatarEl.textContent = (rawInitial[0] || 'U').toUpperCase();
 
         const nseBadge = document.getElementById('mf-inv-nse-badge');
         if (nseBadge) {
             const isAct = ucc.nseStatus === 'ACTIVE';
             nseBadge.className = `badge ${isAct ? 'badge-success' : 'badge-warning'}`;
-            nseBadge.textContent = ucc.nseStatus || 'ACTIVE';
+            nseBadge.textContent = ucc.nseStatus || (ucc.clientCode ? 'PENDING' : 'NOT ONBOARDED');
         }
 
         switchMfInvestorTab('portfolio');
@@ -1875,12 +1886,16 @@ function renderMfInvestorProfileContent(tab) {
 
 async function syncCurrentInvestorUccLive() {
     if (!currentInvestorProfileData) return;
-    const uid = currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?.clientCode;
+    const uid = currentInvestorProfileData.ucc?.clientCode || currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?._id;
+    if (!uid) {
+        toast('No client code or user ID available to sync', 'warning');
+        return;
+    }
     const btn = document.getElementById('btn-sync-ucc-modal');
     try {
         if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Probing NSE...`; }
         toast('Calling NSE client authorization & detail reports...', 'info');
-        const res = await api(`/admin/mutual-funds/users/${uid}/sync-ucc`, { method: 'POST' });
+        const res = await api(`/admin/mutual-funds/users/${encodeURIComponent(uid)}/sync-ucc`, { method: 'POST' });
         if (res && res.success) {
             toast(res.message || 'UCC status synchronized with NSE ✓', 'success');
             await openMfInvestorDrawer(uid);
@@ -1896,12 +1911,16 @@ async function syncCurrentInvestorUccLive() {
 
 async function resendCurrentInvestorUccAuth() {
     if (!currentInvestorProfileData) return;
-    const uid = currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?.clientCode;
+    const uid = currentInvestorProfileData.ucc?.clientCode || currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?._id;
+    if (!uid) {
+        toast('No client code or user ID available', 'warning');
+        return;
+    }
     const btn = document.getElementById('btn-resend-auth-modal');
     try {
         if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatching...`; }
         toast('Re-dispatching NSE authorization communication...', 'info');
-        const res = await api(`/admin/mutual-funds/users/${uid}/resend-auth`, { method: 'POST' });
+        const res = await api(`/admin/mutual-funds/users/${encodeURIComponent(uid)}/resend-auth`, { method: 'POST' });
         if (res && res.success) {
             toast('Official OTP Authorization SMS/Email sent to investor ✓', 'success');
             if (res.data?.authLink) {
@@ -1976,7 +1995,8 @@ async function submitMfBankUpdate(e) {
         if (res && res.success) {
             toast('Bank details updated on NSE & DB successfully ✓', 'success');
             closeMfBankUpdateModal();
-            if (userId) await openMfInvestorDrawer(userId);
+            const targetId = userId || clientCode;
+            if (targetId) await openMfInvestorDrawer(targetId);
             loadMfInvestors(mfInvestorsCurrentPage || 1);
         } else {
             toast(res?.message || 'Failed to update bank details', 'danger');
@@ -1990,8 +2010,12 @@ async function submitMfBankUpdate(e) {
 
 async function cleanCurrentInvestorMf() {
     if (!currentInvestorProfileData) return;
-    const uid = currentInvestorProfileData.user?._id;
-    const name = currentInvestorProfileData.user?.name || 'Investor';
+    const uid = currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?.clientCode || currentInvestorProfileData.ucc?._id;
+    const name = currentInvestorProfileData.user?.name || currentInvestorProfileData.ucc?.fullName || (currentInvestorProfileData.ucc?.clientCode ? `Investor (${currentInvestorProfileData.ucc.clientCode})` : 'Investor');
+    if (!uid) {
+        toast('No investor ID available to clean', 'warning');
+        return;
+    }
     await cleanUserMutualFunds(uid, name);
     closeMfInvestorModal();
 }
