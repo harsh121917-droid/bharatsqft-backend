@@ -6931,6 +6931,8 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
             <!-- Real Estate Fractional Ownership Certificate & Allotment Receipt Modal -->
             <div class="cert-modal-overlay" id="inv-certificate-modal" style="display:none"
                 onclick="if(event.target===this) closeInvestmentCertificate()">
@@ -7083,13 +7085,19 @@
                                 <button type="submit" class="btn btn-primary" id="btn-save-homevideo">
                                     <i class="fas fa-save"></i> Save Video
                                 </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
     <!-- ══════════════════════════════════════════════════════════
          MUTUAL FUNDS MODALS: INVESTOR 360°, BANK FIX, REVERSAL, SCHEME
          ══════════════════════════════════════════════════════════ -->
 
     <!-- 1. Investor 360° Profile Modal -->
-    <div class="modal-overlay" id="mf-investor-modal" style="display:none">
-        <div class="modal modal-lg" style="max-width:960px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-overlay" id="mf-investor-modal" onclick="if(event.target === this) closeMfInvestorModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+        <div class="modal modal-lg" style="max-width:960px;max-height:90vh;display:flex;flex-direction:column;width:95%">
             <div class="modal-header" style="border-bottom:1px solid #1E293B;padding-bottom:16px">
                 <div style="display:flex;align-items:center;gap:12px">
                     <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,208,156,0.15);color:#00D09C;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold" id="mf-inv-avatar">U</div>
@@ -7134,8 +7142,8 @@
     </div>
 
     <!-- 2. Bank Account Update / UCC Modification Modal -->
-    <div class="modal-overlay" id="mf-bank-update-modal" style="display:none">
-        <div class="modal modal-md">
+    <div class="modal-overlay" id="mf-bank-update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+        <div class="modal modal-md" style="width:95%">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-university" style="color:#00D09C;margin-right:8px"></i> Update Bank & NSE UCC Bank Details</div>
                 <button class="modal-close" onclick="closeMfBankUpdateModal()">×</button>
@@ -7180,8 +7188,8 @@
     </div>
 
     <!-- 3. Controlled Administrative Reversal Modal -->
-    <div class="modal-overlay" id="mf-reversal-modal" style="display:none">
-        <div class="modal modal-md">
+    <div class="modal-overlay" id="mf-reversal-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+        <div class="modal modal-md" style="width:95%">
             <div class="modal-header">
                 <div class="modal-title" style="color:#ef4444"><i class="fas fa-undo-alt" style="margin-right:8px"></i> Controlled Financial Reversal</div>
                 <button class="modal-close" onclick="closeMfReversalModal()">×</button>
@@ -7214,8 +7222,8 @@
     </div>
 
     <!-- 4. Scheme Details Modal -->
-    <div class="modal-overlay" id="mf-scheme-detail-modal" style="display:none">
-        <div class="modal modal-lg">
+    <div class="modal-overlay" id="mf-scheme-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+        <div class="modal modal-lg" style="width:95%">
             <div class="modal-header">
                 <div class="modal-title" id="mf-scheme-modal-title">Scheme Specifications</div>
                 <button class="modal-close" onclick="closeMfSchemeDetailModal()">×</button>
@@ -7235,7 +7243,7 @@
             <script src="js/config.js"></script>
             <script src="js/api.js"></script>
             <script src="js/dashboard.js"></script>
-            <script src="js/users.js?v=2.3"></script>
+            <script src="js/users.js?v=2.4"></script>
             <script src="js/kyc.js"></script>
             <script src="js/properties.js?v=2.5"></script>
             <script src="js/business.js?v=1.0"></script>
@@ -7249,7 +7257,7 @@
             <script src="js/coupons.js"></script>
             <script src="js/legalpolicies.js?v=1.0"></script>
             <script src="js/homevideos.js?v=1.0"></script>
-            <script src="js/mutualfunds.js?v=2.1"></script>
+            <script src="js/mutualfunds.js?v=2.3"></script>
             <script src="js/app.js?v=2.1"></script>
 </body>
 

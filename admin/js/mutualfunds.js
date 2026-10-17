@@ -2179,4 +2179,24 @@ function closeMfSchemeDetailModal() {
     if (modal) modal.style.display = 'none';
 }
 
+// ── Explicit Global Window Exposure ───────────────────────────
+window.openMfInvestorDrawer = openMfInvestorDrawer;
+window.closeMfInvestorModal = closeMfInvestorModal;
+window.switchMfInvestorTab = switchMfInvestorTab;
+window.cleanUserMutualFunds = cleanUserMutualFunds;
+window.syncMfMandateWithNse = syncMfMandateWithNse;
+window.openMfReversalModal = openMfReversalModal;
+window.closeMfReversalModal = closeMfReversalModal;
+window.submitMfControlledReversal = submitMfControlledReversal;
+window.syncMfNavsAndMaster = syncMfNavsAndMaster;
+window.openMfSchemeDetails = openMfSchemeDetails;
+window.closeMfSchemeDetailModal = closeMfSchemeDetailModal;
+window.loadMfInvestors = loadMfInvestors;
+window.loadMfOverview = loadMfOverview;
+window.loadMfOrders = loadMfOrders;
+window.loadMfSips = loadMfSips;
+window.loadMfMandates = loadMfMandates;
+window.loadMfCurationSchemes = loadMfCurationSchemes;
+
+
 
