@@ -1044,6 +1044,20 @@ exports.executeClientAction = async (req, res) => {
       }
     }
 
+    if (action === 'ELOG') {
+      try {
+        const elogPayload = {
+          client_code: clientCode,
+          primary_holder_pan: pan,
+          primary_holder_ip_address: req.body.ip || '13.203.215.132',
+          primary_holder_log_date: req.body.logDate || '17-OCT-26 15:48:50',
+        };
+        result.elogResult = await nseClient.uploadElog(elogPayload);
+      } catch (eErr) {
+        result.elogResult = { error: eErr.message };
+      }
+    }
+
     return res.json({
       success: true,
       message: `Executed action ${action} for client ${clientCode}`,
