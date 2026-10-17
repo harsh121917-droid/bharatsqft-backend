@@ -41,6 +41,7 @@ const {
   getMyMandates,
   getMandateDetail,
   updateUserBank,
+  resendUccActivation,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -64,6 +65,7 @@ router.post('/mandates/:id/verify', verifyUserMandate);
 router.get('/ucc/me', getUserUcc);
 router.post('/ucc/bank/update', updateUserBank);
 router.post('/ucc/register', registerUserUcc);
+router.post('/ucc/resend-act', resendUccActivation);
 router.post('/orders/purchase', createPurchaseOrder);
 router.get('/orders/:orderId/status', syncOrderStatus);
 router.post('/orders/:orderId/sync-status', syncOrderStatus);

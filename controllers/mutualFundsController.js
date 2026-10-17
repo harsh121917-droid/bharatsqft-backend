@@ -1102,6 +1102,71 @@ exports.registerUserUcc = async (req, res) => {
     const nseStatus = isSuccess ? 'ACTIVE' : 'PENDING';
     const nseRemarks = regDetail?.reg_remark || regDetail?.message || nseRes?.data?.message || nseRes?.message || (isSuccess ? 'APPROVED' : 'Exchange registration pending/rejected');
 
+    // Auto-upload FATCA declaration to NSE
+    let fatcaUploaded = false;
+    if (isSuccess && !nseClient.isMockMode()) {
+      try {
+        const fatcaPayload = {
+          pan_rp: pan.toUpperCase(),
+          pekrn: '',
+          inv_name: resolvedFullName,
+          dob: effDob,
+          fr_name: '',
+          sp_name: '',
+          tax_status: taxStatus || '01',
+          data_src: 'E',
+          addr_type: '1',
+          po_bir_inc: effCity || 'Mumbai',
+          co_bir_inc: 'IN',
+          tax_res1: 'IN',
+          tpin1: pan.toUpperCase(),
+          id1_type: 'C',
+          tax_res2: '',
+          tpin2: '',
+          id2_type: '',
+          tax_res3: '',
+          tpin3: '',
+          id3_type: '',
+          tax_res4: '',
+          tpin4: '',
+          id4_type: '',
+          srce_wealt: '01',
+          corp_servs: '',
+          inc_slab: '31',
+          net_worth: '',
+          nw_date: '',
+          pep_flag: 'N',
+          occ_code: occupationCode || '01',
+          occ_type: 'B',
+          exemp_code: '',
+          ffi_drnfe: '',
+          giin_no: '',
+          spr_entity: '',
+          giin_na: '',
+          giin_exemc: '',
+          nffe_catg: '',
+          act_nfe_sc: '',
+          nature_bus: '',
+          rel_listed: '',
+          exch_name: 'O',
+          ubo_appl: 'N',
+          ubo_count: '',
+          sdf_flag: 'Y',
+          ubo_df: 'N',
+          aadhaar_rp: '',
+          new_change: 'N',
+          log_name: resolvedFullName,
+          filler1: '',
+          filler2: '',
+        };
+        const fatcaRes = await nseClient.uploadFatca([fatcaPayload]);
+        console.log('[registerUserUcc] FATCA upload response:', JSON.stringify(fatcaRes));
+        if (fatcaRes?.success) fatcaUploaded = true;
+      } catch (fErr) {
+        console.warn('[registerUserUcc] FATCA upload error:', fErr.message);
+      }
+    }
+
     // 3. Upsert client UCC record in MongoDB
     const uccRecord = await MfClientUcc.findOneAndUpdate(
       { user: userId },
@@ -1137,7 +1202,7 @@ exports.registerUserUcc = async (req, res) => {
         nseStatus,
         nseRemarks,
         rawResponse: nseRes?.data || nseRes,
-        fatcaUploaded: true,
+        fatcaUploaded: fatcaUploaded || nseClient.isMockMode(),
       },
       { upsert: true, new: true }
     );
@@ -1175,15 +1240,29 @@ exports.registerUserUcc = async (req, res) => {
       ).catch(() => {});
     } catch (_) {}
 
-    // Fetch official NSE direct authorization link if nominee opt-in
+    // Fetch official NSE direct authorization link (prefer CL_ACT for investor activation, or NOMINEE_AUTH)
     let nseAuthUrl = null;
+    let clActLink = null;
     try {
-      if (nomineeName) {
-        const shortLinkRes = await nseClient.getShortLink('NOMINEE_AUTH', clientCode);
-        if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
-          nseAuthUrl = shortLinkRes.data.firstHolderLink;
-        }
+      const linkRes = await nseClient.getShortLink('CL_ACT', clientCode);
+      if (linkRes?.success && linkRes?.data?.firstHolderLink) {
+        clActLink = linkRes.data.firstHolderLink;
+        nseAuthUrl = clActLink;
       }
+    } catch (_) {}
+
+    if (!nseAuthUrl && nomineeName) {
+      try {
+        const nomRes = await nseClient.getShortLink('NOMINEE_AUTH', clientCode);
+        if (nomRes?.success && nomRes?.data?.firstHolderLink) {
+          nseAuthUrl = nomRes.data.firstHolderLink;
+        }
+      } catch (_) {}
+    }
+
+    // Trigger RESEND_COMM to send official SMS/Email OTP to investor
+    try {
+      await nseClient.resendCommunication('CL_ACT', clientCode);
     } catch (_) {}
 
     return res.json({
@@ -1191,9 +1270,45 @@ exports.registerUserUcc = async (req, res) => {
       message: 'UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number.',
       data: uccRecord,
       authUrl: nseAuthUrl,
+      clActLink,
     });
   } catch (error) {
     console.error('[registerUserUcc Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 4b. POST /api/mutual-funds/ucc/resend-act (Resend Client Activation Communication & Link) ──
+exports.resendUccActivation = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(404).json({ success: false, message: 'Investor profile not found' });
+    }
+
+    let authUrl = null;
+    try {
+      const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
+      if (linkRes?.success && linkRes?.data?.firstHolderLink) {
+        authUrl = linkRes.data.firstHolderLink;
+      }
+    } catch (_) {}
+
+    try {
+      await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: 'Client activation communication re-sent via SMS and Email by NSE.',
+      data: {
+        clientCode: ucc.clientCode,
+        authUrl,
+      },
+    });
+  } catch (error) {
+    console.error('[resendUccActivation Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -2449,7 +2564,11 @@ exports.simulatePayment = async (req, res) => {
 // ── 10. GET /api/mutual-funds/checkout/:orderId (Visual Web Checkout Simulator) ──
 exports.renderCheckoutSimulator = async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const rawOrderId = req.params.orderId;
+    if (!rawOrderId || !rawOrderId.trim()) {
+      return res.status(404).send('Invalid or missing order reference.');
+    }
+    const orderId = rawOrderId.trim();
     const mongoose = require('mongoose');
 
     // 1. Try finding an MfOrder (Purchase / Lump-sum)
@@ -2477,6 +2596,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
     let mandate = null;
     if (!order && !sip) {
       mandate = await MfMandate.findOne({
+        mandateId: { $nin: ['', ' ', null] },
         $or: [
           { mandateId: orderId },
           ...(mongoose.isValidObjectId(orderId) ? [{ _id: orderId }] : []),
@@ -2637,6 +2757,10 @@ exports.renderCheckoutSimulator = async (req, res) => {
     if (mandate) {
       if (mandate.status !== 'APPROVED') {
         mandate.status = 'APPROVED';
+        if (!mandate.umrn) {
+          mandate.umrn = `UMRN_SIM_${Date.now().toString().slice(-8)}`;
+        }
+        mandate.authorizedAt = new Date();
         await mandate.save();
       }
 
@@ -3307,9 +3431,14 @@ exports.getOnboardingStatus = async (req, res) => {
       });
     }
 
-    const mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
+    const mandate = await MfMandate.findOne({
+      user: userId,
+      mandateId: { $nin: ['', ' ', null] },
+    }).sort({ createdAt: -1 });
     const isMandateApproved = Boolean(
       mandate &&
+      mandate.mandateId &&
+      mandate.mandateId.trim().length > 0 &&
       (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE') &&
       ((typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) || nseClient.isMockMode())
     );
@@ -3372,6 +3501,12 @@ exports.setupUserMandate = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please complete your investor profile (UCC) first.' });
     }
 
+    // Delete any corrupt blank-mandateId records for this user
+    await MfMandate.deleteMany({
+      user: userId,
+      $or: [{ mandateId: '' }, { mandateId: ' ' }, { mandateId: null }, { mandateId: { $regex: /^\s*$/ } }],
+    }).catch(() => {});
+
     const { amount = 50000, forceNew = false } = req.body;
     let mandate = null;
 
@@ -3379,8 +3514,13 @@ exports.setupUserMandate = async (req, res) => {
       mandate = await MfMandate.findOne({
         user: userId,
         accountNo: ucc.primaryBank?.accountNo,
+        mandateId: { $nin: ['', ' ', null] },
         status: { $in: ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'PENDING_AUTH'] },
       }).sort({ createdAt: -1 });
+
+      if (mandate && (!mandate.mandateId || !mandate.mandateId.trim())) {
+        mandate = null;
+      }
     }
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
@@ -3414,7 +3554,9 @@ exports.setupUserMandate = async (req, res) => {
         const nseRes = await nseClient.registerMandate([mandatePayload]);
         rawResponse = nseRes?.data || nseRes;
         const regItem = nseRes?.data?.reg_data?.[0];
-        let liveMandateId = regItem?.mandate_id || regItem?.reg_id;
+        const isValidId = (id) => typeof id === 'string' && id.trim().length > 0;
+        const rawId = regItem?.mandate_id || regItem?.reg_id;
+        let liveMandateId = (isValidId(rawId) && regItem?.reg_status !== 'REG_FAILED') ? String(rawId).trim() : null;
         let clActLink = null;
 
         if (!nseRes?.success || !liveMandateId || regItem?.reg_status === 'REG_FAILED') {
@@ -3506,9 +3648,9 @@ exports.setupUserMandate = async (req, res) => {
             try {
               const retryRes = await nseClient.registerMandate([mandatePayload]);
               const retryRegItem = retryRes?.data?.reg_data?.[0];
-              const retryLiveMandateId = retryRegItem?.mandate_id || retryRegItem?.reg_id;
-              if (retryRes?.success && retryLiveMandateId && retryRegItem?.reg_status !== 'REG_FAILED') {
-                liveMandateId = String(retryLiveMandateId);
+              const retryRawId = retryRegItem?.mandate_id || retryRegItem?.reg_id;
+              if (retryRes?.success && isValidId(retryRawId) && retryRegItem?.reg_status !== 'REG_FAILED') {
+                liveMandateId = String(retryRawId).trim();
                 rawResponse = retryRes?.data || retryRes;
               }
             } catch (_) {}
@@ -3532,7 +3674,7 @@ exports.setupUserMandate = async (req, res) => {
           }
         }
 
-        mandateId = String(liveMandateId);
+        mandateId = String(liveMandateId).trim();
         try {
           const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
           if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
@@ -3598,8 +3740,8 @@ exports.verifyUserMandate = async (req, res) => {
       user: userId,
     });
 
-    if (!mandate) {
-      return res.status(404).json({ success: false, message: 'Mandate record not found' });
+    if (!mandate || !mandate.mandateId || !mandate.mandateId.trim()) {
+      return res.status(404).json({ success: false, message: 'Valid Mandate record not found' });
     }
 
     let liveStatus = null;
@@ -3618,18 +3760,44 @@ exports.verifyUserMandate = async (req, res) => {
       } catch (_) {}
     }
 
-    const newStatus = (liveStatus === 'APPROVED' || liveStatus === 'ACCEPTED_BY_BANK')
-      ? 'APPROVED'
-      : (req.body?.status || 'APPROVED');
-
-    mandate.status = newStatus;
-    if (liveUmrn || req.body?.umrn) {
-      mandate.umrn = (liveUmrn || req.body?.umrn).trim();
-    } else if (!mandate.umrn) {
-      mandate.umrn = `BKID${Date.now().toString().slice(-8)}`;
+    if (!nseClient.isMockMode()) {
+      const isApprovedOnExchange = Boolean(
+        liveStatus && ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(liveStatus.toUpperCase())
+      );
+      if (isApprovedOnExchange) {
+        mandate.status = 'APPROVED';
+        if (liveUmrn) mandate.umrn = liveUmrn.trim();
+        mandate.authorizedAt = new Date();
+        await mandate.save();
+      } else if (liveStatus && ['REJECTED', 'FAILED', 'CANCELLED'].includes(liveStatus.toUpperCase())) {
+        mandate.status = 'REJECTED';
+        await mandate.save();
+        return res.json({
+          success: false,
+          code: 'MANDATE_REJECTED_BY_BANK',
+          message: `Mandate was rejected by your bank: ${liveStatus}`,
+          data: mandate,
+        });
+      } else {
+        mandate.status = 'PENDING_AUTH';
+        await mandate.save();
+        return res.json({
+          success: false,
+          code: 'MANDATE_PENDING_EXCHANGE_AUTH',
+          message: liveStatus ? `Mandate exchange status: ${liveStatus}. Bank authorization is still pending.` : 'Mandate authorization is awaiting bank confirmation.',
+          data: mandate,
+        });
+      }
+    } else {
+      mandate.status = req.body?.status || 'APPROVED';
+      if (liveUmrn || req.body?.umrn) {
+        mandate.umrn = (liveUmrn || req.body?.umrn).trim();
+      } else if (!mandate.umrn) {
+        mandate.umrn = `BKID${Date.now().toString().slice(-8)}`;
+      }
+      mandate.authorizedAt = new Date();
+      await mandate.save();
     }
-    mandate.authorizedAt = new Date();
-    await mandate.save();
 
     const ucc = await MfClientUcc.findOne({ user: userId });
     if (ucc) {
