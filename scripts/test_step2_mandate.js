@@ -38,8 +38,8 @@ async function runStep2MandateVerification() {
   const clientCode = process.env.TEST_CLIENT_CODE || 'VK766957';
   const pan = process.env.TEST_PAN || 'BNWPS7663F';
   const name = process.env.TEST_NAME || 'VIKAS SAINI';
-  const accountNo = process.env.TEST_ACCOUNT_NO || '123654852125';
-  const ifscCode = process.env.TEST_IFSC || 'BKID0001400';
+  const accountNo = process.env.TEST_ACCOUNT_NO || '0847796579';
+  const ifscCode = process.env.TEST_IFSC || 'KKBK0005301';
   const amount = process.env.TEST_AMOUNT || '50000';
 
   console.log('1. Gateway & Credentials Audit:');

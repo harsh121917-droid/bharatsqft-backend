@@ -963,23 +963,84 @@ exports.executeClientAction = async (req, res) => {
         };
         result.bankUpdate = await nseClient.updateClientBankDetail([bankPayload]);
 
-        // If update succeeded, sync to DB as well
-        if (result.bankUpdate?.success) {
+        const bankItem = result.bankUpdate?.data?.bank_dtl?.[0];
+        const isInactive = bankItem?.status === 'FAIL' && /inactive|modification/i.test(bankItem?.error_remark || '');
+        if (isInactive) {
           const MfClientUcc = require('../models/MfClientUcc');
-          await MfClientUcc.findOneAndUpdate(
-            { clientCode },
-            {
-              $set: {
-                'primaryBank.accountNo': req.body.accountNo,
-                'primaryBank.ifsc': req.body.ifsc,
-                'primaryBank.bankName': req.body.bankName || 'Updated Primary Bank',
-                'primaryBank.accountType': req.body.accountType || 'SB',
-              },
-            }
-          );
+          const User = require('../models/User');
+          const ucc = await MfClientUcc.findOne({ clientCode });
+          const user = ucc ? await User.findById(ucc.user) : null;
+          const nameParts = (name || ucc?.fullName || 'VIKAS SAINI').trim().split(/\s+/);
+          const firstName = nameParts[0] || 'VIKAS';
+          const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+          const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
+
+          const modPayload = {
+            client_code: clientCode,
+            primary_holder_first_name: firstName,
+            primary_holder_middle_name: middleName,
+            primary_holder_last_name: lastName,
+            tax_status: ucc?.taxStatus || '01',
+            gender: (ucc?.gender || 'M').charAt(0).toUpperCase(),
+            primary_holder_dob_incorporation: ucc?.dob || '12/10/1991',
+            occupation_code: ucc?.occupationCode || '01',
+            holding_nature: ucc?.holdingNature || 'SI',
+            primary_holder_pan_exempt: 'N',
+            primary_holder_pan: pan.toUpperCase(),
+            client_type: 'P',
+            pms: 'N',
+            default_dp: 'PHYS',
+            account_type_1: req.body.accountType || 'SB',
+            account_no_1: String(req.body.accountNo).trim(),
+            ifsc_code_1: String(req.body.ifsc).trim().toUpperCase(),
+            default_bank_flag_1: 'Y',
+            cheque_name: name || ucc?.fullName || 'VIKAS SAINI',
+            div_pay_mode: '02',
+            address_1: (ucc?.address?.address1 || 'Flat 101, Main Market').slice(0, 40),
+            address_2: (ucc?.address?.address2 || '').slice(0, 40),
+            city: (ucc?.address?.city || 'Mumbai').slice(0, 35),
+            state: 'MH',
+            pincode: (ucc?.address?.pincode || '400001').toString().slice(0, 6),
+            country: 'INDIA',
+            email: user?.email || 'harsh121917@gmail.com',
+            communication_mode: 'E',
+            indian_mobile_no: user?.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9997143005',
+            primary_holder_kyc_type: 'K',
+            primary_holder_ckyc_number: '',
+            aadhaar_updated: 'Y',
+            paperless_flag: 'Z',
+            mobile_declaration_flag: 'SE',
+            email_declaration_flag: 'SE',
+            nomination_opt: 'N',
+            nomination_authentication: 'O',
+          };
+          result.uccModification = await nseClient.registerUcc([modPayload]);
         }
+
+        // Sync to DB as well
+        const MfClientUcc = require('../models/MfClientUcc');
+        await MfClientUcc.findOneAndUpdate(
+          { clientCode },
+          {
+            $set: {
+              'primaryBank.accountNo': req.body.accountNo,
+              'primaryBank.ifsc': req.body.ifsc,
+              'primaryBank.bankName': req.body.bankName || 'Kotak Mahindra Bank',
+              'primaryBank.accountType': req.body.accountType || 'SB',
+            },
+          }
+        );
       } catch (bErr) {
         result.bankUpdate = { error: bErr.message };
+      }
+    }
+
+    if (action === 'UCC_183' || action === 'UCC_MOD') {
+      try {
+        const payload = req.body.payload;
+        result.uccResult = await nseClient.registerUcc([payload]);
+      } catch (uErr) {
+        result.uccResult = { error: uErr.message };
       }
     }
 
