@@ -1730,6 +1730,8 @@ exports.registerSipOrder = async (req, res) => {
       startDate,
       stepUpRequired = false,
       stepUpAmount = 0,
+      paymentMode,
+      firstOrderToday: reqFirstOrderToday,
     } = req.body;
 
     if (!schemeCode || !installmentAmount || Number(installmentAmount) <= 0) {
@@ -1826,20 +1828,26 @@ exports.registerSipOrder = async (req, res) => {
 
     const effectiveMandateId = mandate.mandateId;
 
+    const dpTxnMode = (sipMaster.sipTransactionMode === 'D') ? 'D' : 'P';
+
+    const firstOrderToday = reqFirstOrderToday !== undefined
+      ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
+      : ((paymentMode === 'MANDATE') ? 'N' : 'Y');
+
     // 1. Prepare NSE XSIP payload with authoritative exchange codes
     const nseXsipPayload = {
       amc_code: authoritativeAmcCode,
       sch_code: authoritativeNseCode,
       client_code: ucc.clientCode,
       trans_mode: 'P', // Physical/Folio
-      dp_txn_mode: sipMaster.sipTransactionMode || 'DP',
+      dp_txn_mode: dpTxnMode,
       start_date: dateFormatted,
       frequency_type: normFreq,
       frequency_allowed: '1',
       installment_amount: String(installmentAmount),
       status: '1',
       installment_no: '60', // 5 years default tenure
-      first_order_today: 'Y',
+      first_order_today: firstOrderToday,
       primary_holder_mobile: user.phone?.slice(-10) || '',
       primary_holder_email: user.email,
       step_up_required: stepUpRequired ? 'Y' : 'N',
@@ -1905,10 +1913,11 @@ exports.registerSipOrder = async (req, res) => {
 
     const sipRegNo = isSuccess ? String(rawRegId) : (nseClient.isMockMode() ? String(rawRegId || `TEST_SIP_${Date.now()}`) : '');
 
-    // 3. Request Official Payment / Mandate Link from NSE (GET_LINK API)
+    // 3. Request Official Payment / Mandate Link from NSE if first order is today
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
-    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
-    if (sipRegNo) {
+    let paymentLink = null;
+    if (firstOrderToday === 'Y' && sipRegNo) {
+      paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
       try {
         const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
         if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
@@ -1939,7 +1948,7 @@ exports.registerSipOrder = async (req, res) => {
       mandateId: effectiveMandateId,
       installmentsPaid: 0,
       totalAmountPaid: 0,
-      status: 'PENDING_PAYMENT',
+      status: firstOrderToday === 'Y' ? 'PENDING_PAYMENT' : 'ACTIVE',
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
     });

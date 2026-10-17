@@ -922,6 +922,8 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     assert.equal(lastXsipPayload[0].amc_code, 'INVESCOMUTUALFUND_MF');
     assert.equal(lastXsipPayload[0].mandate_id, 'MND_TESTFIX_04');
     assert.equal(lastXsipPayload[0].installment_amount, '1500');
+    assert.equal(lastXsipPayload[0].dp_txn_mode, 'P');
+    assert.equal(lastXsipPayload[0].dp_txn_mode.length, 1);
   });
 
   it('19. NSE REG_FAILED -> no false SIP active state created in DB', async () => {
