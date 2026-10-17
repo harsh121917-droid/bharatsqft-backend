@@ -737,6 +737,19 @@ exports.getUserUcc = async (req, res) => {
       const rawPan = kyc?.panNumber || user?.panNumber || '';
       const cleanPan = dummyPans.includes(rawPan) ? '' : rawPan;
 
+      let prefillDob = '';
+      if (kyc?.dob) {
+        const rawDob = String(kyc.dob).split('T')[0];
+        if (rawDob.includes('-')) {
+          const parts = rawDob.split('-');
+          if (parts.length === 3 && parts[0].length === 4) {
+            prefillDob = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          } else {
+            prefillDob = rawDob;
+          }
+        }
+      }
+
       return res.json({
         success: true,
         exists: false,
@@ -745,6 +758,8 @@ exports.getUserUcc = async (req, res) => {
           email: user?.email || '',
           phone: user?.phone || '',
           pan: cleanPan,
+          dob: prefillDob,
+          gender: kyc?.gender || user?.gender || 'M',
           isKycVerified: kyc?.status === 'approved' && cleanPan.length === 10,
           bankAccount: bank
             ? {
@@ -1238,6 +1253,41 @@ exports.registerUserUcc = async (req, res) => {
         },
         { upsert: true }
       ).catch(() => {});
+    } catch (_) {}
+
+    // Sync primary bank account with NSE_MFSS_REGISTERED provenance
+    try {
+      const BankAccount = require('../models/BankAccount');
+      await BankAccount.findOneAndUpdate(
+        { user: userId, accountNumber: effAccountNo },
+        {
+          $set: {
+            bankName: effBankName,
+            accountNumber: effAccountNo,
+            ifsc: effIfsc.toUpperCase(),
+            accountHolder: resolvedFullName,
+            isVerified: true,
+            isDefault: true,
+          },
+          $setOnInsert: {
+            verificationSource: 'NSE_MFSS_REGISTERED',
+          },
+        },
+        { upsert: true, new: true }
+      );
+      await BankAccount.updateOne(
+        {
+          user: userId,
+          accountNumber: effAccountNo,
+          $or: [{ verificationSource: '' }, { verificationSource: null }, { verificationSource: 'NONE' }],
+        },
+        {
+          $set: {
+            verificationSource: 'NSE_MFSS_REGISTERED',
+            isVerified: true,
+          },
+        }
+      );
     } catch (_) {}
 
     // Fetch official NSE direct authorization link (prefer CL_ACT for investor activation, or NOMINEE_AUTH)
@@ -3454,6 +3504,10 @@ exports.getOnboardingStatus = async (req, res) => {
           title: 'Set Up Bank AutoPay (Step 2 of 2)',
           subtitle: `Client Code: ${ucc.clientCode}. Authorize your one-time bank mandate to automate monthly SIP investments on NSE.`,
           clientCode: ucc.clientCode,
+          pan: ucc.pan || '',
+          fullName: ucc.fullName || '',
+          dob: ucc.dob || '',
+          gender: ucc.gender || 'M',
           hasUcc: true,
           uccStatus: ucc.nseStatus || 'ACTIVE',
           hasMandate: Boolean(mandate),
@@ -3475,6 +3529,10 @@ exports.getOnboardingStatus = async (req, res) => {
         title: 'Investor Account Active & AutoPay Ready',
         subtitle: 'Your profile and bank mandate are verified for real-time investments.',
         clientCode: ucc.clientCode,
+        pan: ucc.pan || '',
+        fullName: ucc.fullName || '',
+        dob: ucc.dob || '',
+        gender: ucc.gender || 'M',
         hasUcc: true,
         uccStatus: ucc.nseStatus || 'ACTIVE',
         hasMandate: true,
@@ -3804,6 +3862,24 @@ exports.verifyUserMandate = async (req, res) => {
       ucc.defaultMandateId = mandate.mandateId;
       await ucc.save();
     }
+
+    // Also ensure BankAccount record has authoritative exchange provenance
+    try {
+      const BankAccount = require('../models/BankAccount');
+      await BankAccount.updateOne(
+        {
+          user: userId,
+          accountNumber: String(mandate.accountNo).trim(),
+          $or: [{ verificationSource: '' }, { verificationSource: null }, { verificationSource: 'NONE' }],
+        },
+        {
+          $set: {
+            verificationSource: 'NSE_MFSS_REGISTERED',
+            isVerified: true,
+          },
+        }
+      );
+    } catch (_) {}
 
     return res.json({
       success: true,

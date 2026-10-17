@@ -165,6 +165,21 @@ class MfInvestorReadinessService {
       };
     }
 
+    // 3b-2. Auto-synchronize bank verification provenance if bank account is registered on active NSE MFSS UCC
+    if (
+      userBank &&
+      userBank.isVerified &&
+      (!userBank.verificationSource || userBank.verificationSource === 'NONE') &&
+      ucc.nseStatus === 'ACTIVE' &&
+      userBank.accountNumber === (ucc.primaryBank?.accountNo || '').trim()
+    ) {
+      userBank.verificationSource = 'NSE_MFSS_REGISTERED';
+      if (!userBank.accountHolder && ucc.fullName) {
+        userBank.accountHolder = ucc.fullName;
+      }
+      await userBank.save().catch(() => {});
+    }
+
     // 3c. Require isVerified: true and Trustworthy Verification Provenance
     const trustedBankSources = [
       'CASHFREE_PENNY_DROP',
