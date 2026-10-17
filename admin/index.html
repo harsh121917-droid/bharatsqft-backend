@@ -4100,6 +4100,8 @@
                             carousel, Recommended badges, or disable/hide funds</div>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-primary btn-sm" onclick="syncMfNavsAndMaster()" id="btn-sync-nav-header"><i
+                                class="fas fa-sync"></i> Sync NAVs & Master</button>
                         <button class="btn btn-secondary btn-sm" onclick="loadMfCurationSchemes(1)"><i
                                 class="fas fa-sync-alt"></i> Refresh</button>
                     </div>
@@ -7081,11 +7083,151 @@
                                 <button type="submit" class="btn btn-primary" id="btn-save-homevideo">
                                     <i class="fas fa-save"></i> Save Video
                                 </button>
-                            </div>
-                        </form>
+    <!-- ══════════════════════════════════════════════════════════
+         MUTUAL FUNDS MODALS: INVESTOR 360°, BANK FIX, REVERSAL, SCHEME
+         ══════════════════════════════════════════════════════════ -->
+
+    <!-- 1. Investor 360° Profile Modal -->
+    <div class="modal-overlay" id="mf-investor-modal" style="display:none">
+        <div class="modal modal-lg" style="max-width:960px;max-height:90vh;display:flex;flex-direction:column">
+            <div class="modal-header" style="border-bottom:1px solid #1E293B;padding-bottom:16px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,208,156,0.15);color:#00D09C;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold" id="mf-inv-avatar">U</div>
+                    <div>
+                        <div style="font-size:18px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px">
+                            <span id="mf-inv-name">Investor Profile</span>
+                            <span class="badge badge-success" id="mf-inv-nse-badge">ACTIVE</span>
+                        </div>
+                        <div style="font-size:12px;color:var(--text-dim);margin-top:2px">
+                            UCC: <code style="color:#00D09C;font-weight:700" id="mf-inv-ucc">—</code> · PAN: <span style="font-weight:600;color:#fff" id="mf-inv-pan">—</span> · <span id="mf-inv-contact">—</span>
+                        </div>
                     </div>
                 </div>
+                <button class="modal-close" onclick="closeMfInvestorModal()">×</button>
             </div>
+
+            <!-- Tab Navigation Header -->
+            <div style="display:flex;gap:8px;border-bottom:1px solid #1E293B;padding:12px 24px;background:#0B1120;flex-wrap:wrap">
+                <button class="btn btn-sm btn-outline mf-inv-tab active" data-tab="portfolio" onclick="switchMfInvestorTab('portfolio')"><i class="fas fa-chart-pie"></i> Portfolio & Holdings</button>
+                <button class="btn btn-sm btn-outline mf-inv-tab" data-tab="ucc" onclick="switchMfInvestorTab('ucc')"><i class="fas fa-id-card"></i> UCC & KYC Status</button>
+                <button class="btn btn-sm btn-outline mf-inv-tab" data-tab="bank" onclick="switchMfInvestorTab('bank')"><i class="fas fa-university"></i> Bank & Penny Drop</button>
+                <button class="btn btn-sm btn-outline mf-inv-tab" data-tab="mandates" onclick="switchMfInvestorTab('mandates')"><i class="fas fa-file-signature"></i> Mandates & SIPs</button>
+                <button class="btn btn-sm btn-outline mf-inv-tab" data-tab="orders" onclick="switchMfInvestorTab('orders')"><i class="fas fa-receipt"></i> Orders History</button>
+            </div>
+
+            <div class="modal-body" style="overflow-y:auto;flex:1;padding:24px" id="mf-inv-modal-body">
+                <!-- Dynamically rendered by mutualfunds.js -->
+            </div>
+
+            <div class="modal-footer" style="border-top:1px solid #1E293B;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;background:#0B1120;flex-wrap:wrap;gap:10px">
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-sm btn-outline" style="color:#3B82F6;border-color:#3B82F6" id="btn-sync-ucc-modal" onclick="syncCurrentInvestorUccLive()"><i class="fas fa-satellite-dish"></i> Verify Live on NSE</button>
+                    <button class="btn btn-sm btn-outline" style="color:#00D09C;border-color:#00D09C" id="btn-resend-auth-modal" onclick="resendCurrentInvestorUccAuth()"><i class="fas fa-paper-plane"></i> Resend Auth OTP</button>
+                    <button class="btn btn-sm btn-outline" style="color:#D4A017;border-color:#D4A017" id="btn-open-bank-modal" onclick="openCurrentInvestorBankUpdate()"><i class="fas fa-edit"></i> Update Bank / Fix UCC</button>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm btn-outline-danger" id="btn-clean-user-mf" onclick="cleanCurrentInvestorMf()"><i class="fas fa-broom"></i> Reset User MF</button>
+                    <button class="btn btn-sm btn-secondary" onclick="closeMfInvestorModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Bank Account Update / UCC Modification Modal -->
+    <div class="modal-overlay" id="mf-bank-update-modal" style="display:none">
+        <div class="modal modal-md">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-university" style="color:#00D09C;margin-right:8px"></i> Update Bank & NSE UCC Bank Details</div>
+                <button class="modal-close" onclick="closeMfBankUpdateModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px">
+                    Updates the primary bank account on NSE. If the client code is currently inactive on the exchange, this automatically dispatches an official <code>CLIENTCOMMON183</code> modification to replace the rejected bank.
+                </p>
+                <form onsubmit="submitMfBankUpdate(event)">
+                    <input type="hidden" id="mf-bank-user-id" />
+                    <input type="hidden" id="mf-bank-client-code" />
+                    <div class="form-group">
+                        <label class="form-label">Bank Name</label>
+                        <input class="form-control" id="mf-bank-name" placeholder="e.g. Kotak Mahindra Bank" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Account Number</label>
+                        <input class="form-control" id="mf-bank-account-no" placeholder="e.g. 0847796579" required />
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">IFSC Code</label>
+                            <input class="form-control" id="mf-bank-ifsc" placeholder="e.g. KKBK0005301" style="text-transform:uppercase" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Account Type</label>
+                            <select class="form-control" id="mf-bank-account-type">
+                                <option value="SB">Savings Account (SB)</option>
+                                <option value="CA">Current Account (CA)</option>
+                                <option value="NRE">NRE Account</option>
+                                <option value="NRO">NRO Account</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:10px">
+                        <button type="button" class="btn btn-secondary" onclick="closeMfBankUpdateModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-mf-bank"><i class="fas fa-save"></i> Submit Bank Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Controlled Administrative Reversal Modal -->
+    <div class="modal-overlay" id="mf-reversal-modal" style="display:none">
+        <div class="modal modal-md">
+            <div class="modal-header">
+                <div class="modal-title" style="color:#ef4444"><i class="fas fa-undo-alt" style="margin-right:8px"></i> Controlled Financial Reversal</div>
+                <button class="modal-close" onclick="closeMfReversalModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12.5px;color:#fca5a5">
+                    <i class="fas fa-exclamation-triangle"></i> <b>Financial Ledger Protocol:</b> Reversal creates an immutable negative-unit ledger transaction, updates order status to <code>REFUNDED</code>, and atomically recalculates the user's portfolio holding. Direct manual tampering is prevented.
+                </div>
+                <form onsubmit="submitMfControlledReversal(event)">
+                    <input type="hidden" id="mf-reversal-order-id" />
+                    <div class="form-group">
+                        <label class="form-label">Order Reference</label>
+                        <input class="form-control" id="mf-reversal-order-ref" readonly style="opacity:0.8;font-family:monospace" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Scheme & Amount</label>
+                        <input class="form-control" id="mf-reversal-scheme-info" readonly style="opacity:0.8" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reversal Justification / Audit Reason</label>
+                        <textarea class="form-control" id="mf-reversal-reason" rows="3" placeholder="Provide mandatory justification (e.g. Bank chargeback confirmed, RTA reversal instruction ref #1234)..." required></textarea>
+                    </div>
+                    <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:10px">
+                        <button type="button" class="btn btn-secondary" onclick="closeMfReversalModal()">Cancel</button>
+                        <button type="submit" class="btn btn-danger" id="btn-submit-reversal"><i class="fas fa-undo-alt"></i> Execute Reversal</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Scheme Details Modal -->
+    <div class="modal-overlay" id="mf-scheme-detail-modal" style="display:none">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div class="modal-title" id="mf-scheme-modal-title">Scheme Specifications</div>
+                <button class="modal-close" onclick="closeMfSchemeDetailModal()">×</button>
+            </div>
+            <div class="modal-body" id="mf-scheme-modal-body">
+                <!-- Dynamically loaded -->
+            </div>
+            <div class="modal-footer" style="padding:14px 24px;border-top:1px solid #1E293B;display:flex;justify-content:flex-end">
+                <button class="btn btn-secondary" onclick="closeMfSchemeDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
 
             <!-- ══════════════════════════════════════════════════════════
          5. MODULAR JAVASCRIPT BUNDLE
@@ -7093,7 +7235,7 @@
             <script src="js/config.js"></script>
             <script src="js/api.js"></script>
             <script src="js/dashboard.js"></script>
-            <script src="js/users.js?v=2.1"></script>
+            <script src="js/users.js?v=2.2"></script>
             <script src="js/kyc.js"></script>
             <script src="js/properties.js?v=2.5"></script>
             <script src="js/business.js?v=1.0"></script>
@@ -7107,7 +7249,7 @@
             <script src="js/coupons.js"></script>
             <script src="js/legalpolicies.js?v=1.0"></script>
             <script src="js/homevideos.js?v=1.0"></script>
-            <script src="js/mutualfunds.js?v=1.0"></script>
+            <script src="js/mutualfunds.js?v=2.0"></script>
             <script src="js/app.js?v=2.1"></script>
 </body>
 

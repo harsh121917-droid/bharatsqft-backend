@@ -3,11 +3,13 @@ const MfSip = require('../models/MfSip');
 const MfOrder = require('../models/MfOrder');
 const MfMandate = require('../models/MfMandate');
 const MutualFundScheme = require('../models/MutualFundScheme');
+const MfPortfolioHolding = require('../models/MfPortfolioHolding');
 const User = require('../models/User');
 const NseConfig = require('../models/NseConfig');
 const MfReconciliation = require('../models/MfReconciliation');
 const MfAuditLog = require('../models/MfAuditLog');
 const mfReconciliationEngine = require('../services/mfReconciliationEngine');
+const mfAdminService = require('../services/mfAdminService');
 const nseClient = require('../services/nse/nseClient');
 const nseEncryption = require('../services/nse/nseEncryption');
 const axios = require('axios');
@@ -30,6 +32,7 @@ exports.getMfOverview = async (req, res) => {
       totalSipPaidAgg,
       totalOrderPaidAgg,
       totalRedeemedAgg,
+      holdingsAgg,
       purchasesCount,
       redemptionsCount,
       switchesCount,
@@ -72,6 +75,11 @@ exports.getMfOverview = async (req, res) => {
         { $group: { _id: null, totalRedeemed: { $sum: '$orderAmount' } } },
       ]),
 
+      // Real live Portfolio Holdings Valuation
+      MfPortfolioHolding.aggregate([
+        { $group: { _id: null, totalCurrentValue: { $sum: '$currentValue' }, totalInvested: { $sum: '$investedAmount' } } },
+      ]),
+
       // Order counts by type
       MfOrder.countDocuments({ transactionType: 'P' }),
       MfOrder.countDocuments({ transactionType: 'R' }),
@@ -97,7 +105,8 @@ exports.getMfOverview = async (req, res) => {
     const totalSipPaid = totalSipPaidAgg[0]?.totalSipPaid || 0;
     const totalLumpsumPaid = totalOrderPaidAgg[0]?.totalLumpsumPaid || 0;
     const totalRedeemed = totalRedeemedAgg[0]?.totalRedeemed || 0;
-    const totalMfAum = Math.max(0, totalSipPaid + totalLumpsumPaid - totalRedeemed);
+    const holdingsAum = holdingsAgg[0]?.totalCurrentValue || holdingsAgg[0]?.totalInvested || 0;
+    const totalMfAum = holdingsAum > 0 ? holdingsAum : Math.max(0, totalLumpsumPaid - totalRedeemed);
 
     return res.json({
       success: true,
@@ -295,21 +304,6 @@ exports.getMfSips = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate('user', 'name email phone');
-
-    // Reconcile and heal any inflated installmentsPaid with actual confirmed orders
-    for (const sip of sips) {
-      const ordersCount = await MfOrder.countDocuments({
-        user: sip.user?._id || sip.user,
-        schemeCode: sip.schemeCode,
-        paymentStatus: 'SUCCESS',
-        transactionType: 'P',
-      });
-      if (ordersCount > 0 && sip.installmentsPaid > ordersCount) {
-        sip.installmentsPaid = ordersCount;
-        sip.totalAmountPaid = ordersCount * sip.installmentAmount;
-        await sip.save();
-      }
-    }
 
     return res.json({
       success: true,
@@ -1209,29 +1203,42 @@ exports.syncOrderWithNse = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Query NSE exchange for order status
-    const nseRes = await nseClient.getOrderStatusReport({
+    // Query NSE exchange for order status with standard NSE parameters
+    const nseFilter = {
       client_code: order.clientCode,
-      order_no: order.orderId,
-    });
+      order_ref_number: order.orderId,
+    };
+    if (order.nseTrxnOrderId) {
+      nseFilter.trxn_no = order.nseTrxnOrderId;
+    }
+    const nseRes = await nseClient.getOrderStatusReport(nseFilter);
 
-    let exchangeStatus = 'SUBMITTED';
-    let allottedUnits = order.units;
-    let nav = order.navAtOrder;
+    let exchangeStatus = order.nseStatus || 'SUBMITTED';
+    let allottedUnits = order.units || 0;
+    let nav = order.navAtOrder || null;
 
-    if (nseRes && nseRes.success && nseRes.data?.orders?.length > 0) {
-      const exchangeOrder = nseRes.data.orders[0];
-      exchangeStatus = exchangeOrder.order_status || 'ALLOTTED';
+    const exchangeOrder = nseRes?.data?.orders?.[0] || nseRes?.data?.transaction_details?.[0] || nseRes?.data?.report_data?.[0];
+    if (exchangeOrder) {
+      exchangeStatus = exchangeOrder.order_status || exchangeOrder.status || 'ALLOTTED';
       if (exchangeOrder.allotted_units) allottedUnits = parseFloat(exchangeOrder.allotted_units);
       if (exchangeOrder.nav) nav = parseFloat(exchangeOrder.nav);
     } else if (order.paymentStatus === 'SUCCESS') {
-      exchangeStatus = 'ALLOTTED (NSE CONFIRMED)';
+      exchangeStatus = order.nseStatus || 'ALLOTTED (NSE CONFIRMED)';
     }
 
     order.nseStatus = exchangeStatus;
     if (allottedUnits > 0) order.units = allottedUnits;
     if (nav > 0) order.navAtOrder = nav;
     await order.save();
+
+    if (allottedUnits > 0 && order.user) {
+      try {
+        const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+        await recalculateUserPortfolio(order.user);
+      } catch (pErr) {
+        console.warn('[syncOrderWithNse] Portfolio recalculation warning:', pErr.message);
+      }
+    }
 
     return res.json({
       success: true,
@@ -1576,6 +1583,249 @@ exports.getAuditLogs = async (req, res) => {
   } catch (err) {
     console.error('[getAuditLogs Error]:', err);
     return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── 26. POST /api/admin/mutual-funds/mandates/:id/sync-nse ──
+exports.syncMandateWithNse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mandate = await MfMandate.findOne({
+      $or: [
+        { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null },
+        { mandateId: id },
+      ],
+    }).populate('user', 'name phone email');
+
+    if (!mandate) {
+      return res.status(404).json({ success: false, message: 'Mandate not found' });
+    }
+
+    const nseRes = await nseClient.getMandateStatus({
+      mandateId: mandate.mandateId,
+      clientCode: mandate.clientCode,
+    });
+
+    let exchangeStatus = mandate.status;
+    let umrn = mandate.umrn || '';
+    let remark = '';
+
+    const mandateData = nseRes?.data?.mandates?.[0] || nseRes?.data?.report_data?.[0] || nseRes?.data?.mandate_details?.[0];
+    if (mandateData) {
+      const rawStatus = (mandateData.status || mandateData.mandate_status || mandate.status).toUpperCase();
+      if (rawStatus.includes('APPROVED') || rawStatus.includes('ACCEPTED') || rawStatus.includes('SUCCESS') || rawStatus.includes('ACTIVE')) {
+        exchangeStatus = 'ACCEPTED_BY_BANK';
+      } else if (rawStatus.includes('REJECT') || rawStatus.includes('FAIL')) {
+        exchangeStatus = 'REJECTED';
+      } else if (rawStatus.includes('PENDING')) {
+        exchangeStatus = 'PENDING_AUTH';
+      }
+      if (mandateData.umrn_no || mandateData.umrn) {
+        umrn = mandateData.umrn_no || mandateData.umrn;
+      }
+      remark = mandateData.rejection_reason || mandateData.remarks || mandateData.status_description || '';
+    }
+
+    mandate.status = exchangeStatus;
+    if (umrn) mandate.umrn = umrn;
+    if (remark) mandate.remarks = remark;
+    await mandate.save();
+
+    return res.json({
+      success: true,
+      message: `Mandate synchronized with NSE: Status is ${mandate.status}${umrn ? ` (UMRN: ${umrn})` : ''}`,
+      data: {
+        mandate,
+        exchangeRaw: nseRes?.data || null,
+      },
+    });
+  } catch (error) {
+    console.error('[syncMandateWithNse Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 27. GET /api/admin/mutual-funds/users/:userId/details (Investor 360° Profile) ──
+exports.getMfUserFullProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let user = null;
+    let ucc = null;
+
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      user = await User.findById(userId).select('-password');
+      ucc = await MfClientUcc.findOne({ user: userId });
+    }
+    if (!ucc) {
+      ucc = await MfClientUcc.findOne({ clientCode: userId }).populate('user', '-password');
+      if (ucc && !user) user = ucc.user;
+    }
+
+    if (!ucc && !user) {
+      return res.status(404).json({ success: false, message: 'Investor not found' });
+    }
+
+    const actualUserId = user?._id || ucc?.user;
+
+    const [mandates, sips, holdings, orders, auditLogs] = await Promise.all([
+      MfMandate.find({ user: actualUserId }).sort({ createdAt: -1 }),
+      MfSip.find({ user: actualUserId }).sort({ createdAt: -1 }),
+      MfPortfolioHolding.find({ user: actualUserId }),
+      MfOrder.find({ user: actualUserId }).sort({ createdAt: -1 }).limit(20),
+      MfAuditLog.find({ user: actualUserId }).sort({ createdAt: -1 }).limit(20),
+    ]);
+
+    const totalInvested = holdings.reduce((sum, h) => sum + (h.investedAmount || 0), 0);
+    const totalCurrentValue = holdings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
+    const totalReturns = totalCurrentValue - totalInvested;
+    const returnsPercentage = totalInvested > 0 ? ((totalReturns / totalInvested) * 100).toFixed(2) : '0.00';
+
+    return res.json({
+      success: true,
+      data: {
+        user,
+        ucc,
+        portfolio: {
+          totalInvested: +totalInvested.toFixed(2),
+          totalCurrentValue: +totalCurrentValue.toFixed(2),
+          totalReturns: +totalReturns.toFixed(2),
+          returnsPercentage: +returnsPercentage,
+          holdingsCount: holdings.length,
+          holdings,
+        },
+        mandates,
+        sips,
+        recentOrders: orders,
+        auditLogs,
+      },
+    });
+  } catch (error) {
+    console.error('[getMfUserFullProfile Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 28. POST /api/admin/mutual-funds/users/:userId/sync-ucc ──
+exports.syncUccWithNse = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let ucc = null;
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      ucc = await MfClientUcc.findOne({ user: userId });
+    }
+    if (!ucc) {
+      ucc = await MfClientUcc.findOne({ clientCode: userId });
+    }
+    if (!ucc) {
+      return res.status(404).json({ success: false, message: 'UCC record not found' });
+    }
+
+    const clientCode = ucc.clientCode;
+    const [authRes, detailRes] = await Promise.allSettled([
+      nseClient.getClientAuthorizationReport({ clientCode }),
+      nseClient.getClientDetailReport({ clientCode }),
+    ]);
+
+    const authData = authRes.status === 'fulfilled' ? authRes.value?.data : null;
+    const detailData = detailRes.status === 'fulfilled' ? detailRes.value?.data : null;
+
+    let authStatus = ucc.nseStatus || 'ACTIVE';
+    let bankStatus = ucc.primaryBank?.bankStatus || 'ACTIVE';
+    let bankRemark = '';
+
+    const authItem = authData?.auth_data?.[0] || authData?.report_data?.[0];
+    if (authItem) {
+      if (authItem.first_holder_auth_status) {
+        ucc.firstHolderAuthStatus = authItem.first_holder_auth_status;
+      }
+      if (authItem.ucc_status) {
+        authStatus = authItem.ucc_status.toUpperCase();
+      }
+    }
+
+    const detailItem = detailData?.client_details?.[0] || detailData?.report_data?.[0];
+    if (detailItem) {
+      if (detailItem.bank1_status) {
+        bankStatus = detailItem.bank1_status.toUpperCase();
+        if (ucc.primaryBank) ucc.primaryBank.bankStatus = bankStatus;
+      }
+      if (detailItem.bank1_remarks || detailItem.remarks) {
+        bankRemark = detailItem.bank1_remarks || detailItem.remarks;
+        if (ucc.primaryBank) ucc.primaryBank.pennyDropRemark = bankRemark;
+      }
+    }
+
+    ucc.nseStatus = authStatus;
+    await ucc.save();
+
+    return res.json({
+      success: true,
+      message: `UCC synchronized with NSE: Status is ${authStatus}, Bank is ${bankStatus}`,
+      data: {
+        ucc,
+        authData,
+        detailData,
+      },
+    });
+  } catch (error) {
+    console.error('[syncUccWithNse Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 29. POST /api/admin/mutual-funds/users/:userId/resend-auth ──
+exports.resendUccAuth = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let ucc = null;
+    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
+      ucc = await MfClientUcc.findOne({ user: userId });
+    }
+    if (!ucc) {
+      ucc = await MfClientUcc.findOne({ clientCode: userId });
+    }
+    if (!ucc) {
+      return res.status(404).json({ success: false, message: 'UCC record not found' });
+    }
+
+    const resendRes = await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+    const shortLinkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode).catch(() => null);
+
+    return res.json({
+      success: true,
+      message: `Authorization communication re-dispatched for client ${ucc.clientCode}`,
+      data: {
+        resendRes,
+        authLink: shortLinkRes?.data?.short_url || shortLinkRes?.data?.url || null,
+        clientCode: ucc.clientCode,
+      },
+    });
+  } catch (error) {
+    console.error('[resendUccAuth Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 30. POST /api/admin/mutual-funds/orders/:id/controlled-reversal ──
+exports.reverseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Reason is required for controlled administrative reversal' });
+    }
+
+    const adminActor = req.user?.email || req.user?.name || 'SUPER_ADMIN';
+    const result = await mfAdminService.executeControlledReversal({
+      orderId: id,
+      adminActor,
+      reason,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('[reverseOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 

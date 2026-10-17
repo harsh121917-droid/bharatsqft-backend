@@ -15,6 +15,10 @@ const JewelleryRedemption = require("../models/JewelleryRedemption");
 const Jewellery = require("../models/Jewellery");
 const Sip = require("../models/Sip");
 const BankAccount = require("../models/BankAccount");
+const MfClientUcc = require("../models/MfClientUcc");
+const MfPortfolioHolding = require("../models/MfPortfolioHolding");
+const MfSip = require("../models/MfSip");
+const MfOrder = require("../models/MfOrder");
 
 exports.getAllUsers = async (req, res, next) => {
     try {
@@ -407,7 +411,11 @@ exports.getUserById = async (req, res, next) => {
             GoldTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
             SilverTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
             CopperTransaction.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
-            WalletTxn.find({ user: user._id }).sort({ createdAt: -1 }).limit(20)
+            WalletTxn.find({ user: user._id }).sort({ createdAt: -1 }).limit(20),
+            MfClientUcc.findOne({ user: user._id }),
+            MfPortfolioHolding.find({ user: user._id }),
+            MfSip.countDocuments({ user: user._id, status: 'ACTIVE' }),
+            MfOrder.countDocuments({ user: user._id })
         ]);
 
         const wallet = results[0].status === "fulfilled" ? results[0].value : null;
@@ -424,6 +432,13 @@ exports.getUserById = async (req, res, next) => {
         const silverTxns = results[11].status === "fulfilled" ? (results[11].value || []) : [];
         const copperTxns = results[12].status === "fulfilled" ? (results[12].value || []) : [];
         const walletTxns = results[13].status === "fulfilled" ? (results[13].value || []) : [];
+        const mfUcc = results[14]?.status === "fulfilled" ? results[14].value : null;
+        const mfHoldings = results[15]?.status === "fulfilled" ? (results[15].value || []) : [];
+        const mfActiveSips = results[16]?.status === "fulfilled" ? (results[16].value || 0) : 0;
+        const mfOrdersCount = results[17]?.status === "fulfilled" ? (results[17].value || 0) : 0;
+
+        const mfTotalInvested = mfHoldings.reduce((sum, h) => sum + (h.investedAmount || 0), 0);
+        const mfCurrentValuation = mfHoldings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
 
         const walletBalance = wallet ? wallet.balance : 0;
 
@@ -615,7 +630,20 @@ exports.getUserById = async (req, res, next) => {
                 } : null),
                 sips: sips || [],
                 schemes: schemes || [],
-                recentTransactions: unifiedTxns.slice(0, 20)
+                recentTransactions: unifiedTxns.slice(0, 20),
+                mf: mfUcc ? {
+                    clientCode: mfUcc.clientCode,
+                    pan: mfUcc.pan,
+                    nseStatus: mfUcc.nseStatus || 'ACTIVE',
+                    firstHolderAuthStatus: mfUcc.firstHolderAuthStatus || 'SUCCESS',
+                    primaryBank: mfUcc.primaryBank || null,
+                    totalInvested: mfTotalInvested,
+                    currentValuation: mfCurrentValuation,
+                    activeSips: mfActiveSips,
+                    ordersCount: mfOrdersCount,
+                    holdingsCount: mfHoldings.length,
+                    holdings: mfHoldings,
+                } : null
             }
         });
     } catch (err) { next(err); }

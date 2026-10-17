@@ -317,6 +317,9 @@ async function loadMfInvestors(page = 1) {
                     <span class="badge ${isNseActive ? 'badge-success' : 'badge-warning'}">${u.nseStatus || 'ACTIVE'}</span>
                 </td>
                 <td style="text-align:right">
+                    <button class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${userObj._id}')" style="color:#00D09C;border-color:#00D09C;padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer;margin-right:6px" title="View 360° Profile, Live UCC Status, Bank & Portfolio">
+                        <i class="fas fa-eye"></i> View 360°
+                    </button>
                     <button class="btn btn-sm" onclick="cleanUserMutualFunds('${userObj._id}', '${(userObj.name || 'Investor').replace(/'/g, "\\'")}')" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 9px;font-size:11.5px;font-weight:700;border-radius:6px;cursor:pointer" title="Clean all MF data, UCC, orders, and SIPs for this user">
                         <i class="fas fa-broom"></i> Clean MF
                     </button>
@@ -634,6 +637,11 @@ async function loadMfOrders(page = 1) {
                         ${isRedeem && o.payoutStatus !== 'PROCESSED' ? `
                             <button class="btn btn-sm btn-outline" style="color:#f59e0b;border-color:#f59e0b;font-size:11px;padding:3px 7px" onclick="updateMfPayoutStatus('${o._id}', 'PROCESSED')" title="Mark AMC bank payout processed">
                                 <i class="fas fa-check-double"></i> Payout Sent
+                            </button>` : ''
+                        }
+                        ${(o.orderStatus === 'ALLOTTED' || isSucc) && o.orderStatus !== 'REFUNDED' ? `
+                            <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;font-size:11px;padding:3px 7px" onclick="openMfReversalModal('${o._id}', '${o.orderId}', '${(o.schemeName || '').replace(/'/g, "\\'")}', '${o.orderAmount || 0}')" title="Controlled Financial Reversal">
+                                <i class="fas fa-undo-alt"></i> Reversal
                             </button>` : ''
                         }
                     </div>
@@ -1041,6 +1049,9 @@ async function loadMfMandates(page = 1) {
                 </td>
                 <td style="text-align:right">
                     <div style="display:inline-flex;gap:6px;align-items:center">
+                        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;color:#3B82F6;border-color:#3B82F6" onclick="syncMfMandateWithNse('${m._id}')" title="Query NSE for live mandate approval and UMRN allocation">
+                            <i class="fas fa-satellite-dish"></i> Sync NSE
+                        </button>
                         <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C" onclick="resendMandateAuthLink('${m._id}')" title="Re-generate and copy Mandate Auth Link">
                             <i class="fas fa-link"></i> Auth Link
                         </button>
@@ -1465,6 +1476,7 @@ async function loadMfCurationSchemes(page = 1) {
                         <th style="text-align:center">Featured (App Carousel)</th>
                         <th style="text-align:center">Recommended Badge</th>
                         <th style="text-align:center">Status / Visibility</th>
+                        <th style="text-align:center">Details</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -1515,6 +1527,11 @@ async function loadMfCurationSchemes(page = 1) {
                         <i class="${isAct ? 'fas fa-eye' : 'fas fa-eye-slash'}"></i> ${isAct ? 'Active' : 'Hidden'}
                     </button>
                 </td>
+                <td style="text-align:center">
+                    <button class="btn btn-sm btn-outline" onclick="openMfSchemeDetails('${s._id}')" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C" title="View Scheme Specifications">
+                        <i class="fas fa-info-circle"></i> Info
+                    </button>
+                </td>
             </tr>`;
         });
 
@@ -1556,6 +1573,586 @@ async function toggleSchemeCurationField(schemeId, field, newValue) {
         console.error('toggleSchemeCurationField error:', err);
         toast('Error updating scheme curation', 'danger');
     }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 11. INVESTOR 360° PROFILE DRAWER & ACTIONS
+// ══════════════════════════════════════════════════════════════
+let currentInvestorProfileData = null;
+let currentInvestorActiveTab = 'portfolio';
+
+async function openMfInvestorDrawer(userId) {
+    if (!userId) return;
+    const modal = document.getElementById('mf-investor-modal');
+    const body = document.getElementById('mf-inv-modal-body');
+    if (!modal || !body) return;
+
+    modal.style.display = 'flex';
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading investor 360° profile...</div></div>`;
+
+    try {
+        const res = await api(`/admin/mutual-funds/users/${userId}/details`);
+        if (!res || !res.success || !res.data) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res?.message || 'Failed to load investor profile'}</div></div>`;
+            return;
+        }
+
+        currentInvestorProfileData = res.data;
+        const u = res.data.user || {};
+        const ucc = res.data.ucc || {};
+
+        const nameEl = document.getElementById('mf-inv-name');
+        const uccEl = document.getElementById('mf-inv-ucc');
+        const panEl = document.getElementById('mf-inv-pan');
+        const contactEl = document.getElementById('mf-inv-contact');
+        const avatarEl = document.getElementById('mf-inv-avatar');
+
+        if (nameEl) nameEl.textContent = u.name || ucc.fullName || 'Investor Profile';
+        if (uccEl) uccEl.textContent = ucc.clientCode || '—';
+        if (panEl) panEl.textContent = ucc.pan || '—';
+        if (contactEl) contactEl.textContent = `${u.phone || '—'} · ${u.email || '—'}`;
+        if (avatarEl) avatarEl.textContent = (u.name || ucc.fullName || 'U')[0].toUpperCase();
+
+        const nseBadge = document.getElementById('mf-inv-nse-badge');
+        if (nseBadge) {
+            const isAct = ucc.nseStatus === 'ACTIVE';
+            nseBadge.className = `badge ${isAct ? 'badge-success' : 'badge-warning'}`;
+            nseBadge.textContent = ucc.nseStatus || 'ACTIVE';
+        }
+
+        switchMfInvestorTab('portfolio');
+    } catch (err) {
+        console.error('openMfInvestorDrawer error:', err);
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Error loading investor profile</div></div>`;
+    }
+}
+
+function closeMfInvestorModal() {
+    const modal = document.getElementById('mf-investor-modal');
+    if (modal) modal.style.display = 'none';
+    currentInvestorProfileData = null;
+}
+
+function switchMfInvestorTab(tabName) {
+    currentInvestorActiveTab = tabName;
+    document.querySelectorAll('.mf-inv-tab').forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-tab') === tabName);
+    });
+    renderMfInvestorProfileContent(tabName);
+}
+
+function renderMfInvestorProfileContent(tab) {
+    const body = document.getElementById('mf-inv-modal-body');
+    if (!body || !currentInvestorProfileData) return;
+
+    const data = currentInvestorProfileData;
+    const u = data.user || {};
+    const ucc = data.ucc || {};
+    const p = data.portfolio || {};
+    const bank = ucc.primaryBank || {};
+
+    if (tab === 'portfolio') {
+        const holdings = p.holdings || [];
+        body.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px;margin-bottom:20px">
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Total Invested</div>
+                    <div style="font-size:20px;font-weight:800;color:#fff;margin-top:2px">${formatMfInr(p.totalInvested)}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Current Valuation</div>
+                    <div style="font-size:20px;font-weight:800;color:#00D09C;margin-top:2px">${formatMfInr(p.totalCurrentValue)}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Overall P&L</div>
+                    <div style="font-size:20px;font-weight:800;color:${p.totalReturns >= 0 ? '#00D09C' : '#ef4444'};margin-top:2px">
+                        ${p.totalReturns >= 0 ? '+' : ''}${formatMfInr(p.totalReturns)} <span style="font-size:12px;font-weight:600">(${p.returnsPercentage || 0}%)</span>
+                    </div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Active Holdings</div>
+                    <div style="font-size:20px;font-weight:800;color:#38bdf8;margin-top:2px">${p.holdingsCount || 0} Schemes</div>
+                </div>
+            </div>
+
+            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:12px"><i class="fas fa-layer-group" style="color:#00D09C;margin-right:6px"></i> Materialized Scheme Holdings</div>
+            ${holdings.length === 0 ? '<div style="color:var(--text-dim);font-size:13px;padding:20px;background:#0F172A;border-radius:8px;text-align:center">No active scheme holdings found for this investor.</div>' : `
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Scheme Name</th>
+                            <th>Units</th>
+                            <th>Avg / Latest NAV</th>
+                            <th>Invested</th>
+                            <th>Current Value</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${holdings.map(h => {
+                            const pl = (h.currentValue || 0) - (h.investedAmount || 0);
+                            const plPct = h.investedAmount > 0 ? ((pl / h.investedAmount) * 100).toFixed(2) : 0;
+                            return `
+                            <tr>
+                                <td>
+                                    <div style="font-weight:700;color:#fff;font-size:13px">${h.schemeName}</div>
+                                    <div style="font-size:11px;color:var(--text-dim)">ISIN: <code>${h.isin || '—'}</code> · Code: <code>${h.schemeCode}</code></div>
+                                </td>
+                                <td style="font-weight:600;color:#fff">${(h.units || 0).toFixed(3)}</td>
+                                <td>
+                                    <div style="font-size:12.5px;color:#fff">₹${(h.currentNav || h.averageNav || 0).toFixed(2)}</div>
+                                    <div style="font-size:10.5px;color:var(--text-dim)">Avg: ₹${(h.averageNav || 0).toFixed(2)}</div>
+                                </td>
+                                <td style="font-weight:600;color:#fff">${formatMfInr(h.investedAmount)}</td>
+                                <td style="font-weight:700;color:#00D09C">${formatMfInr(h.currentValue)}</td>
+                                <td style="font-weight:700;color:${pl >= 0 ? '#00D09C' : '#ef4444'}">
+                                    ${pl >= 0 ? '+' : ''}${formatMfInr(pl)} (${plPct}%)
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`}
+        `;
+    } else if (tab === 'ucc') {
+        body.innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:18px">
+                    <div style="font-weight:700;color:#fff;margin-bottom:12px;font-size:14px"><i class="fas fa-id-badge" style="color:#00D09C;margin-right:6px"></i> Investor Master Profile</div>
+                    <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;font-size:12.5px">
+                        <span style="color:var(--text-dim)">Client Code:</span><strong style="color:#00D09C;font-family:monospace">${ucc.clientCode || '—'}</strong>
+                        <span style="color:var(--text-dim)">Full Name:</span><span style="color:#fff">${ucc.fullName || u.name || '—'}</span>
+                        <span style="color:var(--text-dim)">PAN:</span><span style="color:#fff;font-family:monospace;font-weight:600">${ucc.pan || '—'}</span>
+                        <span style="color:var(--text-dim)">Date of Birth:</span><span style="color:#fff">${ucc.dob || '—'}</span>
+                        <span style="color:var(--text-dim)">Gender:</span><span style="color:#fff">${ucc.gender || '—'}</span>
+                        <span style="color:var(--text-dim)">Holding Nature:</span><span style="color:#fff">${ucc.holdingNature || 'Single (SI)'}</span>
+                        <span style="color:var(--text-dim)">Tax Status:</span><span style="color:#fff">${ucc.taxStatus || 'Individual (01)'}</span>
+                        <span style="color:var(--text-dim)">Occupation:</span><span style="color:#fff">${ucc.occupationCode || 'Business / Professional (01)'}</span>
+                    </div>
+                </div>
+
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:18px">
+                    <div style="font-weight:700;color:#fff;margin-bottom:12px;font-size:14px"><i class="fas fa-satellite-dish" style="color:#3B82F6;margin-right:6px"></i> NSE Registration & Compliance</div>
+                    <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;font-size:12.5px">
+                        <span style="color:var(--text-dim)">NSE Status:</span><span class="badge ${ucc.nseStatus === 'ACTIVE' ? 'badge-success' : 'badge-warning'}">${ucc.nseStatus || 'ACTIVE'}</span>
+                        <span style="color:var(--text-dim)">Holder OTP Auth:</span><span class="badge ${ucc.firstHolderAuthStatus === 'SUCCESS' ? 'badge-success' : 'badge-warning'}">${ucc.firstHolderAuthStatus || 'SUCCESS'}</span>
+                        <span style="color:var(--text-dim)">Nominee Status:</span><span style="color:#fff">${ucc.nominee?.name ? `Registered (${ucc.nominee.name})` : 'Opted Out (N)'}</span>
+                        <span style="color:var(--text-dim)">Onboarded At:</span><span style="color:#fff">${formatMfDate(ucc.createdAt)}</span>
+                        <span style="color:var(--text-dim)">Registered Mobile:</span><span style="color:#fff;font-family:monospace">${u.phone || '—'}</span>
+                        <span style="color:var(--text-dim)">Registered Email:</span><span style="color:#fff">${u.email || '—'}</span>
+                    </div>
+                    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #1E293B">
+                        <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:6px">Communication Address:</div>
+                        <div style="font-size:12.5px;color:#cbd5e1;line-height:1.4">
+                            ${ucc.address?.address1 || ''} ${ucc.address?.address2 || ''}, ${ucc.address?.city || ''}, ${ucc.address?.state || ''} - ${ucc.address?.pincode || ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (tab === 'bank') {
+        const isBankActive = bank.bankStatus === 'ACTIVE' || ucc.nseStatus === 'ACTIVE';
+        body.innerHTML = `
+            <div style="background:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:20px;margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <div style="font-weight:700;color:#fff;font-size:15px"><i class="fas fa-university" style="color:#00D09C;margin-right:8px"></i> Registered Bank Account (Primary)</div>
+                    <span class="badge ${isBankActive ? 'badge-success' : 'badge-danger'}" style="font-size:12px;padding:4px 10px">
+                        ${isBankActive ? 'PENNY DROP ACTIVE' : 'VERIFICATION PENDING / REJECTED'}
+                    </span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+                    <div><span style="color:var(--text-dim)">Bank Name:</span> <strong style="color:#fff">${bank.bankName || 'Kotak Mahindra Bank'}</strong></div>
+                    <div><span style="color:var(--text-dim)">Account Number:</span> <code style="color:#00D09C;font-size:13px">${bank.accountNo || '—'}</code></div>
+                    <div><span style="color:var(--text-dim)">IFSC Code:</span> <code style="color:#fff;font-size:13px">${bank.ifsc || '—'}</code></div>
+                    <div><span style="color:var(--text-dim)">Account Type:</span> <strong style="color:#fff">${bank.accountType === 'CA' ? 'Current (CA)' : 'Savings (SB)'}</strong></div>
+                    <div style="grid-column:1 / -1"><span style="color:var(--text-dim)">Penny Drop Remark:</span> <span style="color:${isBankActive ? '#00D09C' : '#f87171'}">${bank.pennyDropRemark || 'Customer identity verified successfully'}</span></div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+                <button class="btn btn-primary" onclick="openCurrentInvestorBankUpdate()"><i class="fas fa-edit"></i> Replace / Update Bank via UCC Modification</button>
+            </div>
+        `;
+    } else if (tab === 'mandates') {
+        const mandates = data.mandates || [];
+        const sips = data.sips || [];
+        body.innerHTML = `
+            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:10px"><i class="fas fa-file-signature" style="color:#00D09C;margin-right:6px"></i> Bank Debit Mandates (eNACH)</div>
+            ${mandates.length === 0 ? '<div style="color:var(--text-dim);font-size:12.5px;padding:14px;background:#0F172A;border-radius:8px;margin-bottom:20px">No mandates registered.</div>' : `
+            <div class="table-responsive" style="margin-bottom:20px">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Mandate ID</th>
+                            <th>UMRN</th>
+                            <th>Debit Limit</th>
+                            <th>Status</th>
+                            <th style="text-align:right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${mandates.map(m => `
+                        <tr>
+                            <td><code style="color:#D4A017">${m.mandateId}</code></td>
+                            <td><code>${m.umrn || 'Pending Allocation'}</code></td>
+                            <td style="font-weight:700;color:#00D09C">${formatMfInr(m.amount || 50000)}</td>
+                            <td><span class="badge ${m.status === 'ACCEPTED_BY_BANK' ? 'badge-success' : 'badge-warning'}">${m.status}</span></td>
+                            <td style="text-align:right">
+                                <button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 7px" onclick="syncMfMandateWithNse('${m._id}')"><i class="fas fa-sync"></i> Sync NSE</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`}
+
+            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:10px"><i class="fas fa-repeat" style="color:#38bdf8;margin-right:6px"></i> Active & Past SIP Schedules</div>
+            ${sips.length === 0 ? '<div style="color:var(--text-dim);font-size:12.5px;padding:14px;background:#0F172A;border-radius:8px">No SIP schedules found.</div>' : `
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Scheme Name</th>
+                            <th>Monthly Amount</th>
+                            <th>Installments</th>
+                            <th>Next Due</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sips.map(s => `
+                        <tr>
+                            <td><div style="font-weight:700;color:#fff">${s.schemeName}</div><div style="font-size:11px;color:var(--text-dim)">Reg No: ${s.sipRegNo}</div></td>
+                            <td style="font-weight:700;color:#00D09C">${formatMfInr(s.installmentAmount)}</td>
+                            <td>${s.installmentsPaid || 0} Paid</td>
+                            <td>${formatMfDate(s.nextDueDate)}</td>
+                            <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}">${s.status}</span></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`}
+        `;
+    } else if (tab === 'orders') {
+        const orders = data.recentOrders || [];
+        body.innerHTML = `
+            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:10px"><i class="fas fa-receipt" style="color:#00D09C;margin-right:6px"></i> Recent Transactions</div>
+            ${orders.length === 0 ? '<div style="color:var(--text-dim);font-size:12.5px;padding:14px;background:#0F172A;border-radius:8px">No orders found.</div>' : `
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Scheme</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Units</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th style="text-align:right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(o => `
+                        <tr>
+                            <td><code style="color:#fff">${o.orderId}</code></td>
+                            <td><div style="font-weight:600;color:#fff;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.schemeName}</div></td>
+                            <td><span class="badge ${o.transactionType === 'R' ? 'badge-warning' : 'badge-success'}">${o.transactionType === 'R' ? 'REDEEM' : 'BUY'}</span></td>
+                            <td style="font-weight:700;color:#00D09C">${formatMfInr(o.orderAmount)}</td>
+                            <td>${o.units || o.redemptionUnits || 0}</td>
+                            <td><span class="badge badge-secondary">${o.paymentStatus}</span></td>
+                            <td><span class="badge ${o.nseStatus?.includes('ALLOTTED') ? 'badge-success' : 'badge-purple'}">${o.nseStatus || 'PENDING'}</span></td>
+                            <td style="font-size:11.5px;color:var(--text-dim)">${formatMfDate(o.createdAt)}</td>
+                            <td style="text-align:right">
+                                <button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px" onclick="syncMfOrderWithNse('${o._id}')"><i class="fas fa-sync"></i> Sync</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`}
+        `;
+    }
+}
+
+async function syncCurrentInvestorUccLive() {
+    if (!currentInvestorProfileData) return;
+    const uid = currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?.clientCode;
+    const btn = document.getElementById('btn-sync-ucc-modal');
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Probing NSE...`; }
+        toast('Calling NSE client authorization & detail reports...', 'info');
+        const res = await api(`/admin/mutual-funds/users/${uid}/sync-ucc`, { method: 'POST' });
+        if (res && res.success) {
+            toast(res.message || 'UCC status synchronized with NSE ✓', 'success');
+            await openMfInvestorDrawer(uid);
+        } else {
+            toast(res?.message || 'Failed to sync UCC status', 'danger');
+        }
+    } catch (e) {
+        toast('Error querying live UCC status', 'danger');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-satellite-dish"></i> Verify Live on NSE`; }
+    }
+}
+
+async function resendCurrentInvestorUccAuth() {
+    if (!currentInvestorProfileData) return;
+    const uid = currentInvestorProfileData.user?._id || currentInvestorProfileData.ucc?.clientCode;
+    const btn = document.getElementById('btn-resend-auth-modal');
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatching...`; }
+        toast('Re-dispatching NSE authorization communication...', 'info');
+        const res = await api(`/admin/mutual-funds/users/${uid}/resend-auth`, { method: 'POST' });
+        if (res && res.success) {
+            toast('Official OTP Authorization SMS/Email sent to investor ✓', 'success');
+            if (res.data?.authLink) {
+                if (navigator.clipboard) await navigator.clipboard.writeText(res.data.authLink);
+                prompt('Official NSE Authorization Link (Share with investor):', res.data.authLink);
+            }
+        } else {
+            toast(res?.message || 'Failed to resend authorization communication', 'danger');
+        }
+    } catch (e) {
+        toast('Error resending authorization communication', 'danger');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-paper-plane"></i> Resend Auth OTP`; }
+    }
+}
+
+function openCurrentInvestorBankUpdate() {
+    if (!currentInvestorProfileData) return;
+    const u = currentInvestorProfileData.user || {};
+    const ucc = currentInvestorProfileData.ucc || {};
+    const bank = ucc.primaryBank || {};
+
+    const uidEl = document.getElementById('mf-bank-user-id');
+    const ccEl = document.getElementById('mf-bank-client-code');
+    const nameEl = document.getElementById('mf-bank-name');
+    const accEl = document.getElementById('mf-bank-account-no');
+    const ifscEl = document.getElementById('mf-bank-ifsc');
+    const typeEl = document.getElementById('mf-bank-account-type');
+
+    if (uidEl) uidEl.value = u._id || '';
+    if (ccEl) ccEl.value = ucc.clientCode || '';
+    if (nameEl) nameEl.value = bank.bankName || 'Kotak Mahindra Bank';
+    if (accEl) accEl.value = bank.accountNo || '';
+    if (ifscEl) ifscEl.value = bank.ifsc || '';
+    if (typeEl) typeEl.value = bank.accountType || 'SB';
+
+    const modal = document.getElementById('mf-bank-update-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeMfBankUpdateModal() {
+    const modal = document.getElementById('mf-bank-update-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitMfBankUpdate(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btn-save-mf-bank');
+    const clientCode = document.getElementById('mf-bank-client-code')?.value;
+    const userId = document.getElementById('mf-bank-user-id')?.value;
+    const bankName = document.getElementById('mf-bank-name')?.value.trim();
+    const accountNo = document.getElementById('mf-bank-account-no')?.value.trim();
+    const ifsc = document.getElementById('mf-bank-ifsc')?.value.trim().toUpperCase();
+    const accountType = document.getElementById('mf-bank-account-type')?.value;
+
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Submitting...`; }
+        toast('Submitting bank update and checking UCC modification status...', 'info');
+
+        const res = await api('/admin/mutual-funds/client-action', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'UPDATE_BANK',
+                clientCode,
+                accountNo,
+                ifsc,
+                bankName,
+                accountType,
+            }),
+        });
+
+        if (res && res.success) {
+            toast('Bank details updated on NSE & DB successfully ✓', 'success');
+            closeMfBankUpdateModal();
+            if (userId) await openMfInvestorDrawer(userId);
+            loadMfInvestors(mfInvestorsCurrentPage || 1);
+        } else {
+            toast(res?.message || 'Failed to update bank details', 'danger');
+        }
+    } catch (err) {
+        toast('Error updating bank details', 'danger');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-save"></i> Submit Bank Update`; }
+    }
+}
+
+async function cleanCurrentInvestorMf() {
+    if (!currentInvestorProfileData) return;
+    const uid = currentInvestorProfileData.user?._id;
+    const name = currentInvestorProfileData.user?.name || 'Investor';
+    await cleanUserMutualFunds(uid, name);
+    closeMfInvestorModal();
+}
+
+async function syncMfMandateWithNse(mandateId) {
+    try {
+        toast('Querying NSE exchange for mandate approval & UMRN...', 'info');
+        const res = await api(`/admin/mutual-funds/mandates/${mandateId}/sync-nse`, { method: 'POST' });
+        if (res && res.success) {
+            toast(res.message || 'Mandate status synchronized with NSE ✓', 'success');
+            loadMfMandates(mfMandatesCurrentPage || 1);
+        } else {
+            toast(res?.message || 'Failed to sync mandate with NSE', 'danger');
+        }
+    } catch (e) {
+        toast('Error syncing mandate with NSE', 'danger');
+    }
+}
+
+function openMfReversalModal(orderId, orderRef, schemeName, amount) {
+    const idEl = document.getElementById('mf-reversal-order-id');
+    const refEl = document.getElementById('mf-reversal-order-ref');
+    const infoEl = document.getElementById('mf-reversal-scheme-info');
+    const reasonEl = document.getElementById('mf-reversal-reason');
+
+    if (idEl) idEl.value = orderId || '';
+    if (refEl) refEl.value = orderRef || orderId;
+    if (infoEl) infoEl.value = `${schemeName} (${formatMfInr(amount)})`;
+    if (reasonEl) reasonEl.value = '';
+
+    const modal = document.getElementById('mf-reversal-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeMfReversalModal() {
+    const modal = document.getElementById('mf-reversal-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitMfControlledReversal(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btn-submit-reversal');
+    const orderId = document.getElementById('mf-reversal-order-id')?.value;
+    const reason = document.getElementById('mf-reversal-reason')?.value.trim();
+
+    if (!reason) {
+        toast('Audit justification reason is required', 'warning');
+        return;
+    }
+
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Reversing...`; }
+        toast('Executing controlled financial reversal...', 'info');
+
+        const res = await api(`/admin/mutual-funds/orders/${orderId}/controlled-reversal`, {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
+        });
+
+        if (res && res.success) {
+            toast('Order reversed in ledger & portfolio updated ✓', 'success');
+            closeMfReversalModal();
+            loadMfOrders(mfOrdersCurrentPage || 1);
+        } else {
+            toast(res?.message || 'Controlled reversal failed', 'danger');
+        }
+    } catch (err) {
+        toast('Error executing controlled reversal', 'danger');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-undo-alt"></i> Execute Reversal`; }
+    }
+}
+
+async function syncMfNavsAndMaster() {
+    const btn = document.getElementById('btn-sync-nav-header');
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Syncing NAVs...`; }
+        toast('Triggering official AMFI/NSE consolidated Scheme Master & NAV Ingestion...', 'info');
+
+        const res = await api('/admin/mutual-funds/schemes/sync-nav', {
+            method: 'POST',
+            body: JSON.stringify({ dryRun: false }),
+        });
+
+        if (res && res.success) {
+            const report = res.data || {};
+            toast(`Master & NAV Sync completed! ${report.navDiscrepanciesFlagged || 0} updated, ${report.matchedAccurately || 0} matched ✓`, 'success');
+            loadMfCurationSchemes(1);
+        } else {
+            toast(res?.message || 'NAV Sync encountered an issue', 'danger');
+        }
+    } catch (err) {
+        toast('Error synchronizing NAVs and master', 'danger');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fas fa-sync"></i> Sync NAVs & Master`; }
+    }
+}
+
+async function openMfSchemeDetails(schemeId) {
+    const modal = document.getElementById('mf-scheme-detail-modal');
+    const body = document.getElementById('mf-scheme-modal-body');
+    const title = document.getElementById('mf-scheme-modal-title');
+    if (!modal || !body) return;
+
+    modal.style.display = 'flex';
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading scheme specifications...</div></div>`;
+
+    try {
+        const res = await api(`/mutual-funds/schemes/${schemeId}`);
+        const s = res?.data || {};
+
+        if (title) title.textContent = s.schemeName || 'Scheme Details';
+
+        body.innerHTML = `
+            <div style="background:#0F172A;border:1px solid #1E293B;border-radius:12px;padding:20px;margin-bottom:18px">
+                <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:4px">${s.schemeName}</div>
+                <div style="font-size:12px;color:var(--text-dim)">
+                    <span style="color:#00D09C;font-weight:700">${s.amcName || s.amcCode || 'AMC'}</span> · Category: <b>${s.category || 'Equity'}</b> (${s.subCategory || 'Regular'})
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:13px">
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Scheme Code (NSE)</div>
+                    <code style="color:#00D09C;font-size:13px">${s.schemeCode}</code>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">ISIN Code</div>
+                    <code style="color:#fff;font-size:13px">${s.isin || '—'}</code>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Current NAV</div>
+                    <div style="font-size:18px;font-weight:800;color:#fff">₹${(s.nav || 0).toFixed(2)}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">NAV Date: ${formatMfDate(s.navDate)}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Fund Size (AUM)</div>
+                    <div style="font-size:18px;font-weight:800;color:#cbd5e1">${s.aum ? '₹' + s.aum.toLocaleString('en-IN') + ' Cr' : '—'}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Minimum SIP Amount</div>
+                    <div style="font-size:16px;font-weight:700;color:#00D09C">${s.minSipAmount ? formatMfInr(s.minSipAmount) : '₹500'}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Minimum Lumpsum Purchase</div>
+                    <div style="font-size:16px;font-weight:700;color:#fff">${s.minPurchaseAmount ? formatMfInr(s.minPurchaseAmount) : '₹1,000'}</div>
+                </div>
+                <div style="background:#0F172A;border:1px solid #1E293B;border-radius:10px;padding:14px;grid-column:1 / -1">
+                    <div style="font-size:11.5px;color:var(--text-dim)">Exit Load Policy</div>
+                    <div style="font-size:12.5px;color:#fff;margin-top:2px">${s.exitLoad || 'Nil after 1 year, 1% if redeemed within 365 days'}</div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Failed to load scheme details</div></div>`;
+    }
+}
+
+function closeMfSchemeDetailModal() {
+    const modal = document.getElementById('mf-scheme-detail-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 

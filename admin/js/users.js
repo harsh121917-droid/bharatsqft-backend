@@ -2598,28 +2598,48 @@ async function saveUserDetailsProfile() {
 async function loadUserMutualFundsModalSection(userId, containerEl) {
     if (!userId || !containerEl) return;
     try {
-        const res = await api(`/admin/mutual-funds/users?search=${encodeURIComponent(userId)}`);
-        const mfUser = res?.data?.users?.[0];
-        if (mfUser) {
-            const s = mfUser.stats || {};
-            const b = mfUser.bank || {};
+        // First check if already supplied by getUserById
+        let mfData = typeof currentUserDetailsData !== 'undefined' && currentUserDetailsData?.mf ? currentUserDetailsData.mf : null;
+
+        if (!mfData) {
+            const res = await api(`/admin/mutual-funds/users?search=${encodeURIComponent(userId)}`);
+            const mfUser = Array.isArray(res?.data) ? res.data[0] : (res?.data?.users?.[0] || null);
+            if (mfUser) {
+                const s = mfUser.stats || {};
+                const b = mfUser.primaryBank || {};
+                mfData = {
+                    clientCode: mfUser.clientCode,
+                    pan: mfUser.pan,
+                    nseStatus: mfUser.nseStatus,
+                    primaryBank: b,
+                    totalInvested: s.totalInvested || 0,
+                    activeSips: s.activeSips || 0,
+                    monthlySipAmount: s.monthlySipAmount || 0,
+                };
+            }
+        }
+
+        if (mfData) {
+            const b = mfData.primaryBank || {};
+            const isNseActive = mfData.nseStatus === 'ACTIVE';
             const mfHtml = `
             <div style="margin-top:14px;padding:14px;background:rgba(0,208,156,0.06);border-radius:var(--radius-md);border:1px solid rgba(0,208,156,0.25)">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <div style="font-weight:700;color:#00D09C;font-size:13.5px;display:flex;align-items:center;gap:6px">
                         <i class="fas fa-chart-pie"></i> Mutual Funds Portfolio & NSE UCC
                     </div>
-                    <span class="badge ${mfUser.nseStatus === 'ACTIVE' ? 'badge-success' : 'badge-warning'}">${mfUser.nseStatus || 'ACTIVE'}</span>
+                    <span class="badge ${isNseActive ? 'badge-success' : 'badge-warning'}">${mfData.nseStatus || 'ACTIVE'}</span>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12.5px">
-                    <div>Client Code: <strong style="font-family:var(--font-mono);color:#00D09C">${mfUser.clientCode}</strong></div>
-                    <div>PAN: <strong style="font-family:var(--font-mono);color:#fff">${mfUser.pan || '—'}</strong></div>
-                    <div>Total Invested: <strong style="font-family:var(--font-mono);color:#fff">${formatINR(s.totalInvested || 0)}</strong></div>
-                    <div>Active SIPs: <strong style="font-family:var(--font-mono);color:#00D09C">${s.activeSips || 0} SIPs</strong></div>
-                    <div>Bank A/C: <span style="font-family:var(--font-mono);color:var(--text-dim)">${b.bankName || 'Bank'} (••••${b.accountNo ? b.accountNo.slice(-4) : '—'})</span></div>
-                    <div>Monthly Volume: <strong style="font-family:var(--font-mono);color:#fff">${formatINR(s.monthlySipAmount || 0)}</strong></div>
+                    <div>Client Code: <strong style="font-family:var(--font-mono);color:#00D09C">${mfData.clientCode}</strong></div>
+                    <div>PAN: <strong style="font-family:var(--font-mono);color:#fff">${mfData.pan || '—'}</strong></div>
+                    <div>Total Invested: <strong style="font-family:var(--font-mono);color:#fff">${formatINR(mfData.totalInvested || 0)}</strong></div>
+                    <div>Active SIPs: <strong style="font-family:var(--font-mono);color:#00D09C">${mfData.activeSips || 0} SIPs</strong></div>
+                    <div>Bank A/C: <span style="font-family:var(--font-mono);color:var(--text-dim)">${b.bankName || 'Bank'} (••••${b.accountNo ? String(b.accountNo).slice(-4) : '—'})</span></div>
+                    <div>Valuation: <strong style="font-family:var(--font-mono);color:#00D09C">${formatINR(mfData.currentValuation || mfData.totalInvested || 0)}</strong></div>
                 </div>
-                <div style="margin-top:10px;display:flex;gap:8px">
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openMfInvestorDrawer('${userId}')" style="font-size:11px;padding:3px 8px;color:#00D09C;border-color:#00D09C"><i class="fas fa-eye"></i> Investor 360°</button>
                     <button type="button" class="btn btn-sm btn-outline" onclick="showPage('mfsips')" style="font-size:11px;padding:3px 8px">View SIPs</button>
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="cleanUserMutualFunds('${userId}')" style="font-size:11px;padding:3px 8px"><i class="fas fa-broom"></i> Clean MF Data</button>
                 </div>

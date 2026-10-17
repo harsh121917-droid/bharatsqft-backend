@@ -198,10 +198,14 @@ router.post("/sips/remind-all", sipController.sendBulkSipReminders);
 const adminMfController = require("../controllers/adminMfController");
 router.get("/mutual-funds/overview", adminMfController.getMfOverview);
 router.get("/mutual-funds/users", adminMfController.getMfUsers);
+router.get("/mutual-funds/users/:userId/details", adminMfController.getMfUserFullProfile);
+router.post("/mutual-funds/users/:userId/sync-ucc", adminMfController.syncUccWithNse);
+router.post("/mutual-funds/users/:userId/resend-auth", adminMfController.resendUccAuth);
 router.get("/mutual-funds/sips", adminMfController.getMfSips);
 router.get("/mutual-funds/orders", adminMfController.getMfOrders);
 router.post("/mutual-funds/sips/:id/status", adminMfController.updateMfSipStatus);
 router.post("/mutual-funds/orders/:id/verify", adminMfController.reconcileMfOrder);
+router.post("/mutual-funds/orders/:id/controlled-reversal", adminMfController.reverseOrder);
 router.delete("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMfData);
 router.post("/mutual-funds/users/:userId/clean", adminMfController.cleanUserMfData);
 router.post("/mutual-funds/clean-all", adminMfController.cleanAllMfData);
@@ -216,6 +220,7 @@ router.post("/mutual-funds/client-action", adminMfController.executeClientAction
 router.get("/mutual-funds/mandates", adminMfController.getMfMandates);
 router.post("/mutual-funds/mandates/:id/status", adminMfController.updateMfMandateStatus);
 router.post("/mutual-funds/mandates/:id/resend-link", adminMfController.resendMandateAuthLink);
+router.post("/mutual-funds/mandates/:id/sync-nse", adminMfController.syncMandateWithNse);
 
 // Live NSE Exchange Re-Query & Status Sync
 router.post("/mutual-funds/orders/:id/sync-nse", adminMfController.syncOrderWithNse);
@@ -224,6 +229,11 @@ router.post("/mutual-funds/sips/:id/sync-nse", adminMfController.syncSipWithNse)
 // Scheme Management & Curation (Featured, Recommended, Active/Hidden)
 router.get("/mutual-funds/schemes", adminMfController.getAdminMfSchemes);
 router.post("/mutual-funds/schemes/:id/toggle", adminMfController.toggleAdminMfScheme);
+router.post("/mutual-funds/schemes/sync-nav", adminMfController.reconcileNseMaster);
+router.get("/mutual-funds/schemes/master-audit", adminMfController.getNseMasterAudit);
+
+// Audit Trail & Logs
+router.get("/mutual-funds/audit-logs", adminMfController.getAuditLogs);
 
 // Daily Automated Reconciliation Reports & Alerts (Section 22)
 router.get("/mutual-funds/reconciliation", adminMfController.getReconciliationReport);
