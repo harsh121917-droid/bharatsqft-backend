@@ -43,6 +43,15 @@ const {
   updateUserBank,
   resendUccActivation,
   handleUpiPaymentCallback,
+  recordRecentlyViewed,
+  getRecentlyViewed,
+  getCart,
+  addToCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
+  getMfProfile,
+  addMfBank,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -94,6 +103,21 @@ router.get('/transactions/:id', getTransactionDetail);
 router.get('/tax/capital-gains', getCapitalGains);
 router.get('/orders/my', getMyOrders);
 router.post('/test/reset', resetTestData);
+
+// ── Recently Viewed Schemes ──
+router.get('/recently-viewed', getRecentlyViewed);
+router.post('/recently-viewed', recordRecentlyViewed);
+
+// ── Mutual Funds Cart ──
+router.get('/cart', getCart);
+router.post('/cart/add', addToCart);
+router.put('/cart/:itemId', updateCartItem);
+router.delete('/cart/:itemId', removeFromCart);
+router.delete('/cart', clearCart);
+
+// ── Mutual Funds Profile, Bank & Orders ──
+router.get('/profile', getMfProfile);
+router.post('/profile/bank', addMfBank);
 
 module.exports = router;
 

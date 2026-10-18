@@ -23,6 +23,8 @@ const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
 const mfMarketSyncService = require('../services/mfMarketSyncService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
+const MfRecentlyViewed = require('../models/MfRecentlyViewed');
+const MfCart = require('../models/MfCart');
 const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const STATE_CODE_MAP = {
   'ANDAMAN & NICOBAR': 'AN', 'ANDAMAN AND NICOBAR': 'AN', 'AN': 'AN',
@@ -4699,4 +4701,458 @@ exports.getSchemeHoldings = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to retrieve holdings' });
   }
 };
+
+// ── 21. POST /api/mutual-funds/recently-viewed ──
+exports.recordRecentlyViewed = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { schemeCode } = req.body;
+    if (!schemeCode) {
+      return res.status(400).json({ success: false, message: 'schemeCode is required' });
+    }
+
+    let record = await MfRecentlyViewed.findOne({ user: userId });
+    if (!record) {
+      record = new MfRecentlyViewed({ user: userId, items: [] });
+    }
+
+    // Filter out existing occurrence of this schemeCode
+    record.items = (record.items || []).filter((item) => item.schemeCode !== String(schemeCode).trim());
+    // Add to the front
+    record.items.unshift({
+      schemeCode: String(schemeCode).trim(),
+      viewedAt: new Date(),
+    });
+
+    // Keep at most 20 recent items
+    if (record.items.length > 20) {
+      record.items = record.items.slice(0, 20);
+    }
+
+    await record.save();
+    return res.json({ success: true, message: 'Recently viewed recorded successfully' });
+  } catch (error) {
+    console.error('[recordRecentlyViewed Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 22. GET /api/mutual-funds/recently-viewed ──
+exports.getRecentlyViewed = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const record = await MfRecentlyViewed.findOne({ user: userId });
+    if (!record || !record.items || record.items.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const schemeCodes = record.items.map((i) => i.schemeCode);
+    const schemes = await MutualFundScheme.find({
+      schemeCode: { $in: schemeCodes },
+    }).lean();
+
+    const schemeMap = new Map();
+    schemes.forEach((s) => schemeMap.set(s.schemeCode, s));
+
+    const orderedSchemes = schemeCodes
+      .map((code) => schemeMap.get(code))
+      .filter(Boolean);
+
+    return res.json({ success: true, data: orderedSchemes });
+  } catch (error) {
+    console.error('[getRecentlyViewed Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 23. GET /api/mutual-funds/cart ──
+exports.getCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    let cart = await MfCart.findOne({ user: userId });
+    if (!cart) {
+      cart = await MfCart.create({ user: userId, items: [] });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        items: cart.items || [],
+        totalAmount: cart.totalAmount || 0,
+        count: cart.items ? cart.items.length : 0,
+      },
+    });
+  } catch (error) {
+    console.error('[getCart Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 24. POST /api/mutual-funds/cart/add ──
+exports.addToCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      schemeCode,
+      schemeName,
+      amcName,
+      category,
+      investmentType = 'SIP',
+      amount,
+      frequency = 'MONTHLY',
+      sipDay = 5,
+      folioNo = '',
+    } = req.body;
+
+    if (!schemeCode || !amount) {
+      return res.status(400).json({ success: false, message: 'schemeCode and amount are required' });
+    }
+
+    let finalSchemeName = schemeName;
+    let finalAmcName = amcName;
+    let finalCategory = category;
+
+    if (!finalSchemeName) {
+      const scheme = await MutualFundScheme.findOne({ schemeCode: String(schemeCode).trim() });
+      if (scheme) {
+        finalSchemeName = scheme.schemeName;
+        finalAmcName = scheme.fundHouse || finalAmcName;
+        finalCategory = scheme.category || finalCategory;
+      } else {
+        finalSchemeName = `Scheme ${schemeCode}`;
+      }
+    }
+
+    let cart = await MfCart.findOne({ user: userId });
+    if (!cart) {
+      cart = new MfCart({ user: userId, items: [] });
+    }
+
+    const existingIndex = cart.items.findIndex(
+      (item) => item.schemeCode === String(schemeCode).trim() && item.investmentType === investmentType
+    );
+
+    if (existingIndex > -1) {
+      cart.items[existingIndex].amount = Number(amount);
+      if (frequency) cart.items[existingIndex].frequency = frequency;
+      if (sipDay) cart.items[existingIndex].sipDay = Number(sipDay);
+      if (folioNo !== undefined) cart.items[existingIndex].folioNo = folioNo;
+      cart.items[existingIndex].addedAt = new Date();
+    } else {
+      cart.items.push({
+        schemeCode: String(schemeCode).trim(),
+        schemeName: finalSchemeName,
+        amcName: finalAmcName || '',
+        category: finalCategory || '',
+        investmentType,
+        amount: Number(amount),
+        frequency,
+        sipDay: Number(sipDay) || 5,
+        folioNo: folioNo || '',
+        addedAt: new Date(),
+      });
+    }
+
+    await cart.save();
+
+    return res.json({
+      success: true,
+      message: 'Added to cart successfully',
+      data: {
+        items: cart.items,
+        totalAmount: cart.totalAmount,
+        count: cart.items.length,
+      },
+    });
+  } catch (error) {
+    console.error('[addToCart Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 25. PUT /api/mutual-funds/cart/:itemId ──
+exports.updateCartItem = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { itemId } = req.params;
+    const { amount, frequency, sipDay, folioNo } = req.body;
+
+    const cart = await MfCart.findOne({ user: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    const item = cart.items.id(itemId) || cart.items.find((i) => i.schemeCode === itemId || String(i._id) === itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Cart item not found' });
+    }
+
+    if (amount !== undefined) item.amount = Number(amount);
+    if (frequency !== undefined) item.frequency = frequency;
+    if (sipDay !== undefined) item.sipDay = Number(sipDay);
+    if (folioNo !== undefined) item.folioNo = folioNo;
+
+    await cart.save();
+
+    return res.json({
+      success: true,
+      message: 'Cart item updated',
+      data: {
+        items: cart.items,
+        totalAmount: cart.totalAmount,
+        count: cart.items.length,
+      },
+    });
+  } catch (error) {
+    console.error('[updateCartItem Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 26. DELETE /api/mutual-funds/cart/:itemId ──
+exports.removeFromCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { itemId } = req.params;
+
+    const cart = await MfCart.findOne({ user: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    cart.items = cart.items.filter(
+      (item) => String(item._id) !== itemId && item.schemeCode !== itemId
+    );
+
+    await cart.save();
+
+    return res.json({
+      success: true,
+      message: 'Item removed from cart',
+      data: {
+        items: cart.items,
+        totalAmount: cart.totalAmount,
+        count: cart.items.length,
+      },
+    });
+  } catch (error) {
+    console.error('[removeFromCart Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 27. DELETE /api/mutual-funds/cart ──
+exports.clearCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const cart = await MfCart.findOne({ user: userId });
+    if (cart) {
+      cart.items = [];
+      await cart.save();
+    }
+
+    return res.json({
+      success: true,
+      message: 'Cart cleared successfully',
+      data: { items: [], totalAmount: 0, count: 0 },
+    });
+  } catch (error) {
+    console.error('[clearCart Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 28. GET /api/mutual-funds/profile ──
+exports.getMfProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const [user, ucc, bankAccounts, mandates, orders] = await Promise.all([
+      User.findById(userId).lean(),
+      MfClientUcc.findOne({ user: userId }).lean(),
+      BankAccount.find({ user: userId }).sort({ isDefault: -1, createdAt: -1 }).lean(),
+      MfMandate.find({ user: userId }).sort({ createdAt: -1 }).lean(),
+      MfOrder.find({ user: userId }).sort({ createdAt: -1 }).limit(100).lean(),
+    ]);
+
+    const banks = [...(bankAccounts || [])];
+    if (ucc?.bankDetails?.accountNo) {
+      const exists = banks.some((b) => b.accountNumber === ucc.bankDetails.accountNo);
+      if (!exists) {
+        banks.unshift({
+          _id: 'ucc_bank',
+          accountNumber: ucc.bankDetails.accountNo,
+          ifsc: ucc.bankDetails.ifscCode,
+          bankName: ucc.bankDetails.bankName || 'Registered Primary Bank',
+          accountType: ucc.bankDetails.accountType === 'SB' ? 'savings' : 'current',
+          accountHolder: ucc.name || user?.name || '',
+          isDefault: true,
+          isVerified: true,
+        });
+      }
+    }
+
+    const formattedOrders = (orders || []).map((o) => {
+      const st = (o.orderStatus || o.status || '').toUpperCase();
+      let passFailStatus = 'PENDING';
+      if (['ALLOTTED', 'SUCCESS', 'APPROVED', 'COMPLETED', 'VALID', 'PAYMENT_SUCCESS'].includes(st)) {
+        passFailStatus = 'PASSED';
+      } else if (['FAILED', 'REJECTED', 'CANCELLED', 'REG_FAILED', 'REFUNDED'].includes(st)) {
+        passFailStatus = 'FAILED';
+      }
+
+      return {
+        _id: o._id,
+        orderId: o.orderId || o.clientOrderId || String(o._id),
+        schemeCode: o.schemeCode,
+        schemeName: o.schemeName || `Scheme ${o.schemeCode}`,
+        amount: o.orderAmount || o.amount || 0,
+        units: o.allottedUnits || o.units || 0,
+        nav: o.allottedNav || o.nav || 0,
+        orderType: o.transactionType === 'R' ? 'REDEMPTION' : o.transactionType === 'S' ? 'SWITCH' : (o.orderType || 'PURCHASE'),
+        status: o.orderStatus || o.status || 'CREATED',
+        passFailStatus,
+        rejectionReason: o.rejectionReason || o.remarks || o.exchangeRemark || '',
+        createdAt: o.createdAt,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        investorName: ucc?.name || user?.name || user?.fullName || 'Investor',
+        email: ucc?.email || user?.email || '',
+        phone: ucc?.mobileNo || user?.phone || '',
+        accountDetails: {
+          clientCode: ucc?.clientCode || 'NOT_REGISTERED',
+          status: ucc?.nseStatus || ucc?.status || 'INACTIVE',
+          pan: ucc?.pan || user?.pan || '',
+          isUccRegistered: Boolean(ucc && ucc.clientCode),
+        },
+        personalDetails: {
+          fullName: ucc?.fullName || ucc?.name || user?.name || '',
+          pan: ucc?.pan || user?.pan || '',
+          dob: ucc?.dob || '',
+          gender: ucc?.gender === 'M' ? 'Male' : ucc?.gender === 'F' ? 'Female' : (ucc?.gender || 'Other'),
+          occupation: ucc?.occupationCode || 'Business / Professional',
+          taxStatus: ucc?.taxStatus || 'Individual',
+          holdingNature: ucc?.holdingNature || 'Single',
+          address: ucc?.address || {
+            address1: '',
+            address2: '',
+            city: '',
+            state: '',
+            pincode: '',
+            country: 'India',
+          },
+          nominee: {
+            hasNominee: Boolean(ucc?.nominees && ucc.nominees.length > 0),
+            nominees: ucc?.nominees || [],
+          },
+        },
+        bankAccounts: banks.map((b) => ({
+          id: b._id,
+          accountNumber: b.accountNumber,
+          ifsc: b.ifsc,
+          bankName: b.bankName,
+          accountType: b.accountType,
+          accountHolder: b.accountHolder,
+          isDefault: Boolean(b.isDefault),
+          isVerified: Boolean(b.isVerified),
+        })),
+        mandates: (mandates || []).map((m) => ({
+          mandateId: m.mandateId,
+          amount: m.amount,
+          bankName: m.bankName,
+          accountNo: m.accountNo,
+          status: m.status,
+          authLink: m.authLink,
+        })),
+        orders: formattedOrders,
+      },
+    });
+  } catch (error) {
+    console.error('[getMfProfile Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 29. POST /api/mutual-funds/profile/bank (Add Bank Account) ──
+exports.addMfBank = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      accountNumber,
+      accountNo,
+      ifsc,
+      bankName = 'Bank Account',
+      accountType = 'savings',
+      accountHolder,
+    } = req.body;
+
+    const finalAccountNo = String(accountNumber || accountNo || '').trim();
+    const finalIfsc = String(ifsc || '').trim().toUpperCase();
+
+    if (!finalAccountNo || !finalIfsc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank account number and IFSC code are required',
+      });
+    }
+
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(finalIfsc)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid IFSC code format (e.g. SBIN0001234)',
+      });
+    }
+
+    const user = await User.findById(userId);
+    const holder = accountHolder || user?.name || user?.fullName || 'Account Holder';
+
+    let bank = await BankAccount.findOne({
+      user: userId,
+      accountNumber: finalAccountNo,
+    });
+
+    const isFirstBank = (await BankAccount.countDocuments({ user: userId })) === 0;
+
+    if (bank) {
+      bank.ifsc = finalIfsc;
+      bank.bankName = bankName;
+      bank.accountType = accountType.toLowerCase() === 'current' ? 'current' : 'savings';
+      bank.accountHolder = holder;
+      await bank.save();
+    } else {
+      bank = await BankAccount.create({
+        user: userId,
+        accountNumber: finalAccountNo,
+        ifsc: finalIfsc,
+        bankName,
+        accountType: accountType.toLowerCase() === 'current' ? 'current' : 'savings',
+        accountHolder: holder,
+        isDefault: isFirstBank,
+        isVerified: true,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Bank account added successfully',
+      data: {
+        id: bank._id,
+        accountNumber: bank.accountNumber,
+        ifsc: bank.ifsc,
+        bankName: bank.bankName,
+        accountType: bank.accountType,
+        accountHolder: bank.accountHolder,
+        isDefault: bank.isDefault,
+        isVerified: bank.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error('[addMfBank Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
