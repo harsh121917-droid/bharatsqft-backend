@@ -989,6 +989,155 @@ exports.updateUser = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ── UPDATE CUSTOMER BANK DETAILS FROM ADMIN ──────────────────
+exports.updateUserBank = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        const { bankName, accountHolder, accountHolderName, accountNumber, ifsc, ifscCode, accountType, isVerified } = req.body;
+
+        const holder = (accountHolder || accountHolderName || user.name || "Account Holder").trim();
+        const accNo = accountNumber !== undefined && accountNumber !== null ? String(accountNumber).trim() : "";
+        const ifscVal = (ifsc || ifscCode || "").trim().toUpperCase();
+        const bName = (bankName || "Linked Bank").trim();
+        const accType = accountType || "savings";
+        const verifiedBool = isVerified !== undefined ? Boolean(isVerified) : true;
+
+        if (!accNo && !bName) {
+            return res.status(400).json({ success: false, message: "Please provide Bank Name or Account Number" });
+        }
+
+        // 1. Update or create BankAccount
+        let bank = await BankAccount.findOne({ user: userId });
+        if (!bank) {
+            bank = await BankAccount.create({
+                user: userId,
+                accountHolder: holder,
+                accountNumber: accNo || "PENDING",
+                ifsc: ifscVal || "N/A",
+                bankName: bName,
+                accountType: accType,
+                isDefault: true,
+                isVerified: verifiedBool,
+                verifiedAt: verifiedBool ? new Date() : undefined
+            });
+            await BankAccount.updateMany({ user: userId, _id: { $ne: bank._id } }, { isDefault: false });
+        } else {
+            bank.accountHolder = holder;
+            if (accNo) bank.accountNumber = accNo;
+            if (ifscVal) bank.ifsc = ifscVal;
+            bank.bankName = bName;
+            bank.accountType = accType;
+            bank.isVerified = verifiedBool;
+            if (verifiedBool && !bank.verifiedAt) bank.verifiedAt = new Date();
+            bank.isDefault = true;
+            await bank.save();
+        }
+
+        // 2. Sync to Kyc document if exists, or create/update bankDetails in Kyc
+        let kyc = await Kyc.findOne({ user: userId });
+        if (kyc) {
+            if (!kyc.bankDetails) kyc.bankDetails = {};
+            kyc.bankDetails.bankName = bName;
+            kyc.bankDetails.accountHolderName = holder;
+            if (accNo) kyc.bankDetails.accountNumber = accNo;
+            if (ifscVal) kyc.bankDetails.ifscCode = ifscVal;
+            kyc.bankDetails.accountType = accType;
+            await kyc.save();
+        }
+
+        // 3. Sync to MfClientUcc if user has one
+        try {
+            await MfClientUcc.findOneAndUpdate(
+                { user: userId },
+                {
+                    $set: {
+                        primaryBank: {
+                            accountNo: accNo,
+                            ifsc: ifscVal,
+                            bankName: bName,
+                            accountType: accType === "current" ? "CB" : "SB"
+                        }
+                    }
+                }
+            );
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: "Bank details updated successfully",
+            data: {
+                bankName: bank.bankName,
+                accountHolder: bank.accountHolder,
+                accountNumber: bank.accountNumber,
+                ifsc: bank.ifsc,
+                accountType: bank.accountType,
+                isDefault: bank.isDefault,
+                isVerified: bank.isVerified
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── 1-CLICK APPROVE CUSTOMER KYC FROM USER DETAILS ───────────
+exports.oneClickApproveKyc = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        let kyc = await Kyc.findOne({ user: userId });
+        const now = new Date();
+
+        if (kyc) {
+            kyc.status = "approved";
+            kyc.verificationSource = "ADMIN_DOCUMENT_VERIFIED";
+            kyc.evidenceReference = "Admin Approved via User Details (One-Click)";
+            kyc.panVerified = true;
+            if (!kyc.panRegisteredName && (kyc.fullName || user.name)) {
+                kyc.panRegisteredName = (kyc.fullName || user.name).toUpperCase();
+            }
+            kyc.rejectionReason = undefined;
+            kyc.revokedReason = undefined;
+            kyc.reviewedBy = req.user._id;
+            kyc.reviewedAt = now;
+            await kyc.save();
+        } else {
+            kyc = await Kyc.create({
+                user: userId,
+                fullName: user.name || "Customer",
+                panNumber: "ADMIN_VERIFIED",
+                status: "approved",
+                verificationSource: "ADMIN_DOCUMENT_VERIFIED",
+                evidenceReference: "Admin Approved via User Details (One-Click)",
+                panVerified: true,
+                panRegisteredName: (user.name || "CUSTOMER").toUpperCase(),
+                reviewedBy: req.user._id,
+                reviewedAt: now,
+                submittedAt: now
+            });
+        }
+
+        user.kycStatus = "approved";
+        await user.save();
+
+        return res.json({
+            success: true,
+            message: "Customer KYC approved successfully (One-Click)!",
+            data: {
+                kycStatus: "approved",
+                kyc
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.clearUserLocation = async (req, res, next) => {
     try {
         const user = await User.findByIdAndUpdate(

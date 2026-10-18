@@ -37,6 +37,8 @@ const {
   manuallyApproveTransaction,
   manuallyRejectTransaction,
   syncUserPendingPayments,
+  updateUserBank,
+  oneClickApproveKyc,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -46,7 +48,7 @@ const {
 const { getAllInvestments } = require("../controllers/paymentController");
 const {
   getAllKyc, getKycById, reviewKyc, reviewSoldierKyc, updateKycBank,
-  manualKycEntry, adminUploadKycDocs,
+  manualKycEntry, adminUploadKycDocs, bulkReviewKyc,
 } = require("../controllers/kycController");
 const { uploadKycDocs } = require("../middleware/uploadMiddleware");
 const { enrollmentDetail } = require("../controllers/schemeController");
@@ -80,6 +82,9 @@ router.post("/users/:id/reset-drx-bricks", resetUserDrxBricks);
 router.post("/users/:id/reset-drx-savings", resetUserDrxSavings);
 router.post("/users/:id/reset-drx-all", resetUserDrxAll);
 router.post("/users/:id/reset-all", resetAllUserData);
+router.patch("/users/:id/bank", updateUserBank);
+router.put("/users/:id/bank", updateUserBank);
+router.post("/users/:id/approve-kyc", oneClickApproveKyc);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
 
@@ -123,6 +128,7 @@ router.get("/investments", getAllInvestments);
 // KYC
 router.get("/kyc", getAllKyc);
 router.get("/kyc/:id", getKycById);
+router.post("/kyc/bulk-review", bulkReviewKyc);
 router.post("/kyc/manual-entry", (req, res, next) => {
   uploadKycDocs(req, res, (err) => {
     if (err) return next(err);

@@ -358,6 +358,103 @@ exports.reviewKyc = async (req, res, next) => {
 };
 
 /* ─────────────────────────────────────────
+   POST /api/admin/kyc/bulk-review
+   Admin: Multiple approve or reject pending KYC submissions
+   Body: { ids: string[], status: "approved" | "rejected", rejectionReason?: string }
+───────────────────────────────────────── */
+exports.bulkReviewKyc = async (req, res, next) => {
+    try {
+        const { ids, status, rejectionReason } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ success: false, message: "Please select at least one KYC application" });
+        }
+
+        if (!["approved", "rejected"].includes(status)) {
+            return res.status(400).json({ success: false, message: "Status must be 'approved' or 'rejected'" });
+        }
+
+        if (!req.user || req.user.role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Administrator authorization required"
+            });
+        }
+
+        const User = require("../models/User");
+        const now = new Date();
+        const kycs = await Kyc.find({ _id: { $in: ids } });
+
+        let processedCount = 0;
+        const updatedUserIds = [];
+
+        for (const k of kycs) {
+            // Prevent self-review if admin is in the list
+            if (String(k.user) === String(req.user._id)) {
+                continue;
+            }
+
+            k.status = status;
+            k.reviewedBy = req.user._id;
+            k.reviewedAt = now;
+
+            if (status === "approved") {
+                k.verificationSource = "ADMIN_DOCUMENT_VERIFIED";
+                k.evidenceReference = "Admin Bulk Document Approval";
+                k.panVerified = true;
+                if (!k.panRegisteredName && k.fullName) {
+                    k.panRegisteredName = k.fullName.toUpperCase();
+                }
+                k.rejectionReason = undefined;
+                k.revokedReason = undefined;
+                if (k.soldierDetails && k.soldierDetails.isSoldier && k.soldierDetails.status === "pending") {
+                    k.soldierDetails.status = "approved";
+                    k.soldierDetails.reviewedBy = req.user._id;
+                    k.soldierDetails.reviewedAt = now;
+                }
+            } else if (status === "rejected") {
+                k.verificationSource = "NONE";
+                k.rejectionReason = rejectionReason || "Bulk rejected by Administrator";
+                if (k.soldierDetails && k.soldierDetails.isSoldier && k.soldierDetails.status === "pending") {
+                    k.soldierDetails.status = "rejected";
+                    k.soldierDetails.rejectionReason = rejectionReason || "Bulk rejected by Administrator";
+                }
+            }
+
+            await k.save();
+            if (k.user) {
+                updatedUserIds.push(k.user);
+            }
+            processedCount++;
+        }
+
+        if (updatedUserIds.length > 0) {
+            const userUpdate = { kycStatus: status };
+            if (status === "approved") {
+                await User.updateMany(
+                    { _id: { $in: updatedUserIds } },
+                    { $set: userUpdate }
+                );
+            } else {
+                await User.updateMany(
+                    { _id: { $in: updatedUserIds } },
+                    { $set: userUpdate }
+                );
+            }
+        }
+
+        const actionText = status === "approved" ? "approved" : "rejected";
+        return res.json({
+            success: true,
+            processedCount,
+            message: `Successfully ${actionText} ${processedCount} KYC submission(s)!`
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/* ─────────────────────────────────────────
    POST /api/kyc/soldier/submit
    Submit / update Soldier ID verification
 ───────────────────────────────────────── */

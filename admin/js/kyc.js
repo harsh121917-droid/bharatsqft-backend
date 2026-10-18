@@ -61,6 +61,7 @@ async function loadKyc(status = currentKycFilter) {
         }
 
         renderKycTable(res.data || []);
+        clearKycSelection();
     } catch (err) {
         body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading KYC</div></div>`;
     }
@@ -72,6 +73,7 @@ function renderKycTable(kycList) {
 
     if (!kycList || kycList.length === 0) {
         body.innerHTML = `<div class="loading-box"><i class="fas fa-id-card" style="font-size:32px;color:var(--text-dim)"></i><div>No KYC requests in this category</div></div>`;
+        clearKycSelection();
         return;
     }
 
@@ -80,6 +82,9 @@ function renderKycTable(kycList) {
         <table>
             <thead>
                 <tr>
+                    <th style="width:40px;text-align:center">
+                        <input type="checkbox" id="kyc-select-all" onchange="toggleSelectAllKyc(this.checked)" title="Select All Submissions" style="cursor:pointer;width:16px;height:16px" />
+                    </th>
                     <th>Customer</th>
                     <th>PAN Number</th>
                     <th>City / State</th>
@@ -122,6 +127,9 @@ function renderKycTable(kycList) {
 
         html += `
         <tr>
+            <td style="text-align:center" onclick="event.stopPropagation()">
+                <input type="checkbox" class="kyc-row-checkbox" value="${k._id}" onchange="updateKycSelectionState()" style="cursor:pointer;width:16px;height:16px" />
+            </td>
             <td>
                 <div style="font-weight:600;color:#fff">${k.fullName || u.name || '—'}</div>
                 <div style="font-size:12px;color:var(--text-dim)">${u.email || ''} • ${u.phone || ''}</div>
@@ -167,6 +175,121 @@ function renderKycTable(kycList) {
 
     html += `</tbody></table></div>`;
     body.innerHTML = html;
+    updateKycSelectionState();
+}
+
+// ── BULK / MULTIPLE KYC ACTIONS ──────────────────────────────
+function getSelectedKycIds() {
+    const checkboxes = document.querySelectorAll(".kyc-row-checkbox:checked");
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function toggleSelectAllKyc(checked) {
+    const checkboxes = document.querySelectorAll(".kyc-row-checkbox");
+    checkboxes.forEach(cb => cb.checked = checked);
+    updateKycSelectionState();
+}
+
+function updateKycSelectionState() {
+    const selected = getSelectedKycIds();
+    const count = selected.length;
+    const bar = document.getElementById("kyc-bulk-actions-bar");
+    const countEl = document.getElementById("kyc-selected-count");
+    const numEls = document.querySelectorAll(".kyc-selected-num");
+    const selectAll = document.getElementById("kyc-select-all");
+
+    if (countEl) countEl.textContent = count;
+    numEls.forEach(el => el.textContent = count);
+
+    const totalCheckboxes = document.querySelectorAll(".kyc-row-checkbox").length;
+    if (selectAll) {
+        selectAll.checked = totalCheckboxes > 0 && count === totalCheckboxes;
+        selectAll.indeterminate = count > 0 && count < totalCheckboxes;
+    }
+
+    if (bar) {
+        bar.style.display = count > 0 ? "flex" : "none";
+    }
+}
+
+function clearKycSelection() {
+    const selectAll = document.getElementById("kyc-select-all");
+    if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+    const checkboxes = document.querySelectorAll(".kyc-row-checkbox");
+    checkboxes.forEach(cb => cb.checked = false);
+    const bar = document.getElementById("kyc-bulk-actions-bar");
+    if (bar) bar.style.display = "none";
+    const countEl = document.getElementById("kyc-selected-count");
+    if (countEl) countEl.textContent = "0";
+    const numEls = document.querySelectorAll(".kyc-selected-num");
+    numEls.forEach(el => el.textContent = "0");
+}
+
+async function bulkApproveKyc() {
+    const ids = getSelectedKycIds();
+    if (!ids || ids.length === 0) {
+        toast("Please select at least one KYC submission to approve", "warning");
+        return;
+    }
+
+    const confirmMsg = `Are you sure you want to approve ${ids.length} selected KYC submission(s) simultaneously?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await api("/admin/kyc/bulk-review", {
+            method: "POST",
+            body: JSON.stringify({ ids, status: "approved" })
+        });
+
+        if (res && res.success) {
+            toast(res.message || `Successfully approved ${ids.length} KYC application(s)! ✓`, "success");
+            clearKycSelection();
+            loadKyc(currentKycFilter);
+            if (typeof loadDashboard === "function") loadDashboard();
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+        } else {
+            toast(res?.message || "Failed to bulk approve KYC submissions", "danger");
+        }
+    } catch (err) {
+        toast("Error during bulk approval: " + (err.message || err), "danger");
+    }
+}
+
+async function bulkRejectKyc() {
+    const ids = getSelectedKycIds();
+    if (!ids || ids.length === 0) {
+        toast("Please select at least one KYC submission to reject", "warning");
+        return;
+    }
+
+    const reason = prompt(`Enter rejection reason for the ${ids.length} selected submission(s):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+        toast("Rejection reason is required for audit compliance", "warning");
+        return;
+    }
+
+    try {
+        const res = await api("/admin/kyc/bulk-review", {
+            method: "POST",
+            body: JSON.stringify({ ids, status: "rejected", rejectionReason: reason.trim() })
+        });
+
+        if (res && res.success) {
+            toast(res.message || `Successfully rejected ${ids.length} KYC application(s)`, "success");
+            clearKycSelection();
+            loadKyc(currentKycFilter);
+            if (typeof loadDashboard === "function") loadDashboard();
+            if (typeof loadUsers === "function") loadUsers(usersPage);
+        } else {
+            toast(res?.message || "Failed to bulk reject KYC submissions", "danger");
+        }
+    } catch (err) {
+        toast("Error during bulk rejection: " + (err.message || err), "danger");
+    }
 }
 
 async function openKycModal(id) {

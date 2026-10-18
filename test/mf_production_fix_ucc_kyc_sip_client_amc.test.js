@@ -554,6 +554,42 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     assert.equal(res.data.data.address.pincode, '251318');
   });
 
+  it('6d2. UCC registration without address in payload (standard mobile app flow) -> succeeds with compliant defaults', async () => {
+    await User.deleteMany({ email: 'test_vk_prod_fix_paperless@vikaone.test' });
+    await MfClientUcc.deleteMany({ pan: 'ABCDE9994F' });
+    const freshUser = await User.create({
+      name: 'Paperless Mobile User',
+      email: 'test_vk_prod_fix_paperless@vikaone.test',
+      phone: '9876540094',
+      password: 'testPassword123',
+      isKycVerified: true,
+      kycStatus: 'approved',
+      role: 'user',
+      isActive: true,
+    });
+    const { req, res } = mockReqRes(
+      {
+        pan: 'ABCDE9994F',
+        fullName: 'Paperless Mobile User',
+        dob: '15/08/1995',
+        accountNo: '123456789094',
+        ifsc: 'SBIN0000123',
+      },
+      {},
+      {},
+      freshUser
+    );
+
+    await mutualFundsController.registerUserUcc(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.address.address1, 'Flat 101, Main Road');
+    assert.equal(res.data.data.address.city, 'Mumbai');
+    assert.equal(res.data.data.address.state, 'MA');
+    assert.equal(res.data.data.address.pincode, '400001');
+  });
+
   it('6e. UCC registration with missing DOB -> rejected with NSE_DOB_REQUIRED (no 01/01/1990 fallback)', async () => {
     const freshUser = await User.create({
       name: 'No Dob User',

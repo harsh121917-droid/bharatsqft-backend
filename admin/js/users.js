@@ -1386,30 +1386,40 @@ function renderUserDetailsContent(u) {
     const aadhaarIcon = document.getElementById("ud-kyc-aadhaar-icon");
     const kycDate = document.getElementById("ud-kyc-verified-date");
 
+    const btnOneClickKyc = document.getElementById("btn-ud-oneclick-kyc");
+    const btnCardApproveKyc = document.getElementById("btn-ud-card-approve-kyc");
+
     if (rawKyc === "approved" || rawKyc === "verified" || u.kycVerified === true) {
         if (kycPill) kycPill.className = "ud-kyc-status-pill verified";
         if (kycStatusText) kycStatusText.textContent = "Verified";
         if (panIcon) panIcon.innerHTML = `<i class="fas fa-check-circle" style="color:#10b981"></i>`;
         if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-check-circle" style="color:#10b981"></i>`;
         if (kycDate) kycDate.textContent = formatDate(u.kyc?.updatedAt || u.updatedAt);
-    } else if (rawKyc === "pending") {
-        if (kycPill) kycPill.className = "ud-kyc-status-pill pending";
-        if (kycStatusText) kycStatusText.textContent = "Pending Review";
-        if (panIcon) panIcon.innerHTML = `<i class="fas fa-clock" style="color:#f59e0b"></i>`;
-        if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-clock" style="color:#f59e0b"></i>`;
-        if (kycDate) kycDate.textContent = "Under Verification";
-    } else if (rawKyc === "rejected") {
-        if (kycPill) kycPill.className = "ud-kyc-status-pill rejected";
-        if (kycStatusText) kycStatusText.textContent = "Rejected";
-        if (panIcon) panIcon.innerHTML = `<i class="fas fa-times-circle" style="color:#ef4444"></i>`;
-        if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-times-circle" style="color:#ef4444"></i>`;
-        if (kycDate) kycDate.textContent = "Rejected by Admin";
+        if (btnOneClickKyc) btnOneClickKyc.style.display = "none";
+        if (btnCardApproveKyc) btnCardApproveKyc.style.display = "none";
     } else {
-        if (kycPill) kycPill.className = "ud-kyc-status-pill not_submitted";
-        if (kycStatusText) kycStatusText.textContent = "Not Submitted";
-        if (panIcon) panIcon.innerHTML = `<i class="fas fa-minus-circle" style="color:#64748b"></i>`;
-        if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-minus-circle" style="color:#64748b"></i>`;
-        if (kycDate) kycDate.textContent = "Not Completed";
+        if (btnOneClickKyc) btnOneClickKyc.style.display = "inline-flex";
+        if (btnCardApproveKyc) btnCardApproveKyc.style.display = "inline-flex";
+
+        if (rawKyc === "pending") {
+            if (kycPill) kycPill.className = "ud-kyc-status-pill pending";
+            if (kycStatusText) kycStatusText.textContent = "Pending Review";
+            if (panIcon) panIcon.innerHTML = `<i class="fas fa-clock" style="color:#f59e0b"></i>`;
+            if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-clock" style="color:#f59e0b"></i>`;
+            if (kycDate) kycDate.textContent = "Under Verification";
+        } else if (rawKyc === "rejected") {
+            if (kycPill) kycPill.className = "ud-kyc-status-pill rejected";
+            if (kycStatusText) kycStatusText.textContent = "Rejected";
+            if (panIcon) panIcon.innerHTML = `<i class="fas fa-times-circle" style="color:#ef4444"></i>`;
+            if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-times-circle" style="color:#ef4444"></i>`;
+            if (kycDate) kycDate.textContent = "Rejected by Admin";
+        } else {
+            if (kycPill) kycPill.className = "ud-kyc-status-pill not_submitted";
+            if (kycStatusText) kycStatusText.textContent = "Not Submitted";
+            if (panIcon) panIcon.innerHTML = `<i class="fas fa-minus-circle" style="color:#64748b"></i>`;
+            if (aadhaarIcon) aadhaarIcon.innerHTML = `<i class="fas fa-minus-circle" style="color:#64748b"></i>`;
+            if (kycDate) kycDate.textContent = "Not Completed";
+        }
     }
 
     // Overview Tiles in Hero
@@ -2520,7 +2530,14 @@ function renderUdKycTab(u) {
         </div>
 
         <div>
-            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:1rem"><i class="fas fa-user-edit" style="color:#60a5fa"></i> Account Settings & Verification</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div style="font-size:13px;font-weight:700;color:#fff"><i class="fas fa-user-edit" style="color:#60a5fa"></i> Account Settings & Verification</div>
+                ${(u.kycStatus !== 'approved' && !u.kycVerified) ? `
+                    <button type="button" class="btn btn-sm btn-success" onclick="oneClickApproveKyc('${u._id}')" style="font-size:11.5px;font-weight:700;padding:4px 10px;background:#10b981;border:none;color:#fff;display:inline-flex;align-items:center;gap:4px;border-radius:4px;cursor:pointer">
+                        <i class="fas fa-check-circle"></i> 1-Click Approve
+                    </button>
+                ` : `<span class="badge badge-success"><i class="fas fa-check"></i> Approved</span>`}
+            </div>
             <div class="form-group">
                 <label class="form-label" style="font-size:11.5px">Customer Name</label>
                 <input class="form-control" id="ud-edit-name" value="${u.name || ''}" />
@@ -2591,6 +2608,193 @@ async function saveUserDetailsProfile() {
         }
     } catch (e) {
         toast("Network error updating profile", "danger");
+    }
+}
+
+// ── 1-CLICK APPROVE KYC FROM USER DETAILS ────────────────────
+async function oneClickApproveKyc(targetUserId) {
+    const uid = targetUserId || activeUserId;
+    if (!uid) {
+        toast("No active customer selected", "warning");
+        return;
+    }
+
+    const btnTop = document.getElementById("btn-ud-oneclick-kyc");
+    const btnCard = document.getElementById("btn-ud-card-approve-kyc");
+    const originalTopHtml = btnTop ? btnTop.innerHTML : "";
+    const originalCardHtml = btnCard ? btnCard.innerHTML : "";
+
+    if (btnTop) {
+        btnTop.disabled = true;
+        btnTop.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Approving...`;
+    }
+    if (btnCard) {
+        btnCard.disabled = true;
+        btnCard.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Approving...`;
+    }
+
+    try {
+        const res = await api(`/admin/users/${uid}/approve-kyc`, {
+            method: "POST"
+        });
+
+        if (res && res.success) {
+            toast("KYC Approved successfully by One-Click! ✓", "success");
+
+            if (currentUserDetailsData && String(currentUserDetailsData._id) === String(uid)) {
+                currentUserDetailsData.kycStatus = "approved";
+                currentUserDetailsData.kycVerified = true;
+                if (!currentUserDetailsData.kyc) currentUserDetailsData.kyc = {};
+                currentUserDetailsData.kyc.status = "approved";
+                currentUserDetailsData.kyc.panVerified = true;
+                renderUserDetailsContent(currentUserDetailsData);
+            } else {
+                viewUserDetails(uid);
+            }
+
+            // Sync Users table row in memory
+            const tableUser = (allUsers || []).find(x => String(x._id) === String(uid));
+            if (tableUser) {
+                tableUser.kycStatus = "approved";
+                tableUser.kycVerified = true;
+                renderUsersTable(allUsers);
+            }
+
+            // If KYC tab or queue counters exist, refresh them
+            if (typeof loadKyc === "function" && document.getElementById("page-kyc")?.classList.contains("active")) {
+                loadKyc();
+            }
+        } else {
+            toast(res?.message || "Failed to approve KYC", "danger");
+        }
+    } catch (err) {
+        toast("Error approving KYC: " + (err.message || err), "danger");
+    } finally {
+        if (btnTop) {
+            btnTop.disabled = false;
+            btnTop.innerHTML = originalTopHtml;
+        }
+        if (btnCard) {
+            btnCard.disabled = false;
+            btnCard.innerHTML = originalCardHtml;
+        }
+    }
+}
+
+// ── EDIT / UPDATE BANK DETAILS IN USER DETAILS ───────────────
+function openUdEditBankModal() {
+    const uid = activeUserId || currentUserDetailsData?._id;
+    if (!uid) {
+        toast("Please select a customer first", "warning");
+        return;
+    }
+
+    const u = currentUserDetailsData || {};
+    const b = u.bank || u.kyc?.bankDetails || {};
+
+    const modal = document.getElementById("ud-edit-bank-modal");
+    if (!modal) return;
+
+    const nameInput = document.getElementById("ud-bank-input-name");
+    const holderInput = document.getElementById("ud-bank-input-holder");
+    const accInput = document.getElementById("ud-bank-input-acc");
+    const ifscInput = document.getElementById("ud-bank-input-ifsc");
+    const typeInput = document.getElementById("ud-bank-input-type");
+    const verifiedInput = document.getElementById("ud-bank-input-verified");
+
+    if (nameInput) nameInput.value = b.bankName || "";
+    if (holderInput) holderInput.value = b.accountHolder || b.accountHolderName || u.name || "";
+    const fullAccNo = b.accountNumber !== undefined && b.accountNumber !== null ? String(b.accountNumber).trim() : "";
+    if (accInput) accInput.value = fullAccNo;
+    if (ifscInput) ifscInput.value = (b.ifsc || b.ifscCode || "").toUpperCase();
+    if (typeInput) typeInput.value = b.accountType || "savings";
+    if (verifiedInput) verifiedInput.checked = b.isVerified !== false;
+
+    modal.style.display = "flex";
+}
+
+function closeUdEditBankModal() {
+    const modal = document.getElementById("ud-edit-bank-modal");
+    if (modal) modal.style.display = "none";
+}
+
+async function saveUdBankDetails() {
+    const uid = activeUserId || currentUserDetailsData?._id;
+    if (!uid) {
+        toast("No active customer selected", "danger");
+        return;
+    }
+
+    const bankName = document.getElementById("ud-bank-input-name")?.value.trim();
+    const accountHolder = document.getElementById("ud-bank-input-holder")?.value.trim();
+    const accountNumber = document.getElementById("ud-bank-input-acc")?.value.trim();
+    const ifsc = document.getElementById("ud-bank-input-ifsc")?.value.trim().toUpperCase();
+    const accountType = document.getElementById("ud-bank-input-type")?.value || "savings";
+    const isVerified = document.getElementById("ud-bank-input-verified")?.checked !== false;
+
+    if (!bankName && !accountNumber) {
+        toast("Please enter Bank Name or Account Number", "warning");
+        return;
+    }
+
+    const saveBtn = document.getElementById("btn-save-ud-bank");
+    const originalText = saveBtn ? saveBtn.innerHTML : "";
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+    }
+
+    try {
+        const payload = {
+            bankName: bankName || "Linked Bank",
+            accountHolder: accountHolder || (currentUserDetailsData?.name || "Account Holder"),
+            accountNumber: accountNumber || "",
+            ifsc: ifsc || "",
+            accountType,
+            isVerified
+        };
+
+        const res = await api(`/admin/users/${uid}/bank`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+            toast("Bank details updated successfully! ✓", "success");
+            closeUdEditBankModal();
+
+            const updatedBank = {
+                bankName: payload.bankName,
+                accountHolder: payload.accountHolder,
+                accountNumber: payload.accountNumber,
+                ifsc: payload.ifsc,
+                accountType: payload.accountType,
+                isDefault: true,
+                isVerified: payload.isVerified
+            };
+
+            if (currentUserDetailsData) {
+                currentUserDetailsData.bank = updatedBank;
+                if (currentUserDetailsData.kyc) {
+                    if (!currentUserDetailsData.kyc.bankDetails) currentUserDetailsData.kyc.bankDetails = {};
+                    currentUserDetailsData.kyc.bankDetails.bankName = updatedBank.bankName;
+                    currentUserDetailsData.kyc.bankDetails.accountHolderName = updatedBank.accountHolder;
+                    currentUserDetailsData.kyc.bankDetails.accountNumber = updatedBank.accountNumber;
+                    currentUserDetailsData.kyc.bankDetails.ifscCode = updatedBank.ifsc;
+                }
+            }
+
+            renderUdBankDetails(updatedBank);
+        } else {
+            toast(res?.message || "Failed to update bank details", "danger");
+        }
+    } catch (err) {
+        toast("Error saving bank details: " + (err.message || err), "danger");
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
     }
 }
 
