@@ -86,7 +86,10 @@ exports.getSchemes = async (req, res) => {
       minRating,
       ratings,
       search,
-      sort = 'rating',
+      collection,
+      maxSipAmount,
+      minSipAmount,
+      sort,
       page = 1,
       limit = 20,
     } = req.query;
@@ -164,6 +167,80 @@ exports.getSchemes = async (req, res) => {
       query.isPopular = true;
     }
 
+    // ── Collection Filtering (High Return, ₹100 SIP, Gold & Silver, Market Caps) ──
+    if (collection) {
+      const col = String(collection).trim().toLowerCase();
+      if (col === 'high_return') {
+        const cond = {
+          $or: [
+            { cagr3Y: { $gt: 0 } },
+            { cagr1Y: { $gt: 0 } },
+          ],
+        };
+        if (query.$or) {
+          query.$and = [{ $or: query.$or }, cond];
+          delete query.$or;
+        } else if (query.$and) {
+          query.$and.push(cond);
+        } else {
+          query.$or = cond.$or;
+        }
+      } else if (col === 'sip_100') {
+        query.minSipAmount = { $lte: 100, $gt: 0 };
+      } else if (col === 'gold_silver' || col === 'gold' || col === 'silver') {
+        const cond = {
+          $or: [
+            { category: { $regex: 'gold|silver|commodity', $options: 'i' } },
+            { subCategory: { $regex: 'gold|silver|commodity', $options: 'i' } },
+            { schemeName: { $regex: 'gold|silver', $options: 'i' } },
+          ],
+        };
+        if (query.$or) {
+          query.$and = [{ $or: query.$or }, cond];
+          delete query.$or;
+        } else if (query.$and) {
+          query.$and.push(cond);
+        } else {
+          query.$or = cond.$or;
+        }
+      } else if (col === 'large_cap') {
+        query.subCategory = { $regex: 'large', $options: 'i' };
+      } else if (col === 'mid_cap') {
+        query.subCategory = { $regex: 'mid', $options: 'i' };
+      } else if (col === 'small_cap') {
+        query.subCategory = { $regex: 'small', $options: 'i' };
+      } else if (col === 'tax_saver' || col === 'elss') {
+        const cond = {
+          $or: [
+            { category: { $regex: 'tax', $options: 'i' } },
+            { subCategory: { $regex: 'elss|tax', $options: 'i' } },
+          ],
+        };
+        if (query.$or) {
+          query.$and = [{ $or: query.$or }, cond];
+          delete query.$or;
+        } else if (query.$and) {
+          query.$and.push(cond);
+        } else {
+          query.$or = cond.$or;
+        }
+      }
+    }
+
+    if (maxSipAmount !== undefined && maxSipAmount !== null && maxSipAmount !== '') {
+      const maxVal = Number(maxSipAmount);
+      if (!isNaN(maxVal) && maxVal > 0) {
+        query.minSipAmount = { ...(query.minSipAmount || {}), $lte: maxVal, $gt: 0 };
+      }
+    }
+
+    if (minSipAmount !== undefined && minSipAmount !== null && minSipAmount !== '') {
+      const minVal = Number(minSipAmount);
+      if (!isNaN(minVal) && minVal > 0) {
+        query.minSipAmount = { ...(query.minSipAmount || {}), $gte: minVal };
+      }
+    }
+
     // ── Multi-word Tokenized Fuzzy Search ──
     // e.g. "uti health" or "UTI - He" will cleanly split and match "UTI - Healthcare Fund"
     if (search && search.trim()) {
@@ -205,32 +282,40 @@ exports.getSchemes = async (req, res) => {
     }
 
     // ── Sorting ──
+    const effectiveSort = sort || (
+      collection === 'high_return' ? 'returns3y' :
+      collection === 'gold_silver' ? 'returns1y' :
+      collection === 'sip_100' ? 'returns3y' :
+      (collection === 'large_cap' || collection === 'mid_cap' || collection === 'small_cap') ? 'returns3y' :
+      'rating'
+    );
+
     let sortOption = { rating: -1, cagr3Y: -1, schemeName: 1 };
-    if (sort === 'popularity' || sort === 'popular') {
+    if (effectiveSort === 'popularity' || effectiveSort === 'popular') {
       sortOption = { isPopular: -1, aum: -1, rating: -1, cagr3Y: -1, schemeName: 1 };
-    } else if (sort === 'returns1y' || sort === '1Y Returns' || sort === '1y') {
-      query.cagr1Y = { $ne: null };
-      sortOption = { cagr1Y: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'returns3y' || sort === '3Y Returns' || sort === '3Y Re' || sort === '3y') {
-      query.cagr3Y = { $ne: null };
-      sortOption = { cagr3Y: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'returns5y' || sort === '5Y Returns' || sort === '5Y' || sort === '5y') {
+    } else if (effectiveSort === 'returns1y' || effectiveSort === '1Y Returns' || effectiveSort === '1y') {
+      if (!collection) query.cagr1Y = { $ne: null };
+      sortOption = { cagr1Y: -1, cagr3Y: -1, schemeName: 1, schemeCode: 1 };
+    } else if (effectiveSort === 'returns3y' || effectiveSort === '3Y Returns' || effectiveSort === '3Y Re' || effectiveSort === '3y') {
+      if (!collection || collection === 'high_return') query.cagr3Y = { $ne: null };
+      sortOption = { cagr3Y: -1, cagr1Y: -1, schemeName: 1, schemeCode: 1 };
+    } else if (effectiveSort === 'returns5y' || effectiveSort === '5Y Returns' || effectiveSort === '5Y' || effectiveSort === '5y') {
       query.cagr5Y = { $ne: null };
       sortOption = { cagr5Y: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'returns1m' || sort === '1M Returns' || sort === '1m') {
+    } else if (effectiveSort === 'returns1m' || effectiveSort === '1M Returns' || effectiveSort === '1m') {
       query.return1M = { $ne: null };
       sortOption = { return1M: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'returns3m' || sort === '3M Returns' || sort === '3m') {
+    } else if (effectiveSort === 'returns3m' || effectiveSort === '3M Returns' || effectiveSort === '3m') {
       query.return3M = { $ne: null };
       sortOption = { return3M: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'returns6m' || sort === '6M Returns' || sort === '6m') {
+    } else if (effectiveSort === 'returns6m' || effectiveSort === '6M Returns' || effectiveSort === '6m') {
       query.return6M = { $ne: null };
       sortOption = { return6M: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'rating' || sort === 'Rating') {
+    } else if (effectiveSort === 'rating' || effectiveSort === 'Rating') {
       sortOption = { rating: -1, cagr3Y: -1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'nav') {
+    } else if (effectiveSort === 'nav') {
       sortOption = { nav: 1, schemeName: 1, schemeCode: 1 };
-    } else if (sort === 'aum') {
+    } else if (effectiveSort === 'aum') {
       sortOption = { aum: -1, schemeName: 1, schemeCode: 1 };
     }
 
