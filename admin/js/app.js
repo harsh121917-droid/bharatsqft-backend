@@ -173,7 +173,8 @@ const pageTitles = {
     mforders: "Mutual Funds Investment Orders & Lumpsum",
     mfschemes: "Mutual Funds Scheme Curation (Featured & Recommended)",
     mfmandates: "Mutual Funds Mandates (eNACH / AutoPay)",
-    mfsettings: "NSE MFSS Gateway Credentials & Health-Check"
+    mfsettings: "NSE MFSS Gateway Credentials & Health-Check",
+    mftesting: "MF Testing & Sandbox Diagnostics 🧪"
 };
 
 function showPage(pageId) {
@@ -294,6 +295,9 @@ function showPage(pageId) {
             break;
         case "mfsettings":
             if (typeof loadNseConfig === "function") loadNseConfig();
+            break;
+        case "mftesting":
+            if (typeof initMfTestingPage === "function") initMfTestingPage();
             break;
     }
 }

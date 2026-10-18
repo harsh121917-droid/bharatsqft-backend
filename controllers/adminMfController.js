@@ -8,6 +8,8 @@ const User = require('../models/User');
 const NseConfig = require('../models/NseConfig');
 const MfReconciliation = require('../models/MfReconciliation');
 const MfAuditLog = require('../models/MfAuditLog');
+const Kyc = require('../models/Kyc');
+const BankAccount = require('../models/BankAccount');
 const mfReconciliationEngine = require('../services/mfReconciliationEngine');
 const mfAdminService = require('../services/mfAdminService');
 const nseClient = require('../services/nse/nseClient');
@@ -461,28 +463,97 @@ exports.reconcileMfOrder = async (req, res) => {
   }
 };
 
+// ── Helper: Resolve User by ID, Phone, Email, Client Code, or PAN ──
+async function resolveUserByQuery(queryStr) {
+  if (!queryStr) return { user: null, ucc: null };
+  const q = String(queryStr).trim();
+  if (!q || q === 'undefined' || q === 'null') return { user: null, ucc: null };
+
+  let user = null;
+  let ucc = null;
+
+  // 1. By 24-char hex Mongo ObjectId
+  if (/^[0-9a-fA-F]{24}$/.test(q)) {
+    user = await User.findById(q);
+    if (!user) {
+      ucc = await MfClientUcc.findById(q);
+      if (ucc && ucc.user) {
+        user = await User.findById(ucc.user);
+      }
+    }
+  }
+
+  // 2. By Phone Number (support 10 digits, +91, 91, 0 prefix, spaces, dashes)
+  if (!user) {
+    const digitsOnly = q.replace(/[^0-9]/g, '');
+    if (digitsOnly.length >= 7) {
+      const phoneCandidates = [q, digitsOnly];
+      if (digitsOnly.length === 10) {
+        phoneCandidates.push(`+91${digitsOnly}`, `91${digitsOnly}`, `0${digitsOnly}`);
+      } else if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        const ten = digitsOnly.slice(2);
+        phoneCandidates.push(ten, `+${digitsOnly}`);
+      }
+      user = await User.findOne({ phone: { $in: phoneCandidates } });
+    }
+  }
+
+  // 3. By Email
+  if (!user && q.includes('@')) {
+    user = await User.findOne({ email: q.toLowerCase() });
+  }
+
+  // 4. By NSE Client Code (e.g. VK143005, SH987654)
+  if (!user) {
+    ucc = await MfClientUcc.findOne({
+      $or: [{ clientCode: q }, { clientCode: q.toUpperCase() }],
+    });
+    if (ucc && ucc.user) {
+      user = await User.findById(ucc.user);
+    }
+  }
+
+  // 5. By PAN (e.g. OZYPS8075Q)
+  if (!user && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(q)) {
+    const panUpper = q.toUpperCase();
+    if (!ucc) {
+      ucc = await MfClientUcc.findOne({ pan: panUpper });
+    }
+    if (ucc && ucc.user) {
+      user = await User.findById(ucc.user);
+    }
+    if (!user) {
+      const kyc = await Kyc.findOne({ panNumber: panUpper });
+      if (kyc && kyc.user) {
+        user = await User.findById(kyc.user);
+      }
+    }
+  }
+
+  // Populate UCC if user found but UCC not loaded yet
+  if (user && !ucc) {
+    ucc = await MfClientUcc.findOne({ user: user._id });
+  }
+
+  return { user, ucc };
+}
+
 // ── 7. POST/DELETE /api/admin/mutual-funds/users/:userId/clean (Clean User MF Data) ──
 exports.cleanUserMfData = async (req, res) => {
   try {
     const { userId } = req.params;
 
     if (!userId || userId === 'undefined' || userId === 'null') {
-      return res.status(400).json({ success: false, message: 'Valid user ID or client code is required' });
+      return res.status(400).json({ success: false, message: 'Valid user ID, phone, email, or client code is required' });
     }
 
-    let ucc = null;
-    if (userId.match(/^[0-9a-fA-F]{24}$/)) {
-      ucc = await MfClientUcc.findOne({ user: userId });
-      if (!ucc) ucc = await MfClientUcc.findById(userId);
-    }
-    if (!ucc) {
-      ucc = await MfClientUcc.findOne({
-        $or: [{ clientCode: userId }, { clientCode: userId.toUpperCase() }],
-      });
-    }
-
+    const { user, ucc } = await resolveUserByQuery(userId);
     const clientCode = ucc?.clientCode;
-    const targetUserId = ucc?.user || (userId.match(/^[0-9a-fA-F]{24}$/) ? userId : null);
+    const targetUserId = user?._id || (userId.match(/^[0-9a-fA-F]{24}$/) ? userId : null);
+
+    if (!targetUserId && !clientCode) {
+      return res.status(404).json({ success: false, message: `No user or UCC record found matching '${userId}'` });
+    }
 
     const userOrClient = [];
     if (targetUserId) userOrClient.push({ user: targetUserId });
@@ -491,7 +562,10 @@ exports.cleanUserMfData = async (req, res) => {
 
     const query = userOrClient.length > 1 ? { $or: userOrClient } : (userOrClient[0] || { user: targetUserId });
 
-    const [ordersDel, sipsDel, uccDel, mandateDel, holdingsDel] = await Promise.all([
+    const clearKyc = Boolean(req.body?.clearKyc);
+    const clearBank = Boolean(req.body?.clearBank);
+
+    const [ordersDel, sipsDel, uccDel, mandateDel, holdingsDel, kycDel, bankDel] = await Promise.all([
       MfOrder.deleteMany(query),
       MfSip.deleteMany(query),
       clientCode
@@ -499,21 +573,273 @@ exports.cleanUserMfData = async (req, res) => {
         : MfClientUcc.deleteMany(query),
       MfMandate.deleteMany(query),
       MfPortfolioHolding.deleteMany(query),
+      (clearKyc && targetUserId) ? Kyc.deleteMany({ user: targetUserId }) : Promise.resolve({ deletedCount: 0 }),
+      (clearBank && targetUserId) ? BankAccount.deleteMany({ user: targetUserId }) : Promise.resolve({ deletedCount: 0 }),
     ]);
+
+    // Record audit trail
+    try {
+      await MfAuditLog.create({
+        event: 'ADMIN_CLEAN_USER_MF_DATA',
+        entityType: 'TRANSACTION',
+        entityId: String(targetUserId || clientCode),
+        user: targetUserId || undefined,
+        source: 'ADMIN_PANEL_MF_CLEAN',
+        actor: req.user?.name || req.user?.email || 'ADMIN',
+        reason: req.body?.reason || `Manual clean of user MF data (Target: ${userId})`,
+      });
+    } catch (_) {}
 
     return res.json({
       success: true,
-      message: 'Mutual Funds data (UCC, SIPs, Orders, Mandates, Holdings) cleared successfully.',
+      message: `Mutual Funds data cleared for user ${user?.name || userId}. Orders: ${ordersDel.deletedCount}, SIPs: ${sipsDel.deletedCount}, UCCs: ${uccDel.deletedCount}, Mandates: ${mandateDel.deletedCount}, Holdings: ${holdingsDel.deletedCount}${clearKyc ? `, KYC: ${kycDel.deletedCount}` : ''}${clearBank ? `, Bank: ${bankDel.deletedCount}` : ''}`,
       data: {
         ordersDeleted: ordersDel.deletedCount,
         sipsDeleted: sipsDel.deletedCount,
         uccDeleted: uccDel.deletedCount,
         mandatesDeleted: mandateDel.deletedCount,
         holdingsDeleted: holdingsDel.deletedCount,
+        kycDeleted: kycDel?.deletedCount || 0,
+        bankDeleted: bankDel?.deletedCount || 0,
       },
     });
   } catch (error) {
     console.error('[cleanUserMfData Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7A. GET /api/admin/mutual-funds/testing/inspect (Inspect User MF State) ──
+exports.inspectMfTestingUser = async (req, res) => {
+  try {
+    const queryStr = req.query.query || req.query.q || req.query.userId || req.query.phone;
+    if (!queryStr) {
+      return res.status(400).json({ success: false, message: 'Search query (phone, email, ID, client code, or PAN) is required.' });
+    }
+
+    const { user, ucc } = await resolveUserByQuery(queryStr);
+    if (!user && !ucc) {
+      return res.status(404).json({
+        success: false,
+        message: `No investor account found matching "${queryStr}". Please check the phone number, email, or client code.`,
+      });
+    }
+
+    const targetUserId = user?._id || ucc?.user;
+    const clientCode = ucc?.clientCode;
+
+    const queryFilter = [];
+    if (targetUserId) queryFilter.push({ user: targetUserId });
+    if (clientCode) queryFilter.push({ clientCode });
+    const mfQuery = queryFilter.length > 1 ? { $or: queryFilter } : (queryFilter[0] || { user: targetUserId });
+
+    const [kyc, bankAccounts, mandates, orders, sips, holdings] = await Promise.all([
+      targetUserId ? Kyc.findOne({ user: targetUserId }).lean() : null,
+      targetUserId ? BankAccount.find({ user: targetUserId }).lean() : [],
+      MfMandate.find(mfQuery).sort({ createdAt: -1 }).lean(),
+      MfOrder.find(mfQuery).sort({ createdAt: -1 }).limit(10).lean(),
+      MfSip.find(mfQuery).sort({ createdAt: -1 }).lean(),
+      MfPortfolioHolding.find(mfQuery).lean(),
+    ]);
+
+    const summary = {
+      hasUser: !!user,
+      userId: targetUserId ? String(targetUserId) : null,
+      name: user?.name || ucc?.fullName || kyc?.fullName || 'Unknown',
+      phone: user?.phone || 'Not provided',
+      email: user?.email || 'Not provided',
+      createdAt: user?.createdAt || null,
+      hasUcc: !!ucc,
+      clientCode: clientCode || null,
+      uccPan: ucc?.pan || null,
+      uccStatus: ucc?.nseStatus || null,
+      uccDob: ucc?.dob || null,
+      uccBank: ucc?.primaryBank || null,
+      hasKyc: !!kyc,
+      kycPan: kyc?.panNumber || null,
+      kycStatus: kyc?.status || 'none',
+      kycVerified: Boolean(kyc?.panVerified),
+      kycLegalName: kyc?.panRegisteredName || kyc?.fullName || null,
+      kycSource: kyc?.verificationSource || 'NONE',
+      bankCount: bankAccounts.length,
+      mandatesCount: mandates.length,
+      ordersCount: orders.length,
+      sipsCount: sips.length,
+      holdingsCount: holdings.length,
+    };
+
+    return res.json({
+      success: true,
+      data: {
+        user: user ? {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          createdAt: user.createdAt,
+        } : null,
+        ucc,
+        kyc,
+        bankAccounts,
+        mandates,
+        orders,
+        sips,
+        holdings,
+        summary,
+      },
+    });
+  } catch (error) {
+    console.error('[inspectMfTestingUser Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7B. POST /api/admin/mutual-funds/testing/reset-user (Reset User MF Testing Data) ──
+exports.resetMfTestingUser = async (req, res) => {
+  try {
+    const {
+      query,
+      clearUcc = true,
+      clearOrders = true,
+      clearSips = true,
+      clearMandates = true,
+      clearHoldings = true,
+      clearKyc = false,
+      clearBank = false,
+      adminReason = '',
+    } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'User identifier (phone, email, ID, or client code) is required.' });
+    }
+
+    const { user, ucc } = await resolveUserByQuery(query);
+    if (!user && !ucc) {
+      return res.status(404).json({ success: false, message: `User not found matching "${query}".` });
+    }
+
+    const targetUserId = user?._id || ucc?.user;
+    const clientCode = ucc?.clientCode;
+
+    const queryFilter = [];
+    if (targetUserId) queryFilter.push({ user: targetUserId });
+    if (clientCode) queryFilter.push({ clientCode });
+    const mfQuery = queryFilter.length > 1 ? { $or: queryFilter } : (queryFilter[0] || { user: targetUserId });
+
+    const results = {
+      uccDeleted: 0,
+      ordersDeleted: 0,
+      sipsDeleted: 0,
+      mandatesDeleted: 0,
+      holdingsDeleted: 0,
+      kycReset: false,
+      bankDeleted: 0,
+    };
+
+    const deleteTasks = [];
+
+    if (clearUcc) {
+      deleteTasks.push(
+        (clientCode
+          ? MfClientUcc.deleteMany({ $or: [{ user: targetUserId }, { clientCode }] })
+          : MfClientUcc.deleteMany(mfQuery)
+        ).then(r => { results.uccDeleted = r.deletedCount; })
+      );
+    }
+
+    if (clearOrders) {
+      deleteTasks.push(
+        MfOrder.deleteMany(mfQuery).then(r => { results.ordersDeleted = r.deletedCount; })
+      );
+    }
+
+    if (clearSips) {
+      deleteTasks.push(
+        MfSip.deleteMany(mfQuery).then(r => { results.sipsDeleted = r.deletedCount; })
+      );
+    }
+
+    if (clearMandates) {
+      deleteTasks.push(
+        MfMandate.deleteMany(mfQuery).then(r => { results.mandatesDeleted = r.deletedCount; })
+      );
+    }
+
+    if (clearHoldings) {
+      deleteTasks.push(
+        MfPortfolioHolding.deleteMany(mfQuery).then(r => { results.holdingsDeleted = r.deletedCount; })
+      );
+    }
+
+    if (clearKyc && targetUserId) {
+      deleteTasks.push(
+        Kyc.deleteMany({ user: targetUserId }).then(r => {
+          results.kycReset = r.deletedCount > 0;
+        })
+      );
+    }
+
+    if (clearBank && targetUserId) {
+      deleteTasks.push(
+        BankAccount.deleteMany({ user: targetUserId }).then(r => {
+          results.bankDeleted = r.deletedCount;
+        })
+      );
+    }
+
+    await Promise.all(deleteTasks);
+
+    // Record audit trail
+    try {
+      await MfAuditLog.create({
+        event: 'ADMIN_RESET_TEST_USER',
+        entityType: 'TRANSACTION',
+        entityId: String(targetUserId || clientCode),
+        user: targetUserId || undefined,
+        source: 'ADMIN_MF_TESTING_TOOL',
+        actor: req.user?.name || req.user?.email || 'ADMIN',
+        reason: adminReason || `Testing reset executed from Admin MF Sandbox for ${user?.phone || user?.email || query}`,
+      });
+    } catch (_) {}
+
+    const parts = [];
+    if (results.uccDeleted > 0) parts.push(`UCC: ${results.uccDeleted}`);
+    if (results.ordersDeleted > 0) parts.push(`Orders: ${results.ordersDeleted}`);
+    if (results.sipsDeleted > 0) parts.push(`SIPs: ${results.sipsDeleted}`);
+    if (results.mandatesDeleted > 0) parts.push(`Mandates: ${results.mandatesDeleted}`);
+    if (results.holdingsDeleted > 0) parts.push(`Holdings: ${results.holdingsDeleted}`);
+    if (results.kycReset) parts.push('KYC record cleared');
+    if (results.bankDeleted > 0) parts.push(`Banks: ${results.bankDeleted}`);
+
+    const summaryMsg = parts.length > 0 ? parts.join(', ') : 'No records needed deleting';
+
+    return res.json({
+      success: true,
+      message: `Successfully cleared MF test data for ${user?.name || query} (${user?.phone || 'No phone'}). Details: [${summaryMsg}]. User can now test fresh onboarding without conflicts!`,
+      data: results,
+    });
+  } catch (error) {
+    console.error('[resetMfTestingUser Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7C. POST /api/admin/mutual-funds/testing/check-pan (Live Exchange PAN Check) ──
+exports.quickCheckPanOnNse = async (req, res) => {
+  try {
+    const pan = String(req.body?.pan || req.query?.pan || '').trim().toUpperCase();
+    if (!pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan)) {
+      return res.status(400).json({ success: false, message: 'Valid 10-character PAN format required (e.g. ABCDE1234F).' });
+    }
+
+    const nseRes = await nseClient.checkClientKycStatus(pan);
+    return res.json({
+      success: true,
+      pan,
+      nseResponse: nseRes,
+    });
+  } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };

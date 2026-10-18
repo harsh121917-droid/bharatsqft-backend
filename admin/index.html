@@ -229,6 +229,11 @@
                 <div class="nav-item-icon"><i class="fas fa-server" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">NSE Credentials & Health</span>
             </div>
+            <div class="nav-item" onclick="showPage('mftesting')" id="nav-mftesting">
+                <div class="nav-item-icon"><i class="fas fa-flask" style="color:#f59e0b"></i></div>
+                <span class="nav-item-label">MF Testing & Reset</span>
+                <span class="nav-badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;font-size:10px;padding:1px 6px;border-radius:10px">DEV</span>
+            </div>
         </nav>
 
         <!-- Drawer Footer: Profile & Help -->
@@ -4226,6 +4231,109 @@
                 </div>
             </div>
 
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS TESTING & SANDBOX RESET
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mftesting">
+                <div class="page-header"
+                    style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800"><i
+                                class="fas fa-flask" style="color:#f59e0b;margin-right:10px"></i> Mutual Funds Testing &
+                            Sandbox Reset</h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">
+                            Inspect live investor state across UCC, KYC, Bank Accounts, Mandates & Orders. Perform selective or complete sandbox data resets to test onboarding without stale identity conflicts.
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()"><i
+                                class="fas fa-sync-alt"></i> Refresh</button>
+                        <button class="btn btn-primary btn-sm" onclick="showPage('mfinvestors')"><i
+                                class="fas fa-users"></i> MF Investors</button>
+                    </div>
+                </div>
+
+                <!-- 1. Search Bar & Quick Test User Presets -->
+                <div class="card" style="padding:18px 20px;margin-bottom:20px;background:#0d1527;border:1px solid #1e293b;border-radius:12px">
+                    <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-search" style="color:#00D09C"></i> Find Investor to Inspect & Reset
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+                        <div style="flex:1;min-width:280px;position:relative">
+                            <input type="text" id="mf-test-search-input" class="form-control"
+                                placeholder="Enter Mobile (e.g. 8855088817, 9997143005), Email, User ID, Client Code, or PAN..."
+                                style="background:#090d16;border:1px solid #23324d;color:#fff;font-size:14px;padding:10px 14px;border-radius:8px;width:100%"
+                                onkeydown="if(event.key==='Enter') searchMfTestUser()" />
+                        </div>
+                        <button class="btn btn-primary" onclick="searchMfTestUser()" id="btn-mf-test-search"
+                            style="padding:10px 20px;font-weight:600;display:flex;align-items:center;gap:8px">
+                            <i class="fas fa-search"></i> Inspect User
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearMfTestSearch()" title="Clear search"
+                            style="padding:10px 14px">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <!-- Quick Preset Buttons -->
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px">
+                        <span style="color:var(--text-dim);font-weight:600">Quick Test Accounts:</span>
+                        <button type="button" class="btn btn-sm" onclick="quickInspectMfUser('8855088817')"
+                            style="background:rgba(0,208,156,0.12);color:#00D09C;border:1px solid rgba(0,208,156,0.3);padding:4px 10px;border-radius:6px;font-size:12px">
+                            <i class="fas fa-user"></i> 8855088817 (Ashahad)
+                        </button>
+                        <button type="button" class="btn btn-sm" onclick="quickInspectMfUser('9997143005')"
+                            style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);padding:4px 10px;border-radius:6px;font-size:12px">
+                            <i class="fas fa-user"></i> 9997143005 (Vikas)
+                        </button>
+                        <button type="button" class="btn btn-sm" id="btn-quick-active-user" onclick="quickInspectActiveUser()"
+                            style="display:none;background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);padding:4px 10px;border-radius:6px;font-size:12px">
+                            <i class="fas fa-user-check"></i> Currently Selected User
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Dynamic Results Container -->
+                <div id="mf-test-results-container">
+                    <!-- Default initial state or user details rendered dynamically by mutualfunds.js -->
+                    <div class="card" style="padding:40px 20px;text-align:center;background:#0d1527;border:1px dashed #23324d;border-radius:12px">
+                        <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.1);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px">
+                            <i class="fas fa-vial" style="font-size:28px;color:#f59e0b"></i>
+                        </div>
+                        <h3 style="color:#fff;font-size:17px;font-weight:700;margin:0 0 6px 0">Ready to Test Mutual Funds Flow</h3>
+                        <p style="color:var(--text-dim);font-size:13px;max-width:540px;margin:0 auto 16px auto;line-height:1.5">
+                            Search for any customer using their mobile number, email, or client code above, or click one of the quick test accounts to inspect their current records and reset their MF sandbox data.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. Direct Live Exchange PAN Probe Tool -->
+                <div class="card" style="margin-top:24px;padding:20px;background:#0d1527;border:1px solid #1e293b;border-radius:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                        <div>
+                            <div style="font-weight:700;color:#fff;font-size:14px;display:flex;align-items:center;gap:8px">
+                                <i class="fas fa-satellite-dish" style="color:#3b82f6"></i> Live NSE Exchange PAN & KRA Query Tool
+                            </div>
+                            <div style="font-size:12px;color:var(--text-dim);margin-top:2px">
+                                Test any PAN directly against the NSE MFSS production gateway (CLIENT_KYC_REPORT) to inspect its live KRA registration status.
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                        <input type="text" id="mf-test-pan-input" class="form-control" placeholder="Enter 10-digit PAN (e.g. OZYPS8075Q, AAAPA1234A)..."
+                            style="text-transform:uppercase;max-width:320px;background:#090d16;border:1px solid #23324d;color:#fff;font-family:monospace;font-size:14px;padding:8px 12px;border-radius:8px"
+                            maxlength="10" />
+                        <button class="btn btn-secondary" onclick="executeNsePanProbe()" id="btn-probe-pan"
+                            style="padding:8px 16px;font-weight:600">
+                            <i class="fas fa-search"></i> Check PAN on NSE
+                        </button>
+                    </div>
+                    <div id="mf-test-pan-result" style="margin-top:14px;display:none">
+                        <!-- Populated by mutualfunds.js -->
+                    </div>
+                </div>
+            </div>
+
         </div><!-- /.content -->
     </div><!-- /.main -->
 
@@ -7257,8 +7365,8 @@
             <script src="js/coupons.js"></script>
             <script src="js/legalpolicies.js?v=1.0"></script>
             <script src="js/homevideos.js?v=1.0"></script>
-            <script src="js/mutualfunds.js?v=2.3"></script>
-            <script src="js/app.js?v=2.1"></script>
+            <script src="js/mutualfunds.js?v=2.4"></script>
+            <script src="js/app.js?v=2.2"></script>
 </body>
 
 </html>

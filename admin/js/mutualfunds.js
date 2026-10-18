@@ -2179,6 +2179,527 @@ function closeMfSchemeDetailModal() {
     if (modal) modal.style.display = 'none';
 }
 
+// ══════════════════════════════════════════════════════════════
+// 31. MUTUAL FUNDS TESTING & SANDBOX RESET TOOL
+// ══════════════════════════════════════════════════════════════
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+let currentInspectedMfUser = null;
+
+function initMfTestingPage() {
+    const activeBtn = document.getElementById('btn-quick-active-user');
+    if (activeBtn) {
+        if (typeof activeUserId !== 'undefined' && activeUserId) {
+            activeBtn.style.display = 'inline-flex';
+        } else {
+            activeBtn.style.display = 'none';
+        }
+    }
+
+    // If last queried user exists in session, auto-inspect
+    const savedQuery = sessionStorage.getItem('last_mf_test_query');
+    const input = document.getElementById('mf-test-search-input');
+    if (savedQuery && input && !input.value) {
+        input.value = savedQuery;
+        searchMfTestUser(savedQuery);
+    }
+}
+
+async function searchMfTestUser(queryOverride) {
+    const input = document.getElementById('mf-test-search-input');
+    const query = (queryOverride || input?.value || '').trim();
+    if (!query) {
+        toast('Please enter a mobile number, email, user ID, or client code', 'warning');
+        return;
+    }
+
+    if (input) input.value = query;
+    sessionStorage.setItem('last_mf_test_query', query);
+
+    const container = document.getElementById('mf-test-results-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="card" style="padding:40px;text-align:center;background:#0d1527;border:1px solid #1e293b;border-radius:12px">
+                <i class="fas fa-circle-notch fa-spin" style="font-size:32px;color:#00D09C;margin-bottom:12px"></i>
+                <div style="color:#fff;font-size:15px;font-weight:600">Inspecting investor records for "${escapeHtml(query)}"...</div>
+                <div style="color:var(--text-dim);font-size:12px;margin-top:4px">Connecting to database & checking UCC, KYC, Bank, Orders & Mandates</div>
+            </div>
+        `;
+    }
+
+    try {
+        const res = await api(`/admin/mutual-funds/testing/inspect?query=${encodeURIComponent(query)}`);
+        if (res && res.success && res.data) {
+            currentInspectedMfUser = res.data;
+            renderMfTestingInspectResults(res.data);
+        } else {
+            currentInspectedMfUser = null;
+            if (container) {
+                container.innerHTML = `
+                    <div class="card" style="padding:32px 20px;text-align:center;background:#0d1527;border:1px solid rgba(239,68,68,0.3);border-radius:12px">
+                        <i class="fas fa-user-slash" style="font-size:36px;color:#ef4444;margin-bottom:12px"></i>
+                        <h4 style="color:#fff;margin:0 0 8px 0;font-size:16px">${escapeHtml(res?.message || 'No user found')}</h4>
+                        <p style="color:var(--text-dim);font-size:12.5px;max-width:480px;margin:0 auto 16px auto">
+                            No active user, client code, or PAN matched "${escapeHtml(query)}". Please verify the 10-digit mobile number or email address.
+                        </p>
+                        <button class="btn btn-secondary btn-sm" onclick="clearMfTestSearch()">Clear Search</button>
+                    </div>
+                `;
+            }
+        }
+    } catch (err) {
+        console.error('searchMfTestUser error:', err);
+        currentInspectedMfUser = null;
+        if (container) {
+            container.innerHTML = `
+                <div class="card" style="padding:32px 20px;text-align:center;background:#0d1527;border:1px solid rgba(239,68,68,0.3);border-radius:12px">
+                    <i class="fas fa-exclamation-triangle" style="font-size:36px;color:#ef4444;margin-bottom:12px"></i>
+                    <h4 style="color:#fff;margin:0 0 8px 0;font-size:16px">Lookup Failed</h4>
+                    <p style="color:var(--text-dim);font-size:12.5px;max-width:480px;margin:0 auto 16px auto">${escapeHtml(err.message || 'Error communicating with server')}</p>
+                    <button class="btn btn-secondary btn-sm" onclick="clearMfTestSearch()">Try Again</button>
+                </div>
+            `;
+        }
+    }
+}
+
+function quickInspectMfUser(phone) {
+    const input = document.getElementById('mf-test-search-input');
+    if (input) input.value = phone;
+    searchMfTestUser(phone);
+}
+
+function quickInspectActiveUser() {
+    if (typeof activeUserId !== 'undefined' && activeUserId) {
+        searchMfTestUser(activeUserId);
+    } else {
+        toast('No active user currently opened in user details', 'info');
+    }
+}
+
+function clearMfTestSearch() {
+    sessionStorage.removeItem('last_mf_test_query');
+    currentInspectedMfUser = null;
+    const input = document.getElementById('mf-test-search-input');
+    if (input) input.value = '';
+    const container = document.getElementById('mf-test-results-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="card" style="padding:40px 20px;text-align:center;background:#0d1527;border:1px dashed #23324d;border-radius:12px">
+                <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.1);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px">
+                    <i class="fas fa-vial" style="font-size:28px;color:#f59e0b"></i>
+                </div>
+                <h3 style="color:#fff;font-size:17px;font-weight:700;margin:0 0 6px 0">Ready to Test Mutual Funds Flow</h3>
+                <p style="color:var(--text-dim);font-size:13px;max-width:540px;margin:0 auto 16px auto;line-height:1.5">
+                    Search for any customer using their mobile number, email, or client code above, or click one of the quick test accounts to inspect their current records and reset their MF sandbox data.
+                </p>
+            </div>
+        `;
+    }
+}
+
+function refreshMfTestingInspect() {
+    if (currentInspectedMfUser?.summary?.phone || currentInspectedMfUser?.summary?.userId) {
+        searchMfTestUser(currentInspectedMfUser.summary.phone || currentInspectedMfUser.summary.userId);
+    } else {
+        const input = document.getElementById('mf-test-search-input');
+        if (input?.value?.trim()) searchMfTestUser(input.value.trim());
+    }
+}
+
+function renderMfTestingInspectResults(data) {
+    const container = document.getElementById('mf-test-results-container');
+    if (!container) return;
+
+    const u = data.user || {};
+    const ucc = data.ucc || null;
+    const kyc = data.kyc || null;
+    const banks = data.bankAccounts || [];
+    const mandates = data.mandates || [];
+    const orders = data.orders || [];
+    const sips = data.sips || [];
+    const holdings = data.holdings || [];
+    const summary = data.summary || {};
+
+    const primaryBank = banks.find(b => b.isDefault) || banks[0] || ucc?.primaryBank || null;
+
+    // Check potential identity conflict
+    const kycName = kyc?.panRegisteredName || kyc?.fullName || '';
+    const uccName = ucc?.fullName || '';
+    const hasNameConflict = Boolean(kycName && uccName && kycName.trim().toUpperCase() !== uccName.trim().toUpperCase());
+
+    const isUccApproved = ucc?.nseStatus === 'ACTIVE';
+
+    let overallBadge = `<span style="background:rgba(148,163,184,0.15);color:#94a3b8;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600">Fresh / Not Onboarded</span>`;
+    if (isUccApproved) {
+        overallBadge = `<span style="background:rgba(0,208,156,0.15);color:#00D09C;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600"><i class="fas fa-check-circle"></i> UCC Active on NSE</span>`;
+    } else if (ucc) {
+        overallBadge = `<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600"><i class="fas fa-clock"></i> UCC ${escapeHtml(ucc.nseStatus)}</span>`;
+    }
+
+    container.innerHTML = `
+        <!-- Top Profile & State Header Card -->
+        <div class="card" style="padding:20px;margin-bottom:18px;background:#0d1527;border:1px solid #1e293b;border-radius:12px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px">
+                <div style="display:flex;gap:14px;align-items:center">
+                    <div style="width:52px;height:52px;border-radius:50%;background:rgba(0,208,156,0.15);color:#00D09C;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800">
+                        ${escapeHtml((u.name || 'U').charAt(0).toUpperCase())}
+                    </div>
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                            <h3 style="margin:0;color:#fff;font-size:18px;font-weight:700">${escapeHtml(u.name || 'Unknown User')}</h3>
+                            ${overallBadge}
+                            <span style="font-size:11px;background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:6px">ID: ${escapeHtml(u._id || summary.userId || '-')}</span>
+                        </div>
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;color:var(--text-dim);font-size:12.5px;margin-top:6px">
+                            <span><i class="fas fa-phone-alt" style="color:#00D09C"></i> ${escapeHtml(u.phone || 'No phone')}</span>
+                            <span><i class="fas fa-envelope" style="color:#3b82f6"></i> ${escapeHtml(u.email || 'No email')}</span>
+                            <span><i class="fas fa-calendar-alt"></i> Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '-'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()"><i class="fas fa-sync-alt"></i> Refresh State</button>
+                    <button class="btn btn-sm" onclick="executeFullFreshSlateReset()" style="background:#f59e0b;color:#000;font-weight:700">
+                        <i class="fas fa-bolt"></i> 1-Click Fresh Slate
+                    </button>
+                </div>
+            </div>
+
+            ${hasNameConflict ? `
+                <div style="margin-top:14px;padding:12px 14px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;display:flex;gap:10px;align-items:flex-start">
+                    <i class="fas fa-exclamation-triangle" style="color:#ef4444;font-size:16px;margin-top:2px"></i>
+                    <div style="font-size:12.5px;color:#fca5a5;line-height:1.4">
+                        <b>Identity Name Conflict Detected:</b> Verified KYC Legal Name is <b>"${escapeHtml(kycName)}"</b>, but UCC registered name is <b>"${escapeHtml(uccName)}"</b>.
+                        Testing fresh PAN registration on this user will fail with <code>NSE_IDENTITY_CONFLICT</code> until KYC test data is cleared. Check "Test KYC & PAN Record" below to reset.
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+
+        <!-- 4-Card Diagnostics Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:20px">
+            <!-- 1. UCC Record -->
+            <div class="card" style="padding:16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-id-card" style="color:#00D09C"></i> NSE UCC Profile
+                    </div>
+                    <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${ucc ? (ucc.nseStatus==='ACTIVE'?'rgba(0,208,156,0.15)':'rgba(245,158,11,0.15)'):'rgba(148,163,184,0.15)'};color:${ucc ? (ucc.nseStatus==='ACTIVE'?'#00D09C':'#f59e0b'):'#94a3b8'}">
+                        ${ucc ? escapeHtml(ucc.nseStatus) : 'NOT REGISTERED'}
+                    </span>
+                </div>
+                <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
+                    <div>Client Code: <b style="color:#fff;font-family:monospace">${escapeHtml(ucc?.clientCode || 'None')}</b></div>
+                    <div>Registered PAN: <b style="color:#fff;font-family:monospace">${escapeHtml(ucc?.pan || 'None')}</b></div>
+                    <div>Registered Name: <b style="color:#fff">${escapeHtml(ucc?.fullName || 'None')}</b></div>
+                    <div>DOB: <span style="color:#fff">${escapeHtml(ucc?.dob || 'None')}</span></div>
+                    <div>Tax Status / Occ: <span style="color:#fff">${escapeHtml(ucc?.taxStatus || '-')} / ${escapeHtml(ucc?.occupationCode || '-')}</span></div>
+                </div>
+            </div>
+
+            <!-- 2. KYC / KRA Record -->
+            <div class="card" style="padding:16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-shield-alt" style="color:#3b82f6"></i> KYC & Legal Identity
+                    </div>
+                    <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${kyc?.status==='approved'?'rgba(0,208,156,0.15)':'rgba(245,158,11,0.15)'};color:${kyc?.status==='approved'?'#00D09C':'#f59e0b'}">
+                        ${kyc ? escapeHtml(kyc.status.toUpperCase()) : 'NO KYC'}
+                    </span>
+                </div>
+                <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
+                    <div>KYC PAN: <b style="color:#fff;font-family:monospace">${escapeHtml(kyc?.panNumber || 'None')}</b></div>
+                    <div>Verified Legal Name: <b style="color:#fff">${escapeHtml(kyc?.panRegisteredName || kyc?.fullName || 'None')}</b></div>
+                    <div>PAN Verified: <span style="color:${kyc?.panVerified?'#00D09C':'#ef4444'}">${kyc?.panVerified ? 'Yes (Verified)' : 'No'}</span></div>
+                    <div>Verification Source: <span style="color:#fff;background:#1e293b;padding:1px 6px;border-radius:4px;font-size:11px">${escapeHtml(kyc?.verificationSource || 'NONE')}</span></div>
+                </div>
+            </div>
+
+            <!-- 3. Linked Bank Account -->
+            <div class="card" style="padding:16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-university" style="color:#a855f7"></i> Bank Accounts (${banks.length})
+                    </div>
+                    <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${primaryBank ? 'rgba(0,208,156,0.15)' : 'rgba(148,163,184,0.15)'};color:${primaryBank ? '#00D09C' : '#94a3b8'}">
+                        ${primaryBank ? (primaryBank.isVerified ? 'VERIFIED' : 'LINKED') : 'NO BANK'}
+                    </span>
+                </div>
+                <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
+                    <div>Bank: <b style="color:#fff">${escapeHtml(primaryBank?.bankName || primaryBank?.accountHolder || 'None')}</b></div>
+                    <div>Account No: <b style="color:#fff;font-family:monospace">${primaryBank ? escapeHtml(primaryBank.accountNumber || primaryBank.accountNo || '***') : 'None'}</b></div>
+                    <div>IFSC Code: <span style="color:#fff;font-family:monospace">${escapeHtml(primaryBank?.ifsc || primaryBank?.ifscCode || 'None')}</span></div>
+                    <div>Verified Source: <span style="color:#fff">${escapeHtml(primaryBank?.verificationSource || 'None')}</span></div>
+                </div>
+            </div>
+
+            <!-- 4. Activity & Mandates -->
+            <div class="card" style="padding:16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-chart-pie" style="color:#f59e0b"></i> Investment Activity
+                    </div>
+                </div>
+                <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
+                    <div>Mandates (eNACH): <b style="color:#fff">${mandates.length}</b> ${mandates[0] ? `<span style="font-size:11px;color:#00D09C">(${escapeHtml(mandates[0].status)})</span>` : ''}</div>
+                    <div>Active SIPs: <b style="color:#fff">${sips.length}</b></div>
+                    <div>Orders / Purchases: <b style="color:#fff">${orders.length}</b></div>
+                    <div>Portfolio Holdings: <b style="color:#fff">${holdings.length} funds</b></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selective Reset Control Panel -->
+        <div class="card" style="padding:22px 24px;background:#0d1527;border:1px solid rgba(239,68,68,0.3);border-radius:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+                <div>
+                    <h4 style="margin:0;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-broom" style="color:#ef4444"></i> Selective Sandbox Reset for ${escapeHtml(u.name || summary.phone || 'User')}
+                    </h4>
+                    <div style="font-size:12px;color:var(--text-dim);margin-top:2px">
+                        Choose which records to delete so you can re-test specific onboarding or investment flows cleanly.
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;margin-bottom:18px;background:#090d16;padding:16px;border-radius:8px;border:1px solid #1e293b">
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-ucc" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>MF Client UCC</b> (${ucc ? '1 record' : '0'})
+                        <div style="font-size:11px;color:var(--text-dim)">Deletes UCC registration so mobile app can re-register</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-orders" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>MF Orders & SIPs</b> (${orders.length} orders, ${sips.length} sips)
+                        <div style="font-size:11px;color:var(--text-dim)">Deletes order ledger and SIP schedules</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-mandates" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>MF Mandates (eNACH)</b> (${mandates.length})
+                        <div style="font-size:11px;color:var(--text-dim)">Deletes AutoPay / eNACH mandate records</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-holdings" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>Portfolio Holdings</b> (${holdings.length})
+                        <div style="font-size:11px;color:var(--text-dim)">Wipes test portfolio unit balances</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fca5a5;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-kyc" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>Test KYC & PAN Record</b> (${kyc ? '1 record' : '0'})
+                        <div style="font-size:11px;color:#f87171">Clears test/dummy PAN & name to test fresh PAN onboarding without name conflicts</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-bank" style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>Test Bank Account(s)</b> (${banks.length})
+                        <div style="font-size:11px;color:var(--text-dim)">Optional: deletes bank records to test fresh bank linking</div>
+                    </div>
+                </label>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+                <div style="flex:1;min-width:240px">
+                    <input type="text" id="mf-reset-reason-input" class="form-control" placeholder="Optional audit reason (e.g. Testing fresh investor flow)..."
+                        style="background:#090d16;border:1px solid #1e293b;color:#fff;font-size:12.5px;padding:8px 12px;border-radius:6px;width:100%" />
+                </div>
+                <div style="display:flex;gap:10px">
+                    <button class="btn btn-danger" onclick="executeMfTestReset()" id="btn-execute-mf-reset" style="font-weight:700;padding:8px 18px">
+                        <i class="fas fa-trash-alt"></i> Clear Selected Records
+                    </button>
+                    <button class="btn" onclick="executeFullFreshSlateReset()" style="background:#f59e0b;color:#000;font-weight:700;padding:8px 18px">
+                        <i class="fas fa-bolt"></i> Wipe All (Fresh Slate)
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function executeMfTestReset() {
+    if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
+        toast('No user selected to reset', 'warning');
+        return;
+    }
+
+    const query = currentInspectedMfUser.summary.phone || currentInspectedMfUser.summary.userId;
+    const userName = currentInspectedMfUser.summary.name || query;
+
+    const clearUcc = document.getElementById('mf-reset-chk-ucc')?.checked ?? true;
+    const clearOrders = document.getElementById('mf-reset-chk-orders')?.checked ?? true;
+    const clearSips = document.getElementById('mf-reset-chk-orders')?.checked ?? true;
+    const clearMandates = document.getElementById('mf-reset-chk-mandates')?.checked ?? true;
+    const clearHoldings = document.getElementById('mf-reset-chk-holdings')?.checked ?? true;
+    const clearKyc = document.getElementById('mf-reset-chk-kyc')?.checked ?? false;
+    const clearBank = document.getElementById('mf-reset-chk-bank')?.checked ?? false;
+    const adminReason = document.getElementById('mf-reset-reason-input')?.value?.trim() || 'Admin manual test reset';
+
+    if (!clearUcc && !clearOrders && !clearMandates && !clearHoldings && !clearKyc && !clearBank) {
+        toast('Please check at least one record type to reset', 'warning');
+        return;
+    }
+
+    const confirmMsg = `⚠️ Are you sure you want to clear selected MF test data for "${userName}" (${query})?\n\nThis will permanently delete the checked records so the user can test freshly.\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    const btn = document.getElementById('btn-execute-mf-reset');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Clearing...`;
+    }
+
+    try {
+        const payload = {
+            query,
+            clearUcc,
+            clearOrders,
+            clearSips,
+            clearMandates,
+            clearHoldings,
+            clearKyc,
+            clearBank,
+            adminReason,
+        };
+
+        const res = await api('/admin/mutual-funds/testing/reset-user', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        if (res && res.success) {
+            toast(res.message || 'MF test data cleared successfully! 🎉', 'success');
+            // Re-inspect immediately to show fresh slate
+            await searchMfTestUser(query);
+
+            // Also refresh other MF views in background if functions exist
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
+            if (typeof loadMfOverview === 'function') loadMfOverview();
+        } else {
+            toast(res?.message || 'Failed to reset MF test data', 'danger');
+        }
+    } catch (err) {
+        console.error('executeMfTestReset error:', err);
+        toast(err.message || 'Error executing test reset', 'danger');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-trash-alt"></i> Clear Selected Records`;
+        }
+    }
+}
+
+async function executeFullFreshSlateReset() {
+    if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
+        toast('No user selected to reset', 'warning');
+        return;
+    }
+
+    // Check all checkboxes
+    ['mf-reset-chk-ucc', 'mf-reset-chk-orders', 'mf-reset-chk-mandates', 'mf-reset-chk-holdings', 'mf-reset-chk-kyc'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = true;
+    });
+
+    await executeMfTestReset();
+}
+
+async function executeNsePanProbe() {
+    const input = document.getElementById('mf-test-pan-input');
+    const pan = (input?.value || '').trim().toUpperCase();
+    if (!pan || pan.length !== 10) {
+        toast('Please enter a valid 10-character PAN', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btn-probe-pan');
+    const resultDiv = document.getElementById('mf-test-pan-result');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Querying NSE...`;
+    }
+    if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `<div style="color:var(--text-dim);font-size:13px"><i class="fas fa-circle-notch fa-spin"></i> Connecting to NSE MFSS production gateway for PAN ${pan}...</div>`;
+    }
+
+    try {
+        const res = await api('/admin/mutual-funds/testing/check-pan', {
+            method: 'POST',
+            body: JSON.stringify({ pan }),
+        });
+
+        if (res && res.success) {
+            const raw = res.nseResponse || {};
+            const nseData = raw.data || {};
+
+            resultDiv.innerHTML = `
+                <div style="background:#090d16;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-top:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <div style="font-weight:700;color:#fff;font-size:13.5px">
+                            PAN: <span style="font-family:monospace;color:#00D09C">${pan}</span>
+                        </div>
+                        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${raw.success ? 'rgba(0,208,156,0.15)' : 'rgba(239,68,68,0.15)'};color:${raw.success ? '#00D09C' : '#ef4444'}">
+                            ${raw.success ? 'NSE RESPONDED (200 OK)' : 'NSE ERROR / REJECTED'}
+                        </span>
+                    </div>
+                    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6">
+                        <div>Registered Legal Name: <b style="color:#fff">${escapeHtml(nseData.registeredName || nseData.name || 'Not on exchange / Fresh')}</b></div>
+                        <div>KRA Status: <span style="color:#fff">${escapeHtml(nseData.kra || nseData.status || 'NONE')}</span></div>
+                        <div>Exchange Message: <span style="color:#fff">${escapeHtml(nseData.message || raw.message || 'No remarks')}</span></div>
+                    </div>
+                    <details style="margin-top:10px;font-size:11px;color:var(--text-dim);cursor:pointer">
+                        <summary style="outline:none">View Raw Exchange JSON</summary>
+                        <pre style="background:#050811;padding:8px;border-radius:4px;overflow-x:auto;color:#38bdf8;margin-top:6px;font-family:monospace">${escapeHtml(JSON.stringify(raw, null, 2))}</pre>
+                    </details>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:12px;color:#fca5a5;font-size:12.5px">
+                    <i class="fas fa-exclamation-triangle"></i> ${escapeHtml(res?.message || 'Exchange check failed')}
+                </div>
+            `;
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `
+            <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:12px;color:#fca5a5;font-size:12.5px">
+                <i class="fas fa-exclamation-triangle"></i> Error: ${escapeHtml(err.message)}
+            </div>
+        `;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-search"></i> Check PAN on NSE`;
+        }
+    }
+}
+
 // ── Explicit Global Window Exposure ───────────────────────────
 window.openMfInvestorDrawer = openMfInvestorDrawer;
 window.closeMfInvestorModal = closeMfInvestorModal;
@@ -2197,6 +2718,17 @@ window.loadMfOrders = loadMfOrders;
 window.loadMfSips = loadMfSips;
 window.loadMfMandates = loadMfMandates;
 window.loadMfCurationSchemes = loadMfCurationSchemes;
+
+window.initMfTestingPage = initMfTestingPage;
+window.searchMfTestUser = searchMfTestUser;
+window.quickInspectMfUser = quickInspectMfUser;
+window.quickInspectActiveUser = quickInspectActiveUser;
+window.clearMfTestSearch = clearMfTestSearch;
+window.refreshMfTestingInspect = refreshMfTestingInspect;
+window.executeMfTestReset = executeMfTestReset;
+window.executeFullFreshSlateReset = executeFullFreshSlateReset;
+window.executeNsePanProbe = executeNsePanProbe;
+
 
 
 
