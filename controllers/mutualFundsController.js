@@ -3982,24 +3982,48 @@ exports.setupUserMandate = async (req, res) => {
                 rawResponse = retryRes?.data || retryRes;
               }
             } catch (_) {}
-          }
+            let isAuthConfirmedOnExchange = false;
+            try {
+              const authReport = await nseClient.getClientAuthorizationReport({ clientCode: ucc.clientCode });
+              const authItem = authReport?.data?.auth_data?.[0] || authReport?.data?.report_data?.[0];
+              if (authItem && (
+                authItem.first_holder_auth_status === 'SUCCESS' ||
+                authItem.auth_status === 'SUCCESS' ||
+                authItem.ucc_status?.toUpperCase() === 'ACTIVE'
+              )) {
+                isAuthConfirmedOnExchange = true;
+                ucc.nseStatus = 'ACTIVE';
+                await ucc.save();
+              }
+            } catch (_) {}
 
-          if (!liveMandateId) {
-            return res.status(400).json({
-              success: false,
-              code: errMsg.toUpperCase().includes('INACTIVE') ? 'NSE_CLIENT_ACTIVATION_PENDING' : 'NSE_MANDATE_REJECTED',
-              message: errMsg.toUpperCase().includes('INACTIVE')
-                ? 'Your UCC was registered on NSE and is awaiting client activation. Please complete the one-time OTP verification sent to your mobile/email.'
-                : `NSE MFSS Mandate: ${errMsg}`,
-              data: {
-                status: regItem?.reg_status || 'FAILED',
-                remark: regItem?.reg_remark || '',
-                exchangeDetails: regItem || nseRes?.data || null,
-                clientCode: ucc.clientCode,
-                clActLink: clActLink || null,
-              },
-            });
-          }
+            if (!liveMandateId) {
+              const isInactive = errMsg.toUpperCase().includes('INACTIVE');
+              const errorCode = isInactive
+                ? (isAuthConfirmedOnExchange ? 'NSE_CLIENT_ACTIVATION_SYNCING' : 'NSE_CLIENT_ACTIVATION_PENDING')
+                : 'NSE_MANDATE_REJECTED';
+
+              const errorMsg = isInactive
+                ? (isAuthConfirmedOnExchange
+                    ? 'Your one-time UCC activation on NSE has been successfully authorized! The exchange mandate gateway is currently synchronizing client activation (NSE batch sync typically takes 15–30 minutes). Please retry setting up AutoPay in a few minutes.'
+                    : 'Your UCC was registered on NSE and is awaiting client activation. Please complete the one-time OTP verification sent to your mobile/email.')
+                : `NSE MFSS Mandate: ${errMsg}`;
+
+              return res.status(400).json({
+                success: false,
+                code: errorCode,
+                message: errorMsg,
+                data: {
+                  status: regItem?.reg_status || 'FAILED',
+                  remark: regItem?.reg_remark || '',
+                  exchangeDetails: regItem || nseRes?.data || null,
+                  clientCode: ucc.clientCode,
+                  clActLink: clActLink || null,
+                  isAuthorizedOnExchange: isAuthConfirmedOnExchange,
+                  syncState: isAuthConfirmedOnExchange ? 'BATCH_SYNC_PENDING' : 'PENDING_OTP',
+                },
+              });
+            }
         }
 
         mandateId = String(liveMandateId).trim();
