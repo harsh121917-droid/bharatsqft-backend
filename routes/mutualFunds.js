@@ -42,6 +42,7 @@ const {
   getMandateDetail,
   updateUserBank,
   resendUccActivation,
+  handleUpiPaymentCallback,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -51,6 +52,7 @@ router.get('/schemes/:code/holdings', getSchemeHoldings);
 router.get('/schemes/:code', getSchemeDetail);
 router.get('/checkout/:orderId', renderCheckoutSimulator);
 router.post('/orders/:orderId/simulate-payment', simulatePayment);
+router.post('/orders/upi-callback', handleUpiPaymentCallback);
 router.post('/sync-nav', syncNavsNow);
 
 // ── Protected Routes (User-specific transactions & portfolio) ──

@@ -389,24 +389,41 @@ class NseClient {
     }
 
     if (endpoint.includes('upi_status_check')) {
+      const upiStatus = payload.mockStatus || 'SUCCESS';
       return {
         success: true,
         status: 200,
         data: {
-          status: '100',
-          payment_status: 'SUCCESS',
+          status: upiStatus,
+          payment_mode: 'UPI',
+          client_code: payload.client_code || 'VK123456',
+          nse_upi_ref_no: payload.nse_upi_ref_no || `UPI_REF_${timestamp}`,
+          upi_tran_ref_id: `UPI_TXN_${timestamp}`,
+          cust_ref_no: `RRN${timestamp.toString().slice(-12)}`,
+          remark: upiStatus === 'SUCCESS' ? 'Transaction success' : 'Payment pending or declined',
         },
       };
     }
 
     if (endpoint.includes('purchase_payment')) {
+      const basketId = `BSK_${timestamp}`;
       return {
         success: true,
         status: 200,
         data: {
-          status: '100',
-          payment_status: 'INITIATED',
-          payment_ref_no: `PAY_TEST_${timestamp}`,
+          status: 'success',
+          payment_mode: payload.payment_mode || 'UPI',
+          client_code: payload.client_code || 'VK123456',
+          order_ids: payload.order_ids || '',
+          bank_account_no: payload.bank_account_no || '',
+          ifsc: payload.ifsc || '',
+          vpa: payload.vpa || 'user@upi',
+          order_amount: '1000',
+          remark: 'UPI Collect request successfully dispatched to investor VPA',
+          short_url: `https://nseinvestuat.nseindia.com/trxnpaymentonline/${timestamp}`,
+          basket_id: basketId,
+          payment_ref_no: basketId,
+          nse_upi_ref_no: basketId,
         },
       };
     }

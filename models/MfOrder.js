@@ -176,6 +176,10 @@ const MfOrderSchema = new mongoose.Schema(
       enum: ['PENDING', 'SUCCESS', 'FAILED'],
       default: 'PENDING',
     },
+    vpa: {
+      type: String,
+      default: '',
+    },
     // DEPRECATED: Historical Razorpay fields retained for backward compatibility with legacy DB records.
     // New MF purchases strictly use NSE MF II payment links.
     razorpayOrderId: {

@@ -1367,10 +1367,21 @@ exports.resendUccActivation = async (req, res) => {
 exports.createPurchaseOrder = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { schemeCode, orderAmount, paymentMode = 'NSE_PAYMENT_LINK' } = req.body;
+    const { schemeCode, orderAmount, paymentMode = 'NSE_PAYMENT_LINK', vpa } = req.body;
 
     if (!schemeCode || !orderAmount || Number(orderAmount) <= 0) {
       return res.status(400).json({ success: false, message: 'Valid schemeCode and orderAmount are required' });
+    }
+
+    const isUpi = (paymentMode === 'UPI');
+    if (isUpi) {
+      if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_UPI_ID',
+          message: 'Please provide a valid UPI ID (e.g. yourname@okaxis, yourname@ybl, yourname@paytm).',
+        });
+      }
     }
 
     const readiness = await mfInvestorReadinessService.checkInvestorReady(userId, 'PURCHASE');
@@ -1563,10 +1574,33 @@ exports.createPurchaseOrder = async (req, res) => {
 
     const nseOrderId = isSuccess ? String(rawNseOrderId) : (nseClient.isMockMode() ? String(rawNseOrderId || `TEST_PUR_${Date.now()}`) : null);
 
-    // 3. Request Official Payment Link from NSE (GET_LINK API)
+    // 3. Initiate Payment (UPI Collect via /payments/purchase_payment or Web Gateway via GET_LINK)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
-    if (nseOrderId) {
+    let nsePaymentRefNo = '';
+
+    if (isUpi && nseOrderId) {
+      try {
+        const upiPayload = {
+          payment_mode: 'UPI',
+          client_code: ucc.clientCode,
+          order_ids: String(nseOrderId),
+          bank_account_no: ucc.primaryBank?.accountNo || '',
+          ifsc: ucc.primaryBank?.ifsc || '',
+          vpa: vpa.trim(),
+          callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
+        };
+        const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
+        if (upiRes?.success && (upiRes?.data?.status === 'success' || upiRes?.data?.status === '100')) {
+          nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
+          if (upiRes.data.short_url) {
+            paymentLink = upiRes.data.short_url;
+          }
+        }
+      } catch (upiErr) {
+        console.warn(`[createPurchaseOrder] NSE UPI initiatePurchasePayment error:`, upiErr.message);
+      }
+    } else if (nseOrderId) {
       try {
         const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
         if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
@@ -1595,24 +1629,32 @@ exports.createPurchaseOrder = async (req, res) => {
       allottedNav: null,
       allotmentStatus: 'PENDING',
       navAtOrder: scheme.nav,
-      paymentMode: 'NSE_PAYMENT_LINK',
+      paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
       paymentStatus: 'PENDING',
       orderStatus: 'PAYMENT_PENDING',
+      vpa: isUpi ? vpa.trim() : '',
       paymentLink,
       nseTrxnOrderId: nseOrderId,
+      nsePaymentRefNo,
       nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
-      remarks: 'Order placed on NSE MFSS. Awaiting investor payment through official NSE payment gateway.',
+      remarks: isUpi
+        ? `UPI Collect request dispatched to ${vpa.trim()} by NSE Clearing Limited. Awaiting approval in UPI app.`
+        : 'Order placed on NSE MFSS. Awaiting investor payment through official NSE payment gateway.',
     });
 
     return res.json({
       success: true,
-      message: 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.',
+      message: isUpi
+        ? `UPI Collect request sent to ${vpa.trim()} by NSE Clearing Limited. Please approve in your UPI app.`
+        : 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.',
       data: {
         order,
+        orderId: order.orderId,
         paymentLink,
         amount: Number(orderAmount),
         currency: 'INR',
-        paymentMode: 'NSE_PAYMENT_LINK',
+        paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
+        vpa: isUpi ? vpa.trim() : null,
       },
     });
   } catch (error) {
@@ -1708,6 +1750,31 @@ exports.syncOrderStatus = async (req, res) => {
       await order.save();
     }
 
+    // Check UPI status if order was placed via UPI and payment is still pending
+    if (order.paymentMode === 'UPI' && order.paymentStatus !== 'SUCCESS') {
+      try {
+        const upiCheck = await nseClient.checkUpiStatus(
+          order.nsePaymentRefNo || order.nseTrxnOrderId,
+          order.clientCode || ucc?.clientCode
+        );
+        const upiItem = upiCheck?.data;
+        const upiStatus = (upiItem?.status || upiItem?.payment_status || '').toUpperCase();
+        if (upiStatus === 'SUCCESS') {
+          order.paymentStatus = 'SUCCESS';
+          order.orderStatus = 'PAYMENT_SUCCESS';
+          order.remarks = 'UPI Payment confirmed by NSE Clearing Limited.';
+          await order.save();
+        } else if (['FAILED', 'REJECTED', 'EXPIRED'].includes(upiStatus)) {
+          order.paymentStatus = 'FAILED';
+          order.orderStatus = 'REJECTED';
+          order.remarks = `UPI Payment was ${upiStatus.toLowerCase()} by investor or bank.`;
+          await order.save();
+        }
+      } catch (upiErr) {
+        console.warn(`[syncOrderStatus] UPI check warning:`, upiErr.message);
+      }
+    }
+
     return res.json({
       success: true,
       message: 'Order status updated from authoritative source',
@@ -1715,6 +1782,52 @@ exports.syncOrderStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('[syncOrderStatus Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 5b. POST /api/mutual-funds/orders/upi-callback (NSE UPI Payment Webhook) ──
+exports.handleUpiPaymentCallback = async (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('[handleUpiPaymentCallback] Received NSE UPI payment callback:', payload);
+
+    const {
+      client_code,
+      order_ids,
+      status,
+      nse_upi_ref_no,
+      upi_tran_ref_id,
+      cust_ref_no,
+      remark,
+    } = payload || {};
+
+    const order = await MfOrder.findOne({
+      $or: [
+        { nseTrxnOrderId: order_ids ? String(order_ids) : null },
+        { nsePaymentRefNo: nse_upi_ref_no ? String(nse_upi_ref_no) : null },
+        { orderId: order_ids ? String(order_ids) : null },
+      ].filter(q => Object.values(q)[0] !== null),
+    });
+
+    if (order) {
+      const upiStatus = String(status || '').toUpperCase();
+      if (upiStatus === 'SUCCESS') {
+        order.paymentStatus = 'SUCCESS';
+        order.orderStatus = 'PAYMENT_SUCCESS';
+        order.remarks = `UPI payment confirmed by NSE Clearing Limited (UTR: ${cust_ref_no || upi_tran_ref_id || ''}).`;
+        await order.save();
+      } else if (['FAILED', 'REJECTED', 'EXPIRED'].includes(upiStatus)) {
+        order.paymentStatus = 'FAILED';
+        order.orderStatus = 'REJECTED';
+        order.remarks = `UPI payment ${upiStatus.toLowerCase()}: ${remark || 'Declined'}`;
+        await order.save();
+      }
+    }
+
+    return res.json({ success: true, message: 'UPI callback processed successfully' });
+  } catch (error) {
+    console.error('[handleUpiPaymentCallback Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
