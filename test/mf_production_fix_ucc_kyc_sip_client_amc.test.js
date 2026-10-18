@@ -1678,7 +1678,7 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     await BankAccount.deleteOne({ user: kycUser._id });
   });
 
-  it('36. UCC registration outside test environment without verified KYC records -> rejected with NSE_VERIFIED_IDENTITY_REQUIRED', async () => {
+  it('36. UCC registration outside test environment does NOT require Gold KYC records -> proceeds without NSE_VERIFIED_IDENTITY_REQUIRED', async () => {
     const origEnv = process.env.NODE_ENV;
     try {
       process.env.NODE_ENV = 'production';
@@ -1704,9 +1704,8 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
 
       await mutualFundsController.registerUserUcc(req, res);
 
-      assert.equal(res.statusCode, 400);
-      assert.equal(res.data.success, false);
-      assert.equal(res.data.code, 'NSE_VERIFIED_IDENTITY_REQUIRED');
+      // Must NOT be blocked by Gold KYC (NSE_VERIFIED_IDENTITY_REQUIRED)
+      assert.notEqual(res.data?.code, 'NSE_VERIFIED_IDENTITY_REQUIRED');
 
       await User.deleteOne({ _id: unverifiedUser._id });
     } finally {

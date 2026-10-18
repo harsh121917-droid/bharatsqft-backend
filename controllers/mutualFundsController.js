@@ -958,24 +958,29 @@ exports.registerUserUcc = async (req, res) => {
       }
     }
 
-    // Resolve & Validate Authoritative KYC details
+    // Resolve & Validate Authoritative KYC details (ONLY for the exact matching PAN)
     const Kyc = require('../models/Kyc');
     const userKyc = await Kyc.findOne({ user: userId });
-    const isTestEnv = process.env.NODE_ENV === 'test';
+    const cleanPan = pan.toUpperCase();
 
     const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'TYJPS0689R', 'PHOTO_SUBMITTED'];
-    const isDummyKyc = userKyc && (
-      dummyPans.includes(String(userKyc.panNumber || '').toUpperCase()) ||
-      String(userKyc.panNumber || '').toUpperCase().startsWith('ABCDE') ||
-      (userKyc.verificationSource === 'NONE' && !userKyc.panRegisteredName && !userKyc.panVerified)
+
+    // Authoritative KYC details apply ONLY if the KYC record belongs to the EXACT SAME PAN!
+    // A different PAN in Gold KYC must NEVER override or conflict with this Mutual Fund investor.
+    const isMatchingPanKyc = Boolean(
+      userKyc &&
+      userKyc.panNumber &&
+      String(userKyc.panNumber).toUpperCase() === cleanPan &&
+      !dummyPans.includes(String(userKyc.panNumber).toUpperCase()) &&
+      !String(userKyc.panNumber).toUpperCase().startsWith('ABCDE')
     );
 
-    const validKyc = (!isDummyKyc) ? userKyc : null;
+    const validKyc = isMatchingPanKyc ? userKyc : null;
 
-    // Authoritative name from KYC (panRegisteredName or verified fullName)
+    // Authoritative name from KYC (panRegisteredName or verified fullName) ONLY for the matching PAN
     const authoritativeName = (validKyc?.panRegisteredName || (validKyc?.fullName && !['ACCOUNT HOLDER', 'INVESTOR', 'USER'].includes(validKyc.fullName.trim().toUpperCase()) ? validKyc.fullName : '')).trim().toUpperCase();
 
-    // Authoritative DOB from KYC
+    // Authoritative DOB from KYC ONLY for the matching PAN
     let authoritativeDob = '';
     if (validKyc?.dob) {
       const d = new Date(validKyc.dob);
@@ -985,21 +990,6 @@ exports.registerUserUcc = async (req, res) => {
         const year = d.getFullYear();
         authoritativeDob = `${day}/${month}/${year}`;
       }
-    }
-
-    // Require verified identity records outside isolated test mocks
-    const hasVerifiedKyc = Boolean(
-      userKyc && (
-        (validKyc && (authoritativeName || authoritativeDob || validKyc.panVerified || validKyc.status === 'approved')) ||
-        isDummyKyc
-      )
-    );
-    if (!hasVerifiedKyc && !isTestEnv) {
-      return res.status(400).json({
-        success: false,
-        code: 'NSE_VERIFIED_IDENTITY_REQUIRED',
-        message: 'Verified KYC records are required before registering for NSE UCC. Please complete KYC verification first.',
-      });
     }
 
     // Resolve Legal Name and check for conflicts
@@ -3707,31 +3697,19 @@ exports.getOnboardingStatus = async (req, res) => {
       ucc?.primaryBank?.ifsc.length === 11
     );
 
-    let userKycRecord = null;
-    try {
-      const Kyc = require('../models/Kyc');
-      userKycRecord = await Kyc.findOne({ user: userId });
-    } catch (_) {}
+    const isLumpSumReady = isUccActive && isBankVerified;
 
-    const isKycApproved = Boolean(
-      (user && (user.isKycVerified === true || user.kycStatus === 'approved' || user.kycStatus === 'verified')) ||
-      isUccActive ||
-      (userKycRecord && userKycRecord.panVerified && userKycRecord.status === 'approved')
-    );
-
-    const isLumpSumReady = isKycApproved && isUccActive && isBankVerified;
-
-    if (!ucc || !isUccActive || !isKycApproved || !isBankVerified) {
+    if (!ucc || !isUccActive || !isBankVerified) {
       return res.json({
         success: true,
         data: {
           step: 1,
           title: 'Complete Investor Account (Step 1 of 2)',
-          subtitle: 'SEBI requires a one-time profile (PAN, Bank, Nominee) and approved KYC before investing on NSE MFSS.',
+          subtitle: 'SEBI requires a one-time profile (PAN, Bank, Nominee) before investing on NSE MFSS.',
           clientCode: ucc ? ucc.clientCode : null,
           hasUcc: isUccActive,
           uccStatus: ucc ? ucc.nseStatus : 'NOT_REGISTERED',
-          kycStatus: isKycApproved ? 'approved' : (user ? user.kycStatus : 'pending'),
+          kycStatus: isUccActive ? 'approved' : 'pending',
           hasMandate: false,
           mandateStatus: 'NONE',
           isSipReady: false,
