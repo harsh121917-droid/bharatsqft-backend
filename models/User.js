@@ -91,6 +91,16 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    mfClientCode: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
+    mfClientCodeAttempt: {
+      type: Number,
+      default: 0,
+    },
     profilePicture: {
       type: String,
       default: "",

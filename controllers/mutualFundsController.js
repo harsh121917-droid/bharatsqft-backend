@@ -1081,8 +1081,40 @@ exports.registerUserUcc = async (req, res) => {
     const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
     const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
 
-    // Generate unique client code e.g. VK + 6 digit user identifier
-    const clientCode = `VK${user.phone ? user.phone.slice(-6) : user._id.toString().slice(-6).toUpperCase()}`;
+    // Resolve Client Code:
+    // 1. Explicitly passed in req.body.clientCode (e.g. from testing tool or custom code)
+    // 2. Or user-configured mfClientCode on user model
+    // 3. Or derived from phone + attempt counter (auto-rotates if forceNewClientCode is true)
+    let clientCode = '';
+    if (req.body.clientCode && typeof req.body.clientCode === 'string') {
+      const candidate = req.body.clientCode.trim().toUpperCase();
+      if (/^[A-Z0-9]{4,10}$/.test(candidate)) {
+        clientCode = candidate;
+      }
+    }
+    if (!clientCode && user.mfClientCode) {
+      clientCode = user.mfClientCode.trim().toUpperCase();
+    }
+    if (!clientCode || req.body.forceNewClientCode) {
+      const basePhoneDigits = user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-6) : user._id.toString().slice(-6).toUpperCase();
+      const currentAttempt = user.mfClientCodeAttempt || 0;
+      const attempt = req.body.forceNewClientCode ? (currentAttempt + 1) : currentAttempt;
+      if (attempt > 0) {
+        const numBase = parseInt(basePhoneDigits, 10);
+        if (!isNaN(numBase)) {
+          clientCode = `VK${String(numBase + attempt).padStart(6, '0').slice(-6)}`;
+        } else {
+          clientCode = `VK${basePhoneDigits.slice(0, 5)}${String.fromCharCode(64 + Math.min(attempt, 26))}`;
+        }
+      } else {
+        clientCode = `VK${basePhoneDigits}`;
+      }
+      if (req.body.forceNewClientCode) {
+        user.mfClientCode = clientCode;
+        user.mfClientCodeAttempt = attempt;
+        await user.save().catch(() => {});
+      }
+    }
 
     // 0b. Address Resolution & Strict Non-Placeholder Validation
     const explicitAddressPassed = Boolean(
@@ -1347,6 +1379,7 @@ exports.registerUserUcc = async (req, res) => {
         panNumber: pan.toUpperCase(),
         isKycVerified: true,
         kycStatus: 'approved',
+        mfClientCode: clientCode,
       }).catch(() => {});
 
       const Kyc = require('../models/Kyc');

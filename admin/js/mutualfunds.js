@@ -2400,11 +2400,17 @@ function renderMfTestingInspectResults(data) {
                     </span>
                 </div>
                 <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
-                    <div>Client Code: <b style="color:#fff;font-family:monospace">${escapeHtml(ucc?.clientCode || 'None')}</b></div>
+                    <div>Client Code: <b style="color:#fff;font-family:monospace">${escapeHtml(ucc?.clientCode || u?.mfClientCode || 'None')}</b></div>
+                    ${u?.mfClientCode ? `<div style="font-size:11px;color:#38bdf8">Assigned Code: <b style="font-family:monospace">${escapeHtml(u.mfClientCode)}</b></div>` : ''}
                     <div>Registered PAN: <b style="color:#fff;font-family:monospace">${escapeHtml(ucc?.pan || 'None')}</b></div>
                     <div>Registered Name: <b style="color:#fff">${escapeHtml(ucc?.fullName || 'None')}</b></div>
                     <div>DOB: <span style="color:#fff">${escapeHtml(ucc?.dob || 'None')}</span></div>
                     <div>Tax Status / Occ: <span style="color:#fff">${escapeHtml(ucc?.taxStatus || '-')} / ${escapeHtml(ucc?.occupationCode || '-')}</span></div>
+                    <div style="margin-top:8px">
+                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;width:100%" onclick="quickGenerateNewClientCode('${escapeHtml(u._id || summary.userId || '')}')">
+                            <i class="fas fa-random"></i> Generate New Client Code
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -2521,6 +2527,14 @@ function renderMfTestingInspectResults(data) {
                         <div style="font-size:11px;color:var(--text-dim)">Optional: deletes bank records to test fresh bank linking</div>
                     </div>
                 </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#38bdf8;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-rotate-code" checked style="margin-top:3px;accent-color:#38bdf8" />
+                    <div>
+                        <b>Rotate / Generate Fresh Client Code</b>
+                        <div style="font-size:11px;color:#7dd3fc">Assigns next unique client code so NSE registration starts 100% clean</div>
+                    </div>
+                </label>
             </div>
 
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
@@ -2557,9 +2571,10 @@ async function executeMfTestReset() {
     const clearHoldings = document.getElementById('mf-reset-chk-holdings')?.checked ?? true;
     const clearKyc = document.getElementById('mf-reset-chk-kyc')?.checked ?? false;
     const clearBank = document.getElementById('mf-reset-chk-bank')?.checked ?? false;
+    const generateNewClientCode = document.getElementById('mf-reset-chk-rotate-code')?.checked ?? false;
     const adminReason = document.getElementById('mf-reset-reason-input')?.value?.trim() || 'Admin manual test reset';
 
-    if (!clearUcc && !clearOrders && !clearMandates && !clearHoldings && !clearKyc && !clearBank) {
+    if (!clearUcc && !clearOrders && !clearMandates && !clearHoldings && !clearKyc && !clearBank && !generateNewClientCode) {
         toast('Please check at least one record type to reset', 'warning');
         return;
     }
@@ -2583,6 +2598,7 @@ async function executeMfTestReset() {
             clearHoldings,
             clearKyc,
             clearBank,
+            generateNewClientCode,
             adminReason,
         };
 
@@ -2613,6 +2629,36 @@ async function executeMfTestReset() {
     }
 }
 
+async function quickGenerateNewClientCode(userId) {
+    const query = userId || currentInspectedMfUser?.summary?.phone || currentInspectedMfUser?.summary?.userId;
+    if (!query) {
+        toast('No user selected', 'warning');
+        return;
+    }
+    const custom = prompt(`Enter custom client code (4-10 alphanumeric characters e.g. VK088818), or leave blank to auto-generate the next sequential code:`);
+    if (custom === null) return; // cancelled
+
+    try {
+        const res = await api('/admin/mutual-funds/testing/generate-client-code', {
+            method: 'POST',
+            body: JSON.stringify({
+                query,
+                customClientCode: custom.trim().toUpperCase(),
+                clearOldUcc: true,
+            }),
+        });
+        if (res && res.success) {
+            toast(res.message || 'New client code generated! 🎉', 'success');
+            await searchMfTestUser(query);
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
+        } else {
+            toast(res?.message || 'Failed to generate client code', 'danger');
+        }
+    } catch (err) {
+        toast(err.message || 'Error generating client code', 'danger');
+    }
+}
+
 async function executeFullFreshSlateReset() {
     if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
         toast('No user selected to reset', 'warning');
@@ -2620,7 +2666,7 @@ async function executeFullFreshSlateReset() {
     }
 
     // Check all checkboxes
-    ['mf-reset-chk-ucc', 'mf-reset-chk-orders', 'mf-reset-chk-mandates', 'mf-reset-chk-holdings', 'mf-reset-chk-kyc'].forEach(id => {
+    ['mf-reset-chk-ucc', 'mf-reset-chk-orders', 'mf-reset-chk-mandates', 'mf-reset-chk-holdings', 'mf-reset-chk-kyc', 'mf-reset-chk-rotate-code'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.checked = true;
     });

@@ -243,4 +243,45 @@ describe('Admin MF Testing & Sandbox Reset Tools', () => {
     assert.equal(res.data.success, true);
     assert.equal(res.data.data.uccDeleted, 1);
   });
+
+  it('7. generateNewClientCode generates fresh sequential client code and updates User', async () => {
+    const { req, res } = mockReqRes({ query: testPhone });
+    await adminMfController.generateNewClientCode(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.match(res.data.data.newClientCode, /^VK\d{6}$/);
+
+    const updatedUser = await User.findById(testUser._id);
+    assert.equal(updatedUser.mfClientCode, res.data.data.newClientCode);
+    assert.equal(updatedUser.mfClientCodeAttempt, 1);
+  });
+
+  it('8. generateNewClientCode supports custom client code (e.g. VK088818)', async () => {
+    const customCode = 'VK088818';
+    const { req, res } = mockReqRes({ query: testPhone, customClientCode: customCode });
+    await adminMfController.generateNewClientCode(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.newClientCode, customCode);
+
+    const updatedUser = await User.findById(testUser._id);
+    assert.equal(updatedUser.mfClientCode, customCode);
+  });
+
+  it('9. resetMfTestingUser with generateNewClientCode: true clears records and rotates client code', async () => {
+    const { req, res } = mockReqRes({
+      query: testPhone,
+      clearUcc: true,
+      generateNewClientCode: true,
+      adminReason: 'Rotate client code on reset',
+    });
+    await adminMfController.resetMfTestingUser(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.notEqual(res.data.data.newClientCode, null);
+    assert.match(res.data.data.newClientCode, /^VK/);
+  });
 });

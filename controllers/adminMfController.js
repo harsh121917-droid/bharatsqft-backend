@@ -707,6 +707,8 @@ exports.resetMfTestingUser = async (req, res) => {
       clearHoldings = true,
       clearKyc = false,
       clearBank = false,
+      generateNewClientCode = false,
+      customClientCode = '',
       adminReason = '',
     } = req.body;
 
@@ -790,6 +792,27 @@ exports.resetMfTestingUser = async (req, res) => {
 
     await Promise.all(deleteTasks);
 
+    // If fresh client code rotation or custom code requested
+    if ((generateNewClientCode || customClientCode) && user) {
+      let nextCode = '';
+      if (customClientCode && /^[A-Z0-9]{4,10}$/i.test(customClientCode)) {
+        nextCode = customClientCode.trim().toUpperCase();
+      } else {
+        const nextAttempt = (user.mfClientCodeAttempt || 0) + 1;
+        const basePhoneDigits = user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-6) : user._id.toString().slice(-6).toUpperCase();
+        const numBase = parseInt(basePhoneDigits, 10);
+        if (!isNaN(numBase)) {
+          nextCode = `VK${String(numBase + nextAttempt).padStart(6, '0').slice(-6)}`;
+        } else {
+          nextCode = `VK${basePhoneDigits.slice(0, 5)}${String.fromCharCode(64 + Math.min(nextAttempt, 26))}`;
+        }
+        user.mfClientCodeAttempt = nextAttempt;
+      }
+      user.mfClientCode = nextCode;
+      await user.save();
+      results.newClientCode = nextCode;
+    }
+
     // Record audit trail
     try {
       await MfAuditLog.create({
@@ -811,6 +834,7 @@ exports.resetMfTestingUser = async (req, res) => {
     if (results.holdingsDeleted > 0) parts.push(`Holdings: ${results.holdingsDeleted}`);
     if (results.kycReset) parts.push('KYC record cleared');
     if (results.bankDeleted > 0) parts.push(`Banks: ${results.bankDeleted}`);
+    if (results.newClientCode) parts.push(`New Client Code: ${results.newClientCode}`);
 
     const summaryMsg = parts.length > 0 ? parts.join(', ') : 'No records needed deleting';
 
@@ -821,6 +845,65 @@ exports.resetMfTestingUser = async (req, res) => {
     });
   } catch (error) {
     console.error('[resetMfTestingUser Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7C. POST /api/admin/mutual-funds/testing/generate-client-code ──
+exports.generateNewClientCode = async (req, res) => {
+  try {
+    const query = req.body?.query || req.body?.userId || req.body?.phone;
+    const customCode = req.body?.customClientCode ? String(req.body.customClientCode).trim().toUpperCase() : '';
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'User identifier (phone, email, ID) is required.' });
+    }
+    const { user } = await resolveUserByQuery(query);
+    if (!user) {
+      return res.status(404).json({ success: false, message: `User not found matching "${query}".` });
+    }
+
+    let newCode = '';
+    if (customCode) {
+      if (!/^[A-Z0-9]{4,10}$/.test(customCode)) {
+        return res.status(400).json({ success: false, message: 'Client code must be 4-10 alphanumeric characters (e.g. VK088818).' });
+      }
+      newCode = customCode;
+    } else {
+      const nextAttempt = (user.mfClientCodeAttempt || 0) + 1;
+      const basePhoneDigits = user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-6) : user._id.toString().slice(-6).toUpperCase();
+      const numBase = parseInt(basePhoneDigits, 10);
+      if (!isNaN(numBase)) {
+        newCode = `VK${String(numBase + nextAttempt).padStart(6, '0').slice(-6)}`;
+      } else {
+        newCode = `VK${basePhoneDigits.slice(0, 5)}${String.fromCharCode(64 + Math.min(nextAttempt, 26))}`;
+      }
+      user.mfClientCodeAttempt = nextAttempt;
+    }
+
+    user.mfClientCode = newCode;
+    await user.save();
+
+    // Clean old UCC record so new client code is immediately ready
+    const clearOldUcc = req.body?.clearOldUcc !== false;
+    let deletedOldUcc = false;
+    if (clearOldUcc) {
+      const del = await MfClientUcc.deleteMany({ user: user._id });
+      deletedOldUcc = del.deletedCount > 0;
+    }
+
+    return res.json({
+      success: true,
+      message: `Generated fresh client code '${newCode}' for ${user.name || user.phone}. Ready for clean NSE registration.`,
+      data: {
+        userId: user._id,
+        phone: user.phone,
+        newClientCode: newCode,
+        attempt: user.mfClientCodeAttempt || 1,
+        deletedOldUcc,
+      },
+    });
+  } catch (error) {
+    console.error('[generateNewClientCode Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
