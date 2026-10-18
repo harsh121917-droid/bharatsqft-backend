@@ -152,10 +152,10 @@ const AMC_REGISTRY = {
   BANDHAN_MF: {
     amcCode: 'BANDHAN_MF',
     amcName: 'Bandhan Mutual Fund',
-    totalAum: 155800.00,
+    totalAum: 214259.00,
     totalAumAsOfDate: '2026-09-30',
     totalAumSource: 'AMFI Official Average AUM Disclosure Q2 FY2026-27',
-    amcRank: 12,
+    amcRank: 9,
     officialDomain: 'bandhanmutual.com',
     status: 'LIVE_VERIFIED',
     parserVersion: 'bandhan_v1',

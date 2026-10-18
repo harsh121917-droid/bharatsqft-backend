@@ -53,6 +53,7 @@ connectDB();
 require("./crons/goldCron");
 require("./crons/mfNavSyncCron");
 require("./crons/mfReconciliationCron").startReconciliationCron();
+require("./crons/mfAumSyncCron");
 
 /* ---------- Routes ---------- */
 

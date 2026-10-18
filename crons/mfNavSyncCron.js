@@ -9,10 +9,18 @@ const MutualFundScheme = require('../models/MutualFundScheme');
  */
 
 const nseMasterReconciliationService = require('../services/nse/nseMasterReconciliationService');
+const mfMarketSyncService = require('../services/mfMarketSyncService');
 
 async function syncMutualFundNavs() {
   console.log('[MF NAV Sync] Starting daily official Master & NAV synchronization...');
   try {
+    // Step 0: Sync official AMFI Daily NAVs
+    try {
+      await mfMarketSyncService.syncAmfiDailyNavs();
+    } catch (e) {
+      console.warn('[MF NAV Sync] AMFI direct feed note:', e.message);
+    }
+
     // Step 1: Execute NSE Master Ingestion Pipeline (SCH, NAV, SIP)
     const pipelineReport = await nseMasterReconciliationService.syncNseMasterPipeline({ dryRun: false });
     console.log(`[MF NAV Sync] NSE Master Pipeline completed. SCH=${pipelineReport.sch.status}, NAV=${pipelineReport.nav.status}, SIP=${pipelineReport.sip.status}`);

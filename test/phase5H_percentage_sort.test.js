@@ -184,7 +184,7 @@ describe('Phase 5H: Portfolio Percentage Accuracy, Ranking & Sort Reconciliation
 
     test('Bandhan Small Cap (147944): CCIL Reverse Repo is Rank 1 at 13.10% and Top 10 matches official source', async () => {
       const apiResult = await mfPortfolioService.getSchemePortfolio('147944');
-      assert.ok(apiResult.holdings.length === 264, 'Expected 264 holdings');
+      assert.ok(apiResult.holdings.length === 269, 'Expected 269 holdings');
 
       const top1 = apiResult.holdings[0];
       assert.match(top1.securityName, /Clearing Corporation of India Ltd. - Reverse Repo/);

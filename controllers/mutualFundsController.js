@@ -21,6 +21,7 @@ const mfIntelligenceService = require('../services/mfIntelligenceService');
 const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
+const mfMarketSyncService = require('../services/mfMarketSyncService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
 const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const STATE_CODE_MAP = {
@@ -342,6 +343,9 @@ exports.getSchemeDetail = async (req, res) => {
 
     // 1.5 Retrieve verified static statutory intelligence fallback (Tier 2 AMC Factsheets/SIDs)
     const staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
+    if (staticIntel) {
+      await mfMarketSyncService.lazyEnrichScheme(scheme);
+    }
 
     // Canonical Scheme & AMC AUM resolution via Phase 5I MfAumService
     const schemeAumInfo = mfAumService.resolveSchemeAum(scheme);
