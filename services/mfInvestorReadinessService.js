@@ -250,8 +250,28 @@ class MfInvestorReadinessService {
         mandate.umrn.trim().length > 0
       );
 
-      const isMock = nseClient.isMockMode();
-      const isMandateAuthorized = isApprovedStatus && (hasValidUmrn || isMock);
+      let isMandateAuthorized = isApprovedStatus && (hasValidUmrn || isMock);
+
+      // If mandate is present but pending in local DB, check live status on NSE
+      if (!isMandateAuthorized && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
+        try {
+          const statusRes = await nseClient.getMandateStatus({
+            mandateId: mandate.mandateId,
+            client_code: ucc.clientCode,
+          });
+          const reportItem = statusRes?.data?.mandates?.[0] || statusRes?.data?.report_data?.[0];
+          if (reportItem) {
+            const rawStatus = (reportItem.status || reportItem.mandate_status || '').toUpperCase();
+            const rawUmrn = reportItem.umrn || reportItem.umrnNo || reportItem.umrn_no || '';
+            if (['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'].includes(rawStatus) || (rawUmrn && rawUmrn.length > 0)) {
+              mandate.status = 'APPROVED';
+              if (rawUmrn) mandate.umrn = String(rawUmrn).trim();
+              await mandate.save();
+              isMandateAuthorized = true;
+            }
+          }
+        } catch (_) {}
+      }
 
       if (!isMandateAuthorized) {
         return {

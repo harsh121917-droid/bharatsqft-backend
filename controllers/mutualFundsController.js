@@ -1554,6 +1554,11 @@ exports.registerUserUcc = async (req, res) => {
       await nseClient.resendCommunication('CL_ACT', clientCode);
     } catch (_) {}
 
+    // Default to official NSE investor verification portal URL
+    const officialNseAuthPortal = 'https://www.nseinvest.com/mf/';
+    nseAuthUrl = nseAuthUrl || officialNseAuthPortal;
+    clActLink = clActLink || officialNseAuthPortal;
+
     return res.json({
       success: true,
       message: 'UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number.',
@@ -1587,6 +1592,8 @@ exports.resendUccActivation = async (req, res) => {
     try {
       await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
     } catch (_) {}
+
+    authUrl = authUrl || 'https://www.nseinvest.com/mf/';
 
     return res.json({
       success: true,
@@ -2174,9 +2181,25 @@ exports.registerSipOrder = async (req, res) => {
     const sipRefNo = `SIP${Date.now()}`;
     const user = await User.findById(userId);
 
-    // Calculate dates
-    const start = startDate ? new Date(startDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const dateFormatted = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}/${start.getFullYear()}`;
+    // Calculate dates & enforce NSE NNF v1.9.8 Mandate buffer rule (min 7 days for recurring automated debit)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const minBufferDays = 7;
+    const minAllowedDate = new Date(today.getTime() + minBufferDays * 24 * 60 * 60 * 1000);
+
+    let chosenDate = startDate ? new Date(startDate) : new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    let recurringStartDate = new Date(chosenDate);
+    let bufferApplied = false;
+
+    if (recurringStartDate < minAllowedDate) {
+      bufferApplied = true;
+      recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+      if (recurringStartDate < minAllowedDate) {
+        recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+      }
+    }
+
+    const dateFormatted = `${String(recurringStartDate.getDate()).padStart(2, '0')}/${String(recurringStartDate.getMonth() + 1).padStart(2, '0')}/${recurringStartDate.getFullYear()}`;
 
     const effectiveMandateId = mandate.mandateId;
 
@@ -2184,7 +2207,7 @@ exports.registerSipOrder = async (req, res) => {
 
     const firstOrderToday = reqFirstOrderToday !== undefined
       ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
-      : ((paymentMode === 'MANDATE') ? 'N' : 'Y');
+      : ((paymentMode === 'MANDATE' && !bufferApplied) ? 'N' : 'Y');
 
     // 1. Prepare NSE XSIP payload with authoritative exchange codes
     const nseXsipPayload = {
@@ -2295,8 +2318,8 @@ exports.registerSipOrder = async (req, res) => {
       schemeName: scheme.schemeName,
       frequency: frequency.toUpperCase(),
       installmentAmount: Number(installmentAmount),
-      startDate: start,
-      nextDueDate: start,
+      startDate: recurringStartDate,
+      nextDueDate: recurringStartDate,
       mandateId: effectiveMandateId,
       installmentsPaid: 0,
       totalAmountPaid: 0,
@@ -2305,13 +2328,28 @@ exports.registerSipOrder = async (req, res) => {
       stepUpAmount: Number(stepUpAmount || 0),
     });
 
+    let userExplanation = '';
+    if (firstOrderToday === 'Y') {
+      userExplanation = bufferApplied
+        ? `Installment #1 of ₹${installmentAmount} initiated for today. Per exchange rules, automated mandate AutoPay requires a 7-day setup buffer, so recurring monthly debits will start on ${dateFormatted}.`
+        : `Installment #1 of ₹${installmentAmount} initiated for today. Recurring monthly AutoPay debits will start on ${dateFormatted}.`;
+    } else {
+      userExplanation = bufferApplied
+        ? `Monthly SIP registered! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your first automated debit will execute on ${dateFormatted}.`
+        : `Monthly SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`;
+    }
+
     return res.json({
       success: true,
-      message: 'SIP successfully registered on NSE MFSS',
+      message: userExplanation,
+      userMessage: userExplanation,
       data: {
         sip: sipRecord,
         sipId: sipRecord._id,
         paymentLink,
+        firstOrderToday: firstOrderToday === 'Y',
+        nextDebitDate: dateFormatted,
+        bufferApplied,
         amount: Number(installmentAmount),
         currency: 'INR',
       },
@@ -3842,13 +3880,34 @@ exports.getOnboardingStatus = async (req, res) => {
       user: userId,
       mandateId: { $nin: ['', ' ', null] },
     }).sort({ createdAt: -1 });
-    const isMandateApproved = Boolean(
+    let isMandateApproved = Boolean(
       mandate &&
       mandate.mandateId &&
       mandate.mandateId.trim().length > 0 &&
       (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE') &&
       ((typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) || nseClient.isMockMode())
     );
+
+    // If mandate exists and is not yet marked approved in local DB, check live status on NSE
+    if (!isMandateApproved && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
+      try {
+        const mStatusRes = await nseClient.getMandateStatus({
+          mandateId: mandate.mandateId,
+          client_code: ucc.clientCode,
+        });
+        const repItem = mStatusRes?.data?.mandates?.[0] || mStatusRes?.data?.report_data?.[0];
+        if (repItem) {
+          const rawSt = (repItem.status || repItem.mandate_status || '').toUpperCase();
+          const rawUmrn = repItem.umrn || repItem.umrnNo || repItem.umrn_no || '';
+          if (['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'].includes(rawSt) || (rawUmrn && rawUmrn.length > 0)) {
+            mandate.status = 'APPROVED';
+            if (rawUmrn) mandate.umrn = String(rawUmrn).trim();
+            await mandate.save();
+            isMandateApproved = true;
+          }
+        }
+      } catch (_) {}
+    }
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const authUrl = mandate?.authLink || (mandate ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox` : null);
@@ -4106,7 +4165,7 @@ exports.setupUserMandate = async (req, res) => {
                 remark: regItem?.reg_remark || '',
                 exchangeDetails: regItem || nseRes?.data || null,
                 clientCode: ucc.clientCode,
-                clActLink: clActLink || null,
+                clActLink: clActLink || 'https://www.nseinvest.com/mf/',
                 isAuthorizedOnExchange: isAuthConfirmedOnExchange,
                 syncState: isAuthConfirmedOnExchange ? 'BATCH_SYNC_PENDING' : 'PENDING_OTP',
               },
