@@ -2234,18 +2234,34 @@ exports.registerSipOrder = async (req, res) => {
 
     // 2. Register with NSE Gateway
     let nseRes;
-    if (effectiveMandateId) {
-      nseRes = await nseClient.registerXsip([nseXsipPayload]);
-    } else {
+    const isGatewayPayment = (paymentMode === 'NSE_GATEWAY');
+
+    if (!isGatewayPayment && effectiveMandateId) {
       nseRes = await nseClient.registerXsip([nseXsipPayload]);
       const checkItem = nseRes?.data?.reg_data?.[0];
-      if (!nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0) {
-        // Fallback to standard broker SIP if no mandate ID is linked
+      const isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
+      const remark = checkItem?.reg_remark || '';
+      // If XSIP was rejected by exchange because mandate is not yet approved on exchange, and user didn't explicitly mandate-lock it:
+      if (isFailed && (/mandate/i.test(remark) || /umrn/i.test(remark)) && paymentMode !== 'MANDATE') {
+        console.warn(`[registerSipOrder] XSIP registration rejected due to mandate (${remark}). Attempting standard SIP registration fallback...`);
         const standardSipPayload = { ...nseXsipPayload };
         delete standardSipPayload.mandate_id;
         const stdRes = await nseClient.registerSip([standardSipPayload]);
-        if (stdRes?.success && stdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && stdRes?.data?.reg_data?.[0]?.reg_id !== '0') {
+        if (stdRes?.success && stdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && stdRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED' && stdRes?.data?.reg_data?.[0]?.reg_id !== '0') {
           nseRes = stdRes;
+        }
+      }
+    } else {
+      // Standard broker SIP (Non-Mandate / Gateway)
+      const standardSipPayload = { ...nseXsipPayload };
+      delete standardSipPayload.mandate_id;
+      nseRes = await nseClient.registerSip([standardSipPayload]);
+      const checkItem = nseRes?.data?.reg_data?.[0];
+      if ((!nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0) && effectiveMandateId) {
+        // Fallback to XSIP if standard SIP failed and mandate ID exists
+        const xsipRes = await nseClient.registerXsip([nseXsipPayload]);
+        if (xsipRes?.success && xsipRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && xsipRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
+          nseRes = xsipRes;
         }
       }
     }
@@ -4054,6 +4070,7 @@ exports.setupUserMandate = async (req, res) => {
           start_date: startDate,
           end_date: endDate,
           member_mandate_no: memberMandateNo,
+          send_comm: 'Y',
         };
 
         const nseRes = await nseClient.registerMandate([mandatePayload]);
@@ -4210,6 +4227,10 @@ exports.setupUserMandate = async (req, res) => {
           if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
             authLink = shortLinkRes.data.firstHolderLink;
           }
+        } catch (_) {}
+
+        try {
+          await nseClient.resendCommunication('MANDATE_AUTH', liveMandateId);
         } catch (_) {}
       } else {
         mandateId = `TEST_MND_${Date.now()}`;

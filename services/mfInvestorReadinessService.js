@@ -278,11 +278,11 @@ class MfInvestorReadinessService {
       let isMandateAuthorized = Boolean(
         mandate &&
         hasMandateId &&
-        (isApprovedStatus || hasValidUmrn || nseClient.isMockMode())
+        (isApprovedStatus || hasValidUmrn)
       );
 
-      // If mandate is present but pending in local DB, check live status on NSE
-      if (!isMandateAuthorized && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
+      // If mandate is present but pending in local DB, check live status on NSE (in production only)
+      if (!isMandateAuthorized && !nseClient.isMockMode() && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
         try {
           const statusRes = await nseClient.getMandateStatus({
             mandateId: mandate.mandateId,
