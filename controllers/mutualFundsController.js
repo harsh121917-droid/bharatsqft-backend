@@ -3877,10 +3877,25 @@ exports.getOnboardingStatus = async (req, res) => {
       });
     }
 
-    const mandate = await MfMandate.findOne({
+    let mandate = await MfMandate.findOne({
       user: userId,
       mandateId: { $nin: ['', ' ', null] },
+      status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
     }).sort({ createdAt: -1 });
+
+    if (!mandate && ucc.defaultMandateId) {
+      mandate = await MfMandate.findOne({
+        user: userId,
+        mandateId: ucc.defaultMandateId,
+      });
+    }
+
+    if (!mandate) {
+      mandate = await MfMandate.findOne({
+        user: userId,
+        mandateId: { $nin: ['', ' ', null] },
+      }).sort({ createdAt: -1 });
+    }
     let isMandateApproved = Boolean(
       mandate &&
       mandate.mandateId &&
@@ -3996,8 +4011,17 @@ exports.setupUserMandate = async (req, res) => {
         user: userId,
         accountNo: ucc.primaryBank?.accountNo,
         mandateId: { $nin: ['', ' ', null] },
-        status: { $in: ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'PENDING_AUTH'] },
+        status: { $in: ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'AUTHORIZED'] },
       }).sort({ createdAt: -1 });
+
+      if (!mandate) {
+        mandate = await MfMandate.findOne({
+          user: userId,
+          accountNo: ucc.primaryBank?.accountNo,
+          mandateId: { $nin: ['', ' ', null] },
+          status: 'PENDING_AUTH',
+        }).sort({ createdAt: -1 });
+      }
 
       if (mandate && (!mandate.mandateId || !mandate.mandateId.trim())) {
         mandate = null;
@@ -4210,8 +4234,10 @@ exports.setupUserMandate = async (req, res) => {
         rawResponse,
       });
 
-      ucc.defaultMandateId = mandate.mandateId;
-      await ucc.save();
+      if (mandate.status === 'APPROVED' || !ucc.defaultMandateId) {
+        ucc.defaultMandateId = mandate.mandateId;
+        await ucc.save();
+      }
     } else if (!mandate.authLink) {
       mandate.authLink = `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox`;
       await mandate.save();

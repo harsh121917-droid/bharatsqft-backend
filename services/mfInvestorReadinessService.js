@@ -237,7 +237,26 @@ class MfInvestorReadinessService {
 
     // 4. Mandate / eNACH Validation (strictly required for SIP / XSIP)
     if (mode === 'SIP') {
-      const mandate = await MfMandate.findOne({ user: userId }).sort({ createdAt: -1 });
+      let mandate = await MfMandate.findOne({
+        user: userId,
+        mandateId: { $nin: ['', ' ', null] },
+        status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
+      }).sort({ createdAt: -1 });
+
+      if (!mandate && ucc.defaultMandateId) {
+        mandate = await MfMandate.findOne({
+          user: userId,
+          mandateId: ucc.defaultMandateId,
+        });
+      }
+
+      if (!mandate) {
+        mandate = await MfMandate.findOne({
+          user: userId,
+          mandateId: { $nin: ['', ' ', null] },
+        }).sort({ createdAt: -1 });
+      }
+
       const isApprovedStatus = Boolean(
         mandate &&
         ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'].includes(mandate.status)
