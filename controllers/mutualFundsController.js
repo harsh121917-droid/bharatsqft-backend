@@ -1933,6 +1933,7 @@ exports.syncOrderStatus = async (req, res) => {
     // Query NSE ORDER_STATUS report
     const ucc = await MfClientUcc.findOne({ user: userId });
     const nseFilter = {
+      order_ids: String(order.nseTrxnOrderId || order.orderId),
       order_ref_number: order.orderId,
       client_code: order.clientCode || ucc?.clientCode,
       ...(req.body?.mockStatus ? { mockStatus: req.body.mockStatus } : {}),
@@ -1942,23 +1943,24 @@ exports.syncOrderStatus = async (req, res) => {
     let nseData = null;
     try {
       const report = await nseClient.getOrderStatusReport(nseFilter);
-      nseData = report?.data?.orders?.[0];
+      nseData = report?.data?.report_data?.[0] || report?.data?.orders?.[0] || report?.data?.transaction_details?.[0];
     } catch (err) {
       console.warn(`[syncOrderStatus] NSE query warning for ${orderId}:`, err.message);
     }
 
     if (nseData) {
       const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
-      const allottedUnits = parseFloat(nseData.allotted_units || '0');
-      const allottedNav = parseFloat(nseData.nav || '0');
+      const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
+      const allottedUnits = parseFloat(nseData.allotted_units || nseData.allottedqty || '0');
+      const allottedNav = parseFloat(nseData.nav || nseData.allottednav || '0');
 
-      order.nseStatus = nseOrderStatus;
+      order.nseStatus = nseOrderStatus || nseRemark || order.nseStatus;
 
       // Handle Rejection / Failure
-      if (['REJECTED', 'FAILED', 'CANCELLED'].includes(nseOrderStatus)) {
+      if (['REJECTED', 'FAILED', 'CANCELLED', 'INVALID'].includes(nseOrderStatus) && !['PROVISIONAL ORDER', 'ALLOTMENT DONE'].includes(nseRemark)) {
         order.paymentStatus = 'FAILED';
         order.orderStatus = 'REJECTED';
-        order.remarks = nseData.rejection_reason || 'Order rejected by NSE MFSS exchange';
+        order.remarks = nseData.rejection_reason || nseRemark || 'Order rejected by NSE MFSS exchange';
         await order.save();
         return res.json({
           success: true,
@@ -1967,11 +1969,12 @@ exports.syncOrderStatus = async (req, res) => {
         });
       }
 
-      // Handle Confirmed Payment / Accepted Transaction
-      if (['SUCCESS', 'APPROVED', 'VALIDATED', 'ACCEPTED', 'ORDER PLACED'].includes(nseOrderStatus)) {
+      // Handle Confirmed Payment / Accepted Transaction (including 'VALID' and 'PROVISIONAL ORDER')
+      if (['SUCCESS', 'APPROVED', 'VALIDATED', 'ACCEPTED', 'ORDER PLACED', 'VALID'].includes(nseOrderStatus) || /PROVISIONAL|ALLOTMENT|ACCEPTED|VALID/i.test(nseRemark)) {
         if (order.paymentStatus !== 'SUCCESS') {
           order.paymentStatus = 'SUCCESS';
-          order.orderStatus = 'PAYMENT_SUCCESS';
+          order.orderStatus = 'PROCESSING';
+          order.remarks = nseData.order_remark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
         }
       }
 
@@ -2989,9 +2992,35 @@ exports.getMyOrders = async (req, res) => {
     const userId = req.user._id;
     const orders = await MfOrder.find({ user: userId }).sort({ createdAt: -1 });
 
+    const formattedOrders = orders.map((ord) => {
+      const orderDate = new Date(ord.createdAt);
+      const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+      const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      let displayStatus = 'Order Placed';
+      if (ord.allotmentStatus === 'ALLOTTED') {
+        displayStatus = 'Completed';
+      } else if (['REJECTED', 'FAILED'].includes(ord.orderStatus)) {
+        displayStatus = 'Failed';
+      } else if (ord.orderStatus === 'CANCELLED') {
+        displayStatus = 'Cancelled';
+      } else if (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus) || ord.nseStatus === 'ORDER PLACED' || ord.nseStatus === 'VALID') {
+        displayStatus = 'Processing (Allotment Pending)';
+      } else if (ord.orderStatus === 'PAYMENT_PENDING') {
+        displayStatus = 'Payment Pending';
+      }
+
+      return {
+        ...ord.toObject(),
+        displayStatus,
+        expectedAllotmentDate: dayName,
+        isProcessing: ord.allotmentStatus !== 'ALLOTTED' && !['CANCELLED', 'REJECTED', 'FAILED'].includes(ord.orderStatus),
+      };
+    });
+
     return res.json({
       success: true,
-      data: orders,
+      data: formattedOrders,
     });
   } catch (error) {
     console.error('[getMyOrders Error]:', error);

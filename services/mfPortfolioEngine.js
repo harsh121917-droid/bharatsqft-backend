@@ -403,6 +403,57 @@ async function recalculateUserPortfolio(userId) {
     lastUpdatedAt: new Date(),
   };
 
+  // 5. In-progress / Processing Orders (orders placed or payment completed, awaiting RTA unit allotment)
+  const rawPendingOrders = await MfOrder.find({
+    user: userId,
+    $or: [
+      { orderStatus: { $in: ['PAYMENT_PENDING', 'PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING', 'PENDING_NSE'] } },
+      { allotmentStatus: 'PENDING', orderStatus: { $nin: ['CANCELLED', 'REJECTED', 'FAILED'] } },
+    ],
+    allotmentStatus: { $ne: 'ALLOTTED' },
+  }).sort({ createdAt: -1 });
+
+  const inProgressOrders = rawPendingOrders.map((ord) => {
+    const isPaymentDone = ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus) || ord.nseStatus === 'ORDER PLACED' || ord.nseStatus === 'VALID';
+    
+    // Calculate expected allotment date (T+1 or T+2 working days)
+    const orderDate = new Date(ord.createdAt);
+    const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+    let displayStatus = 'Order Placed';
+    if (ord.orderStatus === 'PAYMENT_PENDING' && ord.paymentStatus !== 'SUCCESS') {
+      displayStatus = 'Payment Pending';
+    } else if (ord.allotmentStatus === 'PENDING') {
+      displayStatus = 'Processing (Allotment Pending)';
+    }
+
+    return {
+      _id: ord._id,
+      orderId: ord.orderId,
+      schemeCode: ord.schemeCode,
+      schemeName: ord.schemeName,
+      transactionType: ord.transactionType || 'P',
+      orderAmount: ord.orderAmount,
+      estimatedUnits: ord.estimatedUnits || (ord.navAtOrder > 0 ? +(ord.orderAmount / ord.navAtOrder).toFixed(3) : 0),
+      allottedUnits: ord.allottedUnits || 0,
+      allottedNav: ord.allottedNav || null,
+      navAtOrder: ord.navAtOrder || null,
+      orderStatus: ord.orderStatus,
+      paymentStatus: ord.paymentStatus,
+      allotmentStatus: ord.allotmentStatus,
+      paymentLink: ord.paymentLink || '',
+      nseTrxnOrderId: ord.nseTrxnOrderId || '',
+      nseStatus: ord.nseStatus || '',
+      createdAt: ord.createdAt,
+      displayStatus,
+      expectedAllotmentDate: dayName,
+      isPaymentDone,
+    };
+  });
+
+  summary.inProgressOrdersCount = inProgressOrders.length;
+
   return {
     totalInvested: summary.totalInvested,
     currentValue: summary.currentValuation,
@@ -415,6 +466,8 @@ async function recalculateUserPortfolio(userId) {
       byAmc: amcAllocationList,
     },
     activeSips,
+    inProgressOrders,
+    pendingOrders: inProgressOrders,
   };
 }
 
