@@ -3885,8 +3885,14 @@ exports.getOnboardingStatus = async (req, res) => {
       mandate &&
       mandate.mandateId &&
       mandate.mandateId.trim().length > 0 &&
-      (mandate.status === 'APPROVED' || mandate.status === 'ACCEPTED_BY_BANK' || mandate.status === 'ACTIVE') &&
-      ((typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) || nseClient.isMockMode())
+      (
+        mandate.status === 'APPROVED' ||
+        mandate.status === 'ACCEPTED_BY_BANK' ||
+        mandate.status === 'ACTIVE' ||
+        mandate.status === 'AUTHORIZED' ||
+        (typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) ||
+        nseClient.isMockMode()
+      )
     );
 
     // If mandate exists and is not yet marked approved in local DB, check live status on NSE

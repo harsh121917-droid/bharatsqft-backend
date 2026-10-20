@@ -243,14 +243,24 @@ class MfInvestorReadinessService {
         ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'].includes(mandate.status)
       );
 
-      // In production, an authorized mandate requires a valid UMRN assigned by NPCI/bank
+      const hasMandateId = Boolean(
+        mandate &&
+        typeof mandate.mandateId === 'string' &&
+        mandate.mandateId.trim().length > 0
+      );
+
+      // In production, an authorized mandate requires an approved status on the bank/exchange or a valid UMRN assigned
       const hasValidUmrn = Boolean(
         mandate &&
         typeof mandate.umrn === 'string' &&
         mandate.umrn.trim().length > 0
       );
 
-      let isMandateAuthorized = isApprovedStatus && (hasValidUmrn || isMock);
+      let isMandateAuthorized = Boolean(
+        mandate &&
+        hasMandateId &&
+        (isApprovedStatus || hasValidUmrn || nseClient.isMockMode())
+      );
 
       // If mandate is present but pending in local DB, check live status on NSE
       if (!isMandateAuthorized && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
