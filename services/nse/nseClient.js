@@ -438,6 +438,36 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('TRANSACTION_DETAIL_REPORT')) {
+      const isApproved = payload.mockStatus ? payload.mockStatus === 'APPROVED' || payload.mockStatus === 'SUCCESS' : true;
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              member_code: this.memberCode || '1031616',
+              client_code: payload.client_code || 'VK046041',
+              product_type: 'NORMAL PURCHASE',
+              product_id: payload.order_id || `462930073897`,
+              amount_units: '100.00(A)',
+              primary_holder_auth_status: isApproved ? 'SUCCESS' : 'PENDING',
+              mode_of_payment: isApproved ? 'UPI' : '',
+              payment_date_time: isApproved ? new Date().toISOString() : '',
+              payment_status: isApproved ? 'APPROVED' : '',
+              payment_reference_no: isApproved ? '104286039298' : '',
+              reconciliation_status: isApproved ? 'SUCCESS' : '',
+              amc_payout_utr_no: isApproved ? '2031471664' : '',
+              order_status: isApproved ? 'VALID' : 'INVALID',
+              order_remark: isApproved ? 'AUTO VALIDATED BY RTA' : '2FA PENDING',
+            },
+          ],
+        },
+      };
+    }
+
     if (endpoint.includes('upi_status_check')) {
       const upiStatus = payload.mockStatus || 'SUCCESS';
       return {
@@ -651,6 +681,19 @@ class NseClient {
       client_code: filter.clientCode || '',
       from_date: filter.fromDate || '',
       to_date: filter.toDate || '',
+    });
+  }
+
+  // ── 11d. Transaction Detail Report (Doc Page 131 - Matches NSE Web Portal Transaction Report) ──
+  async getTransactionDetailReport(filter = {}) {
+    return this.post('/nsemfdesk/api/v2/reports/TRANSACTION_DETAIL_REPORT', {
+      order_id: String(filter.orderId || ''),
+      client_code: filter.clientCode || '',
+      from_date: filter.fromDate || '',
+      to_date: filter.toDate || '',
+      Pan: filter.pan || '',
+      date_type: filter.dateType || 'REQUEST_DATE',
+      ...(filter.mockStatus ? { mockStatus: filter.mockStatus } : {}),
     });
   }
 

@@ -2990,6 +2990,24 @@ exports.settleRedemptionOrder = async (req, res) => {
 exports.getMyOrders = async (req, res) => {
   try {
     const userId = req.user._id;
+
+    // Auto-expire abandoned unpaid orders older than 24 hours
+    const expirationCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await MfOrder.updateMany(
+      {
+        user: userId,
+        orderStatus: 'PAYMENT_PENDING',
+        paymentStatus: 'PENDING',
+        createdAt: { $lt: expirationCutoff },
+      },
+      {
+        $set: {
+          orderStatus: 'CANCELLED',
+          remarks: 'Payment session expired by exchange (unpaid past validity window)',
+        },
+      }
+    );
+
     const orders = await MfOrder.find({ user: userId }).sort({ createdAt: -1 });
 
     const formattedOrders = orders.map((ord) => {
@@ -3003,7 +3021,7 @@ exports.getMyOrders = async (req, res) => {
       } else if (['REJECTED', 'FAILED'].includes(ord.orderStatus)) {
         displayStatus = 'Failed';
       } else if (ord.orderStatus === 'CANCELLED') {
-        displayStatus = 'Cancelled';
+        displayStatus = 'Expired';
       } else if (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus)) {
         displayStatus = 'Processing (Allotment Pending)';
       } else if (ord.orderStatus === 'PAYMENT_PENDING') {
