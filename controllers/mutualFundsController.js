@@ -1824,7 +1824,7 @@ exports.createPurchaseOrder = async (req, res) => {
     // 3. Initiate Payment (UPI Collect via /payments/purchase_payment or Web Gateway via GET_LINK)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
-    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}${isLive ? '' : '?mode=sandbox'}`;
+    let paymentLink = null;
     let nsePaymentRefNo = '';
 
     if (isUpi && nseOrderId) {
@@ -1855,6 +1855,11 @@ exports.createPurchaseOrder = async (req, res) => {
           paymentLink = linkRes.data.firstHolderLink;
         }
       } catch (_) {}
+    }
+
+    // Strictly fallback to simulator ONLY in offline test/mock environments (never in live PROD)
+    if (!paymentLink && !isLive) {
+      paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
     }
 
     // 4. Units & Allotment: Estimated units strictly for display, actual units remain 0 until authoritative allotment
@@ -2325,7 +2330,6 @@ exports.registerSipOrder = async (req, res) => {
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
     let paymentLink = null;
     if (firstOrderToday === 'Y' && sipRegNo) {
-      paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}${isLive ? '' : '?mode=sandbox'}`;
       try {
         const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
         if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
@@ -2354,6 +2358,11 @@ exports.registerSipOrder = async (req, res) => {
         }
       } catch (linkErr) {
         console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
+      }
+
+      // Strictly fallback to simulator ONLY in offline test/mock environments (never in live PROD)
+      if (!paymentLink && !isLive) {
+        paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
       }
     }
 
@@ -4034,7 +4043,7 @@ exports.getOnboardingStatus = async (req, res) => {
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
-    const authUrl = mandate?.authLink || (mandate ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}${isLive ? '' : '?mode=sandbox'}` : null);
+    const authUrl = mandate?.authLink || (mandate && !isLive ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox` : null);
 
     if (!isMandateApproved) {
       return res.json({
@@ -4319,12 +4328,14 @@ exports.setupUserMandate = async (req, res) => {
           await nseClient.resendCommunication('MANDATE_AUTH', liveMandateId);
         } catch (_) {}
       } else {
-        mandateId = `TEST_MND_${Date.now()}`;
-        authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
+        mandateId = isLive ? null : `TEST_MND_${Date.now()}`;
+        if (!isLive) {
+          authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
+        }
       }
 
-      if (!authLink) {
-        authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=mandate_auth`;
+      if (!authLink && !isLive) {
+        authLink = `${backendUrl}/api/mutual-funds/checkout/${mandateId}?mode=sandbox`;
       }
 
       mandate = await MfMandate.create({
@@ -4345,7 +4356,7 @@ exports.setupUserMandate = async (req, res) => {
         ucc.defaultMandateId = mandate.mandateId;
         await ucc.save();
       }
-    } else if (!mandate.authLink) {
+    } else if (!mandate.authLink && !isLive) {
       mandate.authLink = `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox`;
       await mandate.save();
     }
