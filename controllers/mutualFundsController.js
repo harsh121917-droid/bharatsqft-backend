@@ -3016,21 +3016,28 @@ exports.getMyOrders = async (req, res) => {
       const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
       let displayStatus = 'Order Placed';
+      let subStatus = '';
       if (ord.allotmentStatus === 'ALLOTTED') {
         displayStatus = 'Completed';
+        subStatus = 'Units Allotted';
       } else if (['REJECTED', 'FAILED'].includes(ord.orderStatus)) {
         displayStatus = 'Failed';
+        subStatus = 'Rejected by Exchange';
       } else if (ord.orderStatus === 'CANCELLED') {
         displayStatus = 'Expired';
+        subStatus = 'Validity Expired';
       } else if (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus)) {
-        displayStatus = 'Processing (Allotment Pending)';
+        displayStatus = 'In Progress';
+        subStatus = 'Allotment Pending';
       } else if (ord.orderStatus === 'PAYMENT_PENDING') {
         displayStatus = 'Payment Pending';
+        subStatus = 'Awaiting Authorization';
       }
 
       return {
         ...ord.toObject(),
         displayStatus,
+        subStatus,
         expectedAllotmentDate: dayName,
         isProcessing: ord.allotmentStatus !== 'ALLOTTED' && (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus)),
       };

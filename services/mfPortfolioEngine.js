@@ -439,11 +439,14 @@ async function recalculateUserPortfolio(userId) {
     const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
     const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
-    let displayStatus = 'Processing (Allotment Pending)';
+    let displayStatus = 'In Progress';
+    let subStatus = 'Allotment Pending';
     if (ord.orderStatus === 'SUBMITTED' || ord.orderStatus === 'PAYMENT_SUCCESS') {
-      displayStatus = 'Submitted to AMC';
+      displayStatus = 'Submitted';
+      subStatus = 'Sent to AMC';
     } else if (ord.orderStatus === 'PROCESSING') {
-      displayStatus = 'Processing (Allotment Pending)';
+      displayStatus = 'In Progress';
+      subStatus = 'Allotment Pending';
     }
 
     return {
@@ -465,6 +468,7 @@ async function recalculateUserPortfolio(userId) {
       nseStatus: ord.nseStatus || '',
       createdAt: ord.createdAt,
       displayStatus,
+      subStatus,
       expectedAllotmentDate: dayName,
       isPaymentDone,
     };
