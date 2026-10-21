@@ -237,19 +237,43 @@ class MfInvestorReadinessService {
 
     // 4. Mandate / eNACH Validation (strictly required for SIP / XSIP)
     if (mode === 'SIP') {
-      let mandate = await MfMandate.findOne({
-        user: userId,
-        mandateId: { $nin: ['', ' ', null] },
-        status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
-      }).sort({ createdAt: -1 });
+      let mandate = null;
 
-      if (!mandate && ucc.defaultMandateId) {
+      // 1. If UCC has an explicit defaultMandateId, prioritize that first
+      if (ucc && ucc.defaultMandateId) {
         mandate = await MfMandate.findOne({
           user: userId,
           mandateId: ucc.defaultMandateId,
+          status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
         });
+        if (!mandate) {
+          mandate = await MfMandate.findOne({
+            user: userId,
+            mandateId: ucc.defaultMandateId,
+          });
+        }
       }
 
+      // 2. Find approved mandate that has a verified exchange UMRN
+      if (!mandate) {
+        mandate = await MfMandate.findOne({
+          user: userId,
+          mandateId: { $nin: ['', ' ', null] },
+          status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
+          umrn: { $nin: ['', ' ', null] },
+        }).sort({ createdAt: -1 });
+      }
+
+      // 3. Find any approved mandate
+      if (!mandate) {
+        mandate = await MfMandate.findOne({
+          user: userId,
+          mandateId: { $nin: ['', ' ', null] },
+          status: { $in: ['APPROVED', 'AUTHORIZED', 'ACTIVE', 'ACCEPTED_BY_BANK'] },
+        }).sort({ createdAt: -1 });
+      }
+
+      // 4. Fallback to any recent mandate
       if (!mandate) {
         mandate = await MfMandate.findOne({
           user: userId,

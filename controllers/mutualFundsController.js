@@ -2213,6 +2213,8 @@ exports.registerSipOrder = async (req, res) => {
       ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
       : ((paymentMode === 'MANDATE' && !bufferApplied) ? 'N' : 'Y');
 
+    const memberCode = String(process.env.NSE_MEMBER_CODE || nseClient.memberCode || '1031616');
+
     // 1. Prepare NSE XSIP payload with authoritative exchange codes
     const nseXsipPayload = {
       amc_code: authoritativeAmcCode,
@@ -2225,6 +2227,8 @@ exports.registerSipOrder = async (req, res) => {
       frequency_allowed: '1',
       installment_amount: String(installmentAmount),
       status: '1',
+      member_code: memberCode,
+      memberCode: memberCode,
       installment_no: '60', // 5 years default tenure
       first_order_today: firstOrderToday,
       primary_holder_mobile: user.phone?.slice(-10) || '',
@@ -2232,14 +2236,17 @@ exports.registerSipOrder = async (req, res) => {
       step_up_required: stepUpRequired ? 'Y' : 'N',
       step_up_amount: stepUpAmount ? String(stepUpAmount) : '0',
       member_unique_id: sipRefNo,
-      mandate_id: effectiveMandateId,
+      internal_ref_no: sipRefNo,
+      mandate_id: String(effectiveMandateId || ''),
+      xsip_mandate_id: String(effectiveMandateId || ''),
+      mandateId: String(effectiveMandateId || ''),
+      euin_declaration: 'N',
+      dpc_flag: 'Y',
     };
 
     // 2. Register with NSE Gateway
     let nseRes;
-    const isGatewayPayment = (paymentMode === 'NSE_GATEWAY');
-
-    if (!isGatewayPayment && effectiveMandateId) {
+    if (effectiveMandateId) {
       nseRes = await nseClient.registerXsip([nseXsipPayload]);
       const checkItem = nseRes?.data?.reg_data?.[0];
       const isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
@@ -2249,6 +2256,8 @@ exports.registerSipOrder = async (req, res) => {
         console.warn(`[registerSipOrder] XSIP registration rejected due to mandate (${remark}). Attempting standard SIP registration fallback...`);
         const standardSipPayload = { ...nseXsipPayload };
         delete standardSipPayload.mandate_id;
+        delete standardSipPayload.xsip_mandate_id;
+        delete standardSipPayload.mandateId;
         const stdRes = await nseClient.registerSip([standardSipPayload]);
         if (stdRes?.success && stdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && stdRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED' && stdRes?.data?.reg_data?.[0]?.reg_id !== '0') {
           nseRes = stdRes;
@@ -2258,6 +2267,8 @@ exports.registerSipOrder = async (req, res) => {
       // Standard broker SIP (Non-Mandate / Gateway)
       const standardSipPayload = { ...nseXsipPayload };
       delete standardSipPayload.mandate_id;
+      delete standardSipPayload.xsip_mandate_id;
+      delete standardSipPayload.mandateId;
       nseRes = await nseClient.registerSip([standardSipPayload]);
       const checkItem = nseRes?.data?.reg_data?.[0];
       if ((!nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0) && effectiveMandateId) {

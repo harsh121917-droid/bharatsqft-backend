@@ -581,48 +581,94 @@ class NseClient {
   // ── 4. XSIP Registration ──
   async registerXsip(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
+    const enrichedList = list.map((item) => ({
+      member_code: memberCode,
+      memberCode: memberCode,
+      ...item,
+      ...(item.member_code ? {} : { member_code: memberCode }),
+    }));
     return this.post('/nsemfdesk/api/v2/registration/product/XSIP', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: enrichedList,
     });
   }
 
   // ── 5. Standard SIP Registration ──
   async registerSip(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
+    const enrichedList = list.map((item) => ({
+      member_code: memberCode,
+      memberCode: memberCode,
+      ...item,
+      ...(item.member_code ? {} : { member_code: memberCode }),
+    }));
     return this.post('/nsemfdesk/api/v2/registration/product/SIP', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: enrichedList,
     });
   }
 
   // ── 6. (X)SIP Topup Registration ──
   async registerSipTopup(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
     return this.post('/nsemfdesk/api/v2/registration/product/SIP_TOPUP', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: list.map((item) => ({
+        member_code: memberCode,
+        memberCode: memberCode,
+        ...item,
+      })),
     });
   }
 
   // ── 6b. STP (Systematic Transfer Plan) Registration ──
   async registerStp(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
     return this.post('/nsemfdesk/api/v2/registration/product/STP', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: list.map((item) => ({
+        member_code: memberCode,
+        memberCode: memberCode,
+        ...item,
+      })),
     });
   }
 
   // ── 6c. SWP (Systematic Withdrawal Plan) Registration ──
   async registerSwp(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
     return this.post('/nsemfdesk/api/v2/registration/product/SWP', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: list.map((item) => ({
+        member_code: memberCode,
+        memberCode: memberCode,
+        ...item,
+      })),
     });
   }
 
   // ── 7. Mandate Registration (eNACH / Physical) ──
   async registerMandate(regData) {
     const list = Array.isArray(regData) ? regData : [regData];
+    const memberCode = String(this.memberCode || process.env.NSE_MEMBER_CODE || '1031616');
     return this.post('/nsemfdesk/api/v2/registration/product/MANDATE', {
-      reg_data: list,
+      member_code: memberCode,
+      memberCode: memberCode,
+      reg_data: list.map((item) => ({
+        member_code: memberCode,
+        memberCode: memberCode,
+        ...item,
+      })),
     });
   }
 
