@@ -390,6 +390,54 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('order_lifecycle')) {
+      const isPaid = payload.mockPaymentStatus ? payload.mockPaymentStatus === 'SUCCESS' : true;
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: 'S',
+          report_data_total: '1',
+          report_data: [
+            {
+              product_id: payload.product_id || `ORD_${timestamp}`,
+              product_type: payload.Product_type || 'PUR',
+              mode_of_payment: 'UPI',
+              payment_datetime: new Date().toISOString(),
+              payment_status: isPaid ? 'SUCCESS' : 'PENDING',
+              reconciliation_status: isPaid ? 'SUCCESS' : 'PENDING',
+              order_status: 'VALID',
+              order_remark: isPaid ? 'PROVISIONAL ORDER' : 'PAYMENT CONFIRMATION PENDING',
+            },
+          ],
+        },
+      };
+    }
+
+    if (endpoint.includes('MEMBER_FUND_ALLOCATION')) {
+      const isAllocated = payload.mockSettled ? payload.mockSettled === 'Y' : true;
+      return {
+        success: true,
+        status: 200,
+        data: {
+          response_status: isAllocated ? 'S' : 'F',
+          report_data_total: isAllocated ? '1' : '0',
+          report_data: isAllocated
+            ? [
+                {
+                  order_number: payload.order_id || `ORD_${timestamp}`,
+                  settled_flag: 'Y',
+                  allotment_flag: 'Y',
+                  totalamount: '100',
+                  payment_mode: 'UPI',
+                },
+              ]
+            : [],
+          error_remark: isAllocated ? '' : 'No record(s) found',
+        },
+      };
+    }
+
     if (endpoint.includes('upi_status_check')) {
       const upiStatus = payload.mockStatus || 'SUCCESS';
       return {
@@ -583,6 +631,27 @@ class NseClient {
   // ── 11. Order Status Report ──
   async getOrderStatusReport(filter) {
     return this.post('/nsemfdesk/api/v2/reports/ORDER_STATUS', filter);
+  }
+
+  // ── 11b. Order Lifecycle Report (Doc Page 129 - Authoritative Payment & Lifecycle Tracking) ──
+  async getOrderLifecycle(filter = {}) {
+    return this.post('/nsemfdesk/api/v2/reports/order_lifecycle', {
+      Product_type: filter.productType || 'PUR',
+      product_id: String(filter.productId || filter.orderId || ''),
+      client_code: filter.clientCode || '',
+      from_date: filter.fromDate || '',
+      to_date: filter.toDate || '',
+    });
+  }
+
+  // ── 11c. Member Fund Allocation Order-Wise Report (Doc Page 99 - Checks Received Funds) ──
+  async getFundAllocationOrderWise(filter = {}) {
+    return this.post('/nsemfdesk/api/v2/reports/MEMBER_FUND_ALLOCATION/ORDER_WISE', {
+      order_id: String(filter.orderId || ''),
+      client_code: filter.clientCode || '',
+      from_date: filter.fromDate || '',
+      to_date: filter.toDate || '',
+    });
   }
 
   // ── 12. Scheme Master & NAV Download ──

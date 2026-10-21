@@ -403,28 +403,29 @@ async function recalculateUserPortfolio(userId) {
     lastUpdatedAt: new Date(),
   };
 
-  // 5. In-progress / Processing Orders (orders placed or payment completed, awaiting RTA unit allotment)
+  // 5. In-progress / Processing Orders (ONLY orders where payment is completed, awaiting RTA unit allotment)
   const rawPendingOrders = await MfOrder.find({
     user: userId,
-    $or: [
-      { orderStatus: { $in: ['PAYMENT_PENDING', 'PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING', 'PENDING_NSE'] } },
-      { allotmentStatus: 'PENDING', orderStatus: { $nin: ['CANCELLED', 'REJECTED', 'FAILED'] } },
-    ],
     allotmentStatus: { $ne: 'ALLOTTED' },
+    orderStatus: { $nin: ['CANCELLED', 'REJECTED', 'FAILED'] },
+    $or: [
+      { paymentStatus: 'SUCCESS' },
+      { orderStatus: { $in: ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'] } },
+    ],
   }).sort({ createdAt: -1 });
 
   const inProgressOrders = rawPendingOrders.map((ord) => {
-    const isPaymentDone = ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus) || ord.nseStatus === 'ORDER PLACED' || ord.nseStatus === 'VALID';
+    const isPaymentDone = true;
     
     // Calculate expected allotment date (T+1 or T+2 working days)
     const orderDate = new Date(ord.createdAt);
     const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
     const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
-    let displayStatus = 'Order Placed';
-    if (ord.orderStatus === 'PAYMENT_PENDING' && ord.paymentStatus !== 'SUCCESS') {
-      displayStatus = 'Payment Pending';
-    } else if (ord.allotmentStatus === 'PENDING') {
+    let displayStatus = 'Processing (Allotment Pending)';
+    if (ord.orderStatus === 'SUBMITTED' || ord.orderStatus === 'PAYMENT_SUCCESS') {
+      displayStatus = 'Submitted to AMC';
+    } else if (ord.orderStatus === 'PROCESSING') {
       displayStatus = 'Processing (Allotment Pending)';
     }
 

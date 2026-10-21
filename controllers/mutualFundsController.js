@@ -3004,7 +3004,7 @@ exports.getMyOrders = async (req, res) => {
         displayStatus = 'Failed';
       } else if (ord.orderStatus === 'CANCELLED') {
         displayStatus = 'Cancelled';
-      } else if (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus) || ord.nseStatus === 'ORDER PLACED' || ord.nseStatus === 'VALID') {
+      } else if (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus)) {
         displayStatus = 'Processing (Allotment Pending)';
       } else if (ord.orderStatus === 'PAYMENT_PENDING') {
         displayStatus = 'Payment Pending';
@@ -3014,7 +3014,7 @@ exports.getMyOrders = async (req, res) => {
         ...ord.toObject(),
         displayStatus,
         expectedAllotmentDate: dayName,
-        isProcessing: ord.allotmentStatus !== 'ALLOTTED' && !['CANCELLED', 'REJECTED', 'FAILED'].includes(ord.orderStatus),
+        isProcessing: ord.allotmentStatus !== 'ALLOTTED' && (ord.paymentStatus === 'SUCCESS' || ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'].includes(ord.orderStatus)),
       };
     });
 
