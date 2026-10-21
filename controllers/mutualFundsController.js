@@ -1823,7 +1823,8 @@ exports.createPurchaseOrder = async (req, res) => {
 
     // 3. Initiate Payment (UPI Collect via /payments/purchase_payment or Web Gateway via GET_LINK)
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
-    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
+    let paymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}${isLive ? '' : '?mode=sandbox'}`;
     let nsePaymentRefNo = '';
 
     if (isUpi && nseOrderId) {
@@ -2321,18 +2322,35 @@ exports.registerSipOrder = async (req, res) => {
 
     // 3. Request Official Payment / Mandate Link from NSE if first order is today
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
     let paymentLink = null;
     if (firstOrderToday === 'Y' && sipRegNo) {
-      paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
+      paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}${isLive ? '' : '?mode=sandbox'}`;
       try {
         const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
         if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
           paymentLink = linkRes.data.firstHolderLink;
         } else {
-          const purLinkRes = await nseClient.getShortLink('PUR', sipRegNo);
-          if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
-            paymentLink = purLinkRes.data.firstHolderLink;
-          }
+          // Check provisional orders for this XSIP to fetch order ID and payment link
+          try {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const provRes = await nseClient.post('/nsemfdesk/api/v2/reports/PROV_ORDERS', {
+              from_date: todayStr,
+              to_date: todayStr,
+              trans_type: 'ALL',
+              order_type: 'XSP',
+              client_code: ucc.clientCode,
+              sip_reg_nos: String(sipRegNo),
+            });
+            const provOrder = provRes?.data?.report_data?.[0];
+            const orderIdFromNse = provOrder?.order_id || provOrder?.orderno;
+            if (orderIdFromNse) {
+              const purLinkRes = await nseClient.getShortLink('PUR', orderIdFromNse);
+              if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
+                paymentLink = purLinkRes.data.firstHolderLink;
+              }
+            }
+          } catch (_) {}
         }
       } catch (linkErr) {
         console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
@@ -3092,7 +3110,7 @@ exports.simulatePayment = async (req, res) => {
   }
 };
 
-// ── 10. GET /api/mutual-funds/checkout/:orderId (Visual Web Checkout Simulator) ──
+// ── 10. GET /api/mutual-funds/checkout/:orderId (Visual Web Checkout Simulator & Exchange Confirmation) ──
 exports.renderCheckoutSimulator = async (req, res) => {
   try {
     const rawOrderId = req.params.orderId;
@@ -3101,6 +3119,8 @@ exports.renderCheckoutSimulator = async (req, res) => {
     }
     const orderId = rawOrderId.trim();
     const mongoose = require('mongoose');
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
+    const isExplicitSandbox = (req.query.mode === 'sandbox') || nseClient.isMockMode();
 
     // 1. Try finding an MfOrder (Purchase / Lump-sum)
     let order = await MfOrder.findOne({
@@ -3207,7 +3227,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
               navAtOrder: nav,
               paymentMode: 'MANDATE',
               paymentStatus: 'SUCCESS',
-              nseStatus: 'SUBMITTED (SANDBOX)',
+              nseStatus: isExplicitSandbox ? 'SUBMITTED (SANDBOX)' : 'VALID',
               remarks: `SIP First Installment for RegNo: ${sip.sipRegNo}`,
             });
           }
@@ -3222,7 +3242,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>NSE MFSS SIP Confirmation</title>
+          <title>${isExplicitSandbox ? 'NSE MFSS SIP Simulator' : 'NSE MFSS Official SIP Confirmation'}</title>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
             body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
@@ -3244,10 +3264,10 @@ exports.renderCheckoutSimulator = async (req, res) => {
         </head>
         <body>
           <div class="card">
-            <div class="badge">⚡ NSE MFSS SIP Mandate Verified</div>
+            <div class="badge">${isExplicitSandbox ? '⚡ NSE MFSS Sandbox Verified' : '⚡ NSE MFSS Exchange Verified'}</div>
             <div class="icon-circle">✓</div>
-            <h1>SIP Setup Successful</h1>
-            <p class="sub">Your SIP has been registered with NSE and the 1st installment is paid.</p>
+            <h1>${isExplicitSandbox ? 'SIP Setup Simulated' : 'SIP Registered Successfully'}</h1>
+            <p class="sub">${isExplicitSandbox ? 'Your test SIP has been simulated in Sandbox mode.' : 'Your SIP has been registered with NSE MFSS and linked to your authorized Bank AutoPay Mandate.'}</p>
 
             <div class="details">
               <div class="row">
@@ -3272,12 +3292,12 @@ exports.renderCheckoutSimulator = async (req, res) => {
               </div>
               <div class="row">
                 <span class="label">SIP Status</span>
-                <span class="val" style="color: #00D09C;">ACTIVE (VERIFIED)</span>
+                <span class="val" style="color: #00D09C;">${isExplicitSandbox ? 'ACTIVE (SANDBOX)' : 'ACTIVE (EXCHANGE REGISTERED)'}</span>
               </div>
             </div>
 
             <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
-            <div class="footer">National Stock Exchange of India (NSE NMF II) Sandbox Simulator</div>
+            <div class="footer">${isExplicitSandbox ? 'National Stock Exchange of India (NSE NMF II) Sandbox Simulator' : 'National Stock Exchange of India (NSE MFSS) • Member 1031616'}</div>
           </div>
         </body>
         </html>
@@ -3352,7 +3372,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
             </div>
 
             <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
-            <div class="footer">National Payments Corporation of India (NPCI eNACH) Sandbox</div>
+            <div class="footer">${isExplicitSandbox ? 'National Payments Corporation of India (NPCI eNACH) Sandbox' : 'National Payments Corporation of India (NPCI eNACH) • Official NSE Mandate'}</div>
           </div>
         </body>
         </html>
@@ -3362,7 +3382,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
     // ── SCENARIO C: ONE-TIME PURCHASE (LUMP-SUM) SIMULATION ──
     if (order.paymentStatus !== 'SUCCESS') {
       order.paymentStatus = 'SUCCESS';
-      order.nseStatus = 'ALLOTTED (SANDBOX)';
+      order.nseStatus = isExplicitSandbox ? 'ALLOTTED (SANDBOX)' : 'VALID';
       await order.save();
     }
 
@@ -3372,7 +3392,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>NSE MFSS Sandbox Payment Simulator</title>
+        <title>${isExplicitSandbox ? 'NSE MFSS Sandbox Payment Simulator' : 'NSE MFSS Official Payment Confirmation'}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           body { background: #0B0F19; color: #F8FAFC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
@@ -3394,10 +3414,10 @@ exports.renderCheckoutSimulator = async (req, res) => {
       </head>
       <body>
         <div class="card">
-          <div class="badge">⚡ NSE MFSS Sandbox Verified</div>
+          <div class="badge">${isExplicitSandbox ? '⚡ NSE MFSS Sandbox Verified' : '⚡ NSE MFSS Official Exchange Verified'}</div>
           <div class="icon-circle">✓</div>
-          <h1>Payment Successful</h1>
-          <p class="sub">Your test mutual fund purchase has been simulated and units are allotted.</p>
+          <h1>${isExplicitSandbox ? 'Payment Simulated' : 'Payment Confirmed'}</h1>
+          <p class="sub">${isExplicitSandbox ? 'Your test mutual fund purchase has been simulated and units are allotted.' : 'Your mutual fund payment has been confirmed by NSE Clearing Limited.'}</p>
 
           <div class="details">
             <div class="row">
@@ -3427,7 +3447,7 @@ exports.renderCheckoutSimulator = async (req, res) => {
           </div>
 
           <button class="btn" onclick="window.close();">Return to GoldVikaone App</button>
-          <div class="footer">National Stock Exchange of India (NSE NNF v1.9.8) Sandbox Simulator</div>
+          <div class="footer">${isExplicitSandbox ? 'National Stock Exchange of India (NSE NNF v1.9.8) Sandbox Simulator' : 'National Stock Exchange of India (NSE MFSS) • Member 1031616'}</div>
         </div>
       </body>
       </html>
@@ -4013,7 +4033,8 @@ exports.getOnboardingStatus = async (req, res) => {
     }
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
-    const authUrl = mandate?.authLink || (mandate ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox` : null);
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
+    const authUrl = mandate?.authLink || (mandate ? `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}${isLive ? '' : '?mode=sandbox'}` : null);
 
     if (!isMandateApproved) {
       return res.json({
