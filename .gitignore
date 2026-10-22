@@ -71,8 +71,9 @@ backups/
 *.cert
 *.pfx
 *.p12
+*.csv
 
 # OS files
 Thumbs.db
 ehthumbs.db
-Desktop.ini
+Desktop.ini
