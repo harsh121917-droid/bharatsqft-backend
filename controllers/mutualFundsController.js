@@ -106,16 +106,25 @@ exports.getSchemes = async (req, res) => {
     };
 
     // Filter out completely hidden AMCs (e.g. HDFC, Axis, ITI toggled off in Admin)
+    let hiddenCodes = [];
+    let hiddenNames = [];
+    let hiddenDisplays = [];
     try {
-      const hiddenAmcs = await MfAmc.find({ isActive: false }).select('amcCode amcName').lean();
+      const hiddenAmcs = await MfAmc.find({ isActive: false }).select('amcCode amcName displayName').lean();
       if (hiddenAmcs && hiddenAmcs.length > 0) {
-        const hiddenCodes = hiddenAmcs.map((a) => a.amcCode).filter(Boolean);
-        const hiddenNames = hiddenAmcs.map((a) => a.amcName).filter(Boolean);
+        hiddenCodes = hiddenAmcs.map((a) => a.amcCode).filter(Boolean);
+        hiddenNames = hiddenAmcs.map((a) => a.amcName).filter(Boolean);
+        hiddenDisplays = hiddenAmcs.map((a) => a.displayName).filter(Boolean);
         if (hiddenCodes.length > 0) {
           query.amcCode = { ...(query.amcCode || {}), $nin: hiddenCodes };
         }
         if (hiddenNames.length > 0) {
           query.amcName = { ...(query.amcName || {}), $nin: hiddenNames };
+        }
+        const allKeywords = [...hiddenDisplays, ...hiddenCodes.map(c => c.replace(/_MF$/i, ''))].filter(Boolean);
+        if (allKeywords.length > 0) {
+          const pattern = allKeywords.map(k => `\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).join('|');
+          query.schemeName = { ...(query.schemeName || {}), $not: new RegExp(pattern, 'i') };
         }
       }
     } catch (_) {}
@@ -337,10 +346,13 @@ exports.getSchemes = async (req, res) => {
       sortOption = { aum: -1, schemeName: 1, schemeCode: 1 };
     }
 
+    const isHighReturn = collection && String(collection).trim().toLowerCase() === 'high_return';
+    const effectiveLimit = isHighReturn ? 15 : (Number(limit) || 20);
+
     const schemes = await MutualFundScheme.find(query)
       .sort(sortOption)
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+      .skip((Number(page) - 1) * effectiveLimit)
+      .limit(effectiveLimit);
 
     const total = await MutualFundScheme.countDocuments(query);
 
@@ -387,12 +399,27 @@ exports.getSchemes = async (req, res) => {
       return obj;
     });
 
+    // Final security filter ensuring hidden/inactive AMCs are completely excluded
+    const filteredSchemes = sanitizedSchemes.filter((obj) => {
+      if (obj.isAmcActive === false) return false;
+      if (hiddenCodes.length > 0 && hiddenCodes.includes(obj.amcCode)) return false;
+      if (hiddenNames.length > 0 && hiddenNames.some(hn => obj.amcName && obj.amcName.toLowerCase() === hn.toLowerCase())) return false;
+      if (hiddenDisplays.length > 0 && hiddenDisplays.some(hd => {
+        const regex = new RegExp(`\\b${hd}\\b`, 'i');
+        return (obj.schemeName && regex.test(obj.schemeName)) || (obj.amcName && regex.test(obj.amcName));
+      })) return false;
+      return true;
+    });
+
+    const finalData = isHighReturn ? filteredSchemes.slice(0, 15) : filteredSchemes;
+    const finalTotal = isHighReturn ? Math.min(total, 15) : total;
+
     return res.json({
       success: true,
-      data: sanitizedSchemes,
-      total,
+      data: finalData,
+      total: finalTotal,
       page: Number(page),
-      pages: Math.ceil(total / Number(limit)),
+      pages: Math.ceil(finalTotal / effectiveLimit),
     });
   } catch (error) {
     console.error('[getSchemes Error]:', error);

@@ -2024,11 +2024,14 @@ exports.toggleAdminMfAmc = async (req, res) => {
     await amc.save();
 
     // Propagate visibility to all mutual fund schemes of this AMC
+    const displayKeyword = amc.displayName || amc.amcName || code;
     const updateRes = await MutualFundScheme.updateMany(
       {
         $or: [
           { amcCode: code },
           { amcName: amc.amcName },
+          { amcName: new RegExp(`^${displayKeyword}`, 'i') },
+          { schemeName: new RegExp(`^${displayKeyword}\\b`, 'i') },
         ],
       },
       {
