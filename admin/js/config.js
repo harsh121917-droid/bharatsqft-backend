@@ -114,3 +114,5 @@ function toast(msg, type = "success") {
         setTimeout(() => t.remove(), 300);
     }, 3800);
 }
+window.toast = toast;
+window.showToast = toast;

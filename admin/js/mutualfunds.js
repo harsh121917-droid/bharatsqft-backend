@@ -15,6 +15,20 @@ let currentMandateStatusFilter = 'ALL';
 let currentSchemeCurationFilter = 'ALL';
 
 // ── Format Currency helper ──
+function safeMfToast(msg, type = 'success') {
+    if (typeof window.toast === 'function') {
+        window.toast(msg, type);
+    } else if (typeof window.showToast === 'function') {
+        window.showToast(msg, type);
+    } else {
+        alert(msg);
+    }
+}
+window.safeMfToast = safeMfToast;
+if (!window.showToast && typeof window.toast === 'function') window.showToast = window.toast;
+if (!window.showToast) window.showToast = safeMfToast;
+if (!window.toast) window.toast = safeMfToast;
+
 function formatMfInr(val) {
     const num = Number(val) || 0;
     return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -2934,30 +2948,34 @@ async function toggleMfAmc(amcCode, currentIsActive) {
         });
 
         if (res.success) {
-            showToast(res.message || `${name} visibility updated successfully!`);
+            const msg = res.message || `${name} visibility updated successfully!`;
+            safeMfToast(msg, 'success');
             loadMfAmcs();
         } else {
-            alert(res.message || 'Failed to update company visibility');
+            const errMsg = res.message || 'Failed to update company visibility';
+            safeMfToast(errMsg, 'error');
         }
     } catch (err) {
         console.error('toggleMfAmc error:', err);
-        alert('Network error while toggling company visibility');
+        safeMfToast('Network error while toggling company visibility', 'error');
     }
 }
 
 async function syncMfAmcsCatalog() {
     try {
-        showToast('Discovering and syncing mutual fund companies from schemes master...');
+        safeMfToast('Discovering and syncing mutual fund companies from schemes master...', 'info');
         const res = await api('/admin/mutual-funds/amcs/sync', { method: 'POST' });
         if (res.success) {
-            showToast(res.message || 'Synced companies successfully!');
+            const msg = res.message || 'Synced companies successfully!';
+            safeMfToast(msg, 'success');
             loadMfAmcs();
         } else {
-            alert(res.message || 'Failed to sync companies');
+            const errMsg = res.message || 'Failed to sync companies';
+            safeMfToast(errMsg, 'error');
         }
     } catch (err) {
         console.error('syncMfAmcsCatalog error:', err);
-        alert('Network error while syncing companies');
+        safeMfToast('Network error while syncing companies', 'error');
     }
 }
 
