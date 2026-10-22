@@ -221,6 +221,10 @@
                 <div class="nav-item-icon"><i class="fas fa-sliders-h" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">MF Scheme Curation</span>
             </div>
+            <div class="nav-item" onclick="showPage('mfamcs')" id="nav-mfamcs">
+                <div class="nav-item-icon"><i class="fas fa-building" style="color:#00D09C"></i></div>
+                <span class="nav-item-label">MF Companies (AMCs)</span>
+            </div>
             <div class="nav-item" onclick="showPage('mfmandates')" id="nav-mfmandates">
                 <div class="nav-item-icon"><i class="fas fa-file-signature" style="color:#00D09C"></i></div>
                 <span class="nav-item-label">MF Mandates (eNACH)</span>
@@ -4196,6 +4200,49 @@
 
                 <div class="card" style="padding:0;overflow:hidden">
                     <div id="mfschemes-body"></div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE: MUTUAL FUNDS COMPANIES & AMCS (Show / Hide Toggles)
+                 ══════════════════════════════════════════════════════════ -->
+            <div class="page" id="page-mfamcs">
+                <div class="page-header"
+                    style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800">
+                            <i class="fas fa-building" style="color:#00D09C;margin-right:10px"></i> Mutual Fund Companies (AMCs)
+                        </h2>
+                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">
+                            Toggle visibility of fund houses (e.g. HDFC, Axis, ITI, SBI). When disabled, all schemes belonging to that company are completely hidden across the mobile app and search.
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-primary btn-sm" onclick="syncMfAmcsCatalog()"><i class="fas fa-sync"></i> Discover & Sync AMCs</button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadMfAmcs()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                </div>
+
+                <div id="mfamcs-stats-bar" style="margin-bottom:18px"></div>
+
+                <div class="card"
+                    style="padding:16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-outline mf-amc-filter-btn active" data-filter="ALL" onclick="filterMfAmcs('ALL')">All Companies</button>
+                        <button class="btn btn-sm btn-outline mf-amc-filter-btn" data-filter="ACTIVE" onclick="filterMfAmcs('ACTIVE')"><i class="fas fa-eye" style="color:#00D09C"></i> Visible in App</button>
+                        <button class="btn btn-sm btn-outline mf-amc-filter-btn" data-filter="HIDDEN" onclick="filterMfAmcs('HIDDEN')"><i class="fas fa-eye-slash" style="color:#ef4444"></i> Hidden from App</button>
+                    </div>
+                    <div style="position:relative;flex:1;max-width:340px">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                        <input class="form-control" id="mfamcs-search" type="text"
+                            placeholder="Search company (e.g. HDFC, Axis, ITI)..."
+                            onkeyup="searchMfAmcs(this.value)"
+                            style="padding-left:38px;width:100%" />
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div id="mfamcs-body"></div>
                 </div>
             </div>
 

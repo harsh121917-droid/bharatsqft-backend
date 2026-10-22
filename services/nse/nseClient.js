@@ -795,6 +795,7 @@ class NseClient {
         {
           client_code: clientCode,
           xsip_reg_no: String(xsipRegNo),
+          remarks: String(remarks).slice(0, 100),
         },
       ],
     });

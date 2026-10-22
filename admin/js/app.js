@@ -172,6 +172,7 @@ const pageTitles = {
     mfsips: "Mutual Funds Systematic Investment Plans (SIPs)",
     mforders: "Mutual Funds Investment Orders & Lumpsum",
     mfschemes: "Mutual Funds Scheme Curation (Featured & Recommended)",
+    mfamcs: "Mutual Fund Companies & AMC Visibility 🏢",
     mfmandates: "Mutual Funds Mandates (eNACH / AutoPay)",
     mfsettings: "NSE MFSS Gateway Credentials & Health-Check",
     mftesting: "MF Testing & Sandbox Diagnostics 🧪"
@@ -289,6 +290,9 @@ function showPage(pageId) {
             break;
         case "mfschemes":
             if (typeof loadMfCurationSchemes === "function") loadMfCurationSchemes(1);
+            break;
+        case "mfamcs":
+            if (typeof loadMfAmcs === "function") loadMfAmcs();
             break;
         case "mfmandates":
             if (typeof loadMfMandates === "function") loadMfMandates(1);

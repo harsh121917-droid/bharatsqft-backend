@@ -3,6 +3,7 @@ const MfSip = require('../models/MfSip');
 const MfOrder = require('../models/MfOrder');
 const MfMandate = require('../models/MfMandate');
 const MutualFundScheme = require('../models/MutualFundScheme');
+const MfAmc = require('../models/MfAmc');
 const MfPortfolioHolding = require('../models/MfPortfolioHolding');
 const User = require('../models/User');
 const NseConfig = require('../models/NseConfig');
@@ -1832,6 +1833,163 @@ exports.toggleAdminMfScheme = async (req, res) => {
     });
   } catch (error) {
     console.error('[toggleAdminMfScheme Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Helper: sync distinct AMCs from MutualFundScheme into MfAmc
+async function syncAmcsHelper() {
+  const aggregated = await MutualFundScheme.aggregate([
+    { $match: { amcCode: { $exists: true, $ne: '' } } },
+    {
+      $group: {
+        _id: '$amcCode',
+        amcName: { $first: '$amcName' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ]);
+
+  for (const item of aggregated) {
+    const rawName = item.amcName || item._id;
+    const cleanDisplay = rawName
+      .replace(/\s+(Mutual\s+Fund|Asset\s+Management.*|Trustee.*|AMC)$/i, '')
+      .trim();
+
+    await MfAmc.findOneAndUpdate(
+      { amcCode: item._id },
+      {
+        $set: {
+          amcName: rawName,
+          displayName: cleanDisplay || rawName,
+          schemeCount: item.count,
+        },
+        $setOnInsert: {
+          isActive: true,
+          logoUrl: '',
+        },
+      },
+      { upsert: true, new: true }
+    );
+  }
+}
+
+// ── 18b. GET /api/admin/mutual-funds/amcs (List All Companies / AMCs with Toggle State) ──
+exports.getAdminMfAmcs = async (req, res) => {
+  try {
+    const count = await MfAmc.countDocuments();
+    if (count === 0) {
+      await syncAmcsHelper();
+    }
+
+    const { search = '', filter = 'ALL' } = req.query;
+    const query = {};
+
+    if (filter === 'ACTIVE') {
+      query.isActive = true;
+    } else if (filter === 'HIDDEN') {
+      query.isActive = false;
+    }
+
+    if (search && search.trim()) {
+      const s = search.trim();
+      query.$or = [
+        { displayName: { $regex: s, $options: 'i' } },
+        { amcName: { $regex: s, $options: 'i' } },
+        { amcCode: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    const [amcs, totalAmcs, activeAmcs, hiddenAmcs, totalSchemes] = await Promise.all([
+      MfAmc.find(query).sort({ schemeCount: -1, displayName: 1 }).lean(),
+      MfAmc.countDocuments(),
+      MfAmc.countDocuments({ isActive: true }),
+      MfAmc.countDocuments({ isActive: false }),
+      MutualFundScheme.countDocuments({ planType: 'REGULAR' }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: amcs,
+      stats: {
+        totalAmcs,
+        activeAmcs,
+        hiddenAmcs,
+        totalSchemes,
+      },
+    });
+  } catch (error) {
+    console.error('[getAdminMfAmcs Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 18c. POST /api/admin/mutual-funds/amcs/:code/toggle (Toggle Visibility of an Entire Fund House) ──
+exports.toggleAdminMfAmc = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { isActive } = req.body;
+
+    let amc = await MfAmc.findOne({ amcCode: code });
+    if (!amc) {
+      // Check if exists in MutualFundScheme and auto-create
+      const sample = await MutualFundScheme.findOne({ amcCode: code });
+      if (sample) {
+        amc = await MfAmc.create({
+          amcCode: code,
+          amcName: sample.amcName || code,
+          displayName: (sample.amcName || code).replace(/\s+(Mutual\s+Fund|Asset\s+Management.*|Trustee.*|AMC)$/i, '').trim(),
+          isActive: true,
+          schemeCount: await MutualFundScheme.countDocuments({ amcCode: code }),
+        });
+      } else {
+        return res.status(404).json({ success: false, message: `AMC with code ${code} not found` });
+      }
+    }
+
+    const newActiveState = typeof isActive === 'boolean' ? isActive : !amc.isActive;
+    amc.isActive = newActiveState;
+    amc.hiddenAt = newActiveState ? null : new Date();
+    await amc.save();
+
+    // Propagate visibility to all mutual fund schemes of this AMC
+    const updateRes = await MutualFundScheme.updateMany(
+      {
+        $or: [
+          { amcCode: code },
+          { amcName: amc.amcName },
+        ],
+      },
+      {
+        $set: { isAmcActive: newActiveState },
+      }
+    );
+
+    const actionText = newActiveState ? 'VISIBLE in app' : 'COMPLETELY HIDDEN from app';
+    return res.json({
+      success: true,
+      message: `${amc.displayName || amc.amcName} is now ${actionText}. (${updateRes.modifiedCount} schemes updated)`,
+      data: amc,
+      schemesUpdated: updateRes.modifiedCount,
+    });
+  } catch (error) {
+    console.error('[toggleAdminMfAmc Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 18d. POST /api/admin/mutual-funds/amcs/sync (Resync All AMCs from Schemes Catalog) ──
+exports.syncAdminMfAmcs = async (req, res) => {
+  try {
+    await syncAmcsHelper();
+    const total = await MfAmc.countDocuments();
+    return res.json({
+      success: true,
+      message: `Successfully synced ${total} Mutual Fund AMCs from schemes master catalog`,
+    });
+  } catch (error) {
+    console.error('[syncAdminMfAmcs Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

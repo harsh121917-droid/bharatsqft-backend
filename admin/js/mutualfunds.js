@@ -2775,6 +2775,197 @@ window.executeMfTestReset = executeMfTestReset;
 window.executeFullFreshSlateReset = executeFullFreshSlateReset;
 window.executeNsePanProbe = executeNsePanProbe;
 
+// ══════════════════════════════════════════════════════════════
+// 32. MUTUAL FUND COMPANIES & AMCS (SHOW / HIDE TOGGLES)
+// ══════════════════════════════════════════════════════════════
+let currentMfAmcFilter = 'ALL';
+let currentMfAmcSearch = '';
+let cachedMfAmcs = [];
+
+async function loadMfAmcs() {
+    const body = document.getElementById('mfamcs-body');
+    const statsBar = document.getElementById('mfamcs-stats-bar');
+    if (!body) return;
+
+    body.innerHTML = `<div class="loading-box"><div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div><div>Loading mutual fund companies...</div></div>`;
+
+    try {
+        const search = encodeURIComponent(currentMfAmcSearch || '');
+        const res = await api(`/admin/mutual-funds/amcs?filter=${currentMfAmcFilter}&search=${search}`);
+        if (!res.success) {
+            body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>${res.message || 'Failed to load AMCs'}</div></div>`;
+            return;
+        }
+
+        const amcs = res.data || [];
+        cachedMfAmcs = amcs;
+        const stats = res.stats || {};
+
+        if (statsBar) {
+            statsBar.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px">
+                <div class="kpi-stat-card" style="padding:14px 18px;cursor:pointer" onclick="filterMfAmcs('ALL')">
+                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total Companies</div>
+                    <div style="font-size:24px;font-weight:800;color:#fff">${stats.totalAmcs || amcs.length}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Indian Fund Houses (AMCs)</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.3);cursor:pointer" onclick="filterMfAmcs('ACTIVE')">
+                    <div style="font-size:11.5px;color:#00D09C;font-weight:600"><i class="fas fa-eye"></i> Visible in App</div>
+                    <div style="font-size:24px;font-weight:800;color:#00D09C">${stats.activeAmcs || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Live & Searchable</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.3);cursor:pointer" onclick="filterMfAmcs('HIDDEN')">
+                    <div style="font-size:11.5px;color:#ef4444;font-weight:600"><i class="fas fa-eye-slash"></i> Hidden from App</div>
+                    <div style="font-size:24px;font-weight:800;color:#ef4444">${stats.hiddenAmcs || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Invisible to Mobile Users</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px">
+                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total Master Funds</div>
+                    <div style="font-size:24px;font-weight:800;color:#38bdf8">${stats.totalSchemes || 0}</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Regular Growth Schemes</div>
+                </div>
+            </div>`;
+        }
+
+        if (amcs.length === 0) {
+            body.innerHTML = `
+            <div class="loading-box" style="padding:40px">
+                <i class="fas fa-building" style="font-size:38px;color:var(--text-dim);margin-bottom:12px"></i>
+                <div style="font-size:15px;font-weight:700">No mutual fund companies found</div>
+                <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Try adjusting your search keyword or click Discover & Sync AMCs above.</div>
+            </div>`;
+            return;
+        }
+
+        let html = `
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="min-width:240px">Fund House / Company</th>
+                        <th>AMC Code</th>
+                        <th>Total Schemes</th>
+                        <th>Status in Mobile App</th>
+                        <th style="text-align:center;min-width:140px">Action Toggle</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        amcs.forEach(amc => {
+            const isAct = amc.isActive !== false;
+            const initials = (amc.displayName || amc.amcName || 'MF').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+            
+            html += `
+            <tr style="${!isAct ? 'background:rgba(239,68,68,0.03);opacity:0.85;' : ''}">
+                <td>
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:38px;height:38px;border-radius:10px;background:${isAct ? 'linear-gradient(135deg, rgba(0,208,156,0.15), rgba(0,208,156,0.05))' : 'rgba(239,68,68,0.1)'};border:1px solid ${isAct ? 'rgba(0,208,156,0.3)' : 'rgba(239,68,68,0.3)'};display:flex;align-items:center;justify-content:center;font-weight:800;color:${isAct ? '#00D09C' : '#ef4444'};font-size:13px;flex-shrink:0">
+                            ${initials}
+                        </div>
+                        <div>
+                            <div style="font-weight:700;font-size:14px;color:#fff">${escapeHtml(amc.displayName || amc.amcName)}</div>
+                            <div style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(amc.amcName || '')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <code style="background:rgba(255,255,255,0.06);padding:3px 7px;border-radius:5px;font-size:12px;color:#38bdf8">${escapeHtml(amc.amcCode)}</code>
+                </td>
+                <td>
+                    <span class="badge" style="background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;padding:4px 9px;border-radius:6px;font-weight:600">
+                        ${amc.schemeCount || 0} schemes
+                    </span>
+                </td>
+                <td>
+                    ${isAct
+                        ? `<span class="badge badge-green" style="font-size:11.5px;padding:5px 12px;font-weight:700"><i class="fas fa-check-circle" style="margin-right:4px"></i> Visible in App</span>`
+                        : `<span class="badge badge-red" style="font-size:11.5px;padding:5px 12px;font-weight:700"><i class="fas fa-eye-slash" style="margin-right:4px"></i> Hidden from App</span>`
+                    }
+                </td>
+                <td style="text-align:center">
+                    <button class="btn btn-sm" onclick="toggleMfAmc('${amc.amcCode}', ${isAct})" style="${isAct ? 'background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.4);' : 'background:rgba(0,208,156,0.18);color:#00D09C;border:1px solid rgba(0,208,156,0.5);'}padding:6px 14px;font-weight:700;border-radius:8px;font-size:12px;cursor:pointer;transition:all 0.2s" title="${isAct ? 'Click to completely hide this company from mobile app' : 'Click to make this company visible in mobile app'}">
+                        <i class="${isAct ? 'fas fa-eye-slash' : 'fas fa-eye'}" style="margin-right:5px"></i> ${isAct ? 'Hide Company' : 'Show Company'}
+                    </button>
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        body.innerHTML = html;
+    } catch (err) {
+        console.error('loadMfAmcs error:', err);
+        body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Error loading mutual fund companies</div></div>`;
+    }
+}
+
+function filterMfAmcs(filter) {
+    currentMfAmcFilter = filter;
+    document.querySelectorAll('.mf-amc-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-filter') === filter);
+    });
+    loadMfAmcs();
+}
+
+let amcSearchTimeout = null;
+function searchMfAmcs(query) {
+    clearTimeout(amcSearchTimeout);
+    amcSearchTimeout = setTimeout(() => {
+        currentMfAmcSearch = query.trim();
+        loadMfAmcs();
+    }, 250);
+}
+
+async function toggleMfAmc(amcCode, currentIsActive) {
+    const amcObj = cachedMfAmcs.find(a => a.amcCode === amcCode);
+    const name = amcObj?.displayName || amcObj?.amcName || amcCode;
+    const count = amcObj?.schemeCount || 0;
+
+    const confirmMsg = currentIsActive
+        ? `Are you sure you want to HIDE ${name}?\n\nAll ${count} mutual fund schemes belonging to ${name} will be completely removed from the mobile app (search, categories, popular, and detail pages).`
+        : `Make ${name} VISIBLE again?\n\nAll ${count} mutual fund schemes will immediately reappear in the mobile app.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await api(`/admin/mutual-funds/amcs/${amcCode}/toggle`, {
+            method: 'POST',
+            body: JSON.stringify({ isActive: !currentIsActive }),
+        });
+
+        if (res.success) {
+            showToast(res.message || `${name} visibility updated successfully!`);
+            loadMfAmcs();
+        } else {
+            alert(res.message || 'Failed to update company visibility');
+        }
+    } catch (err) {
+        console.error('toggleMfAmc error:', err);
+        alert('Network error while toggling company visibility');
+    }
+}
+
+async function syncMfAmcsCatalog() {
+    try {
+        showToast('Discovering and syncing mutual fund companies from schemes master...');
+        const res = await api('/admin/mutual-funds/amcs/sync', { method: 'POST' });
+        if (res.success) {
+            showToast(res.message || 'Synced companies successfully!');
+            loadMfAmcs();
+        } else {
+            alert(res.message || 'Failed to sync companies');
+        }
+    } catch (err) {
+        console.error('syncMfAmcsCatalog error:', err);
+        alert('Network error while syncing companies');
+    }
+}
+
+window.loadMfAmcs = loadMfAmcs;
+window.filterMfAmcs = filterMfAmcs;
+window.searchMfAmcs = searchMfAmcs;
+window.toggleMfAmc = toggleMfAmc;
+window.syncMfAmcsCatalog = syncMfAmcsCatalog;
+
 
 
 

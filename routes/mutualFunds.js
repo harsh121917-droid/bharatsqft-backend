@@ -53,6 +53,7 @@ const {
   getMfProfile,
   addMfBank,
   getNfos,
+  getPublicAmcs,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -60,6 +61,7 @@ const { protect } = require('../middleware/authMiddleware');
 router.get('/schemes', getSchemes);
 router.get('/schemes/:code/holdings', getSchemeHoldings);
 router.get('/schemes/:code', getSchemeDetail);
+router.get('/amcs', getPublicAmcs);
 router.get('/nfos', getNfos);
 router.get('/checkout/:orderId', renderCheckoutSimulator);
 router.post('/orders/:orderId/simulate-payment', simulatePayment);

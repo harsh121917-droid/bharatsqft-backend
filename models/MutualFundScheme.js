@@ -413,6 +413,11 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isAmcActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
   },
   { timestamps: true }
 );

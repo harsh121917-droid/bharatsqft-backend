@@ -1,4 +1,5 @@
 const MutualFundScheme = require('../models/MutualFundScheme');
+const MfAmc = require('../models/MfAmc');
 const MfSchemePortfolioSnapshot = require('../models/MfSchemePortfolioSnapshot');
 const MfClientUcc = require('../models/MfClientUcc');
 const MfOrder = require('../models/MfOrder');
@@ -98,10 +99,26 @@ exports.getSchemes = async (req, res) => {
     // STRICT FISDOM & REGULATORY MODEL: Only active Regular plans, never Direct plans, never IDCW
     const query = {
       isActive: true,
+      isAmcActive: { $ne: false },
       planType: 'REGULAR',
       schemeName: { $not: { $regex: 'direct|idcw|dividend', $options: 'i' } },
       option: { $not: { $regex: 'idcw|dividend', $options: 'i' } },
     };
+
+    // Filter out completely hidden AMCs (e.g. HDFC, Axis, ITI toggled off in Admin)
+    try {
+      const hiddenAmcs = await MfAmc.find({ isActive: false }).select('amcCode amcName').lean();
+      if (hiddenAmcs && hiddenAmcs.length > 0) {
+        const hiddenCodes = hiddenAmcs.map((a) => a.amcCode).filter(Boolean);
+        const hiddenNames = hiddenAmcs.map((a) => a.amcName).filter(Boolean);
+        if (hiddenCodes.length > 0) {
+          query.amcCode = { ...(query.amcCode || {}), $nin: hiddenCodes };
+        }
+        if (hiddenNames.length > 0) {
+          query.amcName = { ...(query.amcName || {}), $nin: hiddenNames };
+        }
+      }
+    } catch (_) {}
 
     // Category filtering (single or multiple)
     const rawCategories = categories || category;
@@ -398,11 +415,22 @@ exports.getSchemeDetail = async (req, res) => {
       ],
     });
 
-    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '')) {
+    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '') || scheme.isAmcActive === false || scheme.isActive === false) {
       return res.status(404).json({
         success: false,
-        message: 'Scheme not found. Only Regular Plan Growth mutual funds are available on Vikaone.',
+        message: 'Scheme not found or currently unavailable.',
       });
+    }
+
+    // Check if the AMC of this scheme is disabled
+    if (scheme.amcCode) {
+      const amcDisabled = await MfAmc.findOne({ amcCode: scheme.amcCode, isActive: false });
+      if (amcDisabled) {
+        return res.status(404).json({
+          success: false,
+          message: 'Scheme not found or currently unavailable.',
+        });
+      }
     }
 
     // 1. Fetch live scheme facts for supplementary metadata (AUM, fund manager, holdings)
@@ -2945,6 +2973,21 @@ exports.cancelUserSip = async (req, res) => {
     if (sip.status === 'CANCELLED') {
       return res.status(400).json({ success: false, message: 'SIP is already cancelled' });
     }
+
+    // If registered on NSE, send cancellation request directly to the exchange
+    let exchangeMessage = '';
+    if (sip.sipRegNo && sip.clientCode) {
+      try {
+        const canRes = await nseClient.cancelXsip(sip.clientCode, sip.sipRegNo, '13:(User requested cancellation)');
+        const canItem = canRes?.data?.can_data?.[0];
+        if (canItem?.can_remark) {
+          exchangeMessage = canItem.can_remark;
+        }
+      } catch (nseErr) {
+        console.warn(`[cancelUserSip] NSE cancellation warning for ${sip.sipRegNo}:`, nseErr.message);
+      }
+    }
+
     const prevStatus = sip.status;
     sip.status = 'CANCELLED';
     sip.cancelledAt = new Date();
@@ -2962,7 +3005,14 @@ exports.cancelUserSip = async (req, res) => {
       reason: 'Cancelled by investor',
     });
 
-    return res.json({ success: true, message: 'SIP cancelled successfully', data: sip });
+    return res.json({
+      success: true,
+      message: 'SIP cancelled successfully on NSE exchange',
+      data: {
+        sip,
+        exchangeMessage,
+      },
+    });
   } catch (error) {
     console.error('[cancelUserSip Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
@@ -4974,11 +5024,22 @@ exports.getSchemeHoldings = async (req, res) => {
       ],
     });
 
-    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '')) {
+    if (!scheme || scheme.planType !== 'REGULAR' || /direct/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.schemeName) || /idcw|dividend/i.test(scheme.option || '') || scheme.isAmcActive === false || scheme.isActive === false) {
       return res.status(404).json({
         success: false,
-        message: 'Scheme not found. Only Regular Plan Growth mutual funds are available on Vikaone.',
+        message: 'Scheme not found or currently unavailable.',
       });
+    }
+
+    // Check if the AMC of this scheme is disabled
+    if (scheme.amcCode) {
+      const amcDisabled = await MfAmc.findOne({ amcCode: scheme.amcCode, isActive: false });
+      if (amcDisabled) {
+        return res.status(404).json({
+          success: false,
+          message: 'Scheme not found or currently unavailable.',
+        });
+      }
     }
 
     const result = await mfPortfolioService.getPaginatedHoldings(scheme.schemeCode, {
@@ -5461,6 +5522,49 @@ exports.getNfos = async (req, res) => {
     });
   } catch (error) {
     console.error('[getNfos Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 31. GET /api/mutual-funds/amcs (Public Visible AMCs for Mobile App) ──
+exports.getPublicAmcs = async (req, res) => {
+  try {
+    let amcs = await MfAmc.find({ isActive: true }).sort({ schemeCount: -1, displayName: 1 }).lean();
+    if (!amcs || amcs.length === 0) {
+      // Lazy seed from schemes catalog if empty
+      const aggregated = await MutualFundScheme.aggregate([
+        { $match: { amcCode: { $exists: true, $ne: '' } } },
+        {
+          $group: {
+            _id: '$amcCode',
+            amcName: { $first: '$amcName' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]);
+      for (const item of aggregated) {
+        const rawName = item.amcName || item._id;
+        const cleanDisplay = rawName
+          .replace(/\s+(Mutual\s+Fund|Asset\s+Management.*|Trustee.*|AMC)$/i, '')
+          .trim();
+        await MfAmc.findOneAndUpdate(
+          { amcCode: item._id },
+          {
+            $set: { amcName: rawName, displayName: cleanDisplay || rawName, schemeCount: item.count },
+            $setOnInsert: { isActive: true },
+          },
+          { upsert: true, new: true }
+        );
+      }
+      amcs = await MfAmc.find({ isActive: true }).sort({ schemeCount: -1, displayName: 1 }).lean();
+    }
+    return res.json({
+      success: true,
+      data: amcs,
+    });
+  } catch (error) {
+    console.error('[getPublicAmcs Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

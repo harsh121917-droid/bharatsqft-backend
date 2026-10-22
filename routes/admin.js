@@ -244,6 +244,11 @@ router.post("/mutual-funds/schemes/:id/toggle", adminMfController.toggleAdminMfS
 router.post("/mutual-funds/schemes/sync-nav", adminMfController.reconcileNseMaster);
 router.get("/mutual-funds/schemes/master-audit", adminMfController.getNseMasterAudit);
 
+// Mutual Fund Companies & AMCs Visibility Management (Show/Hide entire Fund House)
+router.get("/mutual-funds/amcs", adminMfController.getAdminMfAmcs);
+router.post("/mutual-funds/amcs/:code/toggle", adminMfController.toggleAdminMfAmc);
+router.post("/mutual-funds/amcs/sync", adminMfController.syncAdminMfAmcs);
+
 // Audit Trail & Logs
 router.get("/mutual-funds/audit-logs", adminMfController.getAuditLogs);
 
