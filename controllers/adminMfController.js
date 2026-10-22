@@ -1837,6 +1837,73 @@ exports.toggleAdminMfScheme = async (req, res) => {
   }
 };
 
+// AMC Logo Mapping for Static Hosting in Admin Panel & App
+const AMC_LOGO_MAP = {
+  'ICICI_PRUDENTIA_MF': 'mf_icici.png',
+  'ICICI_PRU_MF': 'mf_icici.png',
+  'NIPPON_INDIA_MF': 'mf_nippon.jpg',
+  'NIPPON_MF': 'mf_nippon.jpg',
+  'KOTAK_MAHINDRA_MF': 'mf_kotak.png',
+  'HDFC_MF': 'mf_hdfc.png',
+  'SBI_MF': 'mf_sbi.png',
+  'ADITYA_BIRLA_SU_MF': 'mf_adiya_bilra.png',
+  'AXIS_MF': 'mf_axis.png',
+  'BANDHAN_MF': 'mf_bandhan.jpg',
+  'UTI_MF': 'mf_uti_mutual.png',
+  'DSP_MF': 'mf_dsp.png',
+  'TATA_MF': 'mf_tata.jpg',
+  'EDELWEISS_MF': 'mf_edelweiss.png',
+  'MIRAE_ASSET_MF': 'mf_mirae.png',
+  'INVESCO_MF': 'mf_invesco.png',
+  'BARODA_BNP_PARI_MF': 'mf_baroda_bnp.jpg',
+  'HSBC_MF': 'mf_hsbc.jpg',
+  'MOTILAL_OSWAL_MF': 'mf_motilal_oswal.jpg',
+  'FRANKLIN_TEMPLE_MF': 'mf_franklin.png',
+  'GROWW_MF': 'mf_groww.png',
+  'LIC_MF': 'mf_lic.png',
+  'SUNDARAM_MF': 'mf_sundaram.png',
+  'UNION_MF': 'mf_union.jpg',
+  'QUANT_MF': 'mf_quant.png',
+  'BANK_OF_INDIA_MF': 'mf_boi.jpg',
+  'CANARA_ROBECO_MF': 'mf_canara_robeco.png',
+  'MAHINDRA_MANULI_MF': 'mf_mahindra.png',
+  'PGIM_INDIA_MF': 'mf_pgim.png',
+  'BAJAJ_FINSERV_MF': 'mf_bajaj.jpg',
+  'ITI_MF': 'mf_iti.png',
+  'WHITEOAK_CAPITA_MF': 'mf_whiteoak.jpg',
+  'JM_FINANCIAL_MF': 'mf_jm.png',
+  'NAVI_MF': 'mf_navi.png',
+  'JIO_BLACKROCK_MF': 'mf_jio_blackrock.png',
+  'QUANTUM_MF': 'mf_quantum.jpg',
+  'SAMCO_MF': 'mf_samco.png',
+  'THE_WEALTH_MF': 'wealthcompany.jpg',
+  'TRUST_MF': 'mf_trust.jpg',
+  '360_ONE_MF': 'mf_360one.png',
+  'SHRIRAM_MF': 'mf_shriram.png',
+  'TAURUS_MF': 'mf_taurus.png',
+  'HELIOS_MF': 'mf_helios.jpg',
+  'NJ_MF': 'mf_nj.png',
+  'PPFAS_MF': 'mf_parag_parikh.jpg',
+  'ABAKKUS_MF': 'mf_abakkus.jpg',
+  'ANGEL_ONE_MF': 'mf_angel_one.png',
+  'CAPITALMIND_MF': 'mf_capitalmind.png',
+  'OLD_BRIDGE_MF': 'mf_old_bridge.jpg',
+};
+
+function resolveAmcLogo(code, name = '') {
+  if (AMC_LOGO_MAP[code]) {
+    return `/admin/images/amc_logos/${AMC_LOGO_MAP[code]}`;
+  }
+  const lower = (name || code).toLowerCase();
+  for (const [c, file] of Object.entries(AMC_LOGO_MAP)) {
+    const key = c.replace(/_MF$/, '').toLowerCase().replace(/_/g, ' ');
+    if (lower.includes(key)) {
+      return `/admin/images/amc_logos/${file}`;
+    }
+  }
+  return '/admin/images/amc_logos/mf_brand_logo_3d.jpg';
+}
+
 // Helper: sync distinct AMCs from MutualFundScheme into MfAmc
 async function syncAmcsHelper() {
   const aggregated = await MutualFundScheme.aggregate([
@@ -1857,6 +1924,8 @@ async function syncAmcsHelper() {
       .replace(/\s+(Mutual\s+Fund|Asset\s+Management.*|Trustee.*|AMC)$/i, '')
       .trim();
 
+    const logoUrl = resolveAmcLogo(item._id, rawName);
+
     await MfAmc.findOneAndUpdate(
       { amcCode: item._id },
       {
@@ -1864,10 +1933,10 @@ async function syncAmcsHelper() {
           amcName: rawName,
           displayName: cleanDisplay || rawName,
           schemeCount: item.count,
+          logoUrl,
         },
         $setOnInsert: {
           isActive: true,
-          logoUrl: '',
         },
       },
       { upsert: true, new: true }
@@ -1942,6 +2011,7 @@ exports.toggleAdminMfAmc = async (req, res) => {
           displayName: (sample.amcName || code).replace(/\s+(Mutual\s+Fund|Asset\s+Management.*|Trustee.*|AMC)$/i, '').trim(),
           isActive: true,
           schemeCount: await MutualFundScheme.countDocuments({ amcCode: code }),
+          logoUrl: resolveAmcLogo(code, sample.amcName || code),
         });
       } else {
         return res.status(404).json({ success: false, message: `AMC with code ${code} not found` });

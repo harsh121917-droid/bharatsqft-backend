@@ -2854,14 +2854,15 @@ async function loadMfAmcs() {
         amcs.forEach(amc => {
             const isAct = amc.isActive !== false;
             const initials = (amc.displayName || amc.amcName || 'MF').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+            const logoHtml = amc.logoUrl
+                ? `<img src="${escapeHtml(amc.logoUrl)}" alt="${escapeHtml(amc.displayName || '')}" style="width:38px;height:38px;border-radius:10px;object-fit:contain;background:#ffffff;padding:2px;box-shadow:0 2px 6px rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.15);flex-shrink:0" onerror="this.onerror=null;this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><div style="display:none;width:38px;height:38px;border-radius:10px;background:${isAct ? 'linear-gradient(135deg, rgba(0,208,156,0.15), rgba(0,208,156,0.05))' : 'rgba(239,68,68,0.1)'};border:1px solid ${isAct ? 'rgba(0,208,156,0.3)' : 'rgba(239,68,68,0.3)'};align-items:center;justify-content:center;font-weight:800;color:${isAct ? '#00D09C' : '#ef4444'};font-size:13px;flex-shrink:0">${initials}</div>`
+                : `<div style="width:38px;height:38px;border-radius:10px;background:${isAct ? 'linear-gradient(135deg, rgba(0,208,156,0.15), rgba(0,208,156,0.05))' : 'rgba(239,68,68,0.1)'};border:1px solid ${isAct ? 'rgba(0,208,156,0.3)' : 'rgba(239,68,68,0.3)'};display:flex;align-items:center;justify-content:center;font-weight:800;color:${isAct ? '#00D09C' : '#ef4444'};font-size:13px;flex-shrink:0">${initials}</div>`;
             
             html += `
             <tr style="${!isAct ? 'background:rgba(239,68,68,0.03);opacity:0.85;' : ''}">
                 <td>
                     <div style="display:flex;align-items:center;gap:12px">
-                        <div style="width:38px;height:38px;border-radius:10px;background:${isAct ? 'linear-gradient(135deg, rgba(0,208,156,0.15), rgba(0,208,156,0.05))' : 'rgba(239,68,68,0.1)'};border:1px solid ${isAct ? 'rgba(0,208,156,0.3)' : 'rgba(239,68,68,0.3)'};display:flex;align-items:center;justify-content:center;font-weight:800;color:${isAct ? '#00D09C' : '#ef4444'};font-size:13px;flex-shrink:0">
-                            ${initials}
-                        </div>
+                        ${logoHtml}
                         <div>
                             <div style="font-weight:700;font-size:14px;color:#fff">${escapeHtml(amc.displayName || amc.amcName)}</div>
                             <div style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(amc.amcName || '')}</div>
