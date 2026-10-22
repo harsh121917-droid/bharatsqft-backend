@@ -1457,24 +1457,29 @@ async function loadMfCurationSchemes(page = 1) {
             statsBar.innerHTML = `
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px">
                 <div class="kpi-stat-card" style="padding:14px 18px" onclick="filterMfCurationSchemes('ALL')">
-                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total In Database</div>
+                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600"><i class="fas fa-database"></i> Total In Database</div>
                     <div style="font-size:22px;font-weight:800;color:#fff">${stats.totalSchemes || total}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Indian Direct Schemes</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Master Catalog</div>
                 </div>
-                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(212,160,23,0.3)" onclick="filterMfCurationSchemes('FEATURED')">
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.45);background:rgba(0,208,156,0.06);cursor:pointer" onclick="filterMfCurationSchemes('ACTIVE')">
+                    <div style="font-size:11.5px;color:#00D09C;font-weight:700"><i class="fas fa-check-circle"></i> Current Visible Schemes</div>
+                    <div style="font-size:22px;font-weight:800;color:#00D09C">${(stats.visibleSchemes !== undefined ? stats.visibleSchemes : stats.totalSchemes) || 0}</div>
+                    <div style="font-size:11px;color:#00D09C;opacity:0.85">Live in Mobile App</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(212,160,23,0.3);cursor:pointer" onclick="filterMfCurationSchemes('FEATURED')">
                     <div style="font-size:11.5px;color:#D4A017;font-weight:600"><i class="fas fa-star"></i> Featured / Carousel</div>
                     <div style="font-size:22px;font-weight:800;color:#D4A017">${stats.featuredCount || 0}</div>
                     <div style="font-size:11px;color:var(--text-dim)">Shown in App Home</div>
                 </div>
-                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.3)" onclick="filterMfCurationSchemes('RECOMMENDED')">
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.3);cursor:pointer" onclick="filterMfCurationSchemes('RECOMMENDED')">
                     <div style="font-size:11.5px;color:#00D09C;font-weight:600"><i class="fas fa-thumbs-up"></i> Recommended</div>
                     <div style="font-size:22px;font-weight:800;color:#00D09C">${stats.recommendedCount || 0}</div>
                     <div style="font-size:11px;color:var(--text-dim)">With Trust Badge</div>
                 </div>
-                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.3)" onclick="filterMfCurationSchemes('HIDDEN')">
-                    <div style="font-size:11.5px;color:#ef4444;font-weight:600"><i class="fas fa-eye-slash"></i> Hidden / Disabled</div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06);cursor:pointer" onclick="filterMfCurationSchemes('HIDDEN')">
+                    <div style="font-size:11.5px;color:#ef4444;font-weight:700"><i class="fas fa-eye-slash"></i> Hidden Schemes</div>
                     <div style="font-size:22px;font-weight:800;color:#ef4444">${stats.hiddenCount || 0}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Invisible to Users</div>
+                    <div style="font-size:11px;color:#ef4444;opacity:0.85">Invisible to Users</div>
                 </div>
             </div>`;
         }
@@ -2817,26 +2822,36 @@ async function loadMfAmcs() {
 
         if (statsBar) {
             statsBar.innerHTML = `
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px">
                 <div class="kpi-stat-card" style="padding:14px 18px;cursor:pointer" onclick="filterMfAmcs('ALL')">
                     <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total Companies</div>
                     <div style="font-size:24px;font-weight:800;color:#fff">${stats.totalAmcs || amcs.length}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Indian Fund Houses (AMCs)</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Fund Houses (AMCs)</div>
                 </div>
                 <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.3);cursor:pointer" onclick="filterMfAmcs('ACTIVE')">
-                    <div style="font-size:11.5px;color:#00D09C;font-weight:600"><i class="fas fa-eye"></i> Visible in App</div>
+                    <div style="font-size:11.5px;color:#00D09C;font-weight:600"><i class="fas fa-eye"></i> Visible Companies</div>
                     <div style="font-size:24px;font-weight:800;color:#00D09C">${stats.activeAmcs || 0}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Live & Searchable</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Live in App</div>
                 </div>
                 <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.3);cursor:pointer" onclick="filterMfAmcs('HIDDEN')">
-                    <div style="font-size:11.5px;color:#ef4444;font-weight:600"><i class="fas fa-eye-slash"></i> Hidden from App</div>
+                    <div style="font-size:11.5px;color:#ef4444;font-weight:600"><i class="fas fa-eye-slash"></i> Hidden Companies</div>
                     <div style="font-size:24px;font-weight:800;color:#ef4444">${stats.hiddenAmcs || 0}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Invisible to Mobile Users</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Hidden from App</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(0,208,156,0.45);background:rgba(0,208,156,0.06)">
+                    <div style="font-size:11.5px;color:#00D09C;font-weight:700"><i class="fas fa-check-circle"></i> Current Visible Schemes</div>
+                    <div style="font-size:24px;font-weight:800;color:#00D09C">${(stats.visibleSchemes !== undefined ? stats.visibleSchemes : stats.totalSchemes) || 0}</div>
+                    <div style="font-size:11px;color:#00D09C;opacity:0.85">Live in Mobile App</div>
+                </div>
+                <div class="kpi-stat-card" style="padding:14px 18px;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06)">
+                    <div style="font-size:11.5px;color:#ef4444;font-weight:700"><i class="fas fa-eye-slash"></i> Hidden Schemes</div>
+                    <div style="font-size:24px;font-weight:800;color:#ef4444">${stats.hiddenSchemes || 0}</div>
+                    <div style="font-size:11px;color:#ef4444;opacity:0.85">Blocked by Hidden AMCs</div>
                 </div>
                 <div class="kpi-stat-card" style="padding:14px 18px">
-                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600">Total Master Funds</div>
+                    <div style="font-size:11.5px;color:var(--text-dim);font-weight:600"><i class="fas fa-database"></i> Total Master Funds</div>
                     <div style="font-size:24px;font-weight:800;color:#38bdf8">${stats.totalSchemes || 0}</div>
-                    <div style="font-size:11px;color:var(--text-dim)">Regular Growth Schemes</div>
+                    <div style="font-size:11px;color:var(--text-dim)">Total Database Catalog</div>
                 </div>
             </div>`;
         }

@@ -1742,23 +1742,64 @@ exports.getAdminMfSchemes = async (req, res) => {
       query.category = category;
     }
 
+    // Find hidden AMCs to accurately reflect visibility
+    const hiddenAmcsList = await MfAmc.find({ isActive: false }).select('amcCode amcName displayName').lean();
+    const hiddenAmcCodes = hiddenAmcsList.map(a => a.amcCode).filter(Boolean);
+    const hiddenAmcNames = hiddenAmcsList.map(a => a.amcName).filter(Boolean);
+
     if (filter === 'FEATURED') {
       query.isFeatured = true;
     } else if (filter === 'RECOMMENDED') {
       query.isRecommended = true;
-    } else if (filter === 'ACTIVE') {
+    } else if (filter === 'ACTIVE' || filter === 'VISIBLE') {
       query.isActive = true;
+      query.isAmcActive = { $ne: false };
+      if (hiddenAmcCodes.length > 0) {
+        query.amcCode = { $nin: hiddenAmcCodes };
+      }
+      if (hiddenAmcNames.length > 0) {
+        query.amcName = { $nin: hiddenAmcNames };
+      }
     } else if (filter === 'HIDDEN') {
-      query.isActive = false;
+      const hiddenOrClauses = [
+        { isActive: false },
+        { isAmcActive: false },
+      ];
+      if (hiddenAmcCodes.length > 0) {
+        hiddenOrClauses.push({ amcCode: { $in: hiddenAmcCodes } });
+      }
+      if (hiddenAmcNames.length > 0) {
+        hiddenOrClauses.push({ amcName: { $in: hiddenAmcNames } });
+      }
+      query.$or = hiddenOrClauses;
     }
 
     if (search) {
-      query.$or = [
+      const searchClause = [
         { schemeName: { $regex: search, $options: 'i' } },
         { schemeCode: { $regex: search, $options: 'i' } },
         { amcName: { $regex: search, $options: 'i' } },
         { subCategory: { $regex: search, $options: 'i' } },
       ];
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchClause }];
+        delete query.$or;
+      } else {
+        query.$or = searchClause;
+      }
+    }
+
+    const visibleSchemeQuery = {
+      planType: 'REGULAR',
+      isActive: true,
+      isAmcActive: { $ne: false },
+      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+    };
+    if (hiddenAmcCodes.length > 0) {
+      visibleSchemeQuery.amcCode = { $nin: hiddenAmcCodes };
+    }
+    if (hiddenAmcNames.length > 0) {
+      visibleSchemeQuery.amcName = { $nin: hiddenAmcNames };
     }
 
     const [
@@ -1766,7 +1807,8 @@ exports.getAdminMfSchemes = async (req, res) => {
       schemes,
       featuredCount,
       recommendedCount,
-      hiddenCount,
+      totalRegularSchemes,
+      visibleSchemes,
     ] = await Promise.all([
       MutualFundScheme.countDocuments(query),
       MutualFundScheme.find(query)
@@ -1775,8 +1817,10 @@ exports.getAdminMfSchemes = async (req, res) => {
         .limit(limit),
       MutualFundScheme.countDocuments({ planType: 'REGULAR', isFeatured: true }),
       MutualFundScheme.countDocuments({ planType: 'REGULAR', isRecommended: true }),
-      MutualFundScheme.countDocuments({ planType: 'REGULAR', isActive: false }),
+      MutualFundScheme.countDocuments({ planType: 'REGULAR' }),
+      MutualFundScheme.countDocuments(visibleSchemeQuery),
     ]);
+    const hiddenCount = Math.max(0, totalRegularSchemes - visibleSchemes);
 
     return res.json({
       success: true,
@@ -1788,7 +1832,8 @@ exports.getAdminMfSchemes = async (req, res) => {
         featuredCount,
         recommendedCount,
         hiddenCount,
-        totalSchemes: await MutualFundScheme.countDocuments({ planType: 'REGULAR' }),
+        visibleSchemes,
+        totalSchemes: totalRegularSchemes,
       },
     });
   } catch (error) {
@@ -1970,13 +2015,32 @@ exports.getAdminMfAmcs = async (req, res) => {
       ];
     }
 
-    const [amcs, totalAmcs, activeAmcs, hiddenAmcs, totalSchemes] = await Promise.all([
+    const hiddenAmcsList = await MfAmc.find({ isActive: false }).select('amcCode amcName displayName').lean();
+    const hiddenAmcCodes = hiddenAmcsList.map(a => a.amcCode).filter(Boolean);
+    const hiddenAmcNames = hiddenAmcsList.map(a => a.amcName).filter(Boolean);
+
+    const visibleSchemeQuery = {
+      planType: 'REGULAR',
+      isActive: true,
+      isAmcActive: { $ne: false },
+      schemeName: { $not: { $regex: 'direct', $options: 'i' } },
+    };
+    if (hiddenAmcCodes.length > 0) {
+      visibleSchemeQuery.amcCode = { $nin: hiddenAmcCodes };
+    }
+    if (hiddenAmcNames.length > 0) {
+      visibleSchemeQuery.amcName = { $nin: hiddenAmcNames };
+    }
+
+    const [amcs, totalAmcs, activeAmcs, hiddenAmcs, totalSchemes, visibleSchemes] = await Promise.all([
       MfAmc.find(query).sort({ schemeCount: -1, displayName: 1 }).lean(),
       MfAmc.countDocuments(),
       MfAmc.countDocuments({ isActive: true }),
       MfAmc.countDocuments({ isActive: false }),
       MutualFundScheme.countDocuments({ planType: 'REGULAR' }),
+      MutualFundScheme.countDocuments(visibleSchemeQuery),
     ]);
+    const hiddenSchemes = Math.max(0, totalSchemes - visibleSchemes);
 
     return res.json({
       success: true,
@@ -1985,6 +2049,8 @@ exports.getAdminMfAmcs = async (req, res) => {
         totalAmcs,
         activeAmcs,
         hiddenAmcs,
+        visibleSchemes,
+        hiddenSchemes,
         totalSchemes,
       },
     });
