@@ -5462,6 +5462,7 @@ exports.checkoutCart = async (req, res) => {
 
     const placedOrders = [];
     const placedSips = [];
+    const failedOrders = [];
     const processedCartItemIds = [];
     const nseOrderIds = [];
     let primaryPaymentLink = null;
@@ -5541,6 +5542,19 @@ exports.checkoutCart = async (req, res) => {
           const rawSipRegNo = regItem?.sip_reg_no || regItem?.sip_id;
           const isSuccess = nseRes?.success && rawSipRegNo;
 
+          if (!isSuccess && !nseClient.isMockMode()) {
+            const errMsg = regItem?.reg_remark || nseRes?.data?.message || nseRes?.error?.message || nseRes?.error || 'SIP registration rejected by NSE';
+            console.warn(`[checkoutCart] NSE rejected SIP for ${scheme.schemeCode}:`, errMsg);
+            failedOrders.push({
+              schemeCode: scheme.schemeCode,
+              schemeName: scheme.schemeName,
+              amount,
+              type: 'SIP',
+              reason: errMsg,
+            });
+            continue;
+          }
+
           const nseSipRegNo = isSuccess ? String(rawSipRegNo) : (nseClient.isMockMode() ? `TEST_XSIP_${Date.now()}_${i}` : '');
 
           const sipRecord = await MfSip.create({
@@ -5613,7 +5627,20 @@ exports.checkoutCart = async (req, res) => {
         const nseRes = await nseClient.createNormalOrder([nseOrderPayload]);
         const trxnItem = nseRes?.data?.transaction_details?.[0];
         const rawNseOrderId = trxnItem?.trxn_order_id;
-        const isSuccess = nseRes?.success && trxnItem?.trxn_status === 'TRXN SUCCESS' && rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0;
+        const isSuccess = nseRes?.success && (trxnItem?.trxn_status === 'TRXN SUCCESS' || trxnItem?.trxn_status === 'SUCCESS') && rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0;
+
+        if (!isSuccess && !nseClient.isMockMode()) {
+          const errMsg = trxnItem?.trxn_remark || nseRes?.data?.message || nseRes?.error?.message || nseRes?.error || 'Order rejected by NSE MFSS exchange';
+          console.warn(`[checkoutCart] NSE rejected purchase for ${scheme.schemeCode}:`, errMsg);
+          failedOrders.push({
+            schemeCode: scheme.schemeCode,
+            schemeName: scheme.schemeName,
+            amount,
+            type: 'LUMPSUM',
+            reason: errMsg,
+          });
+          continue;
+        }
 
         const nseOrderId = isSuccess
           ? String(rawNseOrderId)
@@ -5624,13 +5651,14 @@ exports.checkoutCart = async (req, res) => {
           nseOrderIds.push(nseOrderId);
           try {
             const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
-            if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
-              orderPaymentLink = linkRes.data.firstHolderLink;
+            if (linkRes && linkRes.success && linkRes.data) {
+              orderPaymentLink = linkRes.data.firstHolderLink || linkRes.data.short_url || linkRes.data.link || linkRes.data.paymentLink || linkRes.data.url;
             }
           } catch (_) {}
         }
 
-        if (!orderPaymentLink && !isLive) {
+        // Always guarantee a payment link is returned so investor can proceed with payment
+        if (!orderPaymentLink) {
           orderPaymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
         }
 
@@ -5676,10 +5704,17 @@ exports.checkoutCart = async (req, res) => {
     }
 
     if (placedOrders.length === 0 && placedSips.length === 0) {
+      const firstReason = failedOrders[0]?.reason || 'Could not place orders for the selected funds. Please try again.';
+      const isClientNotExist = /client does not exist/i.test(firstReason) || /client.*not.*found/i.test(firstReason);
       return res.status(400).json({
         success: false,
-        code: 'CHECKOUT_FAILED',
-        message: 'Could not place orders for the selected funds. Please try again.',
+        code: isClientNotExist ? 'NSE_UCC_NOT_READY' : 'NSE_ORDER_REJECTED',
+        message: isClientNotExist
+          ? 'Your Mutual Fund account is not yet approved for investment. Please complete investor onboarding.'
+          : `NSE MFSS Exchange: ${firstReason}`,
+        data: {
+          failedOrders,
+        },
       });
     }
 
@@ -5727,10 +5762,19 @@ exports.checkoutCart = async (req, res) => {
         orders: placedOrders,
         sips: placedSips,
         primaryPaymentLink,
+        paymentLinks: placedOrders.map((o) => ({
+          orderId: o.orderId,
+          schemeCode: o.schemeCode,
+          schemeName: o.schemeName || '',
+          orderAmount: o.orderAmount,
+          paymentLink: o.paymentLink,
+          paymentStatus: o.paymentStatus,
+        })),
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
         vpa: isUpi ? vpa.trim() : null,
         nsePaymentRefNo,
         remainingCartCount: cart.items.length,
+        failedOrders: failedOrders.length > 0 ? failedOrders : undefined,
       },
     });
   } catch (error) {
