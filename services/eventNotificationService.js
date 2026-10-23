@@ -278,7 +278,7 @@ class EventNotificationService {
         title,
         body,
         deepLink: "mutual_funds/portfolio",
-        app: "vikadrx",
+        app: "digigold", // Pushed to VikaOne (Gold & MF)
         sentBy: "EVENT_FIRST_MF_PURCHASE",
         eventKey,
         cooldownMs: 24 * 60 * 60 * 1000,

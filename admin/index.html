@@ -3243,16 +3243,16 @@
                         <div class="form-group">
                             <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
                                 <span>Target Application (Redirection App)</span>
-                                <span id="notif-selected-app-label" style="font-size:11px;font-weight:700;color:#93c5fd">🏢 Vika DRX (Real Estate)</span>
+                                <span id="notif-selected-app-label" style="font-size:11px;font-weight:700;color:#fde047">🪙 VikaOne (Gold & MF)</span>
                             </label>
                             <div class="chart-pill-group" style="display:inline-flex;gap:4px">
-                                <button type="button" class="chart-pill-btn notif-app-pill active" id="notif-app-vikadrx"
+                                <button type="button" class="chart-pill-btn notif-app-pill active" id="notif-app-digigold"
+                                    data-app="digigold" onclick="selectNotificationApp('digigold')">
+                                    <i class="fas fa-coins"></i> 🪙 VikaOne (Gold & MF)
+                                </button>
+                                <button type="button" class="chart-pill-btn notif-app-pill" id="notif-app-vikadrx"
                                     data-app="vikadrx" onclick="selectNotificationApp('vikadrx')">
                                     <i class="fas fa-building"></i> 🏢 Vika DRX
-                                </button>
-                                <button type="button" class="chart-pill-btn notif-app-pill" id="notif-app-digigold"
-                                    data-app="digigold" onclick="selectNotificationApp('digigold')">
-                                    <i class="fas fa-coins"></i> 🪙 VikaOne (DigiGold)
                                 </button>
                                 <button type="button" class="chart-pill-btn notif-app-pill" id="notif-app-both"
                                     data-app="both" onclick="selectNotificationApp('both')">
@@ -3386,10 +3386,10 @@
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                             <select class="form-control" id="notif-history-app-filter" onchange="changeNotifAppFilter(this.value)"
-                                style="width:180px;height:32px;font-size:12px;background:rgba(37,99,235,0.12);border-color:rgba(37,99,235,0.4);color:#93c5fd;font-weight:600">
-                                <option value="vikadrx" selected>🏢 Vika DRX (Estate/Bricks)</option>
-                                <option value="digigold">🪙 Digi Gold Logs</option>
-                                <option value="all">🌐 All Notification Logs</option>
+                                style="width:200px;height:32px;font-size:12px;background:rgba(234,179,8,0.12);border-color:rgba(234,179,8,0.4);color:#fde047;font-weight:600">
+                                <option value="digigold" selected>🪙 VikaOne (Gold & MF)</option>
+                                <option value="vikadrx">🏢 Vika DRX (Real Estate)</option>
+                                <option value="all">🌐 All Applications</option>
                             </select>
                             <input class="form-control" id="notif-history-search" placeholder="🔍 Search logs..."
                                 oninput="filterNotifHistory(this.value)" style="width:180px;height:32px;font-size:12px" />

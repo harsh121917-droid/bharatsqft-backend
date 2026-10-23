@@ -52,6 +52,8 @@ describe('Mutual Funds Recently Viewed, Cart & Profile Endpoints', () => {
       phone: `9898${Math.floor(100000 + Math.random() * 900000)}`,
       password: 'password123',
       role: 'user',
+      isKycVerified: true,
+      kycStatus: 'approved',
     });
 
     // Seed dummy scheme
@@ -64,6 +66,63 @@ describe('Mutual Funds Recently Viewed, Cart & Profile Endpoints', () => {
           fundHouse: 'Axis Mutual Fund',
           category: 'Equity',
           planType: 'REGULAR',
+          purchaseAllowed: true,
+          isActive: true,
+          isin: 'INF846K01164',
+          minPurchaseAmount: 500,
+        },
+      },
+      { upsert: true }
+    );
+
+    await MutualFundScheme.updateOne(
+      { schemeCode: '120504' },
+      {
+        $set: {
+          schemeCode: '120504',
+          schemeName: 'HDFC Top 100 Fund - Regular Growth',
+          fundHouse: 'HDFC Mutual Fund',
+          category: 'Equity',
+          planType: 'REGULAR',
+          purchaseAllowed: true,
+          isActive: true,
+          isin: 'INF179K01123',
+          minPurchaseAmount: 500,
+        },
+      },
+      { upsert: true }
+    );
+
+    await MfClientUcc.updateOne(
+      { user: testUser._id },
+      {
+        $set: {
+          clientCode: `TST${Date.now().toString().slice(-6)}`,
+          fullName: 'Ashahad Shaikh',
+          pan: 'ABCDE0001F',
+          nseStatus: 'ACTIVE',
+          nseRemarks: 'APPROVED',
+          primaryBank: {
+            accountNo: '1300182100001716',
+            ifsc: 'BKID0001300',
+            bankName: 'Bank of India',
+          },
+        },
+      },
+      { upsert: true }
+    );
+
+    await BankAccount.updateOne(
+      { user: testUser._id },
+      {
+        $set: {
+          accountHolder: 'Ashahad Shaikh',
+          accountNumber: '1300182100001716',
+          ifsc: 'BKID0001300',
+          bankName: 'Bank of India',
+          isVerified: true,
+          verificationSource: 'CASHFREE_PENNY_DROP',
+          verifiedName: 'ASHAHAD SHAIKH',
         },
       },
       { upsert: true }
@@ -142,6 +201,49 @@ describe('Mutual Funds Recently Viewed, Cart & Profile Endpoints', () => {
     assert.equal(delRes.statusCode, 200);
     assert.equal(delRes.data.data.items.length, 0);
     assert.equal(delRes.data.data.totalAmount, 0);
+  });
+
+  it('2b. Multi-fund cart checkout processes all selected funds and clears them from cart', async () => {
+    // Add 2 funds to cart
+    const { req: a1, res: r1 } = mockReqRes(
+      { schemeCode: '120503', schemeName: 'Axis Bluechip', amount: 1000, investmentType: 'LUMPSUM' },
+      {}, {}, testUser
+    );
+    await mfController.addToCart(a1, r1);
+    assert.equal(r1.statusCode, 200);
+
+    const { req: a2, res: r2 } = mockReqRes(
+      { schemeCode: '120504', schemeName: 'HDFC Top 100', amount: 2000, investmentType: 'LUMPSUM' },
+      {}, {}, testUser
+    );
+    await mfController.addToCart(a2, r2);
+    assert.equal(r2.statusCode, 200);
+    assert.equal(r2.data.data.items.length, 2);
+
+    const item1Id = r2.data.data.items[0]._id.toString();
+    const item2Id = r2.data.data.items[1]._id.toString();
+
+    // Checkout both selected items
+    const { req: coReq, res: coRes } = mockReqRes(
+      {
+        selectedItemIds: [item1Id, item2Id],
+        paymentMode: 'NSE_PAYMENT_LINK',
+      },
+      {}, {}, testUser
+    );
+    await mfController.checkoutCart(coReq, coRes);
+    assert.equal(coRes.statusCode, 200);
+    assert.equal(coRes.data.success, true);
+    assert.equal(coRes.data.data.totalAmount, 3000);
+    assert.equal(coRes.data.data.totalFunds, 2);
+    assert.equal(coRes.data.data.orders.length, 2);
+    assert.ok(coRes.data.data.primaryPaymentLink);
+
+    // Verify both items were cleared from the cart
+    const { req: getReq, res: getRes } = mockReqRes({}, {}, {}, testUser);
+    await mfController.getCart(getReq, getRes);
+    assert.equal(getRes.statusCode, 200);
+    assert.equal(getRes.data.data.items.length, 0);
   });
 
   it('3. Adds bank account and retrieves MF Profile with account details, bank and orders', async () => {

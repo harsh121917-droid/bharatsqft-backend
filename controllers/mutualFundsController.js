@@ -5374,6 +5374,371 @@ exports.clearCart = async (req, res) => {
   }
 };
 
+// ── 27b. POST /api/mutual-funds/cart/checkout ──
+exports.checkoutCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      selectedItemIds,
+      items: customItems,
+      paymentMode = 'NSE_PAYMENT_LINK',
+      vpa,
+    } = req.body;
+
+    const isUpi = (paymentMode === 'UPI');
+    if (isUpi) {
+      if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_UPI_ID',
+          message: 'Please provide a valid UPI ID (e.g. yourname@okaxis, yourname@ybl, yourname@paytm).',
+        });
+      }
+    }
+
+    // 1. Check Investor Readiness for Purchase
+    const readiness = await mfInvestorReadinessService.checkInvestorReady(userId, 'PURCHASE');
+    if (!readiness.ready) {
+      return res.status(400).json({
+        success: false,
+        code: readiness.code,
+        message: readiness.message,
+        data: readiness.data || {},
+      });
+    }
+    const ucc = readiness.ucc;
+    const user = await User.findById(userId);
+
+    // 2. Fetch User's Cart
+    const cart = await MfCart.findOne({ user: userId });
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        code: 'CART_EMPTY',
+        message: 'Your mutual fund cart is empty.',
+      });
+    }
+
+    // 3. Filter only selected items
+    let targetItems = [];
+    if (Array.isArray(selectedItemIds) && selectedItemIds.length > 0) {
+      const selectedSet = new Set(selectedItemIds.map(String));
+      targetItems = cart.items.filter(
+        (i) => selectedSet.has(String(i._id)) || selectedSet.has(String(i.schemeCode))
+      );
+    } else if (Array.isArray(customItems) && customItems.length > 0) {
+      targetItems = customItems;
+    } else {
+      targetItems = cart.items;
+    }
+
+    if (targetItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        code: 'NO_FUNDS_SELECTED',
+        message: 'No mutual funds were selected for investment.',
+      });
+    }
+
+    // Allow overriding amounts from customItems if provided
+    if (Array.isArray(customItems) && customItems.length > 0) {
+      const customMap = new Map();
+      customItems.forEach((ci) => {
+        if (ci.cartItemId) customMap.set(String(ci.cartItemId), ci);
+        if (ci.schemeCode) customMap.set(String(ci.schemeCode), ci);
+      });
+      targetItems = targetItems.map((item) => {
+        const itemObj = item.toObject ? item.toObject() : { ...item };
+        const override = customMap.get(String(item._id)) || customMap.get(String(item.schemeCode));
+        if (override && Number(override.amount) > 0) {
+          itemObj.amount = Number(override.amount);
+        }
+        return itemObj;
+      });
+    }
+
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
+
+    const placedOrders = [];
+    const placedSips = [];
+    const processedCartItemIds = [];
+    const nseOrderIds = [];
+    let primaryPaymentLink = null;
+    let totalInvestedAmount = 0;
+
+    // 4. Process each selected fund
+    for (let i = 0; i < targetItems.length; i++) {
+      const item = targetItems[i];
+      const invType = (item.investmentType || 'LUMPSUM').toUpperCase();
+      const amount = Number(item.amount);
+
+      if (!amount || amount <= 0) continue;
+
+      const searchCode = String(item.schemeCode || '').trim().toUpperCase();
+      const scheme = await MutualFundScheme.findOne({
+        $or: [
+          { schemeCode: searchCode },
+          { nseSchemeCode: searchCode },
+          { isin: searchCode },
+        ],
+      });
+
+      if (!scheme) {
+        console.warn(`[checkoutCart] Scheme ${item.schemeCode} not found in master catalog, skipping.`);
+        continue;
+      }
+
+      if (invType === 'SIP') {
+        // Handle SIP registration
+        try {
+          const sipReadiness = await mfInvestorReadinessService.checkInvestorReady(userId, 'SIP');
+          if (!sipReadiness.ready) {
+            console.warn(`[checkoutCart] User not ready for SIP: ${sipReadiness.message}`);
+            continue;
+          }
+
+          let authoritativeNseCode = scheme.nseSchemeCode || scheme.schemeCode;
+          const sipMaster = await MfSipSchemeMaster.findOne({
+            $or: [{ schemeCode: searchCode }, { isin: scheme.isin }],
+            sipAllowed: true,
+          });
+          if (sipMaster?.schemeCode) {
+            authoritativeNseCode = sipMaster.schemeCode;
+          }
+
+          const sipRegId = `MFS${Date.now()}_${i}`;
+          const sipDay = item.sipDay || 5;
+          const startDate = new Date();
+          startDate.setDate(sipDay);
+          if (startDate <= new Date()) {
+            startDate.setMonth(startDate.getMonth() + 1);
+          }
+          const formattedStartDate = `${String(sipDay).padStart(2, '0')}/${String(startDate.getMonth() + 1).padStart(2, '0')}/${startDate.getFullYear()}`;
+
+          const nseSipPayload = {
+            member_code: process.env.NSE_MEMBER_CODE || '',
+            client_code: ucc.clientCode,
+            scheme_code: authoritativeNseCode,
+            internal_ref_no: sipRegId,
+            trans_mode: 'P',
+            dp_txnMwt: 'P',
+            start_date: formattedStartDate,
+            frequency_type: item.frequency || 'MONTHLY',
+            installment_amount: String(amount),
+            number_of_installment: '120',
+            brokerage: '',
+            mandate_id: sipReadiness.mandate?.mandateId || '',
+            sub_broker_code: '',
+            euin_number: '',
+            euin_declaration: 'N',
+            dpc_flag: 'Y',
+            remarks: 'Cart Checkout via GoldVikaone',
+          };
+
+          const nseRes = await nseClient.registerSip([nseSipPayload]);
+          const regItem = nseRes?.data?.reg_details?.[0] || nseRes?.data?.registration_details?.[0];
+          const rawSipRegNo = regItem?.sip_reg_no || regItem?.sip_id;
+          const isSuccess = nseRes?.success && rawSipRegNo;
+
+          const nseSipRegNo = isSuccess ? String(rawSipRegNo) : (nseClient.isMockMode() ? `TEST_XSIP_${Date.now()}_${i}` : '');
+
+          const sipRecord = await MfSip.create({
+            user: userId,
+            clientCode: ucc.clientCode,
+            sipRegNo: nseSipRegNo || sipRegId,
+            schemeCode: scheme.schemeCode,
+            schemeName: scheme.schemeName,
+            isin: scheme.isin || '',
+            installmentAmount: amount,
+            frequency: item.frequency || 'MONTHLY',
+            sipDay,
+            startDate,
+            nextDueDate: startDate,
+            mandateId: sipReadiness.mandate?.mandateId || '',
+            status: 'ACTIVE',
+            orderStatus: 'SCHEDULED',
+            registrationStatus: isSuccess ? 'ACTIVE' : 'FAILED',
+            nseRemarks: regItem?.reg_remark || 'Registered via Cart Checkout',
+          });
+
+          placedSips.push(sipRecord);
+          totalInvestedAmount += amount;
+          if (item._id) processedCartItemIds.push(String(item._id));
+        } catch (sipErr) {
+          console.error(`[checkoutCart] SIP order error for ${item.schemeCode}:`, sipErr);
+        }
+      } else {
+        // Handle Lumpsum Purchase Order
+        let targetNseCode = scheme.nseSchemeCode;
+        if (!targetNseCode && scheme.schemeCode && !/^\d+$/.test(scheme.schemeCode)) {
+          targetNseCode = scheme.schemeCode;
+        }
+        if (!targetNseCode) targetNseCode = scheme.schemeCode;
+
+        const existingHolding = await MfPortfolioHolding.findOne({ user: userId, schemeCode: scheme.schemeCode });
+        const isAdditional = Boolean(existingHolding && existingHolding.folioNo);
+        const folioNo = item.folioNo || (isAdditional ? existingHolding.folioNo : '');
+        const buySellType = isAdditional || folioNo ? 'ADDITIONAL' : 'FRESH';
+        const orderId = `MFP${Date.now()}_${i}`;
+
+        const nseOrderPayload = {
+          order_ref_number: orderId,
+          scheme_code: targetNseCode,
+          trxn_type: 'P',
+          buy_sell_type: buySellType,
+          client_code: ucc.clientCode,
+          demat_physical: 'P',
+          order_amount: String(amount),
+          folio_no: folioNo,
+          remarks: 'Cart Checkout via GoldVikaone',
+          kyc_flag: 'Y',
+          sub_broker_code: '',
+          euin_number: '',
+          euin_declaration: 'N',
+          min_redemption_flag: 'N',
+          dpc_flag: 'Y',
+          all_units: 'N',
+          redemption_units: '',
+          sub_broker_arn: '',
+          bank_ref_no: '',
+          account_no: ucc.primaryBank?.accountNo || '',
+          mobile_no: user.phone?.slice(-10) || '',
+          email: user.email,
+          mandate_id: '',
+          filler1: '',
+          member_unique_id: orderId,
+        };
+
+        const nseRes = await nseClient.createNormalOrder([nseOrderPayload]);
+        const trxnItem = nseRes?.data?.transaction_details?.[0];
+        const rawNseOrderId = trxnItem?.trxn_order_id;
+        const isSuccess = nseRes?.success && trxnItem?.trxn_status === 'TRXN SUCCESS' && rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0;
+
+        const nseOrderId = isSuccess
+          ? String(rawNseOrderId)
+          : (nseClient.isMockMode() ? String(rawNseOrderId || `TEST_PUR_${Date.now()}_${i}`) : null);
+
+        let orderPaymentLink = null;
+        if (nseOrderId) {
+          nseOrderIds.push(nseOrderId);
+          try {
+            const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
+            if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
+              orderPaymentLink = linkRes.data.firstHolderLink;
+            }
+          } catch (_) {}
+        }
+
+        if (!orderPaymentLink && !isLive) {
+          orderPaymentLink = `${backendUrl}/api/mutual-funds/checkout/${orderId}?mode=sandbox`;
+        }
+
+        if (!primaryPaymentLink && orderPaymentLink) {
+          primaryPaymentLink = orderPaymentLink;
+        }
+
+        const estimatedUnits = scheme.nav && scheme.nav > 0 ? +(amount / scheme.nav).toFixed(3) : null;
+
+        const order = await MfOrder.create({
+          user: userId,
+          clientCode: ucc.clientCode,
+          orderId,
+          schemeCode: scheme.schemeCode,
+          schemeName: scheme.schemeName,
+          isin: scheme.isin || '',
+          folioNo,
+          transactionType: 'P',
+          buySellType,
+          orderAmount: amount,
+          estimatedUnits,
+          units: 0,
+          allottedUnits: 0,
+          allottedNav: null,
+          allotmentStatus: 'PENDING',
+          navAtOrder: scheme.nav,
+          paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
+          paymentStatus: 'PENDING',
+          orderStatus: 'PAYMENT_PENDING',
+          vpa: isUpi ? vpa.trim() : '',
+          paymentLink: orderPaymentLink,
+          nseTrxnOrderId: nseOrderId,
+          nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
+          remarks: isUpi
+            ? `UPI Collect request dispatched to ${vpa.trim()} by NSE Clearing Limited.`
+            : 'Order placed on NSE MFSS. Awaiting payment through official NSE gateway.',
+        });
+
+        placedOrders.push(order);
+        totalInvestedAmount += amount;
+        if (item._id) processedCartItemIds.push(String(item._id));
+      }
+    }
+
+    if (placedOrders.length === 0 && placedSips.length === 0) {
+      return res.status(400).json({
+        success: false,
+        code: 'CHECKOUT_FAILED',
+        message: 'Could not place orders for the selected funds. Please try again.',
+      });
+    }
+
+    // 5. If UPI payment mode with multiple orders, initiate basket payment
+    let nsePaymentRefNo = '';
+    if (isUpi && nseOrderIds.length > 0) {
+      try {
+        const upiPayload = {
+          payment_mode: 'UPI',
+          client_code: ucc.clientCode,
+          order_ids: nseOrderIds.join(','),
+          bank_account_no: ucc.primaryBank?.accountNo || '',
+          ifsc: ucc.primaryBank?.ifsc || '',
+          vpa: vpa.trim(),
+          callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
+        };
+        const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
+        if (upiRes?.success && (upiRes?.data?.status === 'success' || upiRes?.data?.status === '100')) {
+          nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
+          if (upiRes.data.short_url) {
+            primaryPaymentLink = upiRes.data.short_url;
+          }
+        }
+      } catch (upiErr) {
+        console.warn(`[checkoutCart] Basket UPI payment error:`, upiErr.message);
+      }
+    }
+
+    // 6. Remove ONLY successfully placed funds from Cart (unselected stay in cart)
+    const processedSet = new Set(processedCartItemIds);
+    cart.items = cart.items.filter(
+      (item) => !processedSet.has(String(item._id)) && !processedSet.has(String(item.schemeCode))
+    );
+    await cart.save();
+
+    // 7. Return complete checkout result
+    return res.json({
+      success: true,
+      message: isUpi
+        ? `UPI Collect request sent for all ${placedOrders.length} mutual funds to ${vpa.trim()}. Please approve in your UPI app.`
+        : `Orders created for ${placedOrders.length + placedSips.length} mutual funds. Please complete payment through official NSE gateway.`,
+      data: {
+        totalAmount: totalInvestedAmount,
+        totalFunds: placedOrders.length + placedSips.length,
+        orders: placedOrders,
+        sips: placedSips,
+        primaryPaymentLink,
+        paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
+        vpa: isUpi ? vpa.trim() : null,
+        nsePaymentRefNo,
+        remainingCartCount: cart.items.length,
+      },
+    });
+  } catch (error) {
+    console.error('[checkoutCart Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 28. GET /api/mutual-funds/profile ──
 exports.getMfProfile = async (req, res) => {
   try {

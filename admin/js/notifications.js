@@ -6,11 +6,11 @@ let notifHistory = [];
 let notifPage = 1;
 let uploadedNotifImageUrl = "";
 let cachedNotifUsers = [];
-let currentNotifApp = "vikadrx";
-let selectedNotifApp = "vikadrx";
+let currentNotifApp = "digigold";
+let selectedNotifApp = "digigold";
 
 function changeNotifAppFilter(app) {
-    currentNotifApp = app || "vikadrx";
+    currentNotifApp = app || "digigold";
     loadNotificationHistory(1);
 }
 
@@ -633,7 +633,9 @@ function renderNotificationHistoryTable(logs) {
                     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
                         ${l.app === 'vikadrx'
                             ? `<span class="badge" style="background:rgba(37,99,235,0.18);color:#93c5fd;border:1px solid rgba(37,99,235,0.35);font-size:10px">🏢 Vika DRX</span>`
-                            : `<span class="badge" style="background:rgba(234,179,8,0.18);color:#fde047;border:1px solid rgba(234,179,8,0.35);font-size:10px">🪙 VikaOne</span>`}
+                            : (l.app === 'all'
+                                ? `<span class="badge" style="background:rgba(139,92,246,0.18);color:#c4b5fd;border:1px solid rgba(139,92,246,0.35);font-size:10px">🌐 Both Apps</span>`
+                                : `<span class="badge" style="background:rgba(234,179,8,0.18);color:#fde047;border:1px solid rgba(234,179,8,0.35);font-size:10px">🪙 VikaOne</span>`)}
                         ${audienceBadge}
                     </div>
                     ${deepLinkPill}
@@ -677,7 +679,7 @@ async function deleteNotification(id) {
 }
 
 function loadNotificationPage() {
-    selectNotificationApp('vikadrx');
+    selectNotificationApp('digigold');
     selectNotificationTarget('all');
     updateNotificationPreview();
     loadNotificationHistory(1);

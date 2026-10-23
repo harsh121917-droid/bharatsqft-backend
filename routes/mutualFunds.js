@@ -50,6 +50,7 @@ const {
   updateCartItem,
   removeFromCart,
   clearCart,
+  checkoutCart,
   getMfProfile,
   addMfBank,
   getNfos,
@@ -118,6 +119,7 @@ router.post('/cart/add', addToCart);
 router.put('/cart/:itemId', updateCartItem);
 router.delete('/cart/:itemId', removeFromCart);
 router.delete('/cart', clearCart);
+router.post('/cart/checkout', checkoutCart);
 
 // ── Mutual Funds Profile, Bank & Orders ──
 router.get('/profile', getMfProfile);

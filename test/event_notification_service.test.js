@@ -126,6 +126,7 @@ describe('Event-Driven Automatic Notification Service Tests', () => {
     assert.ok(log, 'First purchase notification should be dispatched');
     assert.strictEqual(log.title, 'First Mutual Fund Purchase Confirmed! 🚀');
     assert.strictEqual(log.deepLink, 'mutual_funds/portfolio');
+    assert.strictEqual(log.app, 'digigold');
     assert.match(log.body, /5,000/);
     assert.match(log.body, /HDFC Flexi Cap Fund/i);
     assert.match(log.body, /PROCESSING/i);

@@ -26,7 +26,7 @@ class MfNotificationService {
         title,
         body,
         deepLink,
-        app: 'vikadrx',
+        app: 'digigold', // VikaOne (Gold & MF)
         sentBy: 'MF_LIFECYCLE_SYSTEM',
       });
     } catch (err) {

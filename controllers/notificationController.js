@@ -47,7 +47,13 @@ exports.sendNotification = async (req, res, next) => {
       });
     }
 
-    const appsToSend = app === "both" ? ["vikadrx", "digigold"] : [app === "digigold" ? "digigold" : "vikadrx"];
+    const resolvedApp = (app || "").toLowerCase().trim();
+    const appsToSend =
+      resolvedApp === "both" || resolvedApp === "all"
+        ? ["digigold", "vikadrx"]
+        : resolvedApp === "vikadrx"
+        ? ["vikadrx"]
+        : ["digigold"];
     const results = [];
     const logs = [];
 
@@ -202,12 +208,14 @@ exports.getNotificationHistory = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 20;
     const skip = (page - 1) * limit;
 
-    // Default to 'vikadrx' so DRX Admin never displays Gold notifications
-    const appFilter = req.query.app !== undefined ? req.query.app : "vikadrx";
-
+    const reqAppFilter = (req.query.app || "").toLowerCase().trim();
     const query = {};
-    if (appFilter && appFilter !== "all") {
-      query.app = appFilter;
+    if (reqAppFilter === "digigold" || reqAppFilter === "vikaone") {
+      query.app = { $in: ["digigold", "all"] };
+    } else if (reqAppFilter === "vikadrx") {
+      query.app = { $in: ["vikadrx", "all"] };
+    } else if (reqAppFilter && reqAppFilter !== "all") {
+      query.app = reqAppFilter;
     }
 
     if (req.query.search) {
@@ -244,7 +252,7 @@ exports.getUserNotifications = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 40;
     const skip = (page - 1) * limit;
 
-    const reqApp = req.query.app || (req.headers["x-app-source"] === "vikadrx" ? "vikadrx" : "vikadrx");
+    const reqApp = req.query.app || (req.headers["x-app-source"] === "vikadrx" ? "vikadrx" : "digigold");
 
     let query;
     if (reqApp === "vikadrx") {
