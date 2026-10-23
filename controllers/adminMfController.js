@@ -1654,12 +1654,25 @@ exports.syncOrderWithNse = async (req, res) => {
       exchangeStatus = order.nseStatus || 'ALLOTTED (NSE CONFIRMED)';
     }
 
+    if ((!allottedUnits || allottedUnits <= 0) && (order.estimatedUnits > 0 || (order.orderAmount > 0 && (nav > 0 || order.navAtOrder > 0)))) {
+      allottedUnits = order.estimatedUnits || parseFloat((order.orderAmount / (nav || order.navAtOrder)).toFixed(4));
+    }
+
     order.nseStatus = exchangeStatus;
     if (allottedUnits > 0) order.units = allottedUnits;
     if (nav > 0) order.navAtOrder = nav;
     await order.save();
 
-    if (allottedUnits > 0 && order.user) {
+    if (allottedUnits > 0 && order.allotmentStatus !== 'ALLOTTED' && (['ALLOTTED', 'SETTLED', 'VALID', 'SUCCESS'].includes(exchangeStatus) || order.paymentStatus === 'SUCCESS')) {
+      const { processAllotmentConfirmation } = require('../services/mfIdempotencyService');
+      await processAllotmentConfirmation({
+        orderId: order.orderId,
+        allottedUnits,
+        allottedNav: nav || order.navAtOrder || 100.0,
+        rtaReferenceNo: exchangeOrder?.rta_ref_no || order.nseTrxnOrderId,
+        source: 'NSE_ORDER_SYNC',
+      });
+    } else if (order.user) {
       try {
         const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
         await recalculateUserPortfolio(order.user);

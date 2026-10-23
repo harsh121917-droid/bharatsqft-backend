@@ -101,6 +101,12 @@ exports.submitKyc = async (req, res, next) => {
         const User = require("../models/User");
         await User.findByIdAndUpdate(req.user._id, { kycStatus: "pending" });
 
+        // Trigger automatic notification for KYC submission (pending review)
+        try {
+            const eventNotificationService = require("../services/eventNotificationService");
+            eventNotificationService.notifyKycPending(req.user._id, { isInitialSubmission: true });
+        } catch (_) {}
+
         res.json({
             success: true,
             message: "KYC submitted successfully. Pending admin review.",
@@ -345,6 +351,20 @@ exports.reviewKyc = async (req, res, next) => {
         if (kyc.user) {
             const User = require("../models/User");
             await User.findByIdAndUpdate(kyc.user._id, { kycStatus: status });
+
+            // Trigger authoritative KYC status notifications
+            try {
+                const eventNotificationService = require("../services/eventNotificationService");
+                if (status === "approved") {
+                    eventNotificationService.notifyKycCompleted(kyc.user._id);
+                } else if (status === "rejected") {
+                    eventNotificationService.notifyKycFailed(kyc.user._id, { reason: rejectionReason });
+                } else if (status === "revoked") {
+                    eventNotificationService.notifyKycFailed(kyc.user._id, { reason: rejectionReason, isRevoked: true });
+                } else if (status === "pending") {
+                    eventNotificationService.notifyKycPending(kyc.user._id, { reason: "Admin requested KYC document review" });
+                }
+            } catch (_) {}
         }
 
         let actionMsg = "KYC status updated";
@@ -441,6 +461,18 @@ exports.bulkReviewKyc = async (req, res, next) => {
                     { $set: userUpdate }
                 );
             }
+
+            // Trigger bulk notifications asynchronously
+            try {
+                const eventNotificationService = require("../services/eventNotificationService");
+                for (const uid of updatedUserIds) {
+                    if (status === "approved") {
+                        eventNotificationService.notifyKycCompleted(uid);
+                    } else if (status === "rejected") {
+                        eventNotificationService.notifyKycFailed(uid, { reason: rejectionReason });
+                    }
+                }
+            } catch (_) {}
         }
 
         const actionText = status === "approved" ? "approved" : "rejected";
@@ -739,6 +771,11 @@ exports.verifyDigioKyc = async (req, res, next) => {
             await req.user.save();
         }
 
+        try {
+            const eventNotificationService = require("../services/eventNotificationService");
+            eventNotificationService.notifyKycCompleted(req.user._id);
+        } catch (_) {}
+
         res.json({
             success: true,
             message: "KYC Verified successfully via Digio!",
@@ -957,6 +994,11 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
             await req.user.save();
         }
 
+        try {
+            const eventNotificationService = require("../services/eventNotificationService");
+            eventNotificationService.notifyKycCompleted(req.user._id);
+        } catch (_) {}
+
         res.json({
             success: true,
             message: "KYC Verified successfully via Cashfree!",
@@ -1064,6 +1106,11 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 const User = require("../models/User");
                 await User.findByIdAndUpdate(req.user._id, { kycStatus: "approved", name: registeredName });
                 if (req.user) req.user.kycStatus = "approved";
+
+                try {
+                    const eventNotificationService = require("../services/eventNotificationService");
+                    eventNotificationService.notifyKycCompleted(req.user._id);
+                } catch (_) {}
 
                 return res.json({
                     success: true,
@@ -1175,6 +1222,16 @@ exports.updateKycBank = async (req, res, next) => {
                     }
                 }
             );
+        } catch (_) {}
+
+        // Notify user about verified bank details
+        try {
+            const eventNotificationService = require("../services/eventNotificationService");
+            eventNotificationService.notifyBankVerified(userId, {
+                accountNumber: finalAccNum,
+                bankName: finalBankName,
+                accountHolder: holder
+            });
         } catch (_) {}
 
         return res.json({

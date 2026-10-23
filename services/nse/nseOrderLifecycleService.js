@@ -113,6 +113,12 @@ class NseOrderLifecycleService {
       order.nseStatus = 'ACCEPTED';
       order.remarks = `${order.remarks ? order.remarks + ' | ' : ''}NSE Accepted (${exchangeReference})`;
       await order.save();
+
+      // Notify if this is user's first mutual fund purchase
+      try {
+        const eventNotificationService = require('../eventNotificationService');
+        eventNotificationService.notifyFirstMfPurchase(order.user, order);
+      } catch (_) {}
     } else if (exchangeStatus === 'TIMEOUT') {
       order.nseStatus = 'TIMEOUT';
       order.remarks = `${order.remarks ? order.remarks + ' | ' : ''}NSE Timeout - Pending Reconciliation`;

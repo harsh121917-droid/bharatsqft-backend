@@ -2036,6 +2036,10 @@ exports.syncOrderStatus = async (req, res) => {
           order.paymentStatus = 'SUCCESS';
           order.orderStatus = 'PROCESSING';
           order.remarks = nseData.order_remark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
+          try {
+            const eventNotificationService = require('../services/eventNotificationService');
+            eventNotificationService.notifyFirstMfPurchase(order.user, order);
+          } catch (_) {}
         }
       }
 
@@ -2075,6 +2079,10 @@ exports.syncOrderStatus = async (req, res) => {
           order.orderStatus = 'PAYMENT_SUCCESS';
           order.remarks = 'UPI Payment confirmed by NSE Clearing Limited.';
           await order.save();
+          try {
+            const eventNotificationService = require('../services/eventNotificationService');
+            eventNotificationService.notifyFirstMfPurchase(order.user, order);
+          } catch (_) {}
         } else if (['FAILED', 'REJECTED', 'EXPIRED'].includes(upiStatus)) {
           order.paymentStatus = 'FAILED';
           order.orderStatus = 'REJECTED';
@@ -2128,6 +2136,10 @@ exports.handleUpiPaymentCallback = async (req, res) => {
         order.orderStatus = 'PAYMENT_SUCCESS';
         order.remarks = `UPI payment confirmed by NSE Clearing Limited (UTR: ${cust_ref_no || upi_tran_ref_id || ''}).`;
         await order.save();
+        try {
+          const eventNotificationService = require('../services/eventNotificationService');
+          eventNotificationService.notifyFirstMfPurchase(order.user, order);
+        } catch (_) {}
       } else if (['FAILED', 'REJECTED', 'EXPIRED'].includes(upiStatus)) {
         order.paymentStatus = 'FAILED';
         order.orderStatus = 'REJECTED';
@@ -3470,6 +3482,10 @@ exports.renderCheckoutSimulator = async (req, res) => {
       order.paymentStatus = 'SUCCESS';
       order.nseStatus = isExplicitSandbox ? 'ALLOTTED (SANDBOX)' : 'VALID';
       await order.save();
+      try {
+        const eventNotificationService = require('../services/eventNotificationService');
+        eventNotificationService.notifyFirstMfPurchase(order.user, order);
+      } catch (_) {}
     }
 
     return res.send(`
@@ -4713,6 +4729,15 @@ exports.updateUserBank = async (req, res) => {
       );
     } catch (_) {}
 
+    try {
+      const eventNotificationService = require('../services/eventNotificationService');
+      eventNotificationService.notifyBankVerified(userId, {
+        accountNumber: accountNo,
+        bankName,
+        accountHolder: ucc.fullName,
+      });
+    } catch (_) {}
+
     return res.json({
       success: true,
       message: 'Bank account updated successfully with NSE exchange',
@@ -4843,6 +4868,10 @@ exports.verifyPanDetails = async (req, res) => {
                 isKycVerified: true,
                 kycStatus: 'approved',
               });
+              try {
+                const eventNotificationService = require('../services/eventNotificationService');
+                eventNotificationService.notifyKycCompleted(userId);
+              } catch (_) {}
             } catch (_) {}
 
             if (discoveredClientCode) {
@@ -5517,6 +5546,15 @@ exports.addMfBank = async (req, res) => {
         isVerified: true,
       });
     }
+
+    try {
+      const eventNotificationService = require('../services/eventNotificationService');
+      eventNotificationService.notifyBankVerified(userId, {
+        accountNumber: bank.accountNumber,
+        bankName: bank.bankName,
+        accountHolder: bank.accountHolder,
+      });
+    } catch (_) {}
 
     return res.json({
       success: true,

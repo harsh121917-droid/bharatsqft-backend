@@ -11,6 +11,7 @@
  */
 
 const NotificationLog = require('../models/NotificationLog');
+const eventNotificationService = require('./eventNotificationService');
 
 class MfNotificationService {
   /**
@@ -20,16 +21,13 @@ class MfNotificationService {
     if (!userId) return null;
 
     try {
-      return await NotificationLog.create({
+      return await eventNotificationService.sendNotification({
+        userId,
         title,
         body,
         deepLink,
-        targetType: 'user',
-        targetUser: userId,
+        app: 'vikadrx',
         sentBy: 'MF_LIFECYCLE_SYSTEM',
-        sentCount: 1,
-        successCount: 1,
-        status: 'sent',
       });
     } catch (err) {
       console.warn('[MfNotificationService] Failed to record notification:', err.message);

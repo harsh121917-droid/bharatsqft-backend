@@ -122,6 +122,12 @@ async function processAllotmentConfirmation({
   if (rtaReferenceNo) order.rtaReferenceNo = rtaReferenceNo;
   await order.save();
 
+  // Notify if this is the user's first mutual fund purchase
+  try {
+    const eventNotificationService = require('./eventNotificationService');
+    eventNotificationService.notifyFirstMfPurchase(order.user, order);
+  } catch (_) {}
+
   // 2. Create Ledger Transaction (with unique index guard on { order, transactionType })
   let txn = await MfTransaction.findOne({ order: order._id, transactionType: 'PURCHASE' });
   if (!txn) {

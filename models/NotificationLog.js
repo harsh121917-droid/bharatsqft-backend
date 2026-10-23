@@ -57,6 +57,12 @@ const NotificationLogSchema = new mongoose.Schema(
       enum: ["sent", "failed", "simulated"],
       default: "sent",
     },
+    eventKey: {
+      type: String,
+      default: "",
+      index: true,
+      sparse: true,
+    },
   },
   { timestamps: true }
 );

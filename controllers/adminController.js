@@ -1065,6 +1065,18 @@ exports.updateUserBank = async (req, res, next) => {
             );
         } catch (_) {}
 
+        // Notify user about verified bank details if verified
+        if (verifiedBool) {
+            try {
+                const eventNotificationService = require("../services/eventNotificationService");
+                eventNotificationService.notifyBankVerified(userId, {
+                    accountNumber: bank.accountNumber,
+                    bankName: bank.bankName,
+                    accountHolder: bank.accountHolder
+                });
+            } catch (_) {}
+        }
+
         return res.json({
             success: true,
             message: "Bank details updated successfully",
@@ -1124,6 +1136,12 @@ exports.oneClickApproveKyc = async (req, res, next) => {
 
         user.kycStatus = "approved";
         await user.save();
+
+        // Trigger automatic notification for KYC completed
+        try {
+            const eventNotificationService = require("../services/eventNotificationService");
+            eventNotificationService.notifyKycCompleted(user._id);
+        } catch (_) {}
 
         return res.json({
             success: true,

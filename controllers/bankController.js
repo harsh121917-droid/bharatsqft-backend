@@ -213,6 +213,17 @@ exports.verifyBankAccount = async (req, res, next) => {
             }
         }
 
+        if (isVerified) {
+            try {
+                const eventNotificationService = require("../services/eventNotificationService");
+                eventNotificationService.notifyBankVerified(req.user._id, {
+                    accountNumber: cleanAcc,
+                    bankName,
+                    accountHolder: verifiedName
+                });
+            } catch (_) {}
+        }
+
         return res.json({
             success: isVerified,
             isVerified,
