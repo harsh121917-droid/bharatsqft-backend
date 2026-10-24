@@ -53,8 +53,13 @@ const {
   checkoutCart,
   getMfProfile,
   addMfBank,
+  verifyMfBankAccount,
   getNfos,
   getPublicAmcs,
+  getWatchlist,
+  toggleWatchlist,
+  addToWatchlist,
+  removeFromWatchlist,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -73,6 +78,7 @@ router.post('/sync-nav', syncNavsNow);
 router.use(protect);
 
 router.post('/pan/verify', verifyPanDetails);
+router.post('/bank/verify', verifyMfBankAccount);
 router.get('/onboarding-status', getOnboardingStatus);
 router.get('/mandates/my', getMyMandates);
 router.get('/mandates/:id', getMandateDetail);
@@ -120,6 +126,20 @@ router.put('/cart/:itemId', updateCartItem);
 router.delete('/cart/:itemId', removeFromCart);
 router.delete('/cart', clearCart);
 router.post('/cart/checkout', checkoutCart);
+
+// ── Mutual Funds Watchlist / Wishlist ──
+router.get('/watchlist', getWatchlist);
+router.post('/watchlist/toggle', toggleWatchlist);
+router.post('/watchlist/add', addToWatchlist);
+router.delete('/watchlist/:schemeCode', removeFromWatchlist);
+router.delete('/watchlist', removeFromWatchlist);
+
+// Aliases for wishlist
+router.get('/wishlist', getWatchlist);
+router.post('/wishlist/toggle', toggleWatchlist);
+router.post('/wishlist/add', addToWatchlist);
+router.delete('/wishlist/:schemeCode', removeFromWatchlist);
+router.delete('/wishlist', removeFromWatchlist);
 
 // ── Mutual Funds Profile, Bank & Orders ──
 router.get('/profile', getMfProfile);

@@ -25,6 +25,7 @@ const mfAumService = require('../services/mfAumService');
 const mfMarketSyncService = require('../services/mfMarketSyncService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
 const MfRecentlyViewed = require('../models/MfRecentlyViewed');
+const MfWatchlist = require('../models/MfWatchlist');
 const MfCart = require('../models/MfCart');
 const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const mfNfoService = require('../services/mfNfoService');
@@ -6045,3 +6046,187 @@ exports.getPublicAmcs = async (req, res) => {
 
 
 
+
+
+// ── Mutual Funds Watchlist / Wishlist Controller ──
+exports.getWatchlist = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const record = await MfWatchlist.findOne({ user: userId });
+    if (!record || !record.items || record.items.length === 0) {
+      return res.json({ success: true, count: 0, schemeCodes: [], data: [] });
+    }
+
+    const schemeCodes = record.items.map((i) => i.schemeCode);
+    const schemes = await MutualFundScheme.find({
+      schemeCode: { $in: schemeCodes },
+    }).lean();
+
+    const schemeMap = new Map();
+    schemes.forEach((s) => schemeMap.set(s.schemeCode, s));
+
+    const orderedSchemes = schemeCodes
+      .map((code) => schemeMap.get(code))
+      .filter(Boolean);
+
+    return res.json({
+      success: true,
+      count: orderedSchemes.length,
+      schemeCodes,
+      data: orderedSchemes,
+    });
+  } catch (error) {
+    console.error('[getWatchlist Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.toggleWatchlist = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const schemeCode = (req.body.schemeCode || req.params.schemeCode || '').toString().trim();
+    if (!schemeCode) {
+      return res.status(400).json({ success: false, message: 'schemeCode is required' });
+    }
+
+    let record = await MfWatchlist.findOne({ user: userId });
+    if (!record) {
+      record = new MfWatchlist({ user: userId, items: [] });
+    }
+
+    const existsIndex = (record.items || []).findIndex(
+      (item) => item.schemeCode === schemeCode
+    );
+
+    let isSaved = false;
+    if (existsIndex >= 0) {
+      // Remove from watchlist
+      record.items.splice(existsIndex, 1);
+      isSaved = false;
+    } else {
+      // Add to front of watchlist (preserves all previous funds, never overrides)
+      record.items.unshift({
+        schemeCode,
+        addedAt: new Date(),
+      });
+      isSaved = true;
+    }
+
+    await record.save();
+
+    const schemeCodes = (record.items || []).map((i) => i.schemeCode);
+    const schemes = await MutualFundScheme.find({
+      schemeCode: { $in: schemeCodes },
+    }).lean();
+
+    const schemeMap = new Map();
+    schemes.forEach((s) => schemeMap.set(s.schemeCode, s));
+
+    const orderedSchemes = schemeCodes
+      .map((code) => schemeMap.get(code))
+      .filter(Boolean);
+
+    return res.json({
+      success: true,
+      saved: isSaved,
+      message: isSaved ? 'Added to Watchlist' : 'Removed from Watchlist',
+      count: orderedSchemes.length,
+      schemeCodes,
+      data: orderedSchemes,
+    });
+  } catch (error) {
+    console.error('[toggleWatchlist Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.addToWatchlist = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const schemeCode = (req.body.schemeCode || req.params.schemeCode || '').toString().trim();
+    if (!schemeCode) {
+      return res.status(400).json({ success: false, message: 'schemeCode is required' });
+    }
+
+    let record = await MfWatchlist.findOne({ user: userId });
+    if (!record) {
+      record = new MfWatchlist({ user: userId, items: [] });
+    }
+
+    const alreadyExists = (record.items || []).some(
+      (item) => item.schemeCode === schemeCode
+    );
+
+    if (!alreadyExists) {
+      record.items.unshift({
+        schemeCode,
+        addedAt: new Date(),
+      });
+      await record.save();
+    }
+
+    const schemeCodes = (record.items || []).map((i) => i.schemeCode);
+    const schemes = await MutualFundScheme.find({
+      schemeCode: { $in: schemeCodes },
+    }).lean();
+
+    const schemeMap = new Map();
+    schemes.forEach((s) => schemeMap.set(s.schemeCode, s));
+
+    const orderedSchemes = schemeCodes
+      .map((code) => schemeMap.get(code))
+      .filter(Boolean);
+
+    return res.json({
+      success: true,
+      saved: true,
+      message: 'Added to Watchlist',
+      count: orderedSchemes.length,
+      schemeCodes,
+      data: orderedSchemes,
+    });
+  } catch (error) {
+    console.error('[addToWatchlist Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.removeFromWatchlist = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const schemeCode = (req.params.schemeCode || req.body.schemeCode || '').toString().trim();
+    if (!schemeCode) {
+      return res.status(400).json({ success: false, message: 'schemeCode is required' });
+    }
+
+    let record = await MfWatchlist.findOne({ user: userId });
+    if (record && record.items) {
+      record.items = record.items.filter((item) => item.schemeCode !== schemeCode);
+      await record.save();
+    }
+
+    const schemeCodes = (record?.items || []).map((i) => i.schemeCode);
+    const schemes = await MutualFundScheme.find({
+      schemeCode: { $in: schemeCodes },
+    }).lean();
+
+    const schemeMap = new Map();
+    schemes.forEach((s) => schemeMap.set(s.schemeCode, s));
+
+    const orderedSchemes = schemeCodes
+      .map((code) => schemeMap.get(code))
+      .filter(Boolean);
+
+    return res.json({
+      success: true,
+      saved: false,
+      message: 'Removed from Watchlist',
+      count: orderedSchemes.length,
+      schemeCodes,
+      data: orderedSchemes,
+    });
+  } catch (error) {
+    console.error('[removeFromWatchlist Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

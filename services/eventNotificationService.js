@@ -277,7 +277,7 @@ class EventNotificationService {
         userId,
         title,
         body,
-        deepLink: "mutual_funds/portfolio",
+        deepLink: "mutual_funds/portfolio?tab=orders",
         app: "digigold", // Pushed to VikaOne (Gold & MF)
         sentBy: "EVENT_FIRST_MF_PURCHASE",
         eventKey,
@@ -285,6 +285,235 @@ class EventNotificationService {
       });
     } catch (err) {
       console.warn("[EventNotification notifyFirstMfPurchase warning]:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * 5. SIP Registration: Confirm SIP registration separately from the first successful installment.
+   * Dispatched when an SIP is successfully registered and scheduled.
+   */
+  async notifySipRegistration(userIdOrUser, sip, meta = {}) {
+    try {
+      if (!sip) return null;
+      const userId = userIdOrUser?._id || userIdOrUser || sip.user;
+      if (!userId) return null;
+
+      const eventKey = `SIP_REGISTRATION_${sip.sipRegNo || sip._id}`;
+      const schemeName = sip.schemeName || "Mutual Fund Scheme";
+      const amtStr = sip.installmentAmount ? Number(sip.installmentAmount).toLocaleString("en-IN") : "";
+      const statusLabel = sip.status || "Active";
+      const frequencyLabel = (sip.frequency || "Monthly").toLowerCase();
+
+      // Format upcoming debit date
+      let debitDateStr = meta.nextDebitDate || "";
+      if (!debitDateStr && sip.nextDueDate) {
+        try {
+          debitDateStr = new Date(sip.nextDueDate).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+        } catch (_) {}
+      }
+
+      const dateMsg = debitDateStr ? ` First auto-debit will execute on ${debitDateStr} via Bank AutoPay.` : " Recurring installments will debit via Bank AutoPay.";
+      const title = "SIP Registration Confirmed 🎉";
+      const body = `Your ${frequencyLabel} SIP of ₹${amtStr} in ${schemeName} is registered successfully. Status: ${statusLabel}.${dateMsg}`;
+
+      return await this.sendNotification({
+        userId,
+        title,
+        body,
+        deepLink: "mutual_funds/portfolio?tab=sips",
+        app: "digigold",
+        sentBy: "EVENT_SIP_REGISTRATION",
+        eventKey,
+        cooldownMs: 24 * 60 * 60 * 1000,
+      });
+    } catch (err) {
+      console.warn("[EventNotification notifySipRegistration warning]:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * 6. First SIP Payment: Notify user once the first SIP installment payment is successfully completed.
+   */
+  async notifyFirstSipPayment(userIdOrUser, order, sip = null) {
+    try {
+      if (!order) return null;
+      const userId = userIdOrUser?._id || userIdOrUser || order.user;
+      if (!userId) return null;
+
+      const eventKey = `FIRST_SIP_PAYMENT_${order.orderId || order._id}`;
+      const schemeName = order.schemeName || sip?.schemeName || "Mutual Fund Scheme";
+      const amtStr = order.orderAmount
+        ? Number(order.orderAmount).toLocaleString("en-IN")
+        : (sip?.installmentAmount ? Number(sip.installmentAmount).toLocaleString("en-IN") : "");
+
+      const statusLabel = order.allotmentStatus === "ALLOTTED"
+        ? "Allotted"
+        : (order.orderStatus || (order.paymentStatus === "SUCCESS" ? "Confirmed" : "Processing"));
+
+      const title = "First SIP Payment Successful! 🚀";
+      const body = `Your 1st SIP installment payment of ₹${amtStr} for ${schemeName} is successfully completed. Status: ${statusLabel}. Units will be allotted as per official exchange settlement.`;
+
+      return await this.sendNotification({
+        userId,
+        title,
+        body,
+        deepLink: "mutual_funds/portfolio?tab=orders",
+        app: "digigold",
+        sentBy: "EVENT_FIRST_SIP_PAYMENT",
+        eventKey,
+        cooldownMs: 24 * 60 * 60 * 1000,
+      });
+    } catch (err) {
+      console.warn("[EventNotification notifyFirstSipPayment warning]:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * 7. SIP Payment Failed: Notify user if an installment payment fails and explain actionable next steps.
+   */
+  async notifySipPaymentFailed(userIdOrUser, { order = null, sip = null, amount = null, reason = "" } = {}) {
+    try {
+      const userId = userIdOrUser?._id || userIdOrUser || order?.user || sip?.user;
+      if (!userId) return null;
+
+      const schemeName = order?.schemeName || sip?.schemeName || "Mutual Fund Scheme";
+      const rawAmt = amount || order?.orderAmount || sip?.installmentAmount || 0;
+      const amtStr = rawAmt ? Number(rawAmt).toLocaleString("en-IN") : "";
+      const cleanReason = (reason && typeof reason === "string" && reason.trim())
+        ? reason.trim()
+        : (order?.remarks || "Bank auto-debit request was declined or timed out");
+
+      const eventKey = `SIP_PAYMENT_FAILED_${order?.orderId || sip?._id || Date.now()}`;
+      const title = "SIP Payment Failed ⚠️";
+      const body = `Your SIP installment of ₹${amtStr} for ${schemeName} failed. Status: Failed (${cleanReason}). Next Steps: Please ensure adequate balance in your linked bank account or retry payment from your SIP dashboard to prevent SIP interruption.`;
+
+      return await this.sendNotification({
+        userId,
+        title,
+        body,
+        deepLink: "mutual_funds/portfolio?tab=sips",
+        app: "digigold",
+        sentBy: "EVENT_SIP_PAYMENT_FAILED",
+        eventKey,
+        cooldownMs: 60 * 60 * 1000, // 1 hour cooldown for repeated failure alerts
+      });
+    } catch (err) {
+      console.warn("[EventNotification notifySipPaymentFailed warning]:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * 8. Purchase Confirmation: Send a confirmation for subsequent successful mutual fund purchases (or first purchase if 0 prior).
+   */
+  async notifyPurchaseConfirmation(userIdOrUser, order) {
+    try {
+      if (!order) return null;
+      const userId = userIdOrUser?._id || userIdOrUser || order.user;
+      if (!userId) return null;
+
+      // Check if this is the first-ever purchase
+      const orderDbId = order._id;
+      const priorPurchasesCount = await MfOrder.countDocuments({
+        user: userId,
+        transactionType: "P",
+        paymentStatus: "SUCCESS",
+        ...(orderDbId ? { _id: { $ne: orderDbId } } : {}),
+        orderId: { $ne: order.orderId },
+      });
+
+      if (priorPurchasesCount === 0) {
+        // Delegate to first purchase handler
+        return await this.notifyFirstMfPurchase(userIdOrUser, order);
+      }
+
+      const eventKey = `MF_PURCHASE_CONFIRMATION_${order.orderId || orderDbId}_${order.allotmentStatus || order.orderStatus || "CONFIRMED"}`;
+      const schemeName = order.schemeName || "Mutual Fund Scheme";
+      const amtStr = order.orderAmount ? Number(order.orderAmount).toLocaleString("en-IN") : "";
+
+      let title = "Mutual Fund Purchase Confirmed ✅";
+      let body = "";
+
+      if (order.allotmentStatus === "ALLOTTED" || order.orderStatus === "ALLOTTED") {
+        title = "Units Allotted Successfully 📈";
+        const unitsStr = order.allottedUnits ? `${order.allottedUnits} units of ` : "";
+        const navStr = order.allottedNav ? ` at NAV ₹${order.allottedNav}` : "";
+        body = `Your investment of ₹${amtStr} in ${schemeName} has been allotted successfully (${unitsStr}${navStr}). Status: Allotted.`;
+      } else {
+        const statusLabel = order.orderStatus || (order.paymentStatus === "SUCCESS" ? "Confirmed" : "Processing");
+        body = `Your mutual fund purchase of ₹${amtStr} in ${schemeName} is confirmed with Status: ${statusLabel}. Units will be allotted upon exchange settlement.`;
+      }
+
+      return await this.sendNotification({
+        userId,
+        title,
+        body,
+        deepLink: "mutual_funds/portfolio?tab=orders",
+        app: "digigold",
+        sentBy: "EVENT_MF_PURCHASE_CONFIRMED",
+        eventKey,
+        cooldownMs: 24 * 60 * 60 * 1000,
+      });
+    } catch (err) {
+      console.warn("[EventNotification notifyPurchaseConfirmation warning]:", err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Authoritative Order Lifecycle Dispatcher
+   * Analyzes order attributes and delegates to the appropriate notification handler.
+   */
+  async notifyOrderLifecycle(userIdOrUser, order) {
+    try {
+      if (!order) return null;
+      const userId = userIdOrUser?._id || userIdOrUser || order.user;
+      const isSip = order.paymentMode === "MANDATE" || /SIP/i.test(order.remarks || "") || /SIP/i.test(order.orderId || "");
+
+      // Handle Failed Status
+      if (order.paymentStatus === "FAILED" || ["FAILED", "REJECTED", "CANCELLED"].includes(order.orderStatus)) {
+        if (isSip) {
+          return await this.notifySipPaymentFailed(userId, { order, reason: order.remarks });
+        }
+        return null;
+      }
+
+      // Handle Success / Confirmed Status
+      if (order.paymentStatus === "SUCCESS" || order.allotmentStatus === "ALLOTTED") {
+        if (isSip) {
+          // Check if this is the first SIP payment for this user/scheme
+          const priorSipOrdersCount = await MfOrder.countDocuments({
+            user: userId,
+            paymentStatus: "SUCCESS",
+            $or: [
+              { paymentMode: "MANDATE" },
+              { remarks: { $regex: /SIP/i } },
+              { orderId: { $regex: /SIP/i } },
+            ],
+            ...(order._id ? { _id: { $ne: order._id } } : {}),
+            orderId: { $ne: order.orderId },
+          });
+
+          if (priorSipOrdersCount === 0) {
+            return await this.notifyFirstSipPayment(userId, order);
+          }
+          return await this.notifyPurchaseConfirmation(userId, order);
+        }
+
+        // Standard / Lumpsum purchase
+        return await this.notifyPurchaseConfirmation(userId, order);
+      }
+
+      return null;
+    } catch (err) {
+      console.warn("[EventNotification notifyOrderLifecycle warning]:", err.message);
       return null;
     }
   }

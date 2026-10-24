@@ -37,11 +37,14 @@ class MfNotificationService {
 
   // ── Purchase Lifecycle Notifications ──
   async notifyPaymentReceived(order) {
+    try {
+      await eventNotificationService.notifyOrderLifecycle(order.user, order);
+    } catch (_) {}
     return this.sendCustomerNotification({
       userId: order.user,
       title: 'Payment Received',
-      body: 'Payment received. Your mutual fund order is being processed and being queued for exchange submission.',
-      deepLink: `mutual_funds/order/${order.orderId}`,
+      body: `Payment of ₹${order.orderAmount} received for ${order.schemeName}. Your mutual fund order is being queued for exchange submission.`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
@@ -50,16 +53,19 @@ class MfNotificationService {
       userId: order.user,
       title: 'Order Submitted to Exchange',
       body: `Order ${order.orderId} for ${order.schemeName} submitted to NSE MFSS. Awaiting exchange processing.`,
-      deepLink: `mutual_funds/order/${order.orderId}`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
   async notifyOrderAccepted(order) {
+    try {
+      await eventNotificationService.notifyOrderLifecycle(order.user, order);
+    } catch (_) {}
     return this.sendCustomerNotification({
       userId: order.user,
       title: 'Order Accepted by Exchange',
-      body: 'Your mutual fund order has been accepted and is awaiting allotment.',
-      deepLink: `mutual_funds/order/${order.orderId}`,
+      body: `Your mutual fund order for ${order.schemeName} (₹${order.orderAmount}) has been accepted and is awaiting allotment.`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
@@ -68,16 +74,19 @@ class MfNotificationService {
       userId: order.user,
       title: 'Order Rejected',
       body: `Order ${order.orderId} for ${order.schemeName} was not accepted by exchange: ${reason}. Refund will be initiated if deducted.`,
-      deepLink: `mutual_funds/order/${order.orderId}`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
   async notifyAllotmentConfirmed(order) {
+    try {
+      await eventNotificationService.notifyOrderLifecycle(order.user, order);
+    } catch (_) {}
     return this.sendCustomerNotification({
       userId: order.user,
       title: 'Units Allotted Successfully',
       body: `Your mutual fund units have been allotted. (${order.allottedUnits || ''} units of ${order.schemeName || ''} at NAV ₹${order.allottedNav || ''})`.trim(),
-      deepLink: `mutual_funds/portfolio`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
@@ -86,18 +95,22 @@ class MfNotificationService {
       userId: order.user,
       title: 'Order Processing Failed',
       body: `Order ${order.orderId} for ${order.schemeName} failed: ${reason}.`,
-      deepLink: `mutual_funds/order/${order.orderId}`,
+      deepLink: 'mutual_funds/portfolio?tab=orders',
     });
   }
 
   // ── SIP Lifecycle Notifications ──
   async notifySipCreated(sip) {
-    return this.sendCustomerNotification({
-      userId: sip.user,
-      title: 'SIP Registration Initiated',
-      body: `Your monthly SIP of ₹${sip.installmentAmount} for ${sip.schemeName} has been created. Mandate authorization required.`,
-      deepLink: `mutual_funds/sip/${sip._id}`,
-    });
+    try {
+      return await eventNotificationService.notifySipRegistration(sip.user, sip);
+    } catch (_) {
+      return this.sendCustomerNotification({
+        userId: sip.user,
+        title: 'SIP Registration Confirmed 🎉',
+        body: `Your monthly SIP of ₹${sip.installmentAmount} for ${sip.schemeName} has been created. Mandate authorization required.`,
+        deepLink: 'mutual_funds/portfolio?tab=sips',
+      });
+    }
   }
 
   async notifyMandateActive(sip) {
@@ -105,7 +118,7 @@ class MfNotificationService {
       userId: sip.user,
       title: 'Mandate Activated',
       body: `Bank auto-debit mandate is now active for your SIP in ${sip.schemeName}. Installments will auto-debit on the scheduled date.`,
-      deepLink: `mutual_funds/sip/${sip._id}`,
+      deepLink: 'mutual_funds/portfolio?tab=sips',
     });
   }
 
@@ -114,26 +127,40 @@ class MfNotificationService {
       userId: sip.user,
       title: 'Mandate Registration Rejected',
       body: `Bank mandate registration failed for ${sip.schemeName}: ${reason}. Please register a valid bank account.`,
-      deepLink: `mutual_funds/sip/${sip._id}`,
+      deepLink: 'mutual_funds/portfolio?tab=sips',
     });
   }
 
   async notifyDebitSuccess(sip, amount) {
-    return this.sendCustomerNotification({
-      userId: sip.user,
-      title: 'SIP Installment Debited',
-      body: `Installment of ₹${amount} debited successfully for ${sip.schemeName}. Order submitted for allotment.`,
-      deepLink: `mutual_funds/sip/${sip._id}`,
-    });
+    try {
+      return await eventNotificationService.notifyFirstSipPayment(sip.user, {
+        schemeName: sip.schemeName,
+        orderAmount: amount,
+        orderStatus: 'PAYMENT_SUCCESS',
+        paymentStatus: 'SUCCESS',
+        orderId: `SIP_DEBIT_${sip.sipRegNo || sip._id}_${Date.now()}`,
+      }, sip);
+    } catch (_) {
+      return this.sendCustomerNotification({
+        userId: sip.user,
+        title: 'SIP Installment Debited',
+        body: `Installment of ₹${amount} debited successfully for ${sip.schemeName}. Order submitted for allotment.`,
+        deepLink: 'mutual_funds/portfolio?tab=orders',
+      });
+    }
   }
 
   async notifyDebitFailed(sip, amount, reason = 'Insufficient funds') {
-    return this.sendCustomerNotification({
-      userId: sip.user,
-      title: 'SIP Debit Failed',
-      body: `SIP installment of ₹${amount} for ${sip.schemeName} could not be debited: ${reason}.`,
-      deepLink: `mutual_funds/sip/${sip._id}`,
-    });
+    try {
+      return await eventNotificationService.notifySipPaymentFailed(sip.user, { sip, amount, reason });
+    } catch (_) {
+      return this.sendCustomerNotification({
+        userId: sip.user,
+        title: 'SIP Debit Failed',
+        body: `SIP installment of ₹${amount} for ${sip.schemeName} could not be debited: ${reason}.`,
+        deepLink: 'mutual_funds/portfolio?tab=sips',
+      });
+    }
   }
 
   async notifySipPaused(sip) {

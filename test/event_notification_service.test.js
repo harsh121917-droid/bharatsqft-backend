@@ -125,7 +125,7 @@ describe('Event-Driven Automatic Notification Service Tests', () => {
     const log = await eventNotificationService.notifyFirstMfPurchase(testUserId, firstOrder);
     assert.ok(log, 'First purchase notification should be dispatched');
     assert.strictEqual(log.title, 'First Mutual Fund Purchase Confirmed! 🚀');
-    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio');
+    assert.ok(log.deepLink.startsWith('mutual_funds/portfolio'));
     assert.strictEqual(log.app, 'digigold');
     assert.match(log.body, /5,000/);
     assert.match(log.body, /HDFC Flexi Cap Fund/i);
@@ -177,7 +177,7 @@ describe('Event-Driven Automatic Notification Service Tests', () => {
     const log = await eventNotificationService.notifyFirstMfPurchase(newUser._id, allottedOrder);
     assert.ok(log);
     assert.strictEqual(log.title, 'Units Allotted for First Purchase! 📈');
-    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=orders');
     assert.match(log.body, /0.51 units/i);
     assert.match(log.body, /1960.78/);
 
@@ -185,5 +185,141 @@ describe('Event-Driven Automatic Notification Service Tests', () => {
     await User.findByIdAndDelete(newUser._id);
     await NotificationLog.deleteMany({ targetUser: newUser._id });
     await MfOrder.deleteMany({ user: newUser._id });
+  });
+
+  it('9. SIP Registration: Dispatches registration confirmation with fund name, amount, status and sips tab deepLink', async () => {
+    const sip = {
+      _id: new mongoose.Types.ObjectId(),
+      user: testUserId,
+      sipRegNo: `SIP_TEST_REG_${Date.now()}`,
+      schemeName: 'Nippon India Small Cap Fund - Growth',
+      installmentAmount: 2500,
+      frequency: 'MONTHLY',
+      status: 'ACTIVE',
+      nextDueDate: new Date(Date.now() + 10 * 24 * 3600 * 1000),
+    };
+
+    const log = await eventNotificationService.notifySipRegistration(testUserId, sip, { nextDebitDate: '10 Nov 2026' });
+    assert.ok(log, 'SIP registration notification should be created');
+    assert.strictEqual(log.title, 'SIP Registration Confirmed 🎉');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=sips');
+    assert.strictEqual(log.app, 'digigold');
+    assert.match(log.body, /Nippon India Small Cap Fund/i);
+    assert.match(log.body, /2,500/);
+    assert.match(log.body, /Status: ACTIVE/i);
+    assert.match(log.body, /10 Nov 2026/);
+
+    // Test deduplication
+    const dupe = await eventNotificationService.notifySipRegistration(testUserId, sip);
+    assert.ok(dupe);
+    const count = await NotificationLog.countDocuments({
+      targetUser: testUserId,
+      eventKey: `SIP_REGISTRATION_${sip.sipRegNo}`,
+    });
+    assert.strictEqual(count, 1, 'Duplicate SIP registration notification should be prevented');
+  });
+
+  it('10. First SIP Payment: Dispatches completed alert with fund name, amount, status and orders tab deepLink', async () => {
+    const sipOrder = {
+      _id: new mongoose.Types.ObjectId(),
+      user: testUserId,
+      orderId: `SIP_ORD_1ST_${Date.now()}`,
+      schemeName: 'Parag Parikh Flexi Cap Fund',
+      orderAmount: 3000,
+      paymentStatus: 'SUCCESS',
+      orderStatus: 'PAYMENT_SUCCESS',
+      paymentMode: 'MANDATE',
+    };
+
+    const log = await eventNotificationService.notifyFirstSipPayment(testUserId, sipOrder);
+    assert.ok(log);
+    assert.strictEqual(log.title, 'First SIP Payment Successful! 🚀');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=orders');
+    assert.strictEqual(log.app, 'digigold');
+    assert.match(log.body, /Parag Parikh Flexi Cap Fund/i);
+    assert.match(log.body, /3,000/);
+    assert.match(log.body, /Status: PAYMENT_SUCCESS/i);
+
+    // Test deduplication
+    const dupe = await eventNotificationService.notifyFirstSipPayment(testUserId, sipOrder);
+    assert.ok(dupe);
+    const count = await NotificationLog.countDocuments({
+      targetUser: testUserId,
+      eventKey: `FIRST_SIP_PAYMENT_${sipOrder.orderId}`,
+    });
+    assert.strictEqual(count, 1, 'Duplicate first SIP payment alert must be prevented');
+  });
+
+  it('11. SIP Payment Failed: Dispatches failed alert with failure reason and actionable next steps', async () => {
+    const failedSipOrder = {
+      _id: new mongoose.Types.ObjectId(),
+      user: testUserId,
+      orderId: `SIP_ORD_FAIL_${Date.now()}`,
+      schemeName: 'Tata Digital India Fund',
+      orderAmount: 1500,
+      remarks: 'Insufficient funds in registered bank account',
+    };
+
+    const log = await eventNotificationService.notifySipPaymentFailed(testUserId, {
+      order: failedSipOrder,
+      reason: failedSipOrder.remarks,
+    });
+    assert.ok(log);
+    assert.strictEqual(log.title, 'SIP Payment Failed ⚠️');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=sips');
+    assert.match(log.body, /Tata Digital India Fund/i);
+    assert.match(log.body, /1,500/);
+    assert.match(log.body, /Insufficient funds in registered bank account/i);
+    assert.match(log.body, /Next Steps/i);
+  });
+
+  it('12. Purchase Confirmation: Dispatches confirmation for subsequent mutual fund purchases', async () => {
+    const subsequentOrder = await MfOrder.create({
+      user: testUserId,
+      clientCode: 'VK999999',
+      orderId: `ORD_SUBSEQUENT_${Date.now()}`,
+      schemeCode: '120503',
+      schemeName: 'Mirae Asset Large Cap Fund',
+      transactionType: 'P',
+      orderAmount: 10000,
+      paymentStatus: 'SUCCESS',
+      orderStatus: 'SUBMITTED',
+      paymentMode: 'UPI',
+    });
+
+    const log = await eventNotificationService.notifyPurchaseConfirmation(testUserId, subsequentOrder);
+    assert.ok(log);
+    assert.strictEqual(log.title, 'Mutual Fund Purchase Confirmed ✅');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=orders');
+    assert.match(log.body, /Mirae Asset Large Cap Fund/i);
+    assert.match(log.body, /10,000/);
+    assert.match(log.body, /Status: SUBMITTED/i);
+  });
+
+  it('13. Purchase Confirmation (Allotted): Dispatches units allotted notification with NAV and units', async () => {
+    const allottedSubsequentOrder = await MfOrder.create({
+      user: testUserId,
+      clientCode: 'VK999999',
+      orderId: `ORD_SUB_ALLOT_${Date.now()}`,
+      schemeCode: '120503',
+      schemeName: 'Mirae Asset Large Cap Fund',
+      transactionType: 'P',
+      orderAmount: 10000,
+      paymentStatus: 'SUCCESS',
+      orderStatus: 'ALLOTTED',
+      allotmentStatus: 'ALLOTTED',
+      allottedUnits: 98.45,
+      allottedNav: 101.57,
+      paymentMode: 'UPI',
+    });
+
+    const log = await eventNotificationService.notifyPurchaseConfirmation(testUserId, allottedSubsequentOrder);
+    assert.ok(log);
+    assert.strictEqual(log.title, 'Units Allotted Successfully 📈');
+    assert.strictEqual(log.deepLink, 'mutual_funds/portfolio?tab=orders');
+    assert.match(log.body, /Mirae Asset Large Cap Fund/i);
+    assert.match(log.body, /98.45 units/i);
+    assert.match(log.body, /101.57/);
+    assert.match(log.body, /Status: Allotted/i);
   });
 });

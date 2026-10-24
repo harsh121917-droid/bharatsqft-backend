@@ -114,10 +114,10 @@ class NseOrderLifecycleService {
       order.remarks = `${order.remarks ? order.remarks + ' | ' : ''}NSE Accepted (${exchangeReference})`;
       await order.save();
 
-      // Notify if this is user's first mutual fund purchase
+      // Authoritative notification for purchase / allotment
       try {
         const eventNotificationService = require('../eventNotificationService');
-        eventNotificationService.notifyFirstMfPurchase(order.user, order);
+        eventNotificationService.notifyOrderLifecycle(order.user, order);
       } catch (_) {}
     } else if (exchangeStatus === 'TIMEOUT') {
       order.nseStatus = 'TIMEOUT';
