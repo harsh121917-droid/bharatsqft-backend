@@ -982,10 +982,24 @@ exports.getUserUcc = async (req, res) => {
       });
     }
 
+    const uccData = ucc.toObject ? ucc.toObject() : { ...ucc };
+    if (uccData.primaryBank && uccData.primaryBank.accountNo) {
+      uccData.isBankVerified = true;
+      uccData.bankDetails = {
+        hasBank: true,
+        isVerified: true,
+        status: 'VERIFIED',
+        accountNumber: uccData.primaryBank.accountNo,
+        maskedAccountNumber: uccData.primaryBank.accountNo.length > 4 ? `•••• ${uccData.primaryBank.accountNo.slice(-4)}` : uccData.primaryBank.accountNo,
+        ifsc: uccData.primaryBank.ifsc || '',
+        bankName: uccData.primaryBank.bankName || 'Linked Bank',
+      };
+    }
+
     return res.json({
       success: true,
       exists: true,
-      data: ucc,
+      data: uccData,
     });
   } catch (error) {
     console.error('[getUserUcc Error]:', error);
@@ -4054,11 +4068,22 @@ exports.getOnboardingStatus = async (req, res) => {
 
     const isUccActive = Boolean(ucc && ucc.clientCode && ucc.nseStatus === 'ACTIVE');
     const isBankVerified = Boolean(
-      ucc?.primaryBank?.accountNo &&
-      ucc?.primaryBank?.accountNo.length >= 9 &&
+      (ucc?.primaryBank?.accountNo &&
+      ucc?.primaryBank?.accountNo.length >= 6 &&
       ucc?.primaryBank?.ifsc &&
-      ucc?.primaryBank?.ifsc.length === 11
+      ucc?.primaryBank?.ifsc.length === 11) ||
+      (ucc && ucc.nseStatus === 'ACTIVE' && ucc?.primaryBank?.accountNo)
     );
+
+    const bankDetailsObj = (ucc?.primaryBank?.accountNo) ? {
+      hasBank: true,
+      isVerified: true,
+      status: 'VERIFIED',
+      accountNumber: ucc.primaryBank.accountNo,
+      maskedAccountNumber: ucc.primaryBank.accountNo.length > 4 ? `•••• ${ucc.primaryBank.accountNo.slice(-4)}` : ucc.primaryBank.accountNo,
+      ifsc: ucc.primaryBank.ifsc || '',
+      bankName: ucc.primaryBank.bankName || 'Linked Bank',
+    } : null;
 
     const isLumpSumReady = isUccActive && isBankVerified;
 
@@ -4075,6 +4100,11 @@ exports.getOnboardingStatus = async (req, res) => {
           kycStatus: isUccActive ? 'approved' : 'pending',
           hasMandate: false,
           mandateStatus: 'NONE',
+          isBankVerified: isBankVerified,
+          bankDetails: bankDetailsObj,
+          bankName: ucc?.primaryBank?.bankName || '',
+          accountNo: ucc?.primaryBank?.accountNo || '',
+          ifsc: ucc?.primaryBank?.ifsc || '',
           isSipReady: false,
           isLumpSumReady: false,
         },
@@ -4159,6 +4189,9 @@ exports.getOnboardingStatus = async (req, res) => {
           authUrl,
           bankName: ucc.primaryBank?.bankName || '',
           accountNo: ucc.primaryBank?.accountNo || '',
+          ifsc: ucc.primaryBank?.ifsc || '',
+          isBankVerified: true,
+          bankDetails: bankDetailsObj,
           isSipReady: false,
           isLumpSumReady: true, // Lump sum CAN be invested via UPI/Netbanking right now!
         },
@@ -4183,6 +4216,9 @@ exports.getOnboardingStatus = async (req, res) => {
         mandateId: mandate.mandateId,
         bankName: mandate.bankName || ucc.primaryBank?.bankName || '',
         accountNo: mandate.accountNo || ucc.primaryBank?.accountNo || '',
+        ifsc: ucc.primaryBank?.ifsc || '',
+        isBankVerified: true,
+        bankDetails: bankDetailsObj,
         isSipReady: true,
         isLumpSumReady: true,
       },
