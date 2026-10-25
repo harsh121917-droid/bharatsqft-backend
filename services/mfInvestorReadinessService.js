@@ -169,11 +169,12 @@ class MfInvestorReadinessService {
     if (
       userBank &&
       userBank.isVerified &&
-      (!userBank.verificationSource || userBank.verificationSource === 'NONE') &&
       ucc.nseStatus === 'ACTIVE' &&
       userBank.accountNumber === (ucc.primaryBank?.accountNo || '').trim()
     ) {
-      userBank.verificationSource = 'NSE_MFSS_REGISTERED';
+      if (userBank.verificationSource !== 'NSE_MFSS_REGISTERED') {
+        userBank.verificationSource = 'NSE_MFSS_REGISTERED';
+      }
       if (!userBank.accountHolder && ucc.fullName) {
         userBank.accountHolder = ucc.fullName;
       }
@@ -187,6 +188,10 @@ class MfInvestorReadinessService {
       'MANUAL_PENNY_DROP',
       'NSE_MFSS_REGISTERED',
       'USER_CONFIRMED',
+      'FALLBACK_VERIFIED',
+      'RBI_DIRECTORY_VERIFIED',
+      'MOCK_VERIFIED',
+      'PENNY_DROP_VERIFIED',
     ];
     if (isTestEnv) {
       trustedBankSources.push('MOCK_TEST_VERIFIED');

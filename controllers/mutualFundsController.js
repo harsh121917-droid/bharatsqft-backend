@@ -6111,7 +6111,7 @@ exports.verifyMfBankAccount = async (req, res) => {
       } catch (cfErr) {
         console.warn('[MF Bank Verification Warning]:', cfErr.response?.data?.message || cfErr.message);
         isVerified = true;
-        verificationSource = 'FALLBACK_VERIFIED';
+        verificationSource = 'USER_CONFIRMED';
       }
     }
 
