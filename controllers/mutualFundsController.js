@@ -1823,8 +1823,9 @@ exports.createPurchaseOrder = async (req, res) => {
     const user = await User.findById(userId);
 
     // 1. Prepare NSE Order payload (Order Entry PUR - NNF v1.9.8 Doc page 8-9)
+    const cleanOrderRef = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
     const nseOrderPayload = {
-      order_ref_number: orderId,
+      order_ref_number: cleanOrderRef,
       scheme_code: targetNseCode,
       trxn_type: 'P', // Purchase
       buy_sell_type: buySellType,
@@ -1848,7 +1849,7 @@ exports.createPurchaseOrder = async (req, res) => {
       email: user.email,
       mandate_id: '',
       filler1: '',
-      member_unique_id: orderId,
+      member_unique_id: '',
     };
 
     // 2. Dispatch to NSE Gateway
@@ -3756,14 +3757,15 @@ exports.createRedemptionOrder = async (req, res) => {
     const effectiveFolio = folioNo || holdings.folioNo || '';
 
     // 3. Prepare NSE Redemption payload (Order Entry RED)
+    const cleanRedeemRef = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
     const nseRedemptionPayload = {
-      order_ref_number: orderId,
+      order_ref_number: cleanRedeemRef,
       scheme_code: targetNseCode || scheme.schemeCode,
       trxn_type: 'R', // Redemption
       buy_sell_type: effectiveFolio ? 'ADDITIONAL' : 'FRESH',
       client_code: ucc.clientCode,
       demat_physical: 'P',
-      order_amount: String(computedAmount),
+      order_amount: allUnits ? '' : String(computedAmount),
       allotment_units: effectiveMode === 'UNITS' ? String(unitsToRedeem) : '',
       all_units: allUnits ? 'Y' : 'N',
       folio_no: effectiveFolio,
@@ -3771,7 +3773,7 @@ exports.createRedemptionOrder = async (req, res) => {
       account_no: ucc.primaryBank?.accountNo || '',
       mobile_no: user?.phone?.slice(-10) || '',
       email: user?.email || '',
-      member_unique_id: orderId,
+      member_unique_id: '',
     };
 
     // 4. Dispatch to NSE Gateway
@@ -5632,9 +5634,10 @@ exports.checkoutCart = async (req, res) => {
         const folioNo = item.folioNo || (isAdditional ? existingHolding.folioNo : '');
         const buySellType = isAdditional || folioNo ? 'ADDITIONAL' : 'FRESH';
         const orderId = `MFP${Date.now()}_${i}`;
+        const cleanOrderRef = `MFP${Date.now()}${i}`.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
 
         const nseOrderPayload = {
-          order_ref_number: orderId,
+          order_ref_number: cleanOrderRef,
           scheme_code: targetNseCode,
           trxn_type: 'P',
           buy_sell_type: buySellType,
@@ -5658,7 +5661,7 @@ exports.checkoutCart = async (req, res) => {
           email: user.email,
           mandate_id: '',
           filler1: '',
-          member_unique_id: orderId,
+          member_unique_id: '',
         };
 
         const nseRes = await nseClient.createNormalOrder([nseOrderPayload]);

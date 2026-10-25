@@ -565,16 +565,38 @@ class NseClient {
   // ── 2. Order Entry (PUR/RED Normal Transactions) ──
   async createNormalOrder(transactionDetails) {
     const list = Array.isArray(transactionDetails) ? transactionDetails : [transactionDetails];
+    const cleanedList = list.map((item) => {
+      const sanitized = { ...item };
+      // Sanitize member_unique_id: NSE spec accepts Optional VARCHAR 25 alphanumeric; special characters cause rejection
+      if (sanitized.member_unique_id && /[^a-zA-Z0-9]/.test(sanitized.member_unique_id)) {
+        sanitized.member_unique_id = '';
+      }
+      // Ensure order_ref_number is strictly alphanumeric max 19 chars
+      if (sanitized.order_ref_number) {
+        sanitized.order_ref_number = sanitized.order_ref_number.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
+      }
+      return sanitized;
+    });
     return this.post('/nsemfdesk/api/v2/transaction/NORMAL', {
-      transaction_details: list,
+      transaction_details: cleanedList,
     });
   }
 
   // ── 3. Switch Order Entry ──
   async createSwitchOrder(switchDetails) {
     const list = Array.isArray(switchDetails) ? switchDetails : [switchDetails];
+    const cleanedList = list.map((item) => {
+      const sanitized = { ...item };
+      if (sanitized.member_unique_id && /[^a-zA-Z0-9]/.test(sanitized.member_unique_id)) {
+        sanitized.member_unique_id = '';
+      }
+      if (sanitized.order_ref_number) {
+        sanitized.order_ref_number = sanitized.order_ref_number.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
+      }
+      return sanitized;
+    });
     return this.post('/nsemfdesk/api/v2/transaction/SWITCH', {
-      transaction_details: list,
+      transaction_details: cleanedList,
     });
   }
 
