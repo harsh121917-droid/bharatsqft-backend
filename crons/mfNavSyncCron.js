@@ -11,6 +11,7 @@ const MutualFundScheme = require('../models/MutualFundScheme');
 const nseMasterReconciliationService = require('../services/nse/nseMasterReconciliationService');
 const mfMarketSyncService = require('../services/mfMarketSyncService');
 const mfNfoService = require('../services/mfNfoService');
+const NseConfig = require('../models/NseConfig');
 
 async function syncMutualFundNavs() {
   console.log('[MF NAV Sync] Starting daily official Master & NAV synchronization...');
@@ -36,6 +37,20 @@ async function syncMutualFundNavs() {
     // Step 2: Cross-reconcile against official AMFI/RTA feed
     const report = await nseMasterReconciliationService.reconcileAllSchemes({ dryRun: false });
     console.log(`✅ [MF NAV Sync] Successfully reconciled ${report.totalDbSchemes} schemes. NAVs Updated: ${report.navDiscrepanciesFlagged}, Matched: ${report.matchedAccurately}.`);
+
+    // Step 3: Synchronize statutory scheme facts with TigZig AMFI connector (if enabled in Admin)
+    try {
+      const mfDataSource = await NseConfig.getMfDataSource();
+      if (mfDataSource === 'LEGACY') {
+        console.log('[MF NAV Sync] TigZig sync skipped (Data Source set to LEGACY in Admin NSE Credentials).');
+      } else {
+        console.log('[MF NAV Sync] Starting TigZig statutory facts sync (AUM, TER, Fund Managers, Min Investment)...');
+        await mfMarketSyncService.syncSchemesWithTigzig({ batchSize: 50 });
+      }
+    } catch (e) {
+      console.warn('[MF NAV Sync] TigZig sync note:', e.message);
+    }
+
     return {
       success: true,
       pipelineReport,

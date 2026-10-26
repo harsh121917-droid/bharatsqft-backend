@@ -967,6 +967,7 @@ exports.getNseConfig = async (req, res) => {
         apiSecretMasked: config.apiSecret ? `${config.apiSecret.slice(0, 3)}••••${config.apiSecret.slice(-3)}` : '',
         licenseKeyMasked: config.licenseKey ? `${config.licenseKey.slice(0, 3)}••••${config.licenseKey.slice(-3)}` : '',
         mockMode: config.mockMode,
+        mfDataSource: config.mfDataSource || 'TIGZIG',
         baseUrl: config.env === 'PROD' ? 'https://www.nseinvest.com' : 'https://nseinvestuat.nseindia.com',
         lastTestedAt: config.lastTestedAt,
         lastStatus: config.lastStatus,
@@ -986,7 +987,7 @@ exports.getNseConfig = async (req, res) => {
 // ── 10. POST /api/admin/mutual-funds/nse-config ──
 exports.updateNseConfig = async (req, res) => {
   try {
-    const { env, memberCode, loginUserId, apiSecret, licenseKey, mockMode } = req.body;
+    const { env, memberCode, loginUserId, apiSecret, licenseKey, mockMode, mfDataSource } = req.body;
     const config = await NseConfig.getEffectiveConfig();
 
     if (env && ['UAT', 'PROD'].includes(env)) config.env = env;
@@ -1001,8 +1002,12 @@ exports.updateNseConfig = async (req, res) => {
     if (typeof mockMode === 'boolean') {
       config.mockMode = mockMode;
     }
+    if (mfDataSource && ['TIGZIG', 'LEGACY'].includes(mfDataSource)) {
+      config.mfDataSource = mfDataSource;
+    }
     config.updatedBy = req.user?._id;
     await config.save();
+    NseConfig.invalidateCache();
 
     // Synchronize runtime client and encryption immediately
     nseClient.syncConfig({
@@ -1024,6 +1029,7 @@ exports.updateNseConfig = async (req, res) => {
         apiSecretMasked: config.apiSecret ? `${config.apiSecret.slice(0, 3)}••••${config.apiSecret.slice(-3)}` : '',
         licenseKeyMasked: config.licenseKey ? `${config.licenseKey.slice(0, 3)}••••${config.licenseKey.slice(-3)}` : '',
         mockMode: config.mockMode,
+        mfDataSource: config.mfDataSource || 'TIGZIG',
         baseUrl: config.env === 'PROD' ? 'https://www.nseinvest.com' : 'https://nseinvestuat.nseindia.com',
       },
     });

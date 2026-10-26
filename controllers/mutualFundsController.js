@@ -29,6 +29,7 @@ const MfWatchlist = require('../models/MfWatchlist');
 const MfCart = require('../models/MfCart');
 const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const mfNfoService = require('../services/mfNfoService');
+const NseConfig = require('../models/NseConfig');
 const STATE_CODE_MAP = {
   'ANDAMAN & NICOBAR': 'AN', 'ANDAMAN AND NICOBAR': 'AN', 'AN': 'AN',
   'ANDHRA PRADESH': 'AP', 'AP': 'AP',
@@ -357,12 +358,27 @@ exports.getSchemes = async (req, res) => {
 
     const total = await MutualFundScheme.countDocuments(query);
 
+    // Retrieve mutual fund data source mode (TigZig AMFI connector vs Old Legacy)
+    const mfDataSource = await NseConfig.getMfDataSource();
+    const isTigzig = mfDataSource !== 'LEGACY';
+
     // Sanitize schemes: null holdings instead of empty array when source unavailable
     const sanitizedSchemes = schemes.map((s) => {
       const obj = s.toObject ? s.toObject() : { ...s };
       if (!obj.holdings || obj.holdings.length === 0) {
         obj.holdings = null;
       }
+
+      // If in Legacy mode, strip TigZig-sourced data to display authentic pre-TigZig state
+      if (!isTigzig && obj.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA') {
+        obj.aum = null;
+        obj.expenseRatio = null;
+        obj.fundManager = null;
+        obj.benchmark = null;
+        obj.exitLoad = null;
+        obj.minPurchaseAmount = null;
+      }
+
       const staticIntel = mfIntelligenceService.getSchemeIntelligence(obj.schemeCode || obj.amfiCode);
       if (staticIntel) {
         if (!obj.fundManager && staticIntel.fundManager) obj.fundManager = staticIntel.fundManager;
@@ -378,15 +394,29 @@ exports.getSchemes = async (req, res) => {
         }
       }
 
+      // In TigZig mode, ensure safe statutory defaults so UI never encounters null
+      if (isTigzig) {
+        if (obj.minPurchaseAmount == null) {
+          obj.minPurchaseAmount = (obj.minSipAmount && obj.minSipAmount >= 500) ? obj.minSipAmount : 500;
+        }
+        if (obj.minSipAmount == null) {
+          obj.minSipAmount = 100;
+        }
+      }
+
       // Canonical Scheme AUM resolution
       const schemeAumInfo = mfAumService.resolveSchemeAum(obj);
-      obj.aum = schemeAumInfo.value;
-      obj.aumAsOf = schemeAumInfo.asOf;
-      obj.aumAsOfDate = schemeAumInfo.asOf;
-      obj.aumSource = schemeAumInfo.sourceName;
-      obj.aumStatus = schemeAumInfo.status;
-      obj.aumUnit = schemeAumInfo.unit;
-      obj.aumDefinition = schemeAumInfo.definition;
+      if (isTigzig || obj.dataProvenance?.source !== 'TIGZIG_AMFI_OPEN_DATA') {
+        obj.aum = schemeAumInfo.value;
+        obj.aumAsOf = schemeAumInfo.asOf;
+        obj.aumAsOfDate = schemeAumInfo.asOf;
+        obj.aumSource = schemeAumInfo.sourceName;
+        obj.aumStatus = schemeAumInfo.status;
+        obj.aumUnit = schemeAumInfo.unit;
+        obj.aumDefinition = schemeAumInfo.definition;
+      } else {
+        obj.aum = staticIntel?.aum ?? null;
+      }
       // Section 12 & Phase 5E: Rating removed / null without contracted license; Fund Type, Plan, & Holdings exposed
       obj.rating = null;
       obj.ratingProvider = null;
@@ -485,26 +515,51 @@ exports.getSchemeDetail = async (req, res) => {
       }
     }
 
-    // 1.5 Retrieve verified static statutory intelligence fallback (Tier 2 AMC Factsheets/SIDs)
-    const staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
-    if (staticIntel) {
-      await mfMarketSyncService.lazyEnrichScheme(scheme);
+    // 1.5 Check data source setting (TigZig AMFI connector vs Old Legacy)
+    const mfDataSource = await NseConfig.getMfDataSource();
+    const isTigzig = mfDataSource !== 'LEGACY';
+
+    let staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
+    if (isTigzig) {
+      if (staticIntel) {
+        await mfMarketSyncService.lazyEnrichScheme(scheme);
+      } else if (scheme.aum == null || scheme.expenseRatio == null || scheme.fundManager == null || scheme.minPurchaseAmount == null) {
+        staticIntel = await mfMarketSyncService.lazyEnrichScheme(scheme);
+      }
     }
 
     // Canonical Scheme & AMC AUM resolution via Phase 5I MfAumService
     const schemeAumInfo = mfAumService.resolveSchemeAum(scheme);
     const amcTotalAumInfo = mfAumService.resolveAmcTotalAum(scheme.amcCode, scheme);
-    const realAum = schemeAumInfo.value;
-    const realMinSip = scheme.minSipAmount ?? staticIntel?.minSipAmount ?? liveFacts?.minSipAmount ?? null;
-    const realMinPurchase = scheme.minPurchaseAmount ?? staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? null;
+    const realAum = isTigzig
+      ? schemeAumInfo.value
+      : (staticIntel?.aum ?? liveFacts?.aum ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : schemeAumInfo.value));
+    const realMinSip = isTigzig
+      ? (scheme.minSipAmount ?? staticIntel?.minSipAmount ?? liveFacts?.minSipAmount ?? 100)
+      : (staticIntel?.minSipAmount ?? liveFacts?.minSipAmount ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : scheme.minSipAmount));
+    const realMinPurchase = isTigzig
+      ? (scheme.minPurchaseAmount ?? staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? (realMinSip >= 500 ? realMinSip : 500))
+      : (staticIntel?.minPurchaseAmount ?? liveFacts?.minPurchaseAmount ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : scheme.minPurchaseAmount));
     const realRating = scheme.rating ?? liveFacts?.rating ?? null;
 
     // Pros & Cons - ONLY real data, no synthetic mock fallback
     const prosAndCons = liveFacts?.prosAndCons || { pros: [], cons: [] };
 
     // Fund manager & expense ratio (preserves null if unknown)
-    const fundManagerName = scheme.fundManager ?? staticIntel?.fundManager ?? liveFacts?.fundManager ?? null;
-    const expenseRatio = scheme.expenseRatio ?? staticIntel?.expenseRatio ?? liveFacts?.expenseRatio ?? null;
+    const fundManagerName = isTigzig
+      ? (scheme.fundManager ?? staticIntel?.fundManager ?? liveFacts?.fundManager ?? null)
+      : (staticIntel?.fundManager ?? liveFacts?.fundManager ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : scheme.fundManager));
+    const expenseRatio = isTigzig
+      ? (scheme.expenseRatio ?? staticIntel?.expenseRatio ?? liveFacts?.expenseRatio ?? null)
+      : (staticIntel?.expenseRatio ?? liveFacts?.expenseRatio ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : scheme.expenseRatio));
+    const rawBenchmark = scheme.benchmark || staticIntel?.benchmark || liveFacts?.benchmarkName || null;
+    const resolvedBenchmark = isTigzig
+      ? rawBenchmark
+      : (staticIntel?.benchmark ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : rawBenchmark));
+    const rawExitLoad = scheme.exitLoad || staticIntel?.exitLoad || liveFacts?.exitLoad || null;
+    const resolvedExitLoad = isTigzig
+      ? rawExitLoad
+      : (staticIntel?.exitLoad ?? (scheme.dataProvenance?.source === 'TIGZIG_AMFI_OPEN_DATA' ? null : rawExitLoad));
     const cat = (scheme.category || '').toLowerCase();
 
     // Similar peer schemes strictly in the same Sub-Category (e.g. Mid Cap with Mid Cap)
@@ -636,8 +691,8 @@ exports.getSchemeDetail = async (req, res) => {
     const day1Pos = day1Ret !== null ? day1Ret >= 0 : null;
 
     // Authoritative metadata resolution
-    const benchmark = scheme.benchmark || staticIntel?.benchmark || liveFacts?.benchmarkName || null;
-    const exitLoad = scheme.exitLoad || staticIntel?.exitLoad || liveFacts?.exitLoad || null;
+    const benchmark = resolvedBenchmark;
+    const exitLoad = resolvedExitLoad;
     const riskometer = scheme.riskometer || staticIntel?.riskometer || null;
     const inceptionDate = scheme.inceptionDate || staticIntel?.inceptionDate || null;
     const dataProvenance = scheme.dataProvenance || staticIntel?.dataProvenance || null;
@@ -704,7 +759,7 @@ exports.getSchemeDetail = async (req, res) => {
         navDate,
         navSource,
         navUpdatedAt,
-        aum: schemeAumInfo.value,
+        aum: realAum,
         aumAsOf: schemeAumInfo.asOf,
         aumAsOfDate: schemeAumInfo.asOf,
         aumSource: schemeAumInfo.sourceName,
@@ -747,7 +802,7 @@ exports.getSchemeDetail = async (req, res) => {
         expenseRatioSource: scheme.expenseRatioSource || staticIntel?.expenseRatioSource || (expenseRatio ? 'AMC Statutory TER Disclosure' : null),
         fundManager: fundManagerName,
         fundManagerRole: scheme.fundManagerRole || staticIntel?.fundManagerRole || null,
-        benchmark,
+        benchmark: resolvedBenchmark,
         benchmarkSource: scheme.benchmarkSource || staticIntel?.benchmarkSource || (liveFacts?.benchmarkName ? 'Scheme Factsheet' : null),
         chartData,
         periodReturns,
@@ -823,9 +878,9 @@ exports.getSchemeDetail = async (req, res) => {
           expenseRatioSource: scheme.expenseRatioSource || staticIntel?.expenseRatioSource || (expenseRatio ? 'AMC Statutory TER Disclosure' : null),
           fundManager: fundManagerName,
           fundManagerRole: scheme.fundManagerRole || staticIntel?.fundManagerRole || null,
-          benchmark,
-          benchmarkSource: scheme.benchmarkSource || staticIntel?.benchmarkSource || (benchmark ? 'Scheme Information Document' : null),
-          exitLoad,
+          benchmark: resolvedBenchmark,
+          benchmarkSource: scheme.benchmarkSource || staticIntel?.benchmarkSource || (resolvedBenchmark ? 'Scheme Information Document' : null),
+          exitLoad: resolvedExitLoad,
           exitLoadSource: scheme.exitLoadSource || staticIntel?.exitLoadSource || null,
           lockInPeriod: cat.includes('elss') || (scheme.schemeName && scheme.schemeName.toLowerCase().includes('tax')) ? '3 Years (ELSS)' : (scheme.lockInPeriod || staticIntel?.lockInPeriod || 'Nil'),
           riskometer,
@@ -886,7 +941,7 @@ exports.getSchemeDetail = async (req, res) => {
         },
         expenseDetails: {
           expenseRatio,
-          exitLoad,
+          exitLoad: resolvedExitLoad,
           stampDuty: '0.005% on purchase as per Indian Stamp Act.',
           taxImplications:
             cat.includes('debt')

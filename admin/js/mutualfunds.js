@@ -1263,6 +1263,33 @@ async function loadNseConfig() {
             </div>
 
             <form onsubmit="saveNseConfig(event)">
+                <!-- Data Source Engine Selector (TigZig AMFI vs Old Legacy) -->
+                <div style="background:rgba(0,208,156,0.06);border:1px solid rgba(0,208,156,0.25);border-radius:12px;padding:16px;margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <label class="form-label" style="font-weight:700;margin-bottom:0;color:#fff;font-size:13.5px">
+                            <i class="fas fa-database" style="color:#00D09C;margin-right:8px"></i> Mutual Fund Data Source / Facts Engine
+                        </label>
+                        <span class="badge ${cfg.mfDataSource === 'LEGACY' ? 'badge-warning' : 'badge-success'}" style="font-size:11px;padding:4px 10px">
+                            ${cfg.mfDataSource === 'LEGACY' ? '⏮️ Old / Original Mode' : '🌟 New TigZig AMFI Connector Active'}
+                        </span>
+                    </div>
+                    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
+                        Select which data engine powers Scheme Details, AUM, TER, and Fund Managers across the platform.
+                    </div>
+                    <select class="form-control" id="nse-mf-data-source" style="font-size:13px;font-weight:600;background:#0F172A;border-color:#334155">
+                        <option value="TIGZIG" ${cfg.mfDataSource !== 'LEGACY' ? 'selected' : ''}>
+                            🌟 New TigZig AMFI Open Connector (Real-Time AUM, TER, Fund Managers & Statutory Rules)
+                        </option>
+                        <option value="LEGACY" ${cfg.mfDataSource === 'LEGACY' ? 'selected' : ''}>
+                            ⏮️ Old / Original Data Source (Show how old details worked without TigZig)
+                        </option>
+                    </select>
+                    <div style="display:flex;gap:12px;margin-top:10px;font-size:11.5px;color:#94a3b8">
+                        <div style="flex:1"><b>New:</b> Official AMFI daily AUM in Crores, statutory TER (Regular plan), fund managers, and verified minimums.</div>
+                        <div style="flex:1"><b>Old:</b> Original database details prior to TigZig connector (retains previous state without TigZig overrides).</div>
+                    </div>
+                </div>
+
                 <div class="form-grid-2" style="margin-bottom:16px">
                     <div class="form-group">
                         <label class="form-label">NSE Environment</label>
@@ -1345,6 +1372,7 @@ async function saveNseConfig(e) {
 
     const env = document.getElementById('nse-env')?.value;
     const mockMode = document.getElementById('nse-mock-mode')?.value === 'true';
+    const mfDataSource = document.getElementById('nse-mf-data-source')?.value || 'TIGZIG';
     const memberCode = document.getElementById('nse-member-code')?.value.trim();
     const loginUserId = document.getElementById('nse-user-id')?.value.trim();
     const apiSecret = document.getElementById('nse-api-secret')?.value.trim();
@@ -1361,6 +1389,7 @@ async function saveNseConfig(e) {
             body: JSON.stringify({
                 env,
                 mockMode,
+                mfDataSource,
                 memberCode,
                 loginUserId,
                 apiSecret,

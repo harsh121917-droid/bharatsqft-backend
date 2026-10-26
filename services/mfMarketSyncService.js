@@ -15,6 +15,7 @@ const MutualFundScheme = require('../models/MutualFundScheme');
 const mfIntelligenceService = require('./mfIntelligenceService');
 const mfAumService = require('./mfAumService');
 const amcSourceRegistry = require('./amcSourceRegistry');
+const tigzigService = require('./tigzigService');
 
 const AMFI_NAV_URL = 'https://portal.amfiindia.com/spages/NAVAll.txt';
 
@@ -236,44 +237,192 @@ async function syncAllVerifiedSchemeFacts() {
 
 /**
  * Lazy enrichment helper: Called on scheme detail load.
- * If scheme in MongoDB has missing facts, checks statutory catalog and auto-persists.
+ * If scheme in MongoDB has missing facts, checks statutory catalog or TigZig and auto-persists.
  */
 async function lazyEnrichScheme(scheme) {
   if (!scheme) return null;
   const sCode = scheme.schemeCode || scheme.amfiCode;
-  const intel = mfIntelligenceService.getSchemeIntelligence(sCode);
-  if (!intel) return null;
+  let intel = mfIntelligenceService.getSchemeIntelligence(sCode);
 
   const needsUpdate = scheme.aum == null ||
+    scheme.expenseRatio == null ||
+    scheme.minPurchaseAmount == null ||
     !scheme.fundManagerDetails ||
     scheme.fundManagerDetails.length === 0 ||
     scheme.totalHoldingsCount == null;
 
   if (needsUpdate) {
-    try {
-      await MutualFundScheme.updateOne(
-        { _id: scheme._id },
-        {
-          $set: {
-            aum: intel.aum || scheme.aum,
-            aumStatus: intel.aum ? 'VERIFIED' : scheme.aumStatus,
-            aumAsOfDate: intel.aumAsOfDate ? new Date(intel.aumAsOfDate) : scheme.aumAsOfDate,
-            aumSource: intel.aumSource || scheme.aumSource,
-            fundManager: intel.fundManager || scheme.fundManager,
-            fundManagerRole: intel.fundManagerRole || scheme.fundManagerRole,
-            fundManagerDetails: intel.fundManagerDetails || scheme.fundManagerDetails,
-            totalHoldingsCount: intel.totalHoldingsCount || scheme.totalHoldingsCount,
-            benchmark: intel.benchmark || scheme.benchmark,
-            expenseRatio: intel.expenseRatio || scheme.expenseRatio,
-          },
+    if (!intel) {
+      // Fallback to live statutory facts from TigZig AMFI connector
+      const tigzigData = await tigzigService.fetchSchemeDetails(sCode || scheme.isin);
+      if (tigzigData) {
+        intel = tigzigData;
+      }
+    }
+
+    if (intel) {
+      try {
+        const updateFields = {};
+        if (intel.aum != null && scheme.aum == null) {
+          updateFields.aum = intel.aum;
+          updateFields.aumStatus = intel.aumStatus || 'VERIFIED';
+          updateFields.aumAsOfDate = intel.aumAsOfDate || new Date();
+          updateFields.aumSource = intel.aumSource || 'AMFI Official Disclosure';
         }
-      );
-    } catch (e) {
-      console.warn(`[lazyEnrichScheme] Non-fatal auto-persist error for ${sCode}:`, e.message);
+        if (intel.expenseRatio != null && scheme.expenseRatio == null) {
+          updateFields.expenseRatio = intel.expenseRatio;
+          updateFields.expenseRatioAsOfDate = intel.expenseRatioAsOfDate || new Date();
+          updateFields.expenseRatioSource = intel.expenseRatioSource || 'AMFI TER Disclosure';
+        }
+        if (intel.fundManager && !scheme.fundManager) {
+          updateFields.fundManager = intel.fundManager;
+          updateFields.fundManagerRole = intel.fundManagerRole;
+          updateFields.fundManagerDetails = intel.fundManagerDetails;
+        }
+        if (intel.benchmark && !scheme.benchmark) {
+          updateFields.benchmark = intel.benchmark;
+          updateFields.benchmarkName = intel.benchmark;
+        }
+        if (intel.exitLoad && !scheme.exitLoad) {
+          updateFields.exitLoad = intel.exitLoad;
+          updateFields.exitLoadFlag = intel.exitLoadFlag || 'Y';
+        }
+        if (intel.minPurchaseAmount != null && scheme.minPurchaseAmount == null) {
+          updateFields.minPurchaseAmount = intel.minPurchaseAmount;
+        }
+        if (intel.minSipAmount != null && scheme.minSipAmount == null) {
+          updateFields.minSipAmount = intel.minSipAmount;
+        }
+        if (intel.riskometer && !scheme.riskometer) {
+          updateFields.riskometer = intel.riskometer;
+        }
+
+        if (Object.keys(updateFields).length > 0) {
+          await MutualFundScheme.updateOne({ _id: scheme._id }, { $set: updateFields });
+          Object.assign(scheme, updateFields);
+        }
+      } catch (e) {
+        console.warn(`[lazyEnrichScheme] Non-fatal auto-persist error for ${sCode}:`, e.message);
+      }
     }
   }
 
   return intel;
+}
+
+/**
+ * Batch-synchronize all active schemes with TigZig AMFI master for:
+ * 1. Scheme Details (Min Purchase, SIP Rules, Benchmark, Exit Load)
+ * 2. TER (Expense Ratio - Regular)
+ * 3. Fund Managers (Name, Role, Since)
+ * 4. AUM (Total Fund AUM in Crores)
+ */
+async function syncSchemesWithTigzig({ batchSize = 50, limit = null, onlyMissing = false } = {}) {
+  const query = { isActive: true, planType: 'REGULAR' };
+  if (onlyMissing) {
+    query.$or = [
+      { aum: null },
+      { expenseRatio: null },
+      { fundManager: null },
+      { minPurchaseAmount: null },
+    ];
+  }
+
+  let findQuery = MutualFundScheme.find(query).select('_id schemeCode amfiCode isin aum expenseRatio fundManager minPurchaseAmount minSipAmount');
+  if (limit) findQuery = findQuery.limit(limit);
+
+  const schemes = await findQuery.lean();
+  console.log(`[TigZig Sync] Found ${schemes.length} schemes to synchronize.`);
+  if (schemes.length === 0) return { success: true, processed: 0, modified: 0 };
+
+  const chunks = [];
+  for (let i = 0; i < schemes.length; i += batchSize) {
+    chunks.push(schemes.slice(i, i + batchSize));
+  }
+
+  let totalModified = 0;
+  for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
+    const chunk = chunks[cIdx];
+    const codes = chunk.map(s => s.schemeCode || s.amfiCode).filter(Boolean);
+    const enrichedList = await tigzigService.fetchBatchDetails(codes);
+
+    const bulkOps = [];
+    for (const enriched of enrichedList) {
+      if (!enriched.schemeCode) continue;
+      const matchedLocal = chunk.find(s => String(s.schemeCode) === String(enriched.schemeCode) || String(s.amfiCode) === String(enriched.schemeCode));
+      if (!matchedLocal) continue;
+
+      const $set = {};
+      if (enriched.aum != null) {
+        $set.aum = enriched.aum;
+        $set.aumStatus = enriched.aumStatus;
+        $set.aumAsOfDate = enriched.aumAsOfDate;
+        $set.aumSource = enriched.aumSource;
+        $set.aumSourceType = enriched.aumSourceType;
+        $set.aumDefinition = enriched.aumDefinition;
+        $set.aumUnit = enriched.aumUnit;
+      }
+      if (enriched.expenseRatio != null) {
+        $set.expenseRatio = enriched.expenseRatio;
+        $set.expenseRatioAsOfDate = enriched.expenseRatioAsOfDate;
+        $set.expenseRatioSource = enriched.expenseRatioSource;
+      }
+      if (enriched.fundManager) {
+        $set.fundManager = enriched.fundManager;
+        $set.fundManagerRole = enriched.fundManagerRole;
+        $set.fundManagerAsOfDate = enriched.fundManagerAsOfDate;
+        $set.fundManagerDetails = enriched.fundManagerDetails;
+      }
+      if (enriched.benchmark) {
+        $set.benchmark = enriched.benchmark;
+        $set.benchmarkName = enriched.benchmarkName;
+        $set.benchmarkSource = enriched.benchmarkSource;
+      }
+      if (enriched.exitLoad) {
+        $set.exitLoad = enriched.exitLoad;
+        $set.exitLoadFlag = enriched.exitLoadFlag;
+        $set.exitLoadSource = enriched.exitLoadSource;
+      }
+      if (enriched.minPurchaseAmount != null) {
+        $set.minPurchaseAmount = enriched.minPurchaseAmount;
+      }
+      if (enriched.minAdditionalPurchaseAmount != null) {
+        $set.minAdditionalPurchaseAmount = enriched.minAdditionalPurchaseAmount;
+      }
+      if (enriched.minSipAmount != null && (matchedLocal.minSipAmount == null || matchedLocal.minSipAmount <= 0)) {
+        $set.minSipAmount = enriched.minSipAmount;
+      }
+      if (enriched.riskometer) {
+        $set.riskometer = enriched.riskometer;
+      }
+      if (enriched.investmentObjective) {
+        $set.investmentObjective = enriched.investmentObjective;
+      }
+      $set.dataProvenance = enriched.dataProvenance;
+
+      if (Object.keys($set).length > 0) {
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: matchedLocal._id },
+            update: { $set },
+          },
+        });
+      }
+    }
+
+    if (bulkOps.length > 0) {
+      const res = await MutualFundScheme.bulkWrite(bulkOps, { ordered: false });
+      totalModified += res.modifiedCount;
+      console.log(`[TigZig Sync] Chunk ${cIdx + 1}/${chunks.length} complete. Modified: ${res.modifiedCount} schemes.`);
+    }
+
+    if (cIdx < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+
+  console.log(`✅ [TigZig Sync] Complete: updated ${totalModified} of ${schemes.length} schemes.`);
+  return { success: true, processed: schemes.length, modified: totalModified };
 }
 
 module.exports = {
@@ -282,4 +431,5 @@ module.exports = {
   syncAmfiDailyNavs,
   syncAllVerifiedSchemeFacts,
   lazyEnrichScheme,
+  syncSchemesWithTigzig,
 };

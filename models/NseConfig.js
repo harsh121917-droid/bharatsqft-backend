@@ -31,6 +31,11 @@ const NseConfigSchema = new mongoose.Schema(
       type: Boolean,
       default: process.env.NODE_ENV === 'test',
     },
+    mfDataSource: {
+      type: String,
+      enum: ['TIGZIG', 'LEGACY'],
+      default: 'TIGZIG',
+    },
     lastTestedAt: {
       type: Date,
     },
@@ -58,6 +63,29 @@ const NseConfigSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+let cachedDataSource = null;
+let lastCacheTime = 0;
+
+NseConfigSchema.statics.getMfDataSource = async function () {
+  const now = Date.now();
+  if (cachedDataSource && (now - lastCacheTime < 10000)) {
+    return cachedDataSource;
+  }
+  try {
+    const config = await this.findOne().select('mfDataSource').lean();
+    cachedDataSource = config?.mfDataSource || 'TIGZIG';
+    lastCacheTime = now;
+    return cachedDataSource;
+  } catch (_) {
+    return cachedDataSource || 'TIGZIG';
+  }
+};
+
+NseConfigSchema.statics.invalidateCache = function () {
+  cachedDataSource = null;
+  lastCacheTime = 0;
+};
+
 NseConfigSchema.statics.getEffectiveConfig = async function () {
   let config = await this.findOne();
   if (!config) {
@@ -68,6 +96,7 @@ NseConfigSchema.statics.getEffectiveConfig = async function () {
       apiSecret: process.env.NSE_API_SECRET || '',
       licenseKey: process.env.NSE_MEMBER_LICENSE_KEY || '',
       mockMode: process.env.NODE_ENV === 'test',
+      mfDataSource: 'TIGZIG',
     });
   }
   return config;
