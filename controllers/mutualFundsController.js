@@ -1675,10 +1675,12 @@ exports.registerUserUcc = async (req, res) => {
       } catch (_) {}
     }
 
-    // Trigger RESEND_COMM to send official SMS/Email OTP to investor
-    try {
-      await nseClient.resendCommunication('CL_ACT', clientCode);
-    } catch (_) {}
+    // Trigger RESEND_COMM to send official SMS/Email OTP to investor ONLY if direct link wasn't returned
+    if (!nseAuthUrl) {
+      try {
+        await nseClient.resendCommunication('CL_ACT', clientCode);
+      } catch (_) {}
+    }
 
     // Do not return dummy 404 URL if no personalized link was generated
     nseAuthUrl = nseAuthUrl || null;
@@ -1714,9 +1716,11 @@ exports.resendUccActivation = async (req, res) => {
       }
     } catch (_) {}
 
-    try {
-      await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
-    } catch (_) {}
+    if (!authUrl) {
+      try {
+        await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+      } catch (_) {}
+    }
 
     authUrl = authUrl || null;
 
@@ -4478,10 +4482,12 @@ exports.setupUserMandate = async (req, res) => {
               }
             } catch (_) {}
 
-            // 3. Trigger RESEND_COMM to dispatch SMS/Email OTP to investor
-            try {
-              await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
-            } catch (_) {}
+            // 3. Trigger RESEND_COMM to dispatch SMS/Email OTP to investor ONLY if direct link wasn't returned
+            if (!clActLink) {
+              try {
+                await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+              } catch (_) {}
+            }
 
             // 4. Retry Mandate Registration in case FATCA upload activated the client
             try {
@@ -4530,7 +4536,7 @@ exports.setupUserMandate = async (req, res) => {
                 remark: regItem?.reg_remark || '',
                 exchangeDetails: regItem || nseRes?.data || null,
                 clientCode: ucc.clientCode,
-                clActLink: clActLink || 'https://www.nseinvest.com/mf/',
+                clActLink: clActLink || null,
                 isAuthorizedOnExchange: isAuthConfirmedOnExchange,
                 syncState: isAuthConfirmedOnExchange ? 'BATCH_SYNC_PENDING' : 'PENDING_OTP',
               },
