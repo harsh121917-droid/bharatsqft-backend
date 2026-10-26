@@ -291,7 +291,7 @@ class NseClient {
         data: {
           status: '100',
           firstHolderLink: payload.productType === 'CL_ACT'
-            ? 'https://www.nseinvest.com/mf/'
+            ? null
             : `${backendUrl}/api/mutual-funds/checkout/${refId}?mode=sandbox`,
           productRefId: refId,
         },

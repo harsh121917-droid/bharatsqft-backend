@@ -1680,10 +1680,9 @@ exports.registerUserUcc = async (req, res) => {
       await nseClient.resendCommunication('CL_ACT', clientCode);
     } catch (_) {}
 
-    // Default to official NSE investor verification portal URL
-    const officialNseAuthPortal = 'https://www.nseinvest.com/mf/';
-    nseAuthUrl = nseAuthUrl || officialNseAuthPortal;
-    clActLink = clActLink || officialNseAuthPortal;
+    // Do not return dummy 404 URL if no personalized link was generated
+    nseAuthUrl = nseAuthUrl || null;
+    clActLink = clActLink || null;
 
     return res.json({
       success: true,
@@ -1719,7 +1718,7 @@ exports.resendUccActivation = async (req, res) => {
       await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
     } catch (_) {}
 
-    authUrl = authUrl || 'https://www.nseinvest.com/mf/';
+    authUrl = authUrl || null;
 
     return res.json({
       success: true,
