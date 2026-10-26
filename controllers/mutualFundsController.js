@@ -4123,23 +4123,53 @@ exports.getOnboardingStatus = async (req, res) => {
     const user = await User.findById(userId);
     const ucc = await MfClientUcc.findOne({ user: userId });
 
+    // Look up saved bank account from BankAccount collection if not on UCC
+    let savedBank = null;
+    try {
+      savedBank = await BankAccount.findOne({ user: userId, isDefault: true }).lean();
+      if (!savedBank) {
+        savedBank = await BankAccount.findOne({ user: userId }).sort({ isVerified: -1, createdAt: -1 }).lean();
+      }
+    } catch (_) {}
+
+    let effAccountNo = (ucc?.primaryBank?.accountNo || savedBank?.accountNumber || '').trim();
+    let effIfsc = (ucc?.primaryBank?.ifsc || savedBank?.ifsc || '').trim().toUpperCase();
+    let effBankName = (ucc?.primaryBank?.bankName || savedBank?.bankName || 'Linked Bank').trim();
+    let effAccountHolder = (ucc?.primaryBank?.accountHolder || savedBank?.accountHolder || savedBank?.verifiedName || user?.fullName || '').trim();
+    let effAccountType = (savedBank?.accountType || ucc?.primaryBank?.accountType || 'savings').toLowerCase();
+
+    // Secondary fallback to KYC model bank details if BankAccount was empty
+    if (!effAccountNo) {
+      try {
+        const Kyc = require('../models/Kyc');
+        const userKyc = await Kyc.findOne({ user: userId }).lean();
+        if (userKyc?.bankDetails?.accountNumber) {
+          effAccountNo = String(userKyc.bankDetails.accountNumber).trim();
+          effIfsc = String(userKyc.bankDetails.ifscCode || '').trim().toUpperCase();
+          effBankName = (userKyc.bankDetails.bankName || 'Linked Bank').trim();
+          effAccountHolder = (userKyc.fullName || user?.fullName || '').trim();
+        }
+      } catch (_) {}
+    }
+
     const isUccActive = Boolean(ucc && ucc.clientCode && ucc.nseStatus === 'ACTIVE');
     const isBankVerified = Boolean(
-      (ucc?.primaryBank?.accountNo &&
-      ucc?.primaryBank?.accountNo.length >= 6 &&
-      ucc?.primaryBank?.ifsc &&
-      ucc?.primaryBank?.ifsc.length === 11) ||
+      (effAccountNo && effAccountNo.length >= 6 && effIfsc && effIfsc.length === 11) ||
+      savedBank?.isVerified ||
+      savedBank?.accountStatus === 'VERIFIED' ||
       (ucc && ucc.nseStatus === 'ACTIVE' && ucc?.primaryBank?.accountNo)
     );
 
-    const bankDetailsObj = (ucc?.primaryBank?.accountNo) ? {
+    const bankDetailsObj = effAccountNo ? {
       hasBank: true,
-      isVerified: true,
-      status: 'VERIFIED',
-      accountNumber: ucc.primaryBank.accountNo,
-      maskedAccountNumber: ucc.primaryBank.accountNo.length > 4 ? `•••• ${ucc.primaryBank.accountNo.slice(-4)}` : ucc.primaryBank.accountNo,
-      ifsc: ucc.primaryBank.ifsc || '',
-      bankName: ucc.primaryBank.bankName || 'Linked Bank',
+      isVerified: isBankVerified,
+      status: isBankVerified ? 'VERIFIED' : 'PENDING',
+      accountNumber: effAccountNo,
+      maskedAccountNumber: effAccountNo.length > 4 ? `•••• ${effAccountNo.slice(-4)}` : effAccountNo,
+      ifsc: effIfsc,
+      bankName: effBankName,
+      accountHolder: effAccountHolder,
+      accountType: effAccountType,
     } : null;
 
     const isLumpSumReady = isUccActive && isBankVerified;
@@ -4159,9 +4189,11 @@ exports.getOnboardingStatus = async (req, res) => {
           mandateStatus: 'NONE',
           isBankVerified: isBankVerified,
           bankDetails: bankDetailsObj,
-          bankName: ucc?.primaryBank?.bankName || '',
-          accountNo: ucc?.primaryBank?.accountNo || '',
-          ifsc: ucc?.primaryBank?.ifsc || '',
+          bankName: effBankName,
+          accountNo: effAccountNo,
+          ifsc: effIfsc,
+          accountHolder: effAccountHolder,
+          accountType: effAccountType,
           isSipReady: false,
           isLumpSumReady: false,
         },
@@ -4244,9 +4276,11 @@ exports.getOnboardingStatus = async (req, res) => {
           mandateStatus: mandate ? mandate.status : 'NONE',
           mandateId: mandate ? mandate.mandateId : null,
           authUrl,
-          bankName: ucc.primaryBank?.bankName || '',
-          accountNo: ucc.primaryBank?.accountNo || '',
-          ifsc: ucc.primaryBank?.ifsc || '',
+          bankName: effBankName,
+          accountNo: effAccountNo,
+          ifsc: effIfsc,
+          accountHolder: effAccountHolder,
+          accountType: effAccountType,
           isBankVerified: true,
           bankDetails: bankDetailsObj,
           isSipReady: false,
@@ -4271,9 +4305,11 @@ exports.getOnboardingStatus = async (req, res) => {
         hasMandate: true,
         mandateStatus: mandate.status,
         mandateId: mandate.mandateId,
-        bankName: mandate.bankName || ucc.primaryBank?.bankName || '',
-        accountNo: mandate.accountNo || ucc.primaryBank?.accountNo || '',
-        ifsc: ucc.primaryBank?.ifsc || '',
+        bankName: mandate.bankName || effBankName,
+        accountNo: mandate.accountNo || effAccountNo,
+        ifsc: effIfsc,
+        accountHolder: effAccountHolder,
+        accountType: effAccountType,
         isBankVerified: true,
         bankDetails: bankDetailsObj,
         isSipReady: true,
@@ -5081,6 +5117,51 @@ exports.verifyPanDetails = async (req, res) => {
 
     // 7. Decision Gate: Existing KRA Investor vs Fresh First-Time Investor
     const isFreshInvestor = !isNseVerified && !isKraVerified;
+
+    // Resolve saved bank details to attach to PAN response for instant UI pre-population
+    let panBankDetails = null;
+    if (userId) {
+      try {
+        let savedBank = await BankAccount.findOne({ user: userId, isDefault: true }).lean();
+        if (!savedBank) {
+          savedBank = await BankAccount.findOne({ user: userId }).sort({ isVerified: -1, createdAt: -1 }).lean();
+        }
+        let effPanAcc = (existingUcc?.primaryBank?.accountNo || savedBank?.accountNumber || '').trim();
+        let effPanIfsc = (existingUcc?.primaryBank?.ifsc || savedBank?.ifsc || '').trim().toUpperCase();
+        let effPanBank = (existingUcc?.primaryBank?.bankName || savedBank?.bankName || 'Linked Bank').trim();
+        let effPanHolder = (existingUcc?.primaryBank?.accountHolder || savedBank?.accountHolder || savedBank?.verifiedName || registeredName || '').trim();
+        let effPanType = (savedBank?.accountType || existingUcc?.primaryBank?.accountType || 'savings').toLowerCase();
+
+        if (!effPanAcc) {
+          try {
+            const Kyc = require('../models/Kyc');
+            const userKyc = await Kyc.findOne({ user: userId }).lean();
+            if (userKyc?.bankDetails?.accountNumber) {
+              effPanAcc = String(userKyc.bankDetails.accountNumber).trim();
+              effPanIfsc = String(userKyc.bankDetails.ifscCode || '').trim().toUpperCase();
+              effPanBank = (userKyc.bankDetails.bankName || 'Linked Bank').trim();
+              effPanHolder = (userKyc.fullName || registeredName || '').trim();
+            }
+          } catch (_) {}
+        }
+
+        if (effPanAcc) {
+          const isVer = Boolean((effPanAcc && effPanIfsc) || savedBank?.isVerified);
+          panBankDetails = {
+            hasBank: true,
+            isVerified: isVer,
+            status: isVer ? 'VERIFIED' : 'PENDING',
+            accountNumber: effPanAcc,
+            maskedAccountNumber: effPanAcc.length > 4 ? `•••• ${effPanAcc.slice(-4)}` : effPanAcc,
+            ifsc: effPanIfsc,
+            bankName: effPanBank,
+            accountHolder: effPanHolder,
+            accountType: effPanType,
+          };
+        }
+      } catch (_) {}
+    }
+
     if (isFreshInvestor) {
       // Fresh/first-time investor (valid PAN format, no prior mutual fund KRA history)
       // DO NOT fallback to user.name (which might be an account owner nickname like "Harsh")!
@@ -5121,6 +5202,7 @@ exports.verifyPanDetails = async (req, res) => {
           nseKycRemark: 'First-time Mutual Fund Investor (Fresh e-KYC)',
           kra: 'NONE',
           source: 'FRESH_INVESTOR',
+          bankDetails: panBankDetails,
           message: 'Valid PAN. First-time mutual fund investor detected.',
         },
       });
@@ -5146,6 +5228,7 @@ exports.verifyPanDetails = async (req, res) => {
         nseKycRemark: nseRemark || 'KYC REGISTERED',
         kra: kraName || 'cvlkra',
         source: verifiedSource || 'NSE_MFSS_KYC_VERIFY',
+        bankDetails: panBankDetails,
         message: isAlreadyRegistered
           ? `Investor is already registered on NSE MFSS with UCC: ${finalClientCode}. Account linked successfully.`
           : 'PAN verified successfully on NSE MFSS',
