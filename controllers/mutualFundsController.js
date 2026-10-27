@@ -4576,9 +4576,11 @@ exports.setupUserMandate = async (req, res) => {
           }
         } catch (_) {}
 
-        try {
-          await nseClient.resendCommunication('MANDATE_AUTH', liveMandateId);
-        } catch (_) {}
+        if (!authLink) {
+          try {
+            await nseClient.resendCommunication('MANDATE_AUTH', liveMandateId);
+          } catch (_) {}
+        }
       } else {
         mandateId = isLive ? null : `TEST_MND_${Date.now()}`;
         if (!isLive) {
