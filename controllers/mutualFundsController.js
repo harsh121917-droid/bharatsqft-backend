@@ -4349,6 +4349,41 @@ exports.getOnboardingStatus = async (req, res) => {
   }
 };
 
+const fetchMandateAuthLink = async (mandateId) => {
+  if (!mandateId) return null;
+  const mId = String(mandateId).trim();
+  if (!mId) return null;
+
+  const productTypes = ['MANDATE_AUTH', 'MANDATE_AUT', 'MANDATE'];
+  for (const pType of productTypes) {
+    try {
+      const res = await nseClient.getShortLink(pType, mId);
+      console.log(`[fetchMandateAuthLink] (${pType}, ${mId}) result:`, JSON.stringify(res));
+      const d = res?.data || res;
+      const raw =
+        d?.firstHolderLink ||
+        d?.short_url ||
+        d?.link ||
+        d?.url ||
+        d?.first_holder_link ||
+        d?.report_data?.[0]?.firstHolderLink ||
+        d?.report_data?.[0]?.short_url ||
+        d?.report_data?.[0]?.link ||
+        d?.data?.firstHolderLink;
+
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        const clean = raw.trim();
+        if (clean.startsWith('http://') || clean.startsWith('https://')) {
+          return clean;
+        }
+      }
+    } catch (err) {
+      console.warn(`[fetchMandateAuthLink] attempt error (${pType}):`, err.message);
+    }
+  }
+  return null;
+};
+
 // ── 18. POST /api/mutual-funds/mandates/setup (Generate or Fetch Mandate Link) ──
 exports.setupUserMandate = async (req, res) => {
   try {
@@ -4392,10 +4427,57 @@ exports.setupUserMandate = async (req, res) => {
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
 
-    if (!mandate || !mandate.authLink) {
-      let mandateId = null;
-      let authLink = null;
-      let rawResponse = null;
+    // If an existing mandate is found (and forceNew was not requested), reuse it and make sure authLink is populated
+    if (mandate) {
+      if (['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(mandate.status)) {
+        return res.json({
+          success: true,
+          message: 'Mandate is already authorized and approved',
+          data: {
+            mandateId: mandate.mandateId,
+            status: mandate.status,
+            authUrl: mandate.authLink,
+            amount: mandate.amount,
+            bankName: mandate.bankName,
+            accountNo: mandate.accountNo,
+          },
+        });
+      }
+
+      // If pending authorization, ensure authLink is fetched from NSE
+      if (!mandate.authLink) {
+        if (!nseClient.isMockMode()) {
+          mandate.authLink = await fetchMandateAuthLink(mandate.mandateId);
+          if (mandate.authLink) {
+            await mandate.save();
+          } else {
+            try {
+              await nseClient.resendCommunication('MANDATE_AUTH', mandate.mandateId);
+            } catch (_) {}
+          }
+        } else {
+          mandate.authLink = `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox`;
+          await mandate.save();
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Mandate setup link generated successfully',
+        data: {
+          mandateId: mandate.mandateId,
+          status: mandate.status,
+          authUrl: mandate.authLink,
+          amount: mandate.amount,
+          bankName: mandate.bankName,
+          accountNo: mandate.accountNo,
+        },
+      });
+    }
+
+    let mandateId = null;
+    let authLink = null;
+    let rawResponse = null;
 
       if (!nseClient.isMockMode()) {
         const now = new Date();
@@ -4570,13 +4652,24 @@ exports.setupUserMandate = async (req, res) => {
         }
 
         mandateId = String(liveMandateId).trim();
-        try {
-          const shortLinkRes = await nseClient.getShortLink('MANDATE_AUTH', liveMandateId);
-          if (shortLinkRes?.success && shortLinkRes?.data?.firstHolderLink) {
-            authLink = shortLinkRes.data.firstHolderLink;
-          }
-        } catch (_) {}
 
+        // 1. Check if regItem itself directly returned any link
+        const directLink = regItem?.firstHolderLink || regItem?.link || regItem?.short_url || regItem?.auth_url;
+        if (directLink && typeof directLink === 'string' && directLink.trim().startsWith('http')) {
+          authLink = directLink.trim();
+        }
+
+        // 2. Fetch short link with backoff retries so NSE has time to index
+        if (!authLink) {
+          await new Promise(r => setTimeout(r, 1200));
+          authLink = await fetchMandateAuthLink(liveMandateId);
+        }
+        if (!authLink) {
+          await new Promise(r => setTimeout(r, 1800));
+          authLink = await fetchMandateAuthLink(liveMandateId);
+        }
+
+        // 3. Trigger RESEND_COMM so email/SMS is sent to investor
         if (!authLink) {
           try {
             await nseClient.resendCommunication('MANDATE_AUTH', liveMandateId);
@@ -4611,10 +4704,6 @@ exports.setupUserMandate = async (req, res) => {
         ucc.defaultMandateId = mandate.mandateId;
         await ucc.save();
       }
-    } else if (!mandate.authLink && !isLive) {
-      mandate.authLink = `${backendUrl}/api/mutual-funds/checkout/${mandate.mandateId}?mode=sandbox`;
-      await mandate.save();
-    }
 
     return res.json({
       success: true,
@@ -4766,8 +4855,55 @@ exports.getMandateDetail = async (req, res) => {
     if (!mandate) {
       return res.status(404).json({ success: false, message: 'Mandate record not found' });
     }
+
+    if (!mandate.authLink && mandate.status === 'PENDING_AUTH' && !nseClient.isMockMode()) {
+      const link = await fetchMandateAuthLink(mandate.mandateId);
+      if (link) {
+        mandate.authLink = link;
+        await mandate.save();
+      }
+    }
+
     return res.json({ success: true, data: mandate });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 19c-2. GET /api/mutual-funds/mandates/:id/link (Fetch / Refresh Live Auth URL) ──
+exports.getMandateAuthLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const mandate = await MfMandate.findOne({
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { mandateId: id }],
+      user: userId,
+    });
+    if (!mandate || !mandate.mandateId) {
+      return res.status(404).json({ success: false, message: 'Mandate record not found' });
+    }
+
+    let authUrl = mandate.authLink;
+    if (!authUrl && !nseClient.isMockMode()) {
+      authUrl = await fetchMandateAuthLink(mandate.mandateId);
+      if (authUrl) {
+        mandate.authLink = authUrl;
+        await mandate.save();
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        mandateId: mandate.mandateId,
+        authUrl: mandate.authLink || null,
+        status: mandate.status,
+        bankName: mandate.bankName,
+        accountNo: mandate.accountNo,
+      },
+    });
+  } catch (error) {
+    console.error('[getMandateAuthLink Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

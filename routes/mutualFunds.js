@@ -40,6 +40,7 @@ const {
   verifyUserMandate,
   getMyMandates,
   getMandateDetail,
+  getMandateAuthLink,
   updateUserBank,
   resendUccActivation,
   handleUpiPaymentCallback,
@@ -81,6 +82,7 @@ router.post('/pan/verify', verifyPanDetails);
 router.post('/bank/verify', verifyMfBankAccount);
 router.get('/onboarding-status', getOnboardingStatus);
 router.get('/mandates/my', getMyMandates);
+router.get('/mandates/:id/link', getMandateAuthLink);
 router.get('/mandates/:id', getMandateDetail);
 router.post('/mandates/setup', setupUserMandate);
 router.post('/mandates/:id/verify', verifyUserMandate);
