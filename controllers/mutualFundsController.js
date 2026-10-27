@@ -4390,6 +4390,7 @@ exports.setupUserMandate = async (req, res) => {
     }
 
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
 
     if (!mandate || !mandate.authLink) {
       let mandateId = null;
