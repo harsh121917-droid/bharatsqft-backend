@@ -1,0 +1,1118 @@
+
+
+
+
+ 
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Cache-Control" content="no-cache">
+        <meta charset="utf-8">
+        <meta name='viewport' content='width=device-width, initial-scale=1'>
+        
+<link rel="stylesheet" href="/nsemfclient/resources/bootstrap/css/bootstrap.min.css?v=1">
+<link rel="stylesheet" href="/nsemfclient/resources/css/style.min.css?v=1">
+<link rel="stylesheet" href="/nsemfclient/resources/css/font-awesome.min.css">
+<link type="text/css" rel="shortcut icon" href="/nsemfclient/resources/imgs/nsemf_logo_header.png?id=1" type="image/x-icon">
+<link type="text/css" rel="icon" href="/nsemfclient/resources/imgs/nsemf_logo.ico?id=1" type="image/x-icon">
+
+<!--[if lte IE 8 ]>
+<div class="incompatibility-message text-center" id="incompatibility-message">
+    <div class="messagecontainer">
+        <br/>
+        <h4 class="text-warning">
+            <i class="fa fa-warning"></i>
+            We noticed you are using an outdated version of Internet Explorer. So some features may not work correctly.<br/>
+            For the full site experience, upgrade your browser,
+        </h4>
+        <a target="_blank" href="http://www.google.com/chrome/"><i class="fa fa-chrome"></i> Google Chrome</a>
+        &nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href="https://www.mozilla.org/en-US/firefox/new/?utm_source=firefox-com&utm_medium=referral"><i class="fa fa-firefox"></i> Mozilla Firefox</a>
+        &nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href="http://www.apple.com/safari/"><i class="fa fa-safari"></i> Safari</a>
+        &nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href="http://www.opera.com/"><i class="fa fa-opera"></i> Opera</a>
+        &nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href="http://windows.microsoft.com/en-us/internet-explorer/download-ie"><i class="fa fa-internet-explorer"></i> Internet Explorer</a>
+        <br/><br/>
+        <button class="btn btn-sm btn-info" onclick="javascript:document.getElementById('incompatibility-message').style.display='none'">No Thanks</button>
+    </div>
+</div>
+<![endif]-->
+<!--[if lt IE 9]>
+<script src="resources/js/common/html5shiv.min.js"></script>
+<script src="resources/js/common/respond.min.js"></script>
+<![endif]-->
+        <link rel="stylesheet" href="/nsemfclient/resources/css/font-awesome.min.css">
+        
+<link rel="stylesheet" href="/nsemfclient/resources/toolkit/datatables/DataTables/css/datatables.min.css?v=1">
+        
+        <link rel="stylesheet" href="/nsemfclient/resources/css/togglebutton.css">
+        <title>NSE MF Client Desk</title>
+        <style>
+            .fade {
+                opacity: 1;
+            }
+            .hightlightText
+            {
+                background-color: #f4f49b !important;
+            }
+            .accordion
+            {
+                margin-bottom: 5px !important;
+            }
+            .rowMarginBottom,#tblNomineeDetails,#tblBankDetails
+            {
+                margin-bottom: 10px !important;
+            }
+            .fatcaRowMarginBottom
+            {
+                margin-bottom: 5px !important;
+            }
+            label{
+                overflow-wrap: anywhere !important;
+            }
+        </style>
+		
+		<script type="text/javascript">
+				    function showAnnexurePopup(nominationOpt) {
+				        var annexureFileName = (nominationOpt === 'Y') ? 'annexure2.html' : 'annexure1.html';
+				        var contextPath = document.getElementById('contextPath').value;
+				        window.open(contextPath + '/resources/upload/' + annexureFileName, '_blank');
+				    }
+		</script>
+    </head>
+    <body>
+        <div id="ajaxSpinnerContainer" class="modal_overlays" style="display:none;">
+            <div class="center">
+                <img src="/nsemfclient/resources/imgs/loading.gif" id="ajaxSpinnerImage" title="working..." >
+            </div>
+        </div>
+        
+            
+            
+                
+                <input type="hidden" id="contextPath" name="contextPath" value="/nsemfclient"/>
+                <div class="container-fluid" style="border-bottom:4px solid;border-bottom-color:#392d7d;box-shadow: 2px 1000px 2000px #392d7d;background-color:white; ">
+                    <div class="navbar-header-fluid" >
+                        <a class="navbar-brand" href="">
+                            <img class="img-responsive" src="/nsemfclient/resources/imgs/nsemf_logo_header.png" style="margin-top:5px;" >
+                            <b class="icexname" style="margin-top:10px;" >Client Desk</b>
+                        </a>
+                    </div>
+                </div>
+                <br/>
+
+                
+                    
+                        <div class="container-fluid">
+                            <div class="accordion">
+                                <div class="accordion-item">
+                                    <h4 class="accordion-header-custom" style="font-weight: bolder; font-size: 14px;text-align: center;">Client Authorization</h4> 
+                                    <div id="collapseHeader" class="accordion-collapse collapse show" >
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                <div class="col-lg-4 col-md-4 col-sm-4">
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <span><i class='fa fa-user' style='font-size: 20px;'></i></span>
+                                                            <span style="margin-left: 5px; top: 20px;">Distributor Name</span><br/>
+                                                            <label style="word-break: break-all;">1031616-PAYVIKA INDIA TECHNOLOGY PRIVATE LIMITED</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-4 col-md-4 col-sm-4">
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <i class='fa fa-mobile-phone' style='font-size: 20px;'></i>
+                                                            <span style="margin-left: 5px; top: 20px;">Contact No.<br/>
+                                                                <label style="word-wrap: break-word;">7310710227</label></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-4 col-md-4 col-sm-4">
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <i class='fa fa-envelope' style='font-size: 20px;'></i>
+                                                            <span style="margin-left: 5px; top: 20px;">Email<br/>
+                                                                <label style="word-wrap: break-word;">VIKAS121917@GMAIL.COM</label></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="container-fluid">
+                            <div class="accordion">
+                                <div class="accordion-item">
+                                    <h4 class="accordion-header-custom" style="font-weight: bolder; font-size: 14px;">UCC Details For ASHAHAD SHAIKH (VK088829)</h4> 
+                                    <div id="collapseOne" class="accordion-collapse collapse show" >
+                                        <div class="accordion-body">
+
+                                            
+                                                
+                                                    <input type="hidden" id="otpSeconds" name="otpSeconds" value="60">
+                                                    <form id="frmClientRegDetail" name="frmClientRegDetail" method="post" onsubmit="return false;">
+                                                        <input type="hidden" id="uuid" name="uuid" value="5EC37FC568D4CA95E0635D28A8C00DCD"/>  
+                                                        <div id="divReport">                                            
+                                                            
+
+
+<div class="row rowMarginBottom" >
+    <div class="col-lg-3 col-md-2 col-sm-2">
+        <span style="font-size: 12px;">Tax Status</span><br>
+        <label style="font-weight: bold; word-wrap: break-word;">01 - INDIVIDUAL</label>
+        </div>
+        <div class="col-lg-3 col-md-2 col-sm-2">
+            <span style="font-size: 12px;">Holding Nature</span><br>
+            <label style="font-weight: bold; word-wrap: break-word;">SI - Single</label> 
+        </div>
+        <div class="col-lg-3 col-md-2 col-sm-2">
+            <span style="font-size: 12px;">Client Code</span><br>
+            <label style="font-weight: bold; word-wrap: break-word;">VK088829</label> 
+    </div>
+</div>
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAppOne" aria-expanded="true" aria-controls="collapseAppOne">
+                First Applicant Details
+            </button>
+        </h2>
+        <div id="collapseAppOne" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+                <div class="row rowMarginBottom">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Applicant Name</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            ASHAHAD SHAIKH</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">PAN </span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            TYJPS0689R</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">DOB</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            10-11-2004</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Gender</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            M - MALE</label>
+                    </div>
+                </div>
+                <div class="row rowMarginBottom">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Occupation</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;"  >
+                            01 - BUSINESS</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">KYC Type</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            K - KRA Compliant</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">CKYC No</span><br>
+
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                </div> 
+                <div class="row">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">PAN EXEMPT FLAG</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            N</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Exempt Category</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                             - </label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Exempt Ref No</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNominee" aria-expanded="true" aria-controls="collapseNominee">
+                Nominee Details
+            </button>
+        </h2>
+        <div id="collapseNominee" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+                <div class="row">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Nomination Opted</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            N</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Nomination Authorization Mode</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            OTP authentication</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Nominee SOA</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+                                                            
+
+
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBankDtl" aria-expanded="true" aria-controls="collapseBankDtl">
+                Bank Details
+            </button>
+        </h2>
+        <div id="collapseBankDtl" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+                 
+                    <div class="table-responsive">
+                        <table id="tblBankDetails" class="table table-condensed table-sm table-striped table-bordered cell-border table-hover display dataTable">
+                            <thead>
+                                <tr class="header-datatable">
+                                    <th>Sr No</th>
+                                    <th>Bank Name</th>
+                                    <th>Bank Branch</th>
+                                    <th>Account Type</th>
+                                    <th>Account No</th>
+                                    <th>MICR</th>
+                                    <th>IFSC</th>
+                                    <th>Is Default Bank?</th>
+                                    <th>Cheque Name</th>
+                                    <th>Dividend Payment Mode</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                
+                                    <tr >
+                                        <td >1</td>
+                                        <td >BANK OF INDIA </td>  
+                                        <td >GURUWAR PETH SATARA</td>
+                                        <td >SB - Savings Bank</td>
+                                        <td >1300182100001617</td>
+                                        <td >-</td>
+                                        <td >BKID0001300</td>
+                                        <td >Y</td>                       
+                                        <td >ASHAHAD SHAIKH</td>                       
+                                        <td >02 - DIRECT CREDIT</td>                       
+                                        </tr>      
+                                
+                            </tbody>
+                        </table>                
+                    </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+ 
+                                                            
+
+
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddressIn" aria-expanded="true" aria-controls="collapseAddressIn">
+                Address Details (India)
+            </button>
+        </h2>
+        <div id="collapseAddressIn" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+                <div class="row rowMarginBottom">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Address 1</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            FLAT 101, MAIN ROAD</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Address 2</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Address 3</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                </div>
+                <div class="row rowMarginBottom" >
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">City</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            MUMBAI</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Pin Code</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            400001</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">State</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            MA - MAHARASHTRA</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Country</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;">
+                            IN-India</label>
+                    </div>               
+                </div>
+                <div class="row rowMarginBottom" >
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Residence Phone</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Residence Fax</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Office Phone</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Office Fax</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>               
+                </div>
+                <div class="row">
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Mobile - Mobile Declaration</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            8855088817</label>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                             - SE - Self</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Email - Email Declaration</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            ASHAHADSHAIKH0007@GMAIL.COM</label>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                             - SE - Self</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Communication Mode</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            E - ELECTRONIC</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row" style="display: none;">
+        <div class="accordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddress" aria-expanded="true" aria-controls="collapseAddress">
+                        Address Details (Foreign)
+                    </button>
+                </h2>
+                <div id="collapseAddress" class="accordion-collapse collapse show" >
+                    <div class="accordion-body">
+                        <div class="row rowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Address 1</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Address 2</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Address 3</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                    </div>
+                    <div class="row rowMarginBottom" >
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">City</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Pin Code</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">State</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Country</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Residence Phone</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Residence Fax</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Office Phone</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                        <div class="col-lg-3 col-md-2 col-sm-2">
+                            <span style="font-size: 12px;">Office Fax</span><br>
+                            <label style="font-weight: bold; word-wrap: break-word;" >
+                                -</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+                                                            
+
+
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOther" aria-expanded="true" aria-controls="collapseOther">
+                Other Details
+            </button>
+        </h2>
+        <div id="collapseOther" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+                <div class="row rowMarginBottom" >
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Aadhar Update Flag</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            Y</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Mapin No</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                             </label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Lei No</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>
+                    <div class="col-lg-3 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Lei Validity</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            -</label>
+                    </div>                
+                </div>
+                <div class="row" >
+                    <div class="col-lg-4 col-md-2 col-sm-2">
+                        <span style="font-size: 12px;">Paperless Flag</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;" >
+                            Z - Paperless</label>
+                    </div>                
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+                                                            
+                                                                
+
+
+
+    
+        <div class="accordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFive" aria-expanded="true" aria-controls="collapseFive">
+                        FATCA - TYJPS0689R (ASHAHAD SHAIKH)
+                        </button>
+                    </h2>
+                    <div id="collapseFive" class="accordion-collapse collapse show" >
+                        <div class="accordion-body">                  
+                            <div class="row fatcaRowMarginBottom" >
+                                <div class="col-lg-3 col-md-2 col-sm-2">
+                                    <span style="font-size: 12px;">PAN</span><br>
+                                        <label style="font-weight: bold; word-wrap: break-word;">TYJPS0689R</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">PAN Exempt KYC Ref No</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>
+
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Applicant  Name</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">ASHAHAD SHAIKH</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Father Name</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>
+                        </div>
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Spouse Name</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>
+
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Date of Birth</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">10-11-2004</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Place of Birth</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">MUMBAI</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Country of Birth</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">IN - INDIA</label>
+                            </div>
+                        </div>
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Tax Status</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">01 - INDIVIDUAL</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Data Source</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">Electronic</label>
+                            </div>                
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Address Type</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">1 - RESIDENTIAL OR BUSINESS</label>
+                            </div>
+                        </div>
+
+                        
+                            
+                            
+
+                                <div class="row fatcaRowMarginBottom">
+                                    <div class="col-lg-3 col-md-2 col-sm-2">
+                                        <span style="font-size: 12px;">Residence Country 1</span><br>
+                                        <label style="font-weight: bold; word-wrap: break-word;">IN - INDIA</label>
+                                    </div>                            
+                                    <div class="col-lg-3 col-md-2 col-sm-2">
+                                        <span style="font-size: 12px;">Tax Payer Identification Number / other Equivalent Number 1</span><br>
+                                        <label style="font-weight: bold; word-wrap: break-word;">TYJPS0689R</label>
+                                    </div>                            
+                                    <div class="col-lg-3 col-md-2 col-sm-2">
+                                        <span style="font-size: 12px;">Identification Document Type 1</span><br>
+                                        <label style="font-weight: bold; word-wrap: break-word;">C - PAN CARD</label>
+                                    </div>                                                            
+                                </div>
+                                
+                             
+                            
+                                
+                                    <div class="row fatcaRowMarginBottom">
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Residence Country 2</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Tax Payer Identification Number / other Equivalent Number 2</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Identification Document Type 2</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                                                            
+                                    </div>
+                                
+                                    <div class="row fatcaRowMarginBottom">
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Residence Country 3</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Tax Payer Identification Number / other Equivalent Number 3</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Identification Document Type 3</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                                                            
+                                    </div>
+                                
+                                    <div class="row fatcaRowMarginBottom">
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Residence Country 4</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Tax Payer Identification Number / other Equivalent Number 4</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                            
+                                        <div class="col-lg-3 col-md-2 col-sm-2">
+                                            <span style="font-size: 12px;">Identification Document Type 4</span><br>
+                                            <label style="font-weight: bold; word-wrap: break-word;"> - </label>
+                                        </div>                                                            
+                                    </div>
+                                
+                            
+                        
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Wealth Source</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">01 - SALARY</label>
+                            </div> 
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Corporate Services Sector </span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Income Slab</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">31 - BELOW 1 LAKH</label>
+                            </div>  
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Net Worth</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>   
+                        </div>
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Date of NetWorth </span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div> 
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Politically Exposed Person</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">N</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Occupation Code</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">01 - BUSINESS</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Occupation type</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">B - BUSINESS</label>
+                            </div>                                                    
+                        </div> 
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Exemption Code</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>  
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Sponsoring Entity</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div> 
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">FFI/ DRNFE</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">GIIN Number</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>         
+                        </div>
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">GIIN Number</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">GIIN Exemption Code</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>  
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Non Financial Entity Category</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Non Financial Entity Sub Category</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>         
+                        </div>
+                        <div class="row fatcaRowMarginBottom" >
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Nature of Business</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>                  
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Related to Listed Company</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>  
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Exchange Name</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">O - Others</label>
+                            </div>                            
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Self Declaration Flag</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">Y</label>
+                            </div>  
+                        </div>
+                        <div class="row" >         
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Aaadhar of Reporting Person </span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">Log Name</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">ASHAHAD SHAIKH</label>
+                            </div>          
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">NPO FORM</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div> 
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">NPO Declaration </span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div>   
+                        </div>
+                        <div class="row" >     
+                            <div class="col-lg-3 col-md-2 col-sm-2">
+                                <span style="font-size: 12px;">NPO Registration NO</span><br>
+                                <label style="font-weight: bold; word-wrap: break-word;">-</label>
+                            </div> 
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+ 
+                                                            
+                                                            
+                                                            
+
+
+
+<div class="accordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAuth" aria-expanded="true" aria-controls="collapseAuth">
+                Authorization
+            </button>
+        </h2>
+        <div id="collapseAuth" class="accordion-collapse collapse show" >
+            <div class="accordion-body">
+
+                <div class="row rowMarginBottom" >
+                    <div class="col-lg-12 col-md-12 col-sm-12">
+                        <pre style= "white-space: pre-line;word-break: break-word;"> </pre>
+                    </div>
+                </div>
+				
+		<!-- Annexure Popup Link  -->
+	              
+	                  <div class="row rowMarginBottom">
+	                      <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+	                      <div class="col-lg-4 col-md-4 col-sm-4">
+	                          <div class="form-group">
+									<input id="chkNominee" name="nomineeAction" type="radio" onclick="onCheckNominee(this)" value="nominee" checked>
+	                              		<a href="#" onclick="showAnnexurePopup('N'); return false;">
+	                                  <span style="font-weight:bold; text-decoration: underline; cursor:pointer;">Nominee Declaration</span>
+	                              </a>
+	                          </div>
+	                      </div>
+	                  </div>
+	              
+				
+				
+                <div class="row rowMarginBottom">
+                    <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                    <div class="col-lg-4 col-md-4 col-sm-4">
+                        <div class="form-group">
+                            <input id="chkTandC" name="authAction" type="radio" onclick="onCheckTandC(this)" value="authorize">
+                            <span style="font-weight:bold;">I Agree <a style="text-decoration: underline !important;" href="../resources/upload/uccauthorizationtermsandconditon.html" target="_blank">Terms & Condition </a></span>                     </div>
+                    </div>
+                    <div class="col-lg-3 col-md-3 col-sm-3">
+                        <h4 style="font-weight: bold;"> OR </h4>
+                    </div>
+                    <div class="col-lg-3 col-md-3 col-sm-3">
+                        <div class="form-group">
+                            <input id="chkReview" name="authAction" type="radio" value="review" onchange="javascript: onCheckReview(this);"> <span style="font-weight:bold;">Review for Updation of detail</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="row rowMarginBottom" >
+                    <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                    <div class="col-lg-4 col-md-4 col-sm-4">
+                        <span style="font-size: 12px;">Holder</span><br>
+                        <label style="font-weight: bold; word-wrap: break-word;">ASHAHAD SHAIKH</label>
+                    </div>
+                    <div class="col-lg-3 col-md-3 col-sm-3">
+                        <span style="font-size: 12px;">Mobile</span><br>
+                        <input type="hidden" id="mobile" name="mobile" value="h+42lsfQ31BRMlhD/bWGhw==">
+                        <label style="font-weight: bold; word-wrap: break-word;" > 8855088817</label>
+                    </div>
+                    <div class="col-lg-3 col-md-3 col-sm-3">
+                        <span style="font-size: 12px;">Email</span><br>
+                        <input type="hidden" id="email" name="email" value="iVQ/L4k2qXOjW4jWLv7BiPUzjETNhtw21l5nXo2R+NI=">
+                        <label style="font-weight: bold; word-wrap: break-word;" >ASHAHADSHAIKH0007@GMAIL.COM</label>
+                    </div>
+                </div>
+                <div id="authorize" style="display: none;">
+                    <div class="row" style="margin-bottom: 10px;">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-11 col-md-11 col-sm-11">
+                            <button id="submit-otp" class="btn btn-primary btn-login-submit btn-group m-t-md"  type="button">
+                                <span class="fa fa-paper-plane"></span>&nbsp; Send OTP
+                            </button>
+                        </div>
+                    </div>
+                    <div id="alertDiv" class="row" style="display: none;">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-11 col-md-11 col-sm-11">
+                            <label id="msg" class="alert alert-success" ></label>
+                        </div>
+                    </div>
+                    <div class="row" style="display: none;" id="divAuthOtp">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-2 col-md-2 col-sm-4">
+                            <label ><span style="color:red">*</span> Enter OTP :</label>
+                            <div class="form-group">
+                                <input autocomplete="off" type="text" id="authorizeOtp" name="authorizeOtp" placeholder="Please Enter OTP" class="form-control input-sm"  maxlength="6" autofocus="autofocus" style="font-size: 16px;"/>
+                                <a href="#" data-toggle="tooltip" title=""></a>
+                            </div>
+
+                        </div>
+                        <div class="col-lg-2 col-md-2 col-sm-2"></div>
+                    </div>
+                    <div id="counter-msg-div" class="row" style="display: none;">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-11 col-md-11 col-sm-11">
+                            <label id="counter-msg" class="alert alert-success" ></label>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 10px;display: none;" id="otpButton">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-11 col-md-11 col-sm-11">
+                            <div class="form-group">
+                                <button id="btnAuthorizeClientReg" disabled class="btn btn-primary btn-login-submit btn-group m-t-md authBtn"  type="button">
+                                    <span class="fa fa-upload"></span>&nbsp;Authorize
+                                </button> &nbsp; &nbsp; &nbsp;
+                                <button id="resend-otp" disabled class="btn btn-primary btn-login-submit btn-group m-t-md" href="#" type="button" onclick="resendOtp('/nsemfclient');">
+                                    <span class="fa fa-paper-plane"></span>&nbsp;Resend OTP
+                                </button> &nbsp; &nbsp; &nbsp;
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="review" style="display: none;">
+                    <div class="row" style="margin-bottom: 10px;" >
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-4 col-md-4 col-sm-4"> </div>
+                        <div class="col-lg-3 col-md-3 col-sm-3"> </div>
+                        <div class="col-lg-4 col-md-4 col-sm-4">
+                            <div class="row" >
+                                <div class="col-lg-9 col-md-9 col-sm-9">
+                                    <label>Review Text <span class="astriek"> *</span></label><br/>
+                                    <textarea id="txtReview" name="txtReview" class="form-control input-sm"  maxlength="4000" placeholder="Please Enter Review Text" style="height: 50px;"></textarea>
+                                </div>
+                            </div>
+                            <div class="row" style="color: blue;font-size: small;margin-top:10px;">
+                                <div class="col-lg-12 col-md-12 col-sm-12" >
+                                    <span class="fa fa-info-circle"></span> Note: The entered text here will be shown to your distributor.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-1 col-md-1 col-sm-1"> </div>
+                        <div class="col-lg-4 col-md-4 col-sm-4"> </div>
+                        <div class="col-lg-3 col-md-3 col-sm-3"> </div>
+                        <div class="col-lg-4 col-md-4 col-sm-4">
+                            <div class="form-group">
+                                <button id="reviewBtn" class="btn btn-primary btn-login-submit btn-group m-t-md"  type="button" >
+                                    <span class="fa fa-upload"></span>&nbsp; Review for Updation
+                                </button> &nbsp; &nbsp; &nbsp;
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <div id="validationAlertDiv" class="row" style="display: none;">
+                        <div class="col-lg-12 col-md-12 col-sm-12" style="text-align: center;">
+                            <div class="form-group">
+                                <label id="validationMsg" class="alert alert-danger" ></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+ 
+                                                        </div>
+                                                    </form>
+                                                    <div id="ajaxDiv"></div>
+                                                
+                                            
+                                        </div>
+                                    </div>
+                                </div>                        
+                            </div>                        
+                        
+                        
+                    
+                
+                       
+            
+<div id="footer_push"></div>
+<!--<div id="footer">
+    Copyrights @ 2019 INDIAN COMMODITY EXCHANGE LTD. All Rights Reserved
+    <span class="pull-right">
+        Contact US&nbsp;&nbsp;|&nbsp;&nbsp;Legal Disclaimer&nbsp;&nbsp;|&nbsp;&nbsp;Privacy Policy&nbsp; &nbsp;| &nbsp;&nbsp;Useful Links
+    </span>
+</div>-->
+
+<script src="/nsemfclient/resources/js/common/jquery-3.7.1.min.js" type="text/javascript"></script>
+<script src="/nsemfclient/resources/js/common/jquery-migrate-3.5.2.min.js" type="text/javascript"></script>
+<script src="/nsemfclient/resources/bootstrap/js/bootstrap.bundle.min.js?v=1" type="text/javascript"></script>
+<script src="/nsemfclient/resources/js/common/bootbox.min.js?v=1" type="text/javascript"></script>
+<script src="/nsemfclient/resources/js/common/jquery.ajax.js?v=1" type="text/javascript"></script>
+<script src="/nsemfclient/resources/js/common/topbookmark.min.js?v=1" type="text/javascript"></script>
+<script src="/nsemfclient/resources/js/common/moment.js?v=1" type="text/javascript"></script>
+<script type="text/javascript">
+    var servertime;
+    var localTime;
+    var sessionTime;
+    var x;
+    var countDownDate;
+    $(document).ajaxStart(function ()
+    {
+        $("#ajaxSpinnerContainer").show();
+        if (document.getElementById("sessionTimer"))
+        {
+            clearInterval(x);
+        }
+    }).ajaxStop(function ()
+    {
+        $("#ajaxSpinnerContainer").hide();
+        if (document.getElementById("sessionTimer"))
+        {
+            sessiontimer();
+        }
+    });
+    $(document).ready(function ()
+    {
+        if (document.getElementById("sessionTimer"))
+        {
+            sessionTime = 1800;
+            sessiontimer();
+        }
+        if (document.getElementById("clock"))
+        {
+            servertime = "1793040723942";
+            localTime = +Date.now();
+            displayTime();
+        }
+
+    });
+
+    function displayTime()
+    {
+        var datetime = getDateTimeString(servertime, localTime);
+        //Set date on main page.
+        document.getElementById("clock").innerHTML = datetime; // <-- updates the "clock" div.
+        setTimeout(displayTime, 1000);
+    }
+    function getDateTimeString(valServertime, valLocalTime)
+    {
+        var timeDiff = valServertime - valLocalTime;
+        var dateFormatVal = moment(new Date(+Date.now() + timeDiff)).format('Do MMMM, YYYY');
+        var dateVal = new Date(+Date.now() + timeDiff);
+//        var date = dateVal.getDate();
+//        var month = dateVal.getMonth() + 1;
+//        var year = dateVal.getFullYear();
+        var hours = Number.parseInt(dateVal.getHours());
+        var minutes = Number.parseInt(dateVal.getMinutes());
+        var seconds = Number.parseInt(dateVal.getSeconds());
+
+        if (hours < 10)
+        {
+            hours = "0" + hours;
+        }
+        if (minutes < 10)
+        {
+            minutes = "0" + minutes;
+        }
+        if (seconds < 10)
+        {
+            seconds = "0" + seconds;
+        }
+//        return "<b>" + date + "/" + month + "/" + year + " " + hours + ":" + minutes + ":" + seconds + "</b>";
+        return "<b>" + dateFormatVal + " " + hours + ":" + minutes + ":" + seconds + "</b>";
+    }
+    function sessiontimer()
+    {
+        var countDownDate = +Date.now() + sessionTime * 1000;
+        x = setInterval(function ()
+        {
+            /* Get todays date and time */
+            var now = +Date.now();
+            /* Find the distance between now and the count down date */
+            var distance = countDownDate - now;
+            /* If the count down is over, write some text */
+            if (distance <= 0)
+            {
+                clearInterval(x);
+            }
+            else
+            {
+                /* Time calculations for days, hours, minutes and seconds
+                 var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                 var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); */
+                var minutes = Math.floor((distance / (1000 * 60)));
+                var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                if (minutes <= 3)
+                {
+                    document.getElementById("sessionTimer").setAttribute("style", "color:red;");
+                }
+                else
+                {
+                    document.getElementById("sessionTimer").setAttribute("style", "");
+                }
+                /* Output the result in an element with id="demo" */
+                document.getElementById("sessionTimer").innerHTML = "Session expire in  <br><b>" + minutes + "m " + seconds + "s </b>";
+            }
+        }, 1000);
+    }
+</script>
+            <script src="/nsemfclient/resources/js/common/commonutility.js" type="text/javascript"></script>
+            <script src="/nsemfclient/resources/js/cryptojs/debug.min.js" type="text/javascript"></script>
+            
+<script src="/nsemfclient/resources/toolkit/datatables/DataTables/js/datatables.min.js?v=1" type="text/javascript"></script>
+
+            
+            <script src="/nsemfclient/resources/js/uccauthorization/uccauthorization.js?1793040723937=1793040723937" type="text/javascript"></script>        
+    </body>
+</html>

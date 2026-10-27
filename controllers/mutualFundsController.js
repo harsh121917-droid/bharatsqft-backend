@@ -1935,6 +1935,30 @@ exports.createPurchaseOrder = async (req, res) => {
         });
       }
 
+      const isInactive = /inactive/i.test(errMsg);
+      if (isInactive) {
+        let clActLink = null;
+        try {
+          const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
+          if (linkRes?.success && linkRes?.data?.firstHolderLink) {
+            clActLink = linkRes.data.firstHolderLink;
+          }
+        } catch (_) {}
+
+        return res.status(400).json({
+          success: false,
+          code: 'NSE_CLIENT_ACTIVATION_PENDING',
+          message: 'NSE MFSS Exchange: Client status is inactive. Please complete the one-time OTP verification sent to your mobile/email or wait for the exchange sync batch.',
+          data: {
+            exchangeStatus: trxnItem?.trxn_status || 'FAILED',
+            exchangeRemark: trxnItem?.trxn_remark || 'Client status is inactive.',
+            clientCode: ucc.clientCode,
+            schemeCode: scheme.schemeCode,
+            clActLink,
+          },
+        });
+      }
+
       return res.status(400).json({
         success: false,
         code: 'NSE_ORDER_REJECTED',
