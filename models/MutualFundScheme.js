@@ -99,6 +99,14 @@ const MutualFundSchemeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    prevNav: {
+      type: Number,
+      default: null,
+    },
+    day1Return: {
+      type: Number,
+      default: null,
+    },
     return1M: {
       type: Number,
       default: null,

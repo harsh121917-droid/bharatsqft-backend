@@ -94,6 +94,14 @@ const MfPortfolioHoldingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    day1ChangeAmount: {
+      type: Number,
+      default: 0,
+    },
+    day1ChangePct: {
+      type: Number,
+      default: 0,
+    },
     holdingStatus: {
       type: String,
       enum: ['ACTIVE', 'CLOSED'],
