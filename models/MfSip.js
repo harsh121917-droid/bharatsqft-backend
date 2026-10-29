@@ -115,6 +115,14 @@ const MfSipSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    paymentLink: {
+      type: String,
+      default: null,
+    },
+    authUrl: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );

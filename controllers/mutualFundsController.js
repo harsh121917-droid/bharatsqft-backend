@@ -2386,6 +2386,190 @@ exports.handleUpiPaymentCallback = async (req, res) => {
   }
 };
 
+const fetchMandateAuthLink = async (mandateId) => {
+  if (!mandateId) return null;
+  const mId = String(mandateId).trim();
+  if (!mId) return null;
+
+  const productTypes = ['MANDATE_AUTH', 'MANDATE_AUT', 'MANDATE'];
+  for (const pType of productTypes) {
+    try {
+      const res = await nseClient.getShortLink(pType, mId);
+      console.log(`[fetchMandateAuthLink] (${pType}, ${mId}) result:`, JSON.stringify(res));
+      const d = res?.data || res;
+      const raw =
+        d?.firstHolderLink ||
+        d?.short_url ||
+        d?.link ||
+        d?.url ||
+        d?.first_holder_link ||
+        d?.report_data?.[0]?.firstHolderLink ||
+        d?.report_data?.[0]?.short_url ||
+        d?.report_data?.[0]?.link ||
+        d?.data?.firstHolderLink;
+
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        const clean = raw.trim();
+        if (clean.startsWith('http://') || clean.startsWith('https://')) {
+          return clean;
+        }
+      }
+    } catch (err) {
+      console.warn(`[fetchMandateAuthLink] attempt error (${pType}):`, err.message);
+    }
+  }
+  return null;
+};
+
+const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) => {
+  if (!sipRegNo && !regItem) return null;
+
+  const extractUrl = (obj) => {
+    if (!obj) return null;
+    const d = obj.data || obj;
+    const candidates = [
+      d?.firstHolderLink,
+      d?.short_url,
+      d?.payment_link,
+      d?.link,
+      d?.url,
+      d?.first_holder_link,
+      d?.firstHolderUrl,
+      d?.authUrl,
+      d?.auth_url,
+      d?.report_data?.[0]?.firstHolderLink,
+      d?.report_data?.[0]?.short_url,
+      d?.report_data?.[0]?.link,
+      d?.report_data?.[0]?.url,
+      d?.reg_data?.[0]?.firstHolderLink,
+      d?.reg_data?.[0]?.short_url,
+      d?.reg_data?.[0]?.link,
+      d?.reg_data?.[0]?.payment_link,
+    ];
+    for (const c of candidates) {
+      if (typeof c === 'string') {
+        const trimmed = c.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          return trimmed;
+        }
+      }
+    }
+    return null;
+  };
+
+  // 1. Direct link in regItem
+  const directLink = extractUrl(regItem);
+  if (directLink) {
+    console.log('[fetchSipPaymentLink] Found direct link in regItem:', directLink);
+    return directLink;
+  }
+
+  // 2. Direct order ID in regItem (for installment #1)
+  const directOrderId = regItem?.order_id || regItem?.orderno || regItem?.trxn_order_id || regItem?.prov_order_id;
+  if (directOrderId) {
+    try {
+      const purRes = await nseClient.getShortLink('PUR', directOrderId);
+      const url = extractUrl(purRes);
+      if (url) {
+        console.log(`[fetchSipPaymentLink] Link resolved via regItem orderId (${directOrderId}):`, url);
+        return url;
+      }
+    } catch (_) {}
+  }
+
+  // 3. GET_LINK API with XSIP / SIP product types
+  const sId = String(sipRegNo || '').trim();
+  if (sId) {
+    const sipProductTypes = ['XSIP_REG', 'XSIP', 'SIP_REG', 'SIP', 'XSIP_AUTH'];
+    for (const pType of sipProductTypes) {
+      try {
+        const linkRes = await nseClient.getShortLink(pType, sId);
+        const url = extractUrl(linkRes);
+        if (url) {
+          console.log(`[fetchSipPaymentLink] Link resolved via getShortLink(${pType}, ${sId}):`, url);
+          return url;
+        }
+      } catch (err) {
+        console.warn(`[fetchSipPaymentLink] getShortLink(${pType}) warning:`, err.message);
+      }
+    }
+  }
+
+  // 4. Query PROV_ORDERS with proper NSE date formats (DD-MM-YYYY and DD/MM/YYYY)
+  if (clientCode) {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = now.getFullYear();
+    const dateDash = `${d}-${m}-${y}`;
+    const dateSlash = `${d}/${m}/${y}`;
+
+    const dateFormats = [dateDash, dateSlash];
+    const orderTypes = ['ALL', 'XSP', 'SIP'];
+
+    for (const fmt of dateFormats) {
+      for (const oType of orderTypes) {
+        try {
+          const provRes = await nseClient.post('/nsemfdesk/api/v2/reports/PROV_ORDERS', {
+            from_date: fmt,
+            to_date: fmt,
+            trans_type: 'ALL',
+            order_type: oType,
+            client_code: clientCode,
+            ...(sId ? { sip_reg_nos: sId } : {}),
+          });
+          const reportList = provRes?.data?.report_data;
+          if (Array.isArray(reportList) && reportList.length > 0) {
+            const matched = (sId ? reportList.find((r) => String(r.sip_reg_no || r.sip_reg_nos || '') === sId) : null) || reportList[0];
+            const provUrl = extractUrl(matched);
+            if (provUrl) return provUrl;
+
+            const provOrderId = matched?.order_id || matched?.orderno || matched?.trxn_order_id;
+            if (provOrderId) {
+              const purRes = await nseClient.getShortLink('PUR', provOrderId);
+              const url = extractUrl(purRes);
+              if (url) {
+                console.log(`[fetchSipPaymentLink] Link resolved via PROV_ORDERS (${provOrderId}):`, url);
+                return url;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  // 5. Query ORDER_STATUS report as fallback
+  if (clientCode) {
+    try {
+      const now = new Date();
+      const d = String(now.getDate()).padStart(2, '0');
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const y = now.getFullYear();
+      const dateDash = `${d}-${m}-${y}`;
+      const statusRes = await nseClient.getOrderStatusReport({
+        client_code: clientCode,
+        from_date: dateDash,
+        to_date: dateDash,
+      });
+      const orders = statusRes?.data?.report_data;
+      if (Array.isArray(orders) && orders.length > 0) {
+        const matched = orders.find((o) => (sId && String(o.sip_reg_no || '') === sId) || ['PENDING', 'NEW', 'ACCEPTED'].includes(o.status || o.order_status));
+        if (matched) {
+          const ordId = matched.order_id || matched.orderno || matched.trxn_order_id;
+          if (ordId) {
+            const purRes = await nseClient.getShortLink('PUR', ordId);
+            const url = extractUrl(purRes);
+            if (url) return url;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  return null;
+};
+
 // ── 6. POST /api/mutual-funds/sip/register (SIP / XSIP) ──
 exports.registerSipOrder = async (req, res) => {
   try {
@@ -2623,39 +2807,27 @@ exports.registerSipOrder = async (req, res) => {
 
     const sipRegNo = isSuccess ? String(rawRegId) : (nseClient.isMockMode() ? String(rawRegId || `TEST_SIP_${Date.now()}`) : '');
 
-    // 3. Request Official Payment / Mandate Link from NSE if first order is today
+    // 3. Request Official Payment / Authorization Link from NSE
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
     let paymentLink = null;
-    if (firstOrderToday === 'Y' && sipRegNo) {
+    if (sipRegNo) {
       try {
-        const linkRes = await nseClient.getShortLink('XSIP_REG', sipRegNo);
-        if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
-          paymentLink = linkRes.data.firstHolderLink;
-        } else {
-          // Check provisional orders for this XSIP to fetch order ID and payment link
-          try {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const provRes = await nseClient.post('/nsemfdesk/api/v2/reports/PROV_ORDERS', {
-              from_date: todayStr,
-              to_date: todayStr,
-              trans_type: 'ALL',
-              order_type: 'XSP',
-              client_code: ucc.clientCode,
-              sip_reg_nos: String(sipRegNo),
-            });
-            const provOrder = provRes?.data?.report_data?.[0];
-            const orderIdFromNse = provOrder?.order_id || provOrder?.orderno;
-            if (orderIdFromNse) {
-              const purLinkRes = await nseClient.getShortLink('PUR', orderIdFromNse);
-              if (purLinkRes && purLinkRes.success && purLinkRes.data?.firstHolderLink) {
-                paymentLink = purLinkRes.data.firstHolderLink;
-              }
-            }
-          } catch (_) {}
-        }
+        paymentLink = await fetchSipPaymentLink({
+          sipRegNo,
+          clientCode: ucc.clientCode,
+          regItem,
+          isLive,
+        });
       } catch (linkErr) {
-        console.warn('[registerSipOrder] getShortLink warning:', linkErr.message);
+        console.warn('[registerSipOrder] fetchSipPaymentLink warning:', linkErr.message);
+      }
+
+      // Fallback to mandate authorization link if mandate is not yet authorized
+      if (!paymentLink && effectiveMandateId) {
+        try {
+          paymentLink = await fetchMandateAuthLink(effectiveMandateId);
+        } catch (_) {}
       }
 
       // Strictly fallback to simulator ONLY in offline test/mock environments (never in live PROD)
@@ -2679,7 +2851,9 @@ exports.registerSipOrder = async (req, res) => {
       mandateId: effectiveMandateId,
       installmentsPaid: 0,
       totalAmountPaid: 0,
-      status: firstOrderToday === 'Y' ? 'PENDING_PAYMENT' : 'ACTIVE',
+      status: (firstOrderToday === 'Y' || paymentLink) ? 'PENDING_PAYMENT' : 'ACTIVE',
+      paymentLink: paymentLink || null,
+      authUrl: paymentLink || null,
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
     });
@@ -3148,6 +3322,16 @@ exports.getSipDetail = async (req, res) => {
     const sip = await MfSip.findOne({ _id: id, user: userId }).populate('mandateRef');
     if (!sip) {
       return res.status(404).json({ success: false, message: 'SIP not found' });
+    }
+    if (sip.status === 'PENDING_PAYMENT' && !sip.paymentLink && sip.sipRegNo) {
+      try {
+        const link = await fetchSipPaymentLink({ sipRegNo: sip.sipRegNo, clientCode: sip.clientCode });
+        if (link) {
+          sip.paymentLink = link;
+          sip.authUrl = link;
+          await sip.save();
+        }
+      } catch (_) {}
     }
     return res.json({ success: true, data: sip });
   } catch (error) {
@@ -4480,41 +4664,6 @@ exports.getOnboardingStatus = async (req, res) => {
     console.error('[getOnboardingStatus Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
-};
-
-const fetchMandateAuthLink = async (mandateId) => {
-  if (!mandateId) return null;
-  const mId = String(mandateId).trim();
-  if (!mId) return null;
-
-  const productTypes = ['MANDATE_AUTH', 'MANDATE_AUT', 'MANDATE'];
-  for (const pType of productTypes) {
-    try {
-      const res = await nseClient.getShortLink(pType, mId);
-      console.log(`[fetchMandateAuthLink] (${pType}, ${mId}) result:`, JSON.stringify(res));
-      const d = res?.data || res;
-      const raw =
-        d?.firstHolderLink ||
-        d?.short_url ||
-        d?.link ||
-        d?.url ||
-        d?.first_holder_link ||
-        d?.report_data?.[0]?.firstHolderLink ||
-        d?.report_data?.[0]?.short_url ||
-        d?.report_data?.[0]?.link ||
-        d?.data?.firstHolderLink;
-
-      if (typeof raw === 'string' && raw.trim().length > 0) {
-        const clean = raw.trim();
-        if (clean.startsWith('http://') || clean.startsWith('https://')) {
-          return clean;
-        }
-      }
-    } catch (err) {
-      console.warn(`[fetchMandateAuthLink] attempt error (${pType}):`, err.message);
-    }
-  }
-  return null;
 };
 
 // ── 18. POST /api/mutual-funds/mandates/setup (Generate or Fetch Mandate Link) ──

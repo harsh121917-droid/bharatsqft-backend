@@ -128,8 +128,8 @@ async function recalculateUserPortfolio(userId) {
     ],
   }).sort({ createdAt: 1 });
 
-  // 2. Fetch active SIPs
-  const activeSips = await MfSip.find({ user: userId, status: 'ACTIVE' });
+  // 2. Fetch active and pending-payment SIPs
+  const activeSips = await MfSip.find({ user: userId, status: { $in: ['ACTIVE', 'PENDING_PAYMENT'] } }).sort({ createdAt: -1 });
 
   // 3. Aggregate holdings scheme-by-scheme strictly from confirmed units
   const holdingsMap = {};
@@ -439,7 +439,7 @@ async function recalculateUserPortfolio(userId) {
     todayChangePct: currentValuation > 0 ? +((totalDayChangeAmount / currentValuation) * 100).toFixed(2) : 0,
     xirr, // Investor-level XIRR (distinct from scheme CAGR)
     totalFunds: holdingsList.length,
-    activeSipsCount: activeSips.length,
+    activeSipsCount: activeSips.filter(s => s.status === 'ACTIVE').length,
     lastUpdatedAt: new Date(),
   };
 
