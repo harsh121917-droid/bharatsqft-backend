@@ -624,12 +624,14 @@ exports.getSchemeDetail = async (req, res) => {
       }
     }
 
-    // 1. Fetch live scheme facts for supplementary metadata (AUM, fund manager, holdings)
-    const liveFacts = await mfLiveService.getLiveSchemeFacts(scheme.schemeName, scheme.schemeCode);
+    const liveFacts = null;
     const targetSchemeCode = scheme.amfiCode || scheme.schemeCode;
 
-    // 2. Fetch live historical daily NAV & chart points strictly for the REGULAR Plan
-    const liveNav = await mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme);
+    // Parallel fetch: Historical daily NAV chart points and Scheme Portfolio
+    const [liveNav, portfolioResult] = await Promise.all([
+      mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme),
+      mfPortfolioService.getSchemePortfolio(scheme.schemeCode),
+    ]);
 
     // Prepare chart points per timeframe
     let chartData = null;
@@ -654,10 +656,9 @@ exports.getSchemeDetail = async (req, res) => {
 
     let staticIntel = mfIntelligenceService.getSchemeIntelligence(scheme.schemeCode || scheme.amfiCode);
     if (isTigzig) {
-      if (staticIntel) {
-        await mfMarketSyncService.lazyEnrichScheme(scheme);
-      } else if (scheme.aum == null || scheme.expenseRatio == null || scheme.fundManager == null || scheme.minPurchaseAmount == null) {
-        staticIntel = await mfMarketSyncService.lazyEnrichScheme(scheme);
+      // Non-blocking background lazy enrichment so user response is never stalled
+      if (scheme.aum == null || scheme.expenseRatio == null || scheme.fundManager == null || scheme.minPurchaseAmount == null) {
+        mfMarketSyncService.lazyEnrichScheme(scheme).catch(() => {});
       }
     }
 
@@ -840,7 +841,6 @@ exports.getSchemeDetail = async (req, res) => {
           ? liveFacts.fundManagerDetails
           : [];
 
-    const portfolioResult = await mfPortfolioService.getSchemePortfolio(scheme.schemeCode);
     const isHoldingsAvailable = portfolioResult.holdingsAvailable;
     const resolvedHoldingsAsOf = portfolioResult.asOfDate;
     const resolvedHoldingsSource = portfolioResult.source;

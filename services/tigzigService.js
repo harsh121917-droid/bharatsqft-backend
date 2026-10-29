@@ -14,7 +14,9 @@
 const https = require('https');
 
 const BASE_URL = 'https://api.tigzig.com/mf/v1';
-const REQUEST_TIMEOUT_MS = 25000;
+const REQUEST_TIMEOUT_MS = 3000;
+const tigzigCache = new Map();
+const TIGZIG_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Fetch JSON from HTTPS endpoint
@@ -167,11 +169,18 @@ function normalizeTigzigRecord(item) {
  */
 async function fetchSchemeDetails(codeOrIsin) {
   if (!codeOrIsin) return null;
+  const key = String(codeOrIsin).trim();
+  const cached = tigzigCache.get(key);
+  if (cached && Date.now() - cached.timestamp < TIGZIG_CACHE_TTL_MS) {
+    return cached.data;
+  }
   try {
-    const url = `${BASE_URL}/schemes/${encodeURIComponent(codeOrIsin)}/details`;
+    const url = `${BASE_URL}/schemes/${encodeURIComponent(key)}/details`;
     const json = await fetchJson(url);
     if (json && json.data) {
-      return normalizeTigzigRecord(json.data);
+      const record = normalizeTigzigRecord(json.data);
+      tigzigCache.set(key, { data: record, timestamp: Date.now() });
+      return record;
     }
     return null;
   } catch (error) {

@@ -151,43 +151,41 @@ function normalizeSchemeKey(name) {
  * Resolves the official AMFI Code for the REGULAR Plan (never Direct)
  */
 async function resolveRegularAmfiCode(schemeCode, schemeName = '') {
-  if (!schemeName && !schemeCode) return schemeCode;
+  const cleanCode = String(schemeCode || '').trim();
+  // Fast Path: If schemeCode is already a valid 5-to-7 digit AMFI code, return immediately (0 ms)
+  if (/^\d{5,7}$/.test(cleanCode)) {
+    return cleanCode;
+  }
+
+  if (!schemeName && !cleanCode) return cleanCode;
 
   const normKey = normalizeSchemeKey(schemeName);
-
   if (regularCodeMap.has(normKey)) {
     return regularCodeMap.get(normKey);
   }
 
-  // Load official mfapi index if not loaded or older than 24 hours
-  if (!allMfApiSchemes || Date.now() - allMfApiSchemesTimestamp > 24 * 60 * 60 * 1000) {
-    try {
-      const list = await fetchJson('https://api.mfapi.in/mf');
-      if (Array.isArray(list)) {
-        allMfApiSchemes = list;
-        allMfApiSchemesTimestamp = Date.now();
-        for (const item of list) {
-          const lower = item.schemeName.toLowerCase();
-          // STRICT RULE: Must be REGULAR Plan only. Exclude Direct & IDCW.
-          if (lower.includes('direct') || lower.includes('idcw') || lower.includes('dividend') || lower.includes('bonus')) {
-            continue;
-          }
-          if (lower.includes('regular') || lower.includes('growth')) {
-            const k = normalizeSchemeKey(item.schemeName);
-            if (!regularCodeMap.has(k)) {
-              regularCodeMap.set(k, String(item.schemeCode));
-            }
-          }
+  // Targeted lightweight search on mfapi.in instead of multi-megabyte full catalogue download
+  try {
+    const cleanSearchName = (schemeName || '')
+      .replace(/\s*-\s*(direct|regular)\s*(plan)?\s*-?\s*(growth|idcw)?(\s+option)?/gi, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .trim();
+    if (cleanSearchName) {
+      const searchRes = await fetchJson(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(cleanSearchName)}`);
+      if (Array.isArray(searchRes) && searchRes.length > 0) {
+        const match = searchRes.find((item) => {
+          const lower = (item.schemeName || '').toLowerCase();
+          return !lower.includes('direct') && (lower.includes('regular') || lower.includes('growth')) && !lower.includes('idcw');
+        });
+        if (match && match.schemeCode) {
+          regularCodeMap.set(normKey, String(match.schemeCode));
+          return String(match.schemeCode);
         }
       }
-    } catch (_) {}
-  }
+    }
+  } catch (_) {}
 
-  if (regularCodeMap.has(normKey)) {
-    return regularCodeMap.get(normKey);
-  }
-
-  return schemeCode;
+  return cleanCode;
 }
 
 async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
