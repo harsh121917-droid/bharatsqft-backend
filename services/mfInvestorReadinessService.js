@@ -297,18 +297,29 @@ class MfInvestorReadinessService {
         mandate.mandateId.trim().length > 0
       );
 
-      // In production, an authorized mandate requires an approved status on the bank/exchange or a valid UMRN assigned
+      // In production, an authorized mandate requires a verified UMRN or a real active exchange authorization (not a stale simulator token)
       const hasValidUmrn = Boolean(
         mandate &&
         typeof mandate.umrn === 'string' &&
-        mandate.umrn.trim().length > 0
+        mandate.umrn.trim().length > 0 &&
+        !mandate.umrn.startsWith('UMRN_SIM')
       );
 
-      let isMandateAuthorized = Boolean(
-        mandate &&
-        hasMandateId &&
-        (isApprovedStatus || hasValidUmrn)
-      );
+      let isMandateAuthorized = false;
+      if (mandate && hasMandateId) {
+        if (hasValidUmrn) {
+          isMandateAuthorized = true;
+        } else if (nseClient.isMockMode()) {
+          isMandateAuthorized = isApprovedStatus;
+        } else {
+          const isSimulatorLink = mandate.authLink && (mandate.authLink.includes('mode=mandate_auth') || mandate.authLink.includes('mode=sandbox') || mandate.authLink.includes('/checkout/'));
+          const ageMs = Date.now() - new Date(mandate.createdAt).getTime();
+          const isStale = ageMs > (7 * 24 * 60 * 60 * 1000);
+          if (!isSimulatorLink && !isStale && isApprovedStatus) {
+            isMandateAuthorized = true;
+          }
+        }
+      }
 
       // If mandate is present but pending in local DB, check live status on NSE (in production only)
       if (!isMandateAuthorized && !nseClient.isMockMode() && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {

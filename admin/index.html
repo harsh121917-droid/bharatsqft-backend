@@ -4348,7 +4348,7 @@
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
                         <div style="flex:1;min-width:280px;position:relative">
                             <input type="text" id="mf-test-search-input" class="form-control"
-                                placeholder="Enter Mobile (e.g. 8855088817, 9997143005), Email, User ID, Client Code, or PAN..."
+                                placeholder="Search by Name (e.g. Harsh, Ashahad), Current UCC (e.g. VK046041), Phone, Email, or PAN..."
                                 style="background:#090d16;border:1px solid #23324d;color:#fff;font-size:14px;padding:10px 14px;border-radius:8px;width:100%"
                                 onkeydown="if(event.key==='Enter') searchMfTestUser()" />
                         </div>
@@ -4365,6 +4365,10 @@
                     <!-- Quick Preset Buttons -->
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px">
                         <span style="color:var(--text-dim);font-weight:600">Quick Test Accounts:</span>
+                        <button type="button" class="btn btn-sm" onclick="quickInspectMfUser('VK046041')"
+                            style="background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:4px 10px;border-radius:6px;font-size:12px">
+                            <i class="fas fa-user"></i> VK046041 (Harsh Kakran)
+                        </button>
                         <button type="button" class="btn btn-sm" onclick="quickInspectMfUser('8855088817')"
                             style="background:rgba(0,208,156,0.12);color:#00D09C;border:1px solid rgba(0,208,156,0.3);padding:4px 10px;border-radius:6px;font-size:12px">
                             <i class="fas fa-user"></i> 8855088817 (Ashahad)

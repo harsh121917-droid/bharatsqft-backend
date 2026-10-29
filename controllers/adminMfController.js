@@ -464,7 +464,7 @@ exports.reconcileMfOrder = async (req, res) => {
   }
 };
 
-// ── Helper: Resolve User by ID, Phone, Email, Client Code, or PAN ──
+// ── Helper: Resolve User by ID, Phone, Email, Client Code, Name, or PAN ──
 async function resolveUserByQuery(queryStr) {
   if (!queryStr) return { user: null, ucc: null };
   const q = String(queryStr).trim();
@@ -504,13 +504,18 @@ async function resolveUserByQuery(queryStr) {
     user = await User.findOne({ email: q.toLowerCase() });
   }
 
-  // 4. By NSE Client Code (e.g. VK143005, SH987654)
+  // 4. By NSE Client Code (e.g. VK143005, VK046041, SH987654)
   if (!user) {
     ucc = await MfClientUcc.findOne({
       $or: [{ clientCode: q }, { clientCode: q.toUpperCase() }],
     });
     if (ucc && ucc.user) {
       user = await User.findById(ucc.user);
+    }
+    if (!user) {
+      user = await User.findOne({
+        $or: [{ mfClientCode: q }, { mfClientCode: q.toUpperCase() }],
+      });
     }
   }
 
@@ -525,6 +530,36 @@ async function resolveUserByQuery(queryStr) {
     }
     if (!user) {
       const kyc = await Kyc.findOne({ panNumber: panUpper });
+      if (kyc && kyc.user) {
+        user = await User.findById(kyc.user);
+      }
+    }
+  }
+
+  // 6. By Name (e.g. "Harsh", "Ashahad", "Harsh Kakran", case-insensitive)
+  if (!user) {
+    const escaped = q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const nameRegex = new RegExp(escaped, 'i');
+
+    // First try User name
+    user = await User.findOne({ name: { $regex: nameRegex } });
+
+    // Next try MfClientUcc fullName
+    if (!user) {
+      ucc = await MfClientUcc.findOne({ fullName: { $regex: nameRegex } });
+      if (ucc && ucc.user) {
+        user = await User.findById(ucc.user);
+      }
+    }
+
+    // Next try Kyc registered legal name
+    if (!user) {
+      const kyc = await Kyc.findOne({
+        $or: [
+          { fullName: { $regex: nameRegex } },
+          { panRegisteredName: { $regex: nameRegex } },
+        ],
+      });
       if (kyc && kyc.user) {
         user = await User.findById(kyc.user);
       }
@@ -615,19 +650,57 @@ exports.inspectMfTestingUser = async (req, res) => {
   try {
     const queryStr = req.query.query || req.query.q || req.query.userId || req.query.phone;
     if (!queryStr) {
-      return res.status(400).json({ success: false, message: 'Search query (phone, email, ID, client code, or PAN) is required.' });
+      return res.status(400).json({ success: false, message: 'Search query (name, phone, client code, email, or PAN) is required.' });
     }
 
     const { user, ucc } = await resolveUserByQuery(queryStr);
     if (!user && !ucc) {
       return res.status(404).json({
         success: false,
-        message: `No investor account found matching "${queryStr}". Please check the phone number, email, or client code.`,
+        message: `No investor account found matching "${queryStr}". Please check the name, phone number, client code, or PAN.`,
       });
     }
 
     const targetUserId = user?._id || ucc?.user;
-    const clientCode = ucc?.clientCode;
+    const clientCode = ucc?.clientCode || user?.mfClientCode;
+
+    // Search for other potential candidate matches (helpful if query matches multiple names/accounts)
+    let candidates = [];
+    try {
+      const qTrim = String(queryStr).trim();
+      const escaped = qTrim.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const qRegex = new RegExp(escaped, 'i');
+
+      const matchingUsers = await User.find({
+        $or: [
+          { name: { $regex: qRegex } },
+          { phone: { $regex: qRegex } },
+          { email: { $regex: qRegex } },
+          { mfClientCode: { $regex: qRegex } },
+        ],
+      })
+        .limit(6)
+        .select('_id name phone email mfClientCode')
+        .lean();
+
+      if (matchingUsers.length > 1) {
+        const uIds = matchingUsers.map(m => m._id);
+        const relatedUccs = await MfClientUcc.find({ user: { $in: uIds } }).select('user clientCode fullName').lean();
+        const uccMap = new Map(relatedUccs.map(c => [String(c.user), c]));
+
+        candidates = matchingUsers.map(m => {
+          const uRec = uccMap.get(String(m._id));
+          return {
+            userId: String(m._id),
+            name: m.name,
+            phone: m.phone,
+            email: m.email,
+            clientCode: uRec?.clientCode || m.mfClientCode || null,
+            uccName: uRec?.fullName || null,
+          };
+        });
+      }
+    } catch (_) {}
 
     const queryFilter = [];
     if (targetUserId) queryFilter.push({ user: targetUserId });
@@ -688,6 +761,7 @@ exports.inspectMfTestingUser = async (req, res) => {
         sips,
         holdings,
         summary,
+        candidates,
       },
     });
   } catch (error) {
@@ -714,7 +788,7 @@ exports.resetMfTestingUser = async (req, res) => {
     } = req.body;
 
     if (!query) {
-      return res.status(400).json({ success: false, message: 'User identifier (phone, email, ID, or client code) is required.' });
+      return res.status(400).json({ success: false, message: 'User identifier (name, phone, email, ID, or client code) is required.' });
     }
 
     const { user, ucc } = await resolveUserByQuery(query);
@@ -723,7 +797,7 @@ exports.resetMfTestingUser = async (req, res) => {
     }
 
     const targetUserId = user?._id || ucc?.user;
-    const clientCode = ucc?.clientCode;
+    const clientCode = ucc?.clientCode || user?.mfClientCode;
 
     const queryFilter = [];
     if (targetUserId) queryFilter.push({ user: targetUserId });
@@ -749,6 +823,10 @@ exports.resetMfTestingUser = async (req, res) => {
           : MfClientUcc.deleteMany(mfQuery)
         ).then(r => { results.uccDeleted = r.deletedCount; })
       );
+      if (user && !generateNewClientCode && !customClientCode) {
+        user.mfClientCode = undefined;
+        await user.save().catch(() => {});
+      }
     }
 
     if (clearOrders) {
@@ -767,6 +845,10 @@ exports.resetMfTestingUser = async (req, res) => {
       deleteTasks.push(
         MfMandate.deleteMany(mfQuery).then(r => { results.mandatesDeleted = r.deletedCount; })
       );
+      if (ucc && !clearUcc) {
+        ucc.defaultMandateId = '';
+        await ucc.save().catch(() => {});
+      }
     }
 
     if (clearHoldings) {

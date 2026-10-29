@@ -2421,6 +2421,35 @@ const fetchMandateAuthLink = async (mandateId) => {
   return null;
 };
 
+const isMandateGenuinelyApproved = (mandate) => {
+  if (!mandate || !mandate.mandateId || !mandate.mandateId.trim()) return false;
+  
+  // Real NPCI UMRN means it was definitely registered and approved by the bank on the clearing house
+  if (mandate.umrn && typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0 && !mandate.umrn.startsWith('UMRN_SIM')) {
+    return true;
+  }
+
+  // In offline mock mode, allow simulated statuses
+  if (nseClient.isMockMode()) {
+    return ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'AUTHORIZED'].includes(mandate.status);
+  }
+
+  // In live production:
+  // If mandate authLink points to local simulator, it was never authenticated with the real bank on NSE
+  if (mandate.authLink && (mandate.authLink.includes('mode=mandate_auth') || mandate.authLink.includes('mode=sandbox') || mandate.authLink.includes('/checkout/'))) {
+    return false;
+  }
+
+  // Stale mandate check: NSE mandate authentication links expire after 7 days
+  const ageMs = Date.now() - new Date(mandate.createdAt).getTime();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  if (ageMs > sevenDaysMs && (!mandate.umrn || mandate.umrn.trim().length === 0)) {
+    return false;
+  }
+
+  return ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'AUTHORIZED'].includes(mandate.status);
+};
+
 const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) => {
   if (!sipRegNo && !regItem) return null;
 
@@ -4563,19 +4592,7 @@ exports.getOnboardingStatus = async (req, res) => {
         mandateId: { $nin: ['', ' ', null] },
       }).sort({ createdAt: -1 });
     }
-    let isMandateApproved = Boolean(
-      mandate &&
-      mandate.mandateId &&
-      mandate.mandateId.trim().length > 0 &&
-      (
-        mandate.status === 'APPROVED' ||
-        mandate.status === 'ACCEPTED_BY_BANK' ||
-        mandate.status === 'ACTIVE' ||
-        mandate.status === 'AUTHORIZED' ||
-        (typeof mandate.umrn === 'string' && mandate.umrn.trim().length > 0) ||
-        nseClient.isMockMode()
-      )
-    );
+    let isMandateApproved = isMandateGenuinelyApproved(mandate);
 
     // If mandate exists and is not yet marked approved in local DB, check live status on NSE
     if (!isMandateApproved && mandate && mandate.mandateId && mandate.mandateId.trim().length > 0) {
@@ -4709,9 +4726,18 @@ exports.setupUserMandate = async (req, res) => {
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
 
-    // If an existing mandate is found (and forceNew was not requested), reuse it and make sure authLink is populated
+    // If an existing mandate is found (and forceNew was not requested), reuse it only if genuinely approved or valid
     if (mandate) {
-      if (['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(mandate.status)) {
+      if (!isMandateGenuinelyApproved(mandate)) {
+        console.warn(`[setupUserMandate] Mandate ${mandate.mandateId} is stale or unverified on exchange (no UMRN/simulator). Inactivating and generating fresh live mandate...`);
+        mandate.status = 'EXPIRED';
+        await mandate.save().catch(() => {});
+        if (ucc.defaultMandateId === mandate.mandateId) {
+          ucc.defaultMandateId = null;
+          await ucc.save().catch(() => {});
+        }
+        mandate = null;
+      } else if (['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(mandate.status)) {
         return res.json({
           success: true,
           message: 'Mandate is already authorized and approved',

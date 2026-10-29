@@ -2266,7 +2266,7 @@ async function searchMfTestUser(queryOverride) {
     const input = document.getElementById('mf-test-search-input');
     const query = (queryOverride || input?.value || '').trim();
     if (!query) {
-        toast('Please enter a mobile number, email, user ID, or client code', 'warning');
+        toast('Please enter a Name, Mobile number, Client code, Email, or PAN', 'warning');
         return;
     }
 
@@ -2297,7 +2297,7 @@ async function searchMfTestUser(queryOverride) {
                         <i class="fas fa-user-slash" style="font-size:36px;color:#ef4444;margin-bottom:12px"></i>
                         <h4 style="color:#fff;margin:0 0 8px 0;font-size:16px">${escapeHtml(res?.message || 'No user found')}</h4>
                         <p style="color:var(--text-dim);font-size:12.5px;max-width:480px;margin:0 auto 16px auto">
-                            No active user, client code, or PAN matched "${escapeHtml(query)}". Please verify the 10-digit mobile number or email address.
+                            No investor found matching "${escapeHtml(query)}". You can search by Name (e.g. Harsh, Ashahad), UCC (e.g. VK046041), 10-digit mobile number, or PAN.
                         </p>
                         <button class="btn btn-secondary btn-sm" onclick="clearMfTestSearch()">Clear Search</button>
                     </div>
@@ -2377,6 +2377,7 @@ function renderMfTestingInspectResults(data) {
     const sips = data.sips || [];
     const holdings = data.holdings || [];
     const summary = data.summary || {};
+    const candidates = data.candidates || [];
 
     const primaryBank = banks.find(b => b.isDefault) || banks[0] || ucc?.primaryBank || null;
 
@@ -2394,32 +2395,66 @@ function renderMfTestingInspectResults(data) {
         overallBadge = `<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600"><i class="fas fa-clock"></i> UCC ${escapeHtml(ucc.nseStatus)}</span>`;
     }
 
+    // Multiple match candidate switcher
+    let candidatesHtml = '';
+    if (candidates.length > 1) {
+        const currentUserId = String(u._id || summary.userId || '');
+        candidatesHtml = `
+            <div style="margin-bottom:14px;padding:12px 16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-size:12.5px;color:var(--text-dim);font-weight:600;display:flex;align-items:center;gap:6px">
+                    <i class="fas fa-users" style="color:#38bdf8"></i> Multiple matches found (${candidates.length}):
+                </span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    ${candidates.map(c => {
+                        const isCurrent = String(c.userId) === currentUserId;
+                        const labelCode = c.clientCode ? ` (${escapeHtml(c.clientCode)})` : '';
+                        return `
+                            <button type="button" class="btn btn-sm" onclick="searchMfTestUser('${escapeHtml(c.userId || c.phone || c.clientCode)}')"
+                                style="font-size:12px;padding:3px 10px;border-radius:14px;background:${isCurrent ? 'rgba(0,208,156,0.2)' : 'rgba(255,255,255,0.06)'};color:${isCurrent ? '#00D09C' : '#cbd5e1'};border:1px solid ${isCurrent ? '#00D09C' : '#334155'};cursor:pointer">
+                                <b>${escapeHtml(c.name || 'User')}</b>${labelCode} - <span style="font-family:monospace">${escapeHtml(c.phone || '')}</span>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     container.innerHTML = `
+        ${candidatesHtml}
+
         <!-- Top Profile & State Header Card -->
         <div class="card" style="padding:20px;margin-bottom:18px;background:#0d1527;border:1px solid #1e293b;border-radius:12px">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px">
                 <div style="display:flex;gap:14px;align-items:center">
                     <div style="width:52px;height:52px;border-radius:50%;background:rgba(0,208,156,0.15);color:#00D09C;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800">
-                        ${escapeHtml((u.name || 'U').charAt(0).toUpperCase())}
+                        ${escapeHtml((u.name || summary.name || 'U').charAt(0).toUpperCase())}
                     </div>
                     <div>
                         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                            <h3 style="margin:0;color:#fff;font-size:18px;font-weight:700">${escapeHtml(u.name || 'Unknown User')}</h3>
+                            <h3 style="margin:0;color:#fff;font-size:18px;font-weight:700">${escapeHtml(u.name || summary.name || 'Unknown User')}</h3>
                             ${overallBadge}
+                            ${(ucc?.clientCode || u?.mfClientCode) ? `<span style="font-size:11.5px;background:rgba(56,189,248,0.15);color:#38bdf8;padding:2px 8px;border-radius:6px;font-weight:700;font-family:monospace">UCC: ${escapeHtml(ucc?.clientCode || u?.mfClientCode)}</span>` : ''}
                             <span style="font-size:11px;background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:6px">ID: ${escapeHtml(u._id || summary.userId || '-')}</span>
                         </div>
                         <div style="display:flex;gap:16px;flex-wrap:wrap;color:var(--text-dim);font-size:12.5px;margin-top:6px">
-                            <span><i class="fas fa-phone-alt" style="color:#00D09C"></i> ${escapeHtml(u.phone || 'No phone')}</span>
-                            <span><i class="fas fa-envelope" style="color:#3b82f6"></i> ${escapeHtml(u.email || 'No email')}</span>
+                            <span><i class="fas fa-phone-alt" style="color:#00D09C"></i> ${escapeHtml(u.phone || summary.phone || 'No phone')}</span>
+                            <span><i class="fas fa-envelope" style="color:#3b82f6"></i> ${escapeHtml(u.email || summary.email || 'No email')}</span>
                             <span><i class="fas fa-calendar-alt"></i> Joined: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '-'}</span>
                         </div>
                     </div>
                 </div>
 
-                <div style="display:flex;gap:8px;align-items:center">
-                    <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()"><i class="fas fa-sync-alt"></i> Refresh State</button>
-                    <button class="btn btn-sm" onclick="executeFullFreshSlateReset()" style="background:#f59e0b;color:#000;font-weight:700">
-                        <i class="fas fa-bolt"></i> 1-Click Fresh Slate
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()" title="Refresh live database state"><i class="fas fa-sync-alt"></i> Refresh State</button>
+                    <button class="btn btn-sm" onclick="executeResetSipsOnly()" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700" title="Delete all active SIP schedules only">
+                        <i class="fas fa-redo"></i> Reset SIPs Only (${sips.length})
+                    </button>
+                    <button class="btn btn-sm" onclick="executeResetUccMandateOnly()" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700" title="Delete UCC registration & Mandate to allow fresh mobile onboarding">
+                        <i class="fas fa-id-card"></i> Reset UCC & Mandate
+                    </button>
+                    <button class="btn btn-sm" onclick="executeFullFreshSlateReset()" style="background:#f59e0b;color:#000;font-weight:700" title="Wipe all MF sandbox data">
+                        <i class="fas fa-bolt"></i> Wipe All (Fresh Slate)
                     </button>
                 </div>
             </div>
@@ -2454,9 +2489,12 @@ function renderMfTestingInspectResults(data) {
                     <div>Registered Name: <b style="color:#fff">${escapeHtml(ucc?.fullName || 'None')}</b></div>
                     <div>DOB: <span style="color:#fff">${escapeHtml(ucc?.dob || 'None')}</span></div>
                     <div>Tax Status / Occ: <span style="color:#fff">${escapeHtml(ucc?.taxStatus || '-')} / ${escapeHtml(ucc?.occupationCode || '-')}</span></div>
-                    <div style="margin-top:8px">
-                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;width:100%" onclick="quickGenerateNewClientCode('${escapeHtml(u._id || summary.userId || '')}')">
+                    <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px;width:100%" onclick="quickGenerateNewClientCode('${escapeHtml(u._id || summary.userId || '')}')">
                             <i class="fas fa-random"></i> Generate New Client Code
+                        </button>
+                        <button class="btn btn-sm" style="font-size:11px;padding:4px 8px;width:100%;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="executeResetUccMandateOnly()">
+                            <i class="fas fa-trash-alt"></i> Reset UCC & Mandate Only
                         </button>
                     </div>
                 </div>
@@ -2510,6 +2548,11 @@ function renderMfTestingInspectResults(data) {
                     <div>Active SIPs: <b style="color:#fff">${sips.length}</b></div>
                     <div>Orders / Purchases: <b style="color:#fff">${orders.length}</b></div>
                     <div>Portfolio Holdings: <b style="color:#fff">${holdings.length} funds</b></div>
+                    <div style="margin-top:10px">
+                        <button class="btn btn-sm" style="font-size:11px;padding:4px 8px;width:100%;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3)" onclick="executeResetSipsOnly()">
+                            <i class="fas fa-redo"></i> Reset Active SIPs (${sips.length})
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2519,7 +2562,7 @@ function renderMfTestingInspectResults(data) {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
                 <div>
                     <h4 style="margin:0;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px">
-                        <i class="fas fa-broom" style="color:#ef4444"></i> Selective Sandbox Reset for ${escapeHtml(u.name || summary.phone || 'User')}
+                        <i class="fas fa-broom" style="color:#ef4444"></i> Selective Sandbox Reset for ${escapeHtml(u.name || summary.name || summary.phone || 'User')}
                     </h4>
                     <div style="font-size:12px;color:var(--text-dim);margin-top:2px">
                         Choose which records to delete so you can re-test specific onboarding or investment flows cleanly.
@@ -2536,11 +2579,11 @@ function renderMfTestingInspectResults(data) {
                     </div>
                 </label>
 
-                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
-                    <input type="checkbox" id="mf-reset-chk-orders" checked style="margin-top:3px;accent-color:#ef4444" />
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#38bdf8;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-sips" checked style="margin-top:3px;accent-color:#38bdf8" />
                     <div>
-                        <b>MF Orders & SIPs</b> (${orders.length} orders, ${sips.length} sips)
-                        <div style="font-size:11px;color:var(--text-dim)">Deletes order ledger and SIP schedules</div>
+                        <b>Active SIP Schedules</b> (${sips.length} sips)
+                        <div style="font-size:11px;color:var(--text-dim)">Clears active SIP schedules so you can test starting a fresh SIP</div>
                     </div>
                 </label>
 
@@ -2549,6 +2592,14 @@ function renderMfTestingInspectResults(data) {
                     <div>
                         <b>MF Mandates (eNACH)</b> (${mandates.length})
                         <div style="font-size:11px;color:var(--text-dim)">Deletes AutoPay / eNACH mandate records</div>
+                    </div>
+                </label>
+
+                <label style="display:flex;align-items:flex-start;gap:8px;color:#fff;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="mf-reset-chk-orders" checked style="margin-top:3px;accent-color:#ef4444" />
+                    <div>
+                        <b>MF Orders & Transactions</b> (${orders.length} orders)
+                        <div style="font-size:11px;color:var(--text-dim)">Deletes order ledger and purchase history</div>
                     </div>
                 </label>
 
@@ -2590,9 +2641,15 @@ function renderMfTestingInspectResults(data) {
                     <input type="text" id="mf-reset-reason-input" class="form-control" placeholder="Optional audit reason (e.g. Testing fresh investor flow)..."
                         style="background:#090d16;border:1px solid #1e293b;color:#fff;font-size:12.5px;padding:8px 12px;border-radius:6px;width:100%" />
                 </div>
-                <div style="display:flex;gap:10px">
-                    <button class="btn btn-danger" onclick="executeMfTestReset()" id="btn-execute-mf-reset" style="font-weight:700;padding:8px 18px">
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-danger" onclick="executeMfTestReset()" id="btn-execute-mf-reset" style="font-weight:700;padding:8px 16px">
                         <i class="fas fa-trash-alt"></i> Clear Selected Records
+                    </button>
+                    <button class="btn" onclick="executeResetSipsOnly()" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;padding:8px 16px">
+                        <i class="fas fa-redo"></i> Reset SIPs Only
+                    </button>
+                    <button class="btn" onclick="executeResetUccMandateOnly()" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700;padding:8px 16px">
+                        <i class="fas fa-id-card"></i> Reset UCC & Mandate
                     </button>
                     <button class="btn" onclick="executeFullFreshSlateReset()" style="background:#f59e0b;color:#000;font-weight:700;padding:8px 18px">
                         <i class="fas fa-bolt"></i> Wipe All (Fresh Slate)
@@ -2609,12 +2666,12 @@ async function executeMfTestReset() {
         return;
     }
 
-    const query = currentInspectedMfUser.summary.phone || currentInspectedMfUser.summary.userId;
+    const query = currentInspectedMfUser.summary.userId || currentInspectedMfUser.summary.clientCode || currentInspectedMfUser.summary.phone;
     const userName = currentInspectedMfUser.summary.name || query;
 
     const clearUcc = document.getElementById('mf-reset-chk-ucc')?.checked ?? true;
+    const clearSips = document.getElementById('mf-reset-chk-sips')?.checked ?? true;
     const clearOrders = document.getElementById('mf-reset-chk-orders')?.checked ?? true;
-    const clearSips = document.getElementById('mf-reset-chk-orders')?.checked ?? true;
     const clearMandates = document.getElementById('mf-reset-chk-mandates')?.checked ?? true;
     const clearHoldings = document.getElementById('mf-reset-chk-holdings')?.checked ?? true;
     const clearKyc = document.getElementById('mf-reset-chk-kyc')?.checked ?? false;
@@ -2622,7 +2679,7 @@ async function executeMfTestReset() {
     const generateNewClientCode = document.getElementById('mf-reset-chk-rotate-code')?.checked ?? false;
     const adminReason = document.getElementById('mf-reset-reason-input')?.value?.trim() || 'Admin manual test reset';
 
-    if (!clearUcc && !clearOrders && !clearMandates && !clearHoldings && !clearKyc && !clearBank && !generateNewClientCode) {
+    if (!clearUcc && !clearOrders && !clearSips && !clearMandates && !clearHoldings && !clearKyc && !clearBank && !generateNewClientCode) {
         toast('Please check at least one record type to reset', 'warning');
         return;
     }
@@ -2657,10 +2714,8 @@ async function executeMfTestReset() {
 
         if (res && res.success) {
             toast(res.message || 'MF test data cleared successfully! 🎉', 'success');
-            // Re-inspect immediately to show fresh slate
             await searchMfTestUser(query);
 
-            // Also refresh other MF views in background if functions exist
             if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
             if (typeof loadMfOverview === 'function') loadMfOverview();
         } else {
@@ -2674,6 +2729,97 @@ async function executeMfTestReset() {
             btn.disabled = false;
             btn.innerHTML = `<i class="fas fa-trash-alt"></i> Clear Selected Records`;
         }
+    }
+}
+
+// ── 1-Click Action: Reset SIPs Only ──
+async function executeResetSipsOnly() {
+    if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
+        toast('No user selected to reset', 'warning');
+        return;
+    }
+
+    const query = currentInspectedMfUser.summary.userId || currentInspectedMfUser.summary.clientCode || currentInspectedMfUser.summary.phone;
+    const userName = currentInspectedMfUser.summary.name || query;
+    const sipsCount = currentInspectedMfUser.summary.sipsCount || 0;
+
+    const confirmMsg = `⚠️ Are you sure you want to RESET ALL SIPs for "${userName}" (${query})?\n\nThis will permanently delete ${sipsCount} active SIP schedule(s) from the database so you can test starting a fresh SIP in the mobile app.\n\nUCC, Mandates, KYC, and Bank accounts will remain 100% intact.\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const payload = {
+            query,
+            clearSips: true,
+            clearUcc: false,
+            clearOrders: false,
+            clearMandates: false,
+            clearHoldings: false,
+            clearKyc: false,
+            clearBank: false,
+            generateNewClientCode: false,
+            adminReason: `Admin reset SIPs only for ${userName} (${query})`,
+        };
+
+        const res = await api('/admin/mutual-funds/testing/reset-user', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        if (res && res.success) {
+            toast(res.message || 'Active SIPs reset successfully! 🎉', 'success');
+            await searchMfTestUser(query);
+            if (typeof loadMfOverview === 'function') loadMfOverview();
+        } else {
+            toast(res?.message || 'Failed to reset SIPs', 'danger');
+        }
+    } catch (err) {
+        console.error('executeResetSipsOnly error:', err);
+        toast(err.message || 'Error executing SIP reset', 'danger');
+    }
+}
+
+// ── 1-Click Action: Reset UCC & Mandate Only ──
+async function executeResetUccMandateOnly() {
+    if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
+        toast('No user selected to reset', 'warning');
+        return;
+    }
+
+    const query = currentInspectedMfUser.summary.userId || currentInspectedMfUser.summary.clientCode || currentInspectedMfUser.summary.phone;
+    const userName = currentInspectedMfUser.summary.name || query;
+
+    const confirmMsg = `⚠️ Are you sure you want to RESET UCC & MANDATE for "${userName}" (${query})?\n\nThis will delete the current UCC profile and Bank Mandates so the user can re-register UCC and setup a new Bank AutoPay Mandate cleanly in the mobile app.\n\nKYC and Bank accounts will remain 100% intact.\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const payload = {
+            query,
+            clearUcc: true,
+            clearMandates: true,
+            clearSips: false,
+            clearOrders: false,
+            clearHoldings: false,
+            clearKyc: false,
+            clearBank: false,
+            generateNewClientCode: false,
+            adminReason: `Admin reset UCC and Mandate only for ${userName} (${query})`,
+        };
+
+        const res = await api('/admin/mutual-funds/testing/reset-user', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        if (res && res.success) {
+            toast(res.message || 'UCC & Mandate reset successfully! 🎉', 'success');
+            await searchMfTestUser(query);
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
+        } else {
+            toast(res?.message || 'Failed to reset UCC & Mandate', 'danger');
+        }
+    } catch (err) {
+        console.error('executeResetUccMandateOnly error:', err);
+        toast(err.message || 'Error executing UCC & Mandate reset', 'danger');
     }
 }
 
@@ -2714,7 +2860,7 @@ async function executeFullFreshSlateReset() {
     }
 
     // Check all checkboxes
-    ['mf-reset-chk-ucc', 'mf-reset-chk-orders', 'mf-reset-chk-mandates', 'mf-reset-chk-holdings', 'mf-reset-chk-kyc', 'mf-reset-chk-rotate-code'].forEach(id => {
+    ['mf-reset-chk-ucc', 'mf-reset-chk-sips', 'mf-reset-chk-mandates', 'mf-reset-chk-orders', 'mf-reset-chk-holdings', 'mf-reset-chk-kyc', 'mf-reset-chk-rotate-code'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.checked = true;
     });
