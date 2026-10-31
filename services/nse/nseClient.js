@@ -697,10 +697,10 @@ class NseClient {
   // ── 7b. Mandate Status Report (Doc page 70) ──
   async getMandateStatus(filter = {}) {
     const payload = {};
-    if (filter.mandateId) payload.mandate_id = String(filter.mandateId);
-    if (filter.clientCode) payload.client_code = filter.clientCode;
-    if (filter.fromDate) payload.from_date = filter.fromDate;
-    if (filter.toDate) payload.to_date = filter.toDate;
+    if (filter.mandateId || filter.mandate_id) payload.mandate_id = String(filter.mandateId || filter.mandate_id);
+    if (filter.clientCode || filter.client_code) payload.client_code = filter.clientCode || filter.client_code;
+    if (filter.fromDate || filter.from_date) payload.from_date = filter.fromDate || filter.from_date;
+    if (filter.toDate || filter.to_date) payload.to_date = filter.toDate || filter.to_date;
     if (filter.memberMandateIds) payload.memberMandateIds = filter.memberMandateIds;
     return this.post('/nsemfdesk/api/v2/reports/MANDATE_STATUS', payload);
   }

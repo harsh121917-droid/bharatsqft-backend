@@ -2837,12 +2837,8 @@ exports.registerSipOrder = async (req, res) => {
         console.warn('[registerSipOrder] fetchSipPaymentLink warning:', linkErr.message);
       }
 
-      // Fallback to mandate authorization link if mandate is not yet authorized
-      if (!paymentLink && effectiveMandateId) {
-        try {
-          paymentLink = await fetchMandateAuthLink(effectiveMandateId);
-        } catch (_) {}
-      }
+      // Do NOT fall back to mandate auth link! An SIP order requires SIP payment or 2FA OTP, NEVER mandate setup.
+      // If paymentLink is null in live PROD, NSE MFSS has dispatched the official 2FA OTP/SMS to the investor.
 
       // Strictly fallback to simulator ONLY in offline test/mock environments (never in live PROD)
       if (!paymentLink && !isLive) {
@@ -4713,16 +4709,7 @@ exports.setupUserMandate = async (req, res) => {
 
     // If an existing mandate is found (and forceNew was not requested), reuse it only if genuinely approved or valid
     if (mandate) {
-      if (!isMandateGenuinelyApproved(mandate)) {
-        console.warn(`[setupUserMandate] Mandate ${mandate.mandateId} is stale or unverified on exchange (no UMRN/simulator). Inactivating and generating fresh live mandate...`);
-        mandate.status = 'EXPIRED';
-        await mandate.save().catch(() => {});
-        if (ucc.defaultMandateId === mandate.mandateId) {
-          ucc.defaultMandateId = null;
-          await ucc.save().catch(() => {});
-        }
-        mandate = null;
-      } else if (['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(mandate.status)) {
+      if (['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'AUTHORIZED'].includes(mandate.status)) {
         return res.json({
           success: true,
           message: 'Mandate is already authorized and approved',
@@ -4735,6 +4722,22 @@ exports.setupUserMandate = async (req, res) => {
             accountNo: mandate.accountNo,
           },
         });
+      }
+
+      const isSimulatorLink = mandate.authLink && (mandate.authLink.includes('mode=mandate_auth') || mandate.authLink.includes('mode=sandbox') || mandate.authLink.includes('/checkout/'));
+      const ageMs = Date.now() - new Date(mandate.createdAt).getTime();
+      const isOlderThan7Days = ageMs > (7 * 24 * 60 * 60 * 1000);
+      const isCorruptOrStale = (isLive && isSimulatorLink) || (isOlderThan7Days && (!mandate.umrn || !mandate.umrn.trim()));
+
+      if (isCorruptOrStale) {
+        console.warn(`[setupUserMandate] Mandate ${mandate.mandateId} is stale or simulator link in prod. Inactivating and generating fresh live mandate...`);
+        mandate.status = 'EXPIRED';
+        await mandate.save().catch(() => {});
+        if (ucc.defaultMandateId === mandate.mandateId) {
+          ucc.defaultMandateId = null;
+          await ucc.save().catch(() => {});
+        }
+        mandate = null;
       }
 
       // If pending authorization, ensure authLink is fetched from NSE
@@ -5038,23 +5041,26 @@ exports.verifyUserMandate = async (req, res) => {
         const statusRes = await nseClient.getMandateStatus({
           mandateId: mandate.mandateId,
           clientCode: mandate.clientCode,
+          client_code: mandate.clientCode,
         });
-        const reportItem = statusRes?.data?.report_data?.[0];
+        const reportItem = statusRes?.data?.mandates?.[0] || statusRes?.data?.report_data?.[0];
         if (reportItem) {
-          liveStatus = reportItem.status;
-          liveUmrn = reportItem.umrnNo;
+          liveStatus = reportItem.status || reportItem.mandate_status || reportItem.reg_status;
+          liveUmrn = reportItem.umrn || reportItem.umrnNo || reportItem.umrn_no;
         }
       } catch (_) {}
     }
 
+    const submittedUmrn = (req.body?.umrn || liveUmrn || '').toString().trim();
     if (!nseClient.isMockMode()) {
       const isApprovedOnExchange = Boolean(
-        liveStatus && ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE'].includes(liveStatus.toUpperCase())
+        (liveStatus && ['APPROVED', 'ACCEPTED_BY_BANK', 'ACTIVE', 'AUTHORIZED'].includes(liveStatus.toUpperCase())) ||
+        (submittedUmrn && submittedUmrn.length > 0 && !submittedUmrn.startsWith('UMRN_SIM'))
       );
       if (isApprovedOnExchange) {
         mandate.status = 'APPROVED';
-        if (liveUmrn) mandate.umrn = liveUmrn.trim();
-        mandate.authorizedAt = new Date();
+        if (submittedUmrn) mandate.umrn = submittedUmrn;
+        mandate.authorizedAt = mandate.authorizedAt || new Date();
         await mandate.save();
       } else if (liveStatus && ['REJECTED', 'FAILED', 'CANCELLED'].includes(liveStatus.toUpperCase())) {
         mandate.status = 'REJECTED';
@@ -5065,6 +5071,10 @@ exports.verifyUserMandate = async (req, res) => {
           message: `Mandate was rejected by your bank: ${liveStatus}`,
           data: mandate,
         });
+      } else if (mandate.status === 'APPROVED' || (mandate.umrn && mandate.umrn.trim().length > 0)) {
+        // PRESERVE APPROVED STATUS: Never demote an already approved mandate to PENDING_AUTH due to reporting lag!
+        if (submittedUmrn && !mandate.umrn) mandate.umrn = submittedUmrn;
+        await mandate.save();
       } else {
         mandate.status = 'PENDING_AUTH';
         await mandate.save();
