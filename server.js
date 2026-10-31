@@ -85,6 +85,7 @@ app.use("/api/admin/payment-gateways", require("./routes/paymentGateway"));
 app.use("/api/notifications", require("./routes/notification"));
 app.use("/api/coupons", require("./routes/coupon"));
 app.use("/api/sip", require("./routes/sip"));
+app.use("/api/mutual-funds/mfcentral", require("./routes/mfCentral"));
 app.use("/api/mutual-funds", require("./routes/mutualFunds"));
 app.use("/api/home-videos", require("./routes/homeVideos"));
 app.use("/api/admin/home-videos", require("./routes/homeVideos"));

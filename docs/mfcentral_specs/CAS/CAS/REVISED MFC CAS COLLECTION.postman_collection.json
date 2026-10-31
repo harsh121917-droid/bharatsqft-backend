@@ -1,0 +1,624 @@
+{
+  "info": {
+    "_postman_id": "e6bec75c-996d-4f0f-8721-924a28682221",
+    "name": "REVISED MFC CAS COLLECTION",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "43189516"
+  },
+  "item": [
+    {
+      "name": "PREREQUISITIE STEP GENERATE TOKEN",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "password",
+              "value": "secret_key",
+              "type": "string"
+            },
+            {
+              "key": "username",
+              "value": "client_id",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "client_username",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "client_password",
+              "type": "text"
+            },
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/oauth/token",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "oauth",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP1: ENCRYPTION FOR CAS REQUEST",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "EncryptionDecryptionKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \r\n    \"clientRefNo\": \"newCasQraCo_a19904\", \r\n    \"reqId\": \"\", \r\n    \"pan\": \"BKHPR6018P\", \r\n    \"pekrn\": \"\", \r\n    \"email\": \"\", \r\n    \"mobile\": \"+919786191066\", \r\n    \"fromDate\": \"31-Mar-2022\", //REQUIRED FOR TRANSACTIONS DATA, LEAVE BLANK FOR SUMMARY DATA\r\n    \"toDate\": \"31-Dec-2024\", //REQUIRED FOR TRANSACTIONS DATA, LEAVE BLANK FOR SUMMARY DATA\r\n    \"redirectUrl\": \"https://www.callingapplication.com\" \r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/encrypt",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "encrypt"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP2: GENERATE SIGNATURE",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "PrivateKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "duo5oKSpFN46mACk9pg3f5WEt2XkKi-OaDCibs923EtdWMFCaVuNErSKCAv2rRRETofZHI7aVY4Pg07IDSibtBXF4VCtZlXO_e-GtCpGGU7EADODWRAwLcQwdZTaibBzUCgBCIEQJKoL9CIUqieHLA0iuokCgbxeAN_uLC-zMgQs2CMBx4noMcQ9pYkJhYJZKaor9uxqRddK4ruU_50uHsl8L6DJVR65jFQ9xNSrU_E="
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/generateSignature",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "generateSignature"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP3: CAS REQUEST",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Otigin",
+            "value": "https://uatapp.mfcentral.com",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"signature\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OTUxZTZlLTAzNTMtNDA5YS04MmQ3LWNlMWU4ZjM5NzRlNCIsImI2NCI6ZmFsc2V9..uaG8vZ3KHxd5tXR9he0hBza9fgoIX1cHGlJkttrfj79nIgObVoRbG4OvCBhhQ3f64r-EfRFRyWvN7OrrMvkskH58JSpfgl7PyVm2Y-xFzwdriym77G1PxcjP74-W-YYEVPH5HgZvMHxHKMgP6jMN1_HCRXUah0m1ZmdsO_ljeCcxNVq-quc5lG6l1AMN7mHWFYT1S1IoeS-00kEG_Zsl4uf8d7FWj1r1LiC2482EOZ-qa6pr6_9s9x92yefVL7n-l_15X6nq1sK6f1avqZZExKtshn3M3qgiQvqskqKbj6gebTnj-WwPcSdp3fN3HNwxPXTPie4S2ob1KjINXV5rzw\",\"request\":\"duo5oKSpFN46mACk9pg3f5WEt2XkKi-OaDCibs923EtdWMFCaVuNErSKCAv2rRRETofZHI7aVY4Pg07IDSibtBXF4VCtZlXO_e-GtCpGGU7EADODWRAwLcQwdZTaibBzUCgBCIEQJKoL9CIUqieHLA0iuokCgbxeAN_uLC-zMgQs2CMBx4noMcQ9pYkJhYJZKaor9uxqRddK4ruU_50uHsl8L6DJVR65jFQ9xNSrU_E=\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/client/V1/newCasRequest",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "client",
+            "V1",
+            "newCasRequest"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP4: DECRYPT",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "EncryptionDecryptionKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "WwAG47_2M8bE17TqYx5bovxzZad8J4yo_QVcC2hmtj-h4RF1Z5jmcgV-pWBoLyz2gixcyzyNEyb3uMDZNUbqbjMLJtR50yownbjgG08-teSSEpZIzvvSDwlhVT8FXMGI9iT5J8JyeLy6xBcNO8aQu4waYtAl30-xRTChZQsdCzZbz4C6-XBfxlH049LIqTOj",
+          "options": {
+            "raw": {
+              "language": "text"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/decrypt",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "decrypt"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP5: BUILD URL, REDIRECT INVESTOR",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "odLZvcdVAhq+Re8UstN8u928xRQTE6ym",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "text"
+            }
+          }
+        },
+        "url": {
+          "raw": "No API",
+          "host": [
+            "No API"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP6 : ENCRYTPION FOR VALIDATE QR",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "EncryptionDecryptionKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"clientRefNo\": \"newCasQrCo_132\",\r\n    \"reqId\": \"3088880\",\r\n    \"qrCode\": \"iVBORw0KGgoAAAANSUhEUgAAAPoAAAD6AQAAAACgl2eQAAABr0lEQVR4Xu2XW27DMAwECegAPpKvriP5AAJYzlJNmhRIf7uACRdmxOnHgg/RkZ9txvvJm91A2w203UCbgBllR65jjgt3XOfi3TEboP4quo7MK0adta9zI6BEPU7yOoOfYIbAQ11JRrUnkKNCQbJwDAFJo2sqUx2VXjNA7T91/v28tr8DsC3i5CWlD/MBkEmxMYHPoNiy/HqsgLado1ThlWR8J6Bvw5MJUEp3ycF4AeUrNTNl+PoXL6Av9GCOUXJKE0qtAFper9wTWCWH4wXUBDu4E0PtD7YZJ0B5ofD4Qb6Sknte7h7A2Lv62bWXpImoFTDRRb46Td83S3TMBhjaGJUjSg5ajBewuEqiQ/ji17PkLABM+epRTL7ytSYdgClF/d2RCGQ/4Za3A5hgvWIJ3gPNCkhWXKKLm12ru8aaF0CO9DE4uvbYssqfVkBblVzNZB6FptrHCJioIoTADpXq1PZlBOSewLvSKL+k9rwABpf29rXXRYT/lGkEoJH271Bh6QiEmJZJpn7J/OdAUnKTrpFSau9VpgXQ7T9YUaKiqN6f6kbAJ7uBthtou4G2v4EvHAVNE37zlmgAAAAASUVORK5CYII=\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/encrypt",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "encrypt"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP7: GENERATE SIGNATURE",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "PrivateKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "mSoXfJpCzqNU88j-b_ybaJXclGMb4ceQvm5oxr3k5CG-_awN7VRJRDsKJ2DS9re5sg7_xdIwwc_uh0VpxtSw8pQ9TgatEUTgt4MMhq5Cb9aQtMHinkqKD-1X0oUIT4NqeJoL8K9f5LAeujYqazSuvACq2USGhBoPB6WJ9_QZf0IKbnR1Dq24vy7X0KL1NH9N-X-dglruW29r40Bcq95C7Sj_ul3spMoH9_t16nlHR7iqnfELTQy5CPdcjit-16vL"
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/generateSignature",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "generateSignature"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP8: VALIDATE QR API",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "pxSO52Fynr7bRTinh48uvlGtYCX",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "origin",
+            "value": "https://app.mfcentral.com",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"signature\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OTUxZTZlLTAzNTMtNDA5YS04MmQ3LWNlMWU4ZjM5NzRlNCIsImI2NCI6ZmFsc2V9..L-RNakWfYYZvNgrGlWHXPDttyXPQldIa9AIs-0l-cQYJUvnSoOPmeU9v_58GK6VGglQNT4FMAFh-Wti9hVu6N70F5Oosv3ZqejaOUySYttnPdouWSZaBsWkAaI9GqXcB6deyUuzd2Mn34UgZ8_cY6VZV6uh37LDOwjBTb1_3_UpLqzaYMsfNL0QG0w37kXtEQDFz8cM6SK0uITBQ3YHN2lcXQ9Md2Apub_yJfxgG_IzLaRH8QwTQuaYOxriL3aTFTft8v0irjQyKo1eGMlHpx2bRHy8m-B3xo3VlERnGhX2RGbV63_nLvtSMasoOIcHmlLJjnUPGI84c46tTk0s7Yw\",\"request\":\"mSoXfJpCzqNU88j-b_ybaJXclGMb4ceQvm5oxr3k5CG-_awN7VRJRDsKJ2DS9re5sg7_xdIwwc_uh0VpxtSw8pQ9TgatEUTgt4MMhq5Cb9aQtMHinkqKD-1X0oUIT4NqeJoL8K9f5LAeujYqazSuvACq2USGhBoPB6WJ9_QZf0IKbnR1Dq24vy7X0KL1NH9N-X-dglruW29r40Bcq95C7Sj_ul3spMoH9_t16nlHR7iqnfELTQy5CPdcjit-16vL\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/client/V1/validateQRCode",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "client",
+            "V1",
+            "validateQRCode"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "STEP9: DECRYPT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain",
+            "type": "text"
+          },
+          {
+            "key": "ClientId",
+            "value": "client_id",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "key",
+            "value": "EncryptionDecryptionKey",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "wKX2rENxMXJOw7Ski9TNIg==",
+          "options": {
+            "raw": {
+              "language": "text"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://uatservices.mfcentral.com/api/test/decrypt",
+          "protocol": "https",
+          "host": [
+            "uatservices",
+            "mfcentral",
+            "com"
+          ],
+          "path": [
+            "api",
+            "test",
+            "decrypt"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "ClientID",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "Key",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
