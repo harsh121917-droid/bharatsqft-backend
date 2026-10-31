@@ -2471,6 +2471,8 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
     return null;
   };
 
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
   // 1. Direct link in regItem
   const directLink = extractUrl(regItem);
   if (directLink) {
@@ -2491,20 +2493,33 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
     } catch (_) {}
   }
 
-  // 3. GET_LINK API with XSIP / SIP product types
+  // 3. GET_LINK API with XSIP / SIP product types with retries & RESEND_COMM trigger
   const sId = String(sipRegNo || '').trim();
   if (sId) {
     const sipProductTypes = ['XSIP_REG', 'XSIP', 'SIP_REG', 'SIP', 'XSIP_AUTH'];
-    for (const pType of sipProductTypes) {
-      try {
-        const linkRes = await nseClient.getShortLink(pType, sId);
-        const url = extractUrl(linkRes);
-        if (url) {
-          console.log(`[fetchSipPaymentLink] Link resolved via getShortLink(${pType}, ${sId}):`, url);
-          return url;
+    const maxAttempts = isLive ? 3 : 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      for (const pType of sipProductTypes) {
+        try {
+          const linkRes = await nseClient.getShortLink(pType, sId);
+          const url = extractUrl(linkRes);
+          if (url) {
+            console.log(`[fetchSipPaymentLink] Link resolved via getShortLink(${pType}, ${sId}) on attempt ${attempt}:`, url);
+            return url;
+          }
+        } catch (err) {
+          console.warn(`[fetchSipPaymentLink] getShortLink(${pType}) warning:`, err.message);
         }
-      } catch (err) {
-        console.warn(`[fetchSipPaymentLink] getShortLink(${pType}) warning:`, err.message);
+      }
+
+      if (attempt < maxAttempts) {
+        // Trigger RESEND_COMM to force NSE to push communication & generate token
+        try {
+          await nseClient.resendCommunication('XSIP_REG', sId).catch(() => {});
+          await nseClient.resendCommunication('XSIP', sId).catch(() => {});
+        } catch (_) {}
+        const waitTime = attempt === 1 ? 800 : 1200;
+        await delay(waitTime);
       }
     }
   }
@@ -2577,6 +2592,23 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
             if (url) return url;
           }
         }
+      }
+    } catch (_) {}
+  }
+
+  // 6. Fallback to existing active NSE 2FA Authentication URL for this investor
+  // In NSE MFSS, all pending 2FA SIP authorizations for a client appear on the single official 2FA page
+  if (clientCode) {
+    try {
+      const recentSip = await MfSip.findOne({
+        clientCode,
+        paymentLink: /trxnxsiprtaauthentication/i,
+        createdAt: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+      }).sort({ createdAt: -1 });
+
+      if (recentSip && recentSip.paymentLink) {
+        console.log(`[fetchSipPaymentLink] Reusing active investor 2FA authorization link for client ${clientCode}:`, recentSip.paymentLink);
+        return recentSip.paymentLink;
       }
     } catch (_) {}
   }

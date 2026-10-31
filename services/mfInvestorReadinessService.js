@@ -166,11 +166,13 @@ class MfInvestorReadinessService {
     }
 
     // 3b-2. Auto-synchronize bank verification provenance if bank account is registered on active NSE MFSS UCC
+    const isUntrustedProvenance = userBank.verificationSource === 'UNKNOWN_FABRICATED_SOURCE' || String(userBank.verificationSource || '').startsWith('UNKNOWN_');
     if (
       userBank &&
       userBank.isVerified &&
       ucc.nseStatus === 'ACTIVE' &&
-      userBank.accountNumber === (ucc.primaryBank?.accountNo || '').trim()
+      userBank.accountNumber === (ucc.primaryBank?.accountNo || '').trim() &&
+      !isUntrustedProvenance
     ) {
       if (userBank.verificationSource !== 'NSE_MFSS_REGISTERED') {
         userBank.verificationSource = 'NSE_MFSS_REGISTERED';
