@@ -1617,7 +1617,7 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
     await BankAccount.deleteOne({ user: kycUser._id });
   });
 
-  it('35. UCC registration with conflicting DOB against verified KYC -> rejected with NSE_IDENTITY_CONFLICT', async () => {
+  it('35. UCC registration with submitted DOB does not reject against previously saved KYC DOB and succeeds', async () => {
     const kycUser = await User.create({
       name: 'Vikas Saini',
       email: `ucc_dob_conflict_${Date.now()}@vikaone.test`,
@@ -1653,7 +1653,7 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
       {
         pan: 'BNWPS6666F',
         fullName: 'VIKAS SAINI',
-        dob: '01/01/1990', // Conflicting DOB
+        dob: '01/01/1990', // Newly submitted DOB
         accountNo: '998811223366',
         ifsc: 'SBIN0000123',
         address1: '112, Saniyan, Shahpur',
@@ -1668,10 +1668,9 @@ describe('MF Production Fix: UCC, KYC, SIP, Client Code VK143005 & Scheme 145139
 
     await mutualFundsController.registerUserUcc(req, res);
 
-    assert.equal(res.statusCode, 400);
-    assert.equal(res.data.success, false);
-    assert.equal(res.data.code, 'NSE_IDENTITY_CONFLICT');
-    assert.match(res.data.message, /conflicts with authoritative verified KYC/i);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.data.success, true);
+    assert.equal(res.data.data.dob, '01/01/1990');
 
     await User.deleteOne({ _id: kycUser._id });
     await Kyc.deleteOne({ user: kycUser._id });

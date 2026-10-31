@@ -1393,26 +1393,11 @@ exports.registerUserUcc = async (req, res) => {
       }
     } catch (_) {}
 
-    // Resolve Date of Birth and check for conflicts
+    // Resolve Date of Birth:
+    // Prioritize client-submitted DOB without blocking or throwing conflict errors against saved/other KYC records.
+    // Fall back to saved KYC DOB only when no DOB was explicitly submitted.
     const clientSubmittedDob = (dob || '').toString().trim();
-    let effDob = '';
-
-    if (authoritativeDob) {
-      if (clientSubmittedDob && clientSubmittedDob !== authoritativeDob) {
-        return res.status(400).json({
-          success: false,
-          code: 'NSE_IDENTITY_CONFLICT',
-          message: `Submitted Date of Birth '${dob}' conflicts with authoritative verified KYC Date of Birth '${authoritativeDob}'. UCC registration requires exact match with verified KYC records.`,
-          data: {
-            submittedDob: dob,
-            verifiedDob: authoritativeDob,
-          },
-        });
-      }
-      effDob = authoritativeDob;
-    } else {
-      effDob = clientSubmittedDob;
-    }
+    const effDob = clientSubmittedDob || authoritativeDob;
 
     if (!effDob || !/^\d{2}\/\d{2}\/\d{4}$/.test(effDob)) {
       return res.status(400).json({
