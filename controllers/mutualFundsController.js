@@ -2892,9 +2892,26 @@ exports.registerSipOrder = async (req, res) => {
 
     const dpTxnMode = (sipMaster.sipTransactionMode === 'D') ? 'D' : 'P';
 
-    const firstOrderToday = reqFirstOrderToday !== undefined
-      ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
-      : ((paymentMode === 'MANDATE' && !bufferApplied) ? 'N' : 'Y');
+    const isNseMarketHours = () => {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const ist = new Date(utc + (3600000 * 5.5));
+      const day = ist.getDay(); // 0 is Sunday, 6 is Saturday
+      if (day === 0 || day === 6) return false;
+      const minutes = ist.getHours() * 60 + ist.getMinutes();
+      return minutes >= 9 * 60 && minutes < 15 * 60; // 09:00 - 15:00 IST
+    };
+
+    const marketOpen = isNseMarketHours();
+
+    let firstOrderToday = 'N';
+    if (marketOpen) {
+      firstOrderToday = reqFirstOrderToday !== undefined
+        ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
+        : ((paymentMode === 'MANDATE' && !bufferApplied) ? 'N' : 'Y');
+    } else {
+      console.log(`[registerSipOrder] Request received outside NSE trading hours (IST). Automatically forcing first_order_today='N' to comply with exchange rules.`);
+    }
 
     const memberCode = String(process.env.NSE_MEMBER_CODE || nseClient.memberCode || '1031616');
 
@@ -2931,9 +2948,9 @@ exports.registerSipOrder = async (req, res) => {
     let nseRes;
     if (effectiveMandateId) {
       nseRes = await nseClient.registerXsip([nseXsipPayload]);
-      const checkItem = nseRes?.data?.reg_data?.[0];
-      const isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
-      const remark = checkItem?.reg_remark || '';
+      let checkItem = nseRes?.data?.reg_data?.[0];
+      let isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
+      let remark = checkItem?.reg_remark || '';
       // If XSIP was rejected by exchange because mandate is not yet approved on exchange, and user didn't explicitly mandate-lock it:
       if (isFailed && (/mandate/i.test(remark) || /umrn/i.test(remark)) && paymentMode !== 'MANDATE') {
         console.warn(`[registerSipOrder] XSIP registration rejected due to mandate (${remark}). Attempting standard SIP registration fallback...`);
@@ -2946,6 +2963,20 @@ exports.registerSipOrder = async (req, res) => {
           nseRes = stdRes;
         }
       }
+
+      // Reactive Auto-Retry: If exchange rejected due to FOT (First Order Today) after market hours:
+      checkItem = nseRes?.data?.reg_data?.[0];
+      isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
+      remark = checkItem?.reg_remark || '';
+      if (isFailed && (/after market hours/i.test(remark) || /fot.*market/i.test(remark) || /fot y/i.test(remark))) {
+        console.warn(`[registerSipOrder] NSE XSIP rejected due to FOT outside market hours (${remark}). Retrying with first_order_today='N'...`);
+        firstOrderToday = 'N';
+        nseXsipPayload.first_order_today = 'N';
+        const retryRes = await nseClient.registerXsip([nseXsipPayload]);
+        if (retryRes?.success && retryRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && retryRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
+          nseRes = retryRes;
+        }
+      }
     } else {
       // Standard broker SIP (Non-Mandate / Gateway)
       const standardSipPayload = { ...nseXsipPayload };
@@ -2953,12 +2984,26 @@ exports.registerSipOrder = async (req, res) => {
       delete standardSipPayload.xsip_mandate_id;
       delete standardSipPayload.mandateId;
       nseRes = await nseClient.registerSip([standardSipPayload]);
-      const checkItem = nseRes?.data?.reg_data?.[0];
+      let checkItem = nseRes?.data?.reg_data?.[0];
       if ((!nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0) && effectiveMandateId) {
         // Fallback to XSIP if standard SIP failed and mandate ID exists
         const xsipRes = await nseClient.registerXsip([nseXsipPayload]);
         if (xsipRes?.success && xsipRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && xsipRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
           nseRes = xsipRes;
+        }
+      }
+
+      // Reactive Auto-Retry: If exchange rejected standard SIP due to FOT after market hours:
+      checkItem = nseRes?.data?.reg_data?.[0];
+      const isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
+      const remark = checkItem?.reg_remark || '';
+      if (isFailed && (/after market hours/i.test(remark) || /fot.*market/i.test(remark) || /fot y/i.test(remark))) {
+        console.warn(`[registerSipOrder] NSE standard SIP rejected due to FOT outside market hours (${remark}). Retrying with first_order_today='N'...`);
+        firstOrderToday = 'N';
+        standardSipPayload.first_order_today = 'N';
+        const retryStdRes = await nseClient.registerSip([standardSipPayload]);
+        if (retryStdRes?.success && retryStdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && retryStdRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
+          nseRes = retryStdRes;
         }
       }
     }
@@ -3056,8 +3101,10 @@ exports.registerSipOrder = async (req, res) => {
         : `Installment #1 of ₹${installmentAmount} initiated for today. Recurring ${freqDisplay.toLowerCase()} AutoPay debits will start on ${dateFormatted}.`;
     } else {
       userExplanation = bufferApplied
-        ? `${freqDisplay} SIP registered! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your first automated debit will execute on ${dateFormatted}.`
-        : `${freqDisplay} SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`;
+        ? `${freqDisplay} SIP registered successfully! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your recurring debits will start on ${dateFormatted}.`
+        : (!marketOpen
+          ? `${freqDisplay} SIP registered successfully! Since exchange market is currently closed, your recurring ${freqDisplay.toLowerCase()} debit will start on ${dateFormatted} via Bank AutoPay.`
+          : `${freqDisplay} SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`);
     }
 
     return res.json({
