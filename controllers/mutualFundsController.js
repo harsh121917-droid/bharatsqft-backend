@@ -2602,7 +2602,7 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
     try {
       const recentSip = await MfSip.findOne({
         clientCode,
-        paymentLink: /trxnxsiprtaauthentication/i,
+        paymentLink: { $regex: /(trxnxsiprtaauthentication|trxnauthorise|trxnpaymentonline)/i, $not: /emandate/i },
         createdAt: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
       }).sort({ createdAt: -1 });
 
