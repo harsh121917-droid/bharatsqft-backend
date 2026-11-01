@@ -119,8 +119,8 @@ class MfPortfolioValidationService {
       if (isNaN(rawValue) || !isFinite(rawValue)) {
         throw new Error(`Invalid numeric weight: ${rawValue}`);
       }
-      if (rawValue < 0 || rawValue > 100) {
-        throw new Error(`Weight percentage out of bounds [0, 100]: ${rawValue}`);
+      if (rawValue < -50 || rawValue > 100) {
+        throw new Error(`Weight percentage out of bounds [-50, 100]: ${rawValue}`);
       }
       const fixed = parseFloat(rawValue.toFixed(4));
       const text = `${fixed.toFixed(2)}%`;
@@ -157,8 +157,8 @@ class MfPortfolioValidationService {
       throw new Error(`Invalid non-numeric weight string: "${str}"`);
     }
 
-    if (parsed < 0 || parsed > 100) {
-      throw new Error(`Weight percentage out of bounds [0, 100]: "${str}"`);
+    if (parsed < -50 || parsed > 100) {
+      throw new Error(`Weight percentage out of bounds [-50, 100]: "${str}"`);
     }
 
     const fixed = parseFloat(parsed.toFixed(4));

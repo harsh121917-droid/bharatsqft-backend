@@ -10,6 +10,7 @@ const MutualFundScheme = require('../models/MutualFundScheme');
 
 const nseMasterReconciliationService = require('../services/nse/nseMasterReconciliationService');
 const mfMarketSyncService = require('../services/mfMarketSyncService');
+const tigzigHoldingsService = require('../services/tigzigHoldingsService');
 const mfNfoService = require('../services/mfNfoService');
 const NseConfig = require('../models/NseConfig');
 
@@ -46,6 +47,9 @@ async function syncMutualFundNavs() {
       } else {
         console.log('[MF NAV Sync] Starting TigZig statutory facts sync (AUM, TER, Fund Managers, Min Investment)...');
         await mfMarketSyncService.syncSchemesWithTigzig({ batchSize: 50 });
+
+        console.log('[MF NAV Sync] Step 4: Synchronizing scheme portfolio holdings from TigZig...');
+        await tigzigHoldingsService.ingestAllTigzigHoldings();
       }
     } catch (e) {
       console.warn('[MF NAV Sync] TigZig sync note:', e.message);

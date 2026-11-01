@@ -6,6 +6,7 @@
 const snapshotService = require('./mfPortfolioSnapshotService');
 const sourceRegistry = require('./mfPortfolioSourceRegistry');
 const validationService = require('./mfPortfolioValidationService');
+const tigzigHoldingsService = require('./tigzigHoldingsService');
 const MutualFundScheme = require('../models/MutualFundScheme');
 
 class MfPortfolioService {
@@ -13,9 +14,18 @@ class MfPortfolioService {
    * Get formatted portfolio object for scheme detail view
    */
   async getSchemePortfolio(schemeCode) {
-    const snapshot = await snapshotService.getCurrentSnapshot(schemeCode);
+    let snapshot = await snapshotService.getCurrentSnapshot(schemeCode);
 
     if (!snapshot || !snapshot.holdings || snapshot.holdings.length === 0) {
+      try {
+        const directTigzig = await tigzigHoldingsService.getSchemeHoldingsDirect(schemeCode);
+        if (directTigzig && directTigzig.holdingsAvailable) {
+          return directTigzig;
+        }
+      } catch (err) {
+        // Fallback gracefully to source unavailable
+      }
+
       return {
         asOfDate: null,
         source: null,
@@ -119,7 +129,33 @@ class MfPortfolioService {
    * Get paginated holdings for dedicated holdings view
    */
   async getPaginatedHoldings(schemeCode, options = {}) {
-    return snapshotService.getPaginatedHoldings(schemeCode, options);
+    const res = await snapshotService.getPaginatedHoldings(schemeCode, options);
+    if ((!res || res.total === 0) && !options.snapshotId) {
+      try {
+        const directTigzig = await tigzigHoldingsService.getSchemeHoldingsDirect(schemeCode);
+        if (directTigzig && directTigzig.holdingsAvailable) {
+          const allHoldings = directTigzig.holdings || [];
+          let filtered = allHoldings;
+          if (options.assetClass && options.assetClass !== 'ALL') {
+            filtered = filtered.filter((h) => h.assetClass === options.assetClass);
+          }
+          const p = Number(options.page) || 1;
+          const l = Number(options.limit) || 50;
+          const start = (p - 1) * l;
+          return {
+            snapshotId: null,
+            total: filtered.length,
+            page: p,
+            limit: l,
+            hasMore: start + l < filtered.length,
+            items: filtered.slice(start, start + l),
+          };
+        }
+      } catch (e) {
+        // Fallback gracefully
+      }
+    }
+    return res;
   }
 }
 
