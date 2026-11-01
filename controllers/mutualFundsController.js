@@ -613,7 +613,6 @@ const resolveSchemeSipOptions = async (scheme) => {
     WEEKLY: 'Weekly',
     MONTHLY: 'Monthly',
     QUARTERLY: 'Quarterly',
-    FORTNIGHTLY: 'Fortnightly',
   };
 
   const optionsMap = new Map();
@@ -2877,6 +2876,8 @@ exports.registerSipOrder = async (req, res) => {
         else if (recurringStartDate.getDay() === 0) recurringStartDate.setDate(recurringStartDate.getDate() + 1);
       } else if (normFreq === 'WEEKLY') {
         recurringStartDate = new Date(minAllowedDate);
+        if (recurringStartDate.getDay() === 6) recurringStartDate.setDate(recurringStartDate.getDate() + 2);
+        else if (recurringStartDate.getDay() === 0) recurringStartDate.setDate(recurringStartDate.getDate() + 1);
       } else {
         // MONTHLY default
         recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
@@ -2886,7 +2887,32 @@ exports.registerSipOrder = async (req, res) => {
       }
     }
 
+    // STRICT GUARANTEE FOR NSE: DAILY and WEEKLY SIP start dates MUST be Monday to Friday!
+    if (normFreq === 'DAILY' || normFreq === 'WEEKLY') {
+      if (recurringStartDate.getDay() === 6) {
+        recurringStartDate.setDate(recurringStartDate.getDate() + 2);
+      } else if (recurringStartDate.getDay() === 0) {
+        recurringStartDate.setDate(recurringStartDate.getDate() + 1);
+      }
+    }
+
     const dateFormatted = `${String(recurringStartDate.getDate()).padStart(2, '0')}/${String(recurringStartDate.getMonth() + 1).padStart(2, '0')}/${recurringStartDate.getFullYear()}`;
+
+    // Calculate end_date (MANDATORY for DAILY SIP on NSE MFSS)
+    let endDateFormatted = '';
+    if (req.body.endDate) {
+      const customEnd = new Date(req.body.endDate);
+      if (!isNaN(customEnd.getTime())) {
+        endDateFormatted = `${String(customEnd.getDate()).padStart(2, '0')}/${String(customEnd.getMonth() + 1).padStart(2, '0')}/${customEnd.getFullYear()}`;
+      }
+    }
+    if (!endDateFormatted && normFreq === 'DAILY') {
+      const endDate = new Date(recurringStartDate);
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      if (endDate.getDay() === 6) endDate.setDate(endDate.getDate() + 2);
+      else if (endDate.getDay() === 0) endDate.setDate(endDate.getDate() + 1);
+      endDateFormatted = `${String(endDate.getDate()).padStart(2, '0')}/${String(endDate.getMonth() + 1).padStart(2, '0')}/${endDate.getFullYear()}`;
+    }
 
     const effectiveMandateId = mandate.mandateId;
 
@@ -2923,6 +2949,7 @@ exports.registerSipOrder = async (req, res) => {
       trans_mode: 'P', // Physical/Folio
       dp_txn_mode: dpTxnMode,
       start_date: dateFormatted,
+      ...(endDateFormatted ? { end_date: endDateFormatted } : {}),
       frequency_type: normFreq,
       frequency_allowed: '1',
       installment_amount: String(installmentAmount),
@@ -6391,7 +6418,21 @@ exports.checkoutCart = async (req, res) => {
           if (startDate <= new Date()) {
             startDate.setMonth(startDate.getMonth() + 1);
           }
-          const formattedStartDate = `${String(sipDay).padStart(2, '0')}/${String(startDate.getMonth() + 1).padStart(2, '0')}/${startDate.getFullYear()}`;
+          const normItemFreq = String(item.frequency || 'MONTHLY').toUpperCase();
+          if (normItemFreq === 'DAILY' || normItemFreq === 'WEEKLY') {
+            if (startDate.getDay() === 6) startDate.setDate(startDate.getDate() + 2);
+            else if (startDate.getDay() === 0) startDate.setDate(startDate.getDate() + 1);
+          }
+          const formattedStartDate = `${String(startDate.getDate()).padStart(2, '0')}/${String(startDate.getMonth() + 1).padStart(2, '0')}/${startDate.getFullYear()}`;
+
+          let cartEndDateFormatted = '';
+          if (normItemFreq === 'DAILY') {
+            const cEndDate = new Date(startDate);
+            cEndDate.setFullYear(cEndDate.getFullYear() + 1);
+            if (cEndDate.getDay() === 6) cEndDate.setDate(cEndDate.getDate() + 2);
+            else if (cEndDate.getDay() === 0) cEndDate.setDate(cEndDate.getDate() + 1);
+            cartEndDateFormatted = `${String(cEndDate.getDate()).padStart(2, '0')}/${String(cEndDate.getMonth() + 1).padStart(2, '0')}/${cEndDate.getFullYear()}`;
+          }
 
           const nseSipPayload = {
             member_code: process.env.NSE_MEMBER_CODE || '',
@@ -6401,7 +6442,8 @@ exports.checkoutCart = async (req, res) => {
             trans_mode: 'P',
             dp_txnMwt: 'P',
             start_date: formattedStartDate,
-            frequency_type: item.frequency || 'MONTHLY',
+            ...(cartEndDateFormatted ? { end_date: cartEndDateFormatted } : {}),
+            frequency_type: normItemFreq,
             installment_amount: String(amount),
             number_of_installment: '120',
             brokerage: '',

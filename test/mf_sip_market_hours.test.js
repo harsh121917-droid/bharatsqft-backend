@@ -1,8 +1,7 @@
-const { describe, it, before, after } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const mongoose = require('mongoose');
 
-describe('NSE Market Hours & FOT Handling for SIP Registration', () => {
+describe('NSE Market Hours, FOT & Frequency Validations for SIP Registration', () => {
   it('Calculates IST Market Hours correctly', () => {
     function isNseMarketHoursForDate(date) {
       const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
@@ -34,5 +33,35 @@ describe('NSE Market Hours & FOT Handling for SIP Registration', () => {
     const nseError = 'FOT Y IS NOT ALLOWED AFTER MARKET HOURS';
     const regexMatch = (/after market hours/i.test(nseError) || /fot.*market/i.test(nseError) || /fot y/i.test(nseError));
     assert.strictEqual(regexMatch, true, 'Regex must match NSE exchange FOT error message');
+  });
+
+  it('DAILY SIP correctly computes mandatory end_date in DD/MM/YYYY format', () => {
+    const recurringStartDate = new Date('2026-11-09T00:00:00.000Z'); // Monday
+    const endDate = new Date(recurringStartDate);
+    endDate.setFullYear(endDate.getFullYear() + 1);
+    if (endDate.getDay() === 6) endDate.setDate(endDate.getDate() + 2);
+    else if (endDate.getDay() === 0) endDate.setDate(endDate.getDate() + 1);
+
+    const endDateFormatted = `${String(endDate.getDate()).padStart(2, '0')}/${String(endDate.getMonth() + 1).padStart(2, '0')}/${endDate.getFullYear()}`;
+    assert.strictEqual(endDateFormatted, '09/11/2027');
+    assert.ok(endDate.getDay() >= 1 && endDate.getDay() <= 5, 'End date must be a weekday');
+  });
+
+  it('WEEKLY SIP startDate automatically advances from Sunday to Monday to meet NSE weekday rule', () => {
+    const sundayDate = new Date('2026-11-08T00:00:00.000Z'); // Sunday
+    let recurringStartDate = new Date(sundayDate);
+    const normFreq = 'WEEKLY';
+
+    if (normFreq === 'DAILY' || normFreq === 'WEEKLY') {
+      if (recurringStartDate.getDay() === 6) {
+        recurringStartDate.setDate(recurringStartDate.getDate() + 2);
+      } else if (recurringStartDate.getDay() === 0) {
+        recurringStartDate.setDate(recurringStartDate.getDate() + 1);
+      }
+    }
+
+    assert.strictEqual(recurringStartDate.getDay(), 1, 'Must advance to Monday (1)');
+    const dateFormatted = `${String(recurringStartDate.getDate()).padStart(2, '0')}/${String(recurringStartDate.getMonth() + 1).padStart(2, '0')}/${recurringStartDate.getFullYear()}`;
+    assert.strictEqual(dateFormatted, '09/11/2026', 'Must format to Monday 09/11/2026');
   });
 });
