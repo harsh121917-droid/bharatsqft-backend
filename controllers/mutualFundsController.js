@@ -936,7 +936,7 @@ exports.getSchemeDetail = async (req, res) => {
 
     const accurateNav = (liveNav?.latestNav ? parseFloat(liveNav.latestNav) : scheme.nav);
     const navDate = liveNav?.latestDate ? new Date(liveNav.latestDate) : scheme.navDate;
-    const navSource = liveNav ? 'AMFI Historical NAV Feed' : (scheme.navSource || 'NSE MASTER_DOWNLOAD NAV');
+    const navSource = liveNav?.source || (scheme.navSource || 'NSE MASTER_DOWNLOAD NAV');
     const navUpdatedAt = scheme.navUpdatedAt || scheme.updatedAt;
 
     const day1Ret = liveNav?.day1Return ?? null;
@@ -1038,7 +1038,7 @@ exports.getSchemeDetail = async (req, res) => {
           'All': retAll,
           methodology: liveNav?.methodology || 'SEBI/AMFI: Simple absolute return for <=1Y, CAGR for >1Y',
           calculatedAt: liveNav ? new Date() : (scheme.returnsCalculatedAt || null),
-          source: liveNav ? 'AMFI Daily NAV History' : (scheme.returnsSource || null),
+          source: liveNav?.source || (scheme.returnsSource || null),
           provenance: liveNav?.provenance || null,
           allReturnMethodology: liveNav?.allReturnMethodology || 'CAGR_SINCE_TIMESERIES_START',
           allStartDate: liveNav?.allStartDate || null,

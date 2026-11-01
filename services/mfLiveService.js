@@ -1,6 +1,20 @@
 const https = require('https');
 const { calculateFundReturns } = require('./mfReturnEngine');
 
+let NseConfig = null;
+try {
+  NseConfig = require('../models/NseConfig');
+} catch (_) {}
+
+async function getMfDataSource() {
+  try {
+    if (NseConfig && typeof NseConfig.getMfDataSource === 'function') {
+      return await NseConfig.getMfDataSource();
+    }
+  } catch (_) {}
+  return 'TIGZIG';
+}
+
 
 /**
  * In-memory caches to deliver instant responses and prevent rate-limiting:
@@ -191,7 +205,9 @@ async function resolveRegularAmfiCode(schemeCode, schemeName = '') {
 async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   if (!schemeCode) return null;
 
-  const cached = navCache.get(String(schemeCode));
+  const mfDataSource = await getMfDataSource();
+  const cacheKey = `${String(schemeCode)}_${mfDataSource}`;
+  const cached = navCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.data;
   }
@@ -203,29 +219,55 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     if (regCode) targetCode = regCode;
   } catch (_) {}
 
-  const url = `https://api.mfapi.in/mf/${targetCode}`;
-  let response = await fetchJson(url);
-  if (!response && targetCode !== schemeCode) {
-    response = await fetchJson(`https://api.mfapi.in/mf/${schemeCode}`);
+  let response = null;
+  let dataSourceUsed = 'LEGACY';
+
+  // 1. If admin selected TIGZIG, attempt fetching from TigZig first
+  if (mfDataSource !== 'LEGACY') {
+    try {
+      const tzUrl = `https://api.tigzig.com/mf/v1/schemes/${targetCode}/nav`;
+      let tzRes = await fetchJson(tzUrl);
+      if ((!tzRes || !Array.isArray(tzRes.data) || tzRes.data.length === 0) && targetCode !== schemeCode) {
+        tzRes = await fetchJson(`https://api.tigzig.com/mf/v1/schemes/${schemeCode}/nav`);
+      }
+      if (tzRes && Array.isArray(tzRes.data) && tzRes.data.length > 0) {
+        response = tzRes;
+        dataSourceUsed = 'TIGZIG';
+      }
+    } catch (_) {}
+  }
+
+  // 2. Fallback to mfapi.in if TigZig is not enabled or failed/returned empty
+  if (!response || !Array.isArray(response.data) || response.data.length === 0) {
+    const legacyUrl = `https://api.mfapi.in/mf/${targetCode}`;
+    response = await fetchJson(legacyUrl);
+    if ((!response || !Array.isArray(response.data) || response.data.length === 0) && targetCode !== schemeCode) {
+      response = await fetchJson(`https://api.mfapi.in/mf/${schemeCode}`);
+    }
+    if (response && Array.isArray(response.data) && response.data.length > 0) {
+      dataSourceUsed = 'LEGACY';
+    }
   }
 
   if (!response || !Array.isArray(response.data) || response.data.length === 0) {
     return null;
   }
 
-  // Raw data from mfapi.in: [{ date: "18-09-2026", nav: "29.97240" }, ...]
-  // Ordered from latest date to oldest date
   const rawList = response.data;
 
   // Convert to chronological array: oldest first, latest last
   const chronological = [];
-  for (let i = rawList.length - 1; i >= 0; i--) {
+  for (let i = 0; i < rawList.length; i++) {
     const item = rawList[i];
-    const navVal = parseFloat(item.nav);
-    if (!isNaN(navVal) && navVal > 0) {
-      // Parse DD-MM-YYYY to YYYY-MM-DD
-      const parts = item.date.split('-');
-      const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : item.date;
+    if (!item) continue;
+    const navVal = typeof item.nav === 'number' ? item.nav : parseFloat(item.nav);
+    if (!isNaN(navVal) && navVal > 0 && item.date) {
+      const dateStr = String(item.date).trim();
+      let isoDate = dateStr;
+      if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        const parts = dateStr.split('-');
+        isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
       chronological.push({
         date: isoDate,
         nav: navVal,
@@ -234,6 +276,9 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
   }
 
   if (chronological.length === 0) return null;
+
+  // Ensure strict chronological ascending order (oldest first, latest last)
+  chronological.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   const latestItem = chronological[chronological.length - 1];
   const latestDate = new Date(latestItem.date);
@@ -326,8 +371,19 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     }
   }
 
+  const navSourceLabel = dataSourceUsed === 'TIGZIG' ? 'TigZig AMFI Historical NAV Feed' : 'AMFI Historical NAV Feed';
+
   const result = {
-    meta: response.meta,
+    meta: response.meta || {
+      fund_house: fallbackScheme?.amc || '',
+      scheme_type: fallbackScheme?.schemeType || '',
+      scheme_category: fallbackScheme?.schemeCategory || '',
+      scheme_code: response.scheme_code || targetCode,
+      scheme_name: response.scheme_name || fallbackScheme?.schemeName || '',
+      isin: response.isin || fallbackScheme?.isin || '',
+      count: response.count || chronological.length,
+      latest_available_date: response.latest_available_date || latestItem.date,
+    },
     latestNav: latestItem.nav,
     latestDate: latestItem.date,
     day1Return,
@@ -340,12 +396,14 @@ async function getLiveHistoricalNav(schemeCode, fallbackScheme = null) {
     allStartNav: fundReturns.allStartNav,
     allEndDate: fundReturns.allEndDate,
     allEndNav: fundReturns.allEndNav,
-    allSource: fundReturns.allSource,
+    allSource: dataSourceUsed === 'TIGZIG' ? 'TIGZIG_AMFI_DAILY_NAV' : fundReturns.allSource,
     methodology: fundReturns.returnsMethodology,
-    source: fundReturns.returnsSource,
+    source: navSourceLabel,
+    dataSource: dataSourceUsed,
     calculatedAt: fundReturns.returnsCalculatedAt,
   };
 
+  navCache.set(cacheKey, { data: result, timestamp: Date.now() });
   navCache.set(String(schemeCode), { data: result, timestamp: Date.now() });
   return result;
 }
@@ -493,8 +551,13 @@ function parseGrowwScheme(d, directCode = null) {
   };
 }
 
+function clearNavCache() {
+  navCache.clear();
+}
+
 module.exports = {
   getLiveHistoricalNav,
   getLiveSchemeFacts,
   calculateReturns,
+  clearNavCache,
 };
