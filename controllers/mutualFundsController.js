@@ -835,13 +835,21 @@ exports.getSchemeDetail = async (req, res) => {
 
     // Genuine Regular Plan returns computed strictly from historical daily NAVs
     const retStats = liveFacts?.returnStats;
-    const ret1M = periodReturns['1M']?.returnPercent ?? scheme.return1M ?? null;
-    const ret3M = periodReturns['3M']?.returnPercent ?? scheme.return3M ?? null;
-    const ret6M = periodReturns['6M']?.returnPercent ?? scheme.return6M ?? null;
-    const ret1Y = periodReturns['1Y']?.returnPercent ?? scheme.cagr1Y ?? null;
-    const ret3Y = periodReturns['3Y']?.returnPercent ?? scheme.cagr3Y ?? null;
-    const ret5Y = periodReturns['5Y']?.returnPercent ?? scheme.cagr5Y ?? null;
-    const retAll = periodReturns['All']?.returnPercent ?? null;
+    const isInsufficient = (key) => periodReturns[key]?.insufficientData === true;
+    const getPeriodRet = (key, fallback) => {
+      if (liveNav && periodReturns[key]) {
+        return isInsufficient(key) ? null : (periodReturns[key].returnPercent ?? null);
+      }
+      return fallback ?? null;
+    };
+
+    const ret1M = getPeriodRet('1M', scheme.return1M);
+    const ret3M = getPeriodRet('3M', scheme.return3M);
+    const ret6M = getPeriodRet('6M', scheme.return6M);
+    const ret1Y = getPeriodRet('1Y', scheme.cagr1Y);
+    const ret3Y = getPeriodRet('3Y', scheme.cagr3Y);
+    const ret5Y = getPeriodRet('5Y', scheme.cagr5Y);
+    const retAll = getPeriodRet('All', null);
 
     // Dynamic Category Peer Aggregation Engine for authentic category averages and ranking
     const targetSubCat = scheme.subCategory && scheme.subCategory.trim() ? scheme.subCategory.trim() : scheme.category;
