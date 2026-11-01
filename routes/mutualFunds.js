@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getSchemes,
   getSchemeDetail,
+  getSchemeSipOptions,
   getSchemeHoldings,
   getUserUcc,
   registerUserUcc,
@@ -67,6 +68,7 @@ const { protect } = require('../middleware/authMiddleware');
 // ── Public Routes (Scheme catalog & checkout simulator) ──
 router.get('/schemes', getSchemes);
 router.get('/schemes/:code/holdings', getSchemeHoldings);
+router.get('/schemes/:code/sip-options', getSchemeSipOptions);
 router.get('/schemes/:code', getSchemeDetail);
 router.get('/amcs', getPublicAmcs);
 router.get('/nfos', getNfos);

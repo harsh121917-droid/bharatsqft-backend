@@ -591,6 +591,123 @@ exports.getSchemes = async (req, res) => {
   }
 };
 
+// ── 1b. Helper: Resolve Authoritative SIP Frequencies & Options from MfSipSchemeMaster ──
+const resolveSchemeSipOptions = async (scheme) => {
+  if (!scheme) return { supportedFrequencies: ['MONTHLY'], options: [] };
+
+  const targetNseCode = scheme.nseSchemeCode || scheme.schemeCode;
+  const searchCriteria = [
+    { schemeCode: targetNseCode },
+    { isin: scheme.isin },
+  ];
+  if (scheme.schemeCode) searchCriteria.push({ schemeCode: scheme.schemeCode });
+
+  const activeMasters = await MfSipSchemeMaster.find({
+    $or: searchCriteria,
+    sipStatus: '1',
+  }).lean();
+
+  const freqOrder = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY'];
+  const labelMap = {
+    DAILY: 'Daily',
+    WEEKLY: 'Weekly',
+    MONTHLY: 'Monthly',
+    QUARTERLY: 'Quarterly',
+    FORTNIGHTLY: 'Fortnightly',
+  };
+
+  const optionsMap = new Map();
+
+  for (const m of activeMasters) {
+    const rawFreq = String(m.sipFrequency || '').trim().toUpperCase();
+    if (!labelMap[rawFreq]) continue;
+
+    const existing = optionsMap.get(rawFreq);
+    const parsedMinAmt = Number(m.minInstallmentAmount) || Number(scheme.minSipAmount) || (rawFreq === 'DAILY' ? 100 : 500);
+
+    const datesStr = String(m.sipDates || '').trim();
+    const allowedDates = datesStr
+      ? datesStr.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n >= 1 && n <= 31)
+      : (rawFreq === 'MONTHLY' ? [1, 5, 10, 15, 20, 25, 28] : (rawFreq === 'WEEKLY' ? [1, 8, 15, 22] : []));
+
+    if (!existing || (existing.minAmount > parsedMinAmt && parsedMinAmt > 0)) {
+      optionsMap.set(rawFreq, {
+        frequency: rawFreq,
+        label: labelMap[rawFreq] || rawFreq,
+        minAmount: parsedMinAmt,
+        maxAmount: Number(m.maxInstallmentAmount) || 9999999999,
+        allowedDates,
+        datesString: datesStr,
+        multiplier: Number(m.multiplierAmount) || 1,
+        installmentGap: Number(m.sipInstallmentGap) || null,
+        minimumGap: Number(m.sipMinimumGap) || null,
+      });
+    }
+  }
+
+  // If no SIP master entry exists in DB for this scheme, default safely to MONTHLY
+  if (optionsMap.size === 0) {
+    const defaultMin = Number(scheme.minSipAmount) || 500;
+    optionsMap.set('MONTHLY', {
+      frequency: 'MONTHLY',
+      label: 'Monthly',
+      minAmount: defaultMin,
+      maxAmount: 9999999999,
+      allowedDates: [1, 5, 10, 15, 20, 25, 28],
+      datesString: '1,5,10,15,20,25,28',
+      multiplier: 1,
+      installmentGap: 30,
+      minimumGap: 7,
+    });
+  }
+
+  const sortedOptions = Array.from(optionsMap.values()).sort((a, b) => {
+    const idxA = freqOrder.indexOf(a.frequency);
+    const idxB = freqOrder.indexOf(b.frequency);
+    return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+  });
+
+  const supportedFrequencies = sortedOptions.map((o) => o.frequency);
+
+  return {
+    supportedFrequencies,
+    options: sortedOptions,
+  };
+};
+
+// ── 1c. GET /api/mutual-funds/schemes/:code/sip-options ──
+exports.getSchemeSipOptions = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const searchCode = String(code || '').trim().toUpperCase();
+    const scheme = await MutualFundScheme.findOne({
+      planType: 'REGULAR',
+      $or: [
+        { schemeCode: searchCode },
+        { nseSchemeCode: searchCode },
+        { isin: searchCode },
+      ],
+    }).lean();
+
+    if (!scheme) {
+      return res.status(404).json({ success: false, message: 'Mutual Fund Scheme not found' });
+    }
+
+    const sipData = await resolveSchemeSipOptions(scheme);
+    return res.json({
+      success: true,
+      data: {
+        schemeCode: scheme.schemeCode,
+        schemeName: scheme.schemeName,
+        ...sipData,
+      },
+    });
+  } catch (error) {
+    console.error('[getSchemeSipOptions Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 2. GET /api/mutual-funds/schemes/:code ──
 exports.getSchemeDetail = async (req, res) => {
   try {
@@ -627,10 +744,11 @@ exports.getSchemeDetail = async (req, res) => {
     const liveFacts = null;
     const targetSchemeCode = scheme.amfiCode || scheme.schemeCode;
 
-    // Parallel fetch: Historical daily NAV chart points and Scheme Portfolio
-    const [liveNav, portfolioResult] = await Promise.all([
+    // Parallel fetch: Historical daily NAV chart points, Scheme Portfolio, and authoritative SIP options
+    const [liveNav, portfolioResult, sipOptionsData] = await Promise.all([
       mfLiveService.getLiveHistoricalNav(targetSchemeCode, scheme),
       mfPortfolioService.getSchemePortfolio(scheme.schemeCode),
+      resolveSchemeSipOptions(scheme),
     ]);
 
     // Prepare chart points per timeframe
@@ -1034,7 +1152,9 @@ exports.getSchemeDetail = async (req, res) => {
           minAdditionalPurchaseAmount: scheme.minAdditionalPurchaseAmount || staticIntel?.minAdditionalPurchaseAmount || (realMinPurchase ? Math.min(realMinPurchase, 500) : 500),
           minAdditionalPurchaseSource: staticIntel?.minAdditionalPurchaseSource || 'OFFICIAL_AMC_SID',
           minSipAmount: realMinSip,
-          sipFrequencies: realMinSip ? (scheme.sipFrequencies && scheme.sipFrequencies.length > 0 ? scheme.sipFrequencies : (staticIntel?.sipFrequencies || ['MONTHLY'])) : null,
+          sipFrequencies: sipOptionsData?.supportedFrequencies || (realMinSip ? ['MONTHLY'] : null),
+          supportedFrequencies: sipOptionsData?.supportedFrequencies || (realMinSip ? ['MONTHLY'] : []),
+          sipOptions: sipOptionsData?.options || [],
           sipDates: realMinSip ? (scheme.sipDates && scheme.sipDates.length > 0 ? scheme.sipDates : (staticIntel?.sipDates || [1, 5, 10, 15, 20, 25])) : null,
           minSipInstallments: realMinSip ? (scheme.minSipInstallments || staticIntel?.minSipInstallments || 6) : 6,
           maxSipInstallments: scheme.maxSipInstallments || staticIntel?.maxSipInstallments || null,
@@ -2672,27 +2792,38 @@ exports.registerSipOrder = async (req, res) => {
     }
 
     const normFreq = (frequency || 'MONTHLY').trim().toUpperCase();
+
+    // 1. Look up authoritative MfSipSchemeMaster for requested frequency
     let sipMaster = await MfSipSchemeMaster.findOne({
       schemeCode: targetNseCode,
       sipFrequency: normFreq,
       sipStatus: '1',
     });
-    if (!sipMaster) {
-      sipMaster = await MfSipSchemeMaster.findOne({
-        schemeCode: targetNseCode,
-        sipStatus: '1',
-      });
-    }
-    if (!sipMaster) {
+    if (!sipMaster && scheme.isin) {
       sipMaster = await MfSipSchemeMaster.findOne({
         isin: scheme.isin,
         sipFrequency: normFreq,
         sipStatus: '1',
       });
     }
+
+    // Check if the requested frequency is supported by this fund
     if (!sipMaster) {
+      const availableFreqs = await MfSipSchemeMaster.distinct('sipFrequency', {
+        $or: [{ schemeCode: targetNseCode }, { isin: scheme.isin }],
+        sipStatus: '1',
+      });
+      if (availableFreqs && availableFreqs.length > 0 && !availableFreqs.includes(normFreq)) {
+        return res.status(400).json({
+          success: false,
+          code: 'SIP_FREQUENCY_NOT_SUPPORTED',
+          message: `${normFreq} SIP is not supported for ${scheme.schemeName}. Supported frequencies: ${availableFreqs.join(', ')}`,
+          data: { supportedFrequencies: availableFreqs },
+        });
+      }
+      // If no frequency-specific master found, fallback to any active master if available
       sipMaster = await MfSipSchemeMaster.findOne({
-        isin: scheme.isin,
+        $or: [{ schemeCode: targetNseCode }, { isin: scheme.isin }],
         sipStatus: '1',
       });
     }
@@ -2708,11 +2839,12 @@ exports.registerSipOrder = async (req, res) => {
     const authoritativeAmcCode = sipMaster.amcCode;
     const authoritativeNseCode = sipMaster.schemeCode || targetNseCode;
 
-    const minAllowedAmount = sipMaster.minInstallmentAmount || scheme.minSipAmount || 500;
+    const freqDisplay = normFreq === 'DAILY' ? 'Daily' : (normFreq === 'WEEKLY' ? 'Weekly' : (normFreq === 'QUARTERLY' ? 'Quarterly' : 'Monthly'));
+    const minAllowedAmount = sipMaster.minInstallmentAmount || (normFreq === 'DAILY' ? 100 : (scheme.minSipAmount || 500));
     if (installmentAmount < minAllowedAmount) {
       return res.status(400).json({
         success: false,
-        message: `Minimum SIP amount for ${scheme.schemeName} is ₹${minAllowedAmount}`,
+        message: `Minimum ${freqDisplay} SIP amount for ${scheme.schemeName} is ₹${minAllowedAmount}`,
       });
     }
 
@@ -2725,15 +2857,24 @@ exports.registerSipOrder = async (req, res) => {
     const minBufferDays = 7;
     const minAllowedDate = new Date(today.getTime() + minBufferDays * 24 * 60 * 60 * 1000);
 
-    let chosenDate = startDate ? new Date(startDate) : new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    let chosenDate = startDate ? new Date(startDate) : new Date(today.getTime() + (normFreq === 'DAILY' ? 7 : (normFreq === 'WEEKLY' ? 7 : 30)) * 24 * 60 * 60 * 1000);
     let recurringStartDate = new Date(chosenDate);
     let bufferApplied = false;
 
     if (recurringStartDate < minAllowedDate) {
       bufferApplied = true;
-      recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
-      if (recurringStartDate < minAllowedDate) {
+      if (normFreq === 'DAILY') {
+        recurringStartDate = new Date(minAllowedDate);
+        if (recurringStartDate.getDay() === 6) recurringStartDate.setDate(recurringStartDate.getDate() + 2);
+        else if (recurringStartDate.getDay() === 0) recurringStartDate.setDate(recurringStartDate.getDate() + 1);
+      } else if (normFreq === 'WEEKLY') {
+        recurringStartDate = new Date(minAllowedDate);
+      } else {
+        // MONTHLY default
         recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+        if (recurringStartDate < minAllowedDate) {
+          recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+        }
       }
     }
 
@@ -2763,7 +2904,7 @@ exports.registerSipOrder = async (req, res) => {
       status: '1',
       member_code: memberCode,
       memberCode: memberCode,
-      installment_no: '60', // 5 years default tenure
+      installment_no: normFreq === 'DAILY' ? '250' : (normFreq === 'WEEKLY' ? '104' : (normFreq === 'QUARTERLY' ? '20' : '60')),
       first_order_today: firstOrderToday,
       primary_holder_mobile: user.phone?.slice(-10) || '',
       primary_holder_email: user.email,
@@ -2903,12 +3044,12 @@ exports.registerSipOrder = async (req, res) => {
     let userExplanation = '';
     if (firstOrderToday === 'Y') {
       userExplanation = bufferApplied
-        ? `Installment #1 of ₹${installmentAmount} initiated for today. Per exchange rules, automated mandate AutoPay requires a 7-day setup buffer, so recurring monthly debits will start on ${dateFormatted}.`
-        : `Installment #1 of ₹${installmentAmount} initiated for today. Recurring monthly AutoPay debits will start on ${dateFormatted}.`;
+        ? `Installment #1 of ₹${installmentAmount} initiated for today. Per exchange rules, automated mandate AutoPay requires a 7-day setup buffer, so recurring ${freqDisplay.toLowerCase()} debits will start on ${dateFormatted}.`
+        : `Installment #1 of ₹${installmentAmount} initiated for today. Recurring ${freqDisplay.toLowerCase()} AutoPay debits will start on ${dateFormatted}.`;
     } else {
       userExplanation = bufferApplied
-        ? `Monthly SIP registered! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your first automated debit will execute on ${dateFormatted}.`
-        : `Monthly SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`;
+        ? `${freqDisplay} SIP registered! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your first automated debit will execute on ${dateFormatted}.`
+        : `${freqDisplay} SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`;
     }
 
     return res.json({
