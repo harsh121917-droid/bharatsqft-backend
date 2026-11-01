@@ -111,6 +111,8 @@ router.get('/sips/:id', getSipDetail);
 router.post('/sips/:id/pause', pauseUserSip);
 router.post('/sips/:id/resume', resumeUserSip);
 router.post('/sips/:id/cancel', cancelUserSip);
+router.post('/sips/:id/close', cancelUserSip);
+router.post('/sips/:id/stop', cancelUserSip);
 router.get('/portfolio', getPortfolio);
 router.get('/portfolio/history', getPortfolioHistory);
 router.get('/portfolio/holdings/:schemeCode', getHoldingDetail);
