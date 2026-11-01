@@ -235,19 +235,24 @@ async function recalculateUserPortfolio(userId) {
     }
   }
 
-  // 3b. Include any existing DB holdings to ensure zero-unit / fully-reversed schemes are marked CLOSED
+  // 3b. Include any existing DB holdings to ensure zero-unit / fully-reversed schemes are marked CLOSED & preserve folios
   const existingHoldings = await MfPortfolioHolding.find({ user: userId });
   for (const eh of existingHoldings) {
     const ehCode = (eh.schemeCode || '').toUpperCase();
-    if (ehCode && !holdingsMap[ehCode]) {
-      holdingsMap[ehCode] = {
-        schemeCode: ehCode,
-        schemeName: eh.schemeName,
-        totalUnits: 0,
-        investedAmount: 0,
-        pendingUnits: 0,
-        ordersCount: 0,
-      };
+    if (ehCode) {
+      if (!holdingsMap[ehCode]) {
+        holdingsMap[ehCode] = {
+          schemeCode: ehCode,
+          schemeName: eh.schemeName,
+          totalUnits: 0,
+          investedAmount: 0,
+          pendingUnits: 0,
+          ordersCount: 0,
+          folioNo: eh.folioNo || '',
+        };
+      } else if (eh.folioNo && !holdingsMap[ehCode].folioNo) {
+        holdingsMap[ehCode].folioNo = eh.folioNo;
+      }
     }
   }
 
@@ -376,7 +381,7 @@ async function recalculateUserPortfolio(userId) {
           totalUnits: holdingObj.totalUnits,
           availableUnits: holdingObj.availableUnits,
           pendingRedemptionUnits: holdingObj.pendingRedemptionUnits,
-          folioNo: holdingObj.folioNo,
+          ...(holdingObj.folioNo ? { folioNo: holdingObj.folioNo } : {}),
           units: holdingObj.totalUnits,
           investedAmount: holdingObj.investedAmount,
           averageNav: holdingObj.averageNav,

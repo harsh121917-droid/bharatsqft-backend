@@ -313,6 +313,24 @@ describe('VikaOne Payment, Add Investment & Redeem Lifecycle Tests', () => {
       assert.equal(res.statusCode, 400);
       assert.match(res.data.message, /0 units/i);
     });
+
+    it('2.5. Validates and rejects redemption with FOLIO_REQUIRED when no folio exists or is provided', async () => {
+      // Ensure holding has no folioNo
+      await MfPortfolioHolding.updateOne({ user: testUser._id, schemeCode: testScheme.schemeCode }, { $set: { folioNo: '' } });
+      await MfOrder.updateMany({ user: testUser._id, schemeCode: testScheme.schemeCode }, { $set: { folioNo: '' } });
+
+      const { req, res } = mockReqRes({
+        schemeCode: testScheme.schemeCode,
+        redeemMode: 'UNITS',
+        units: 5,
+        folioNo: '',
+      });
+
+      await mutualFundsController.createRedemptionOrder(req, res);
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.data.code, 'FOLIO_REQUIRED');
+      assert.equal(res.data.data.requiresFolio, true);
+    });
   });
 
   describe('3. Redeem Execution by Units & Section 11 Invariant', () => {

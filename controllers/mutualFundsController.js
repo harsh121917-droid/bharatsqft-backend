@@ -2373,11 +2373,21 @@ exports.syncOrderStatus = async (req, res) => {
         });
       }
 
+      // Capture folio if provided by exchange in status/allotment feed
+      const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
+      if (rawFolio && !order.folioNo) {
+        order.folioNo = String(rawFolio).trim();
+        await MfPortfolioHolding.updateOne(
+          { user: order.user, schemeCode: order.schemeCode },
+          { $set: { folioNo: String(rawFolio).trim() } }
+        );
+      }
+
       // Handle Confirmed Payment / Accepted Transaction (including 'VALID' and 'PROVISIONAL ORDER')
       if (['SUCCESS', 'APPROVED', 'VALIDATED', 'ACCEPTED', 'ORDER PLACED', 'VALID'].includes(nseOrderStatus) || /PROVISIONAL|ALLOTMENT|ACCEPTED|VALID/i.test(nseRemark)) {
         if (order.paymentStatus !== 'SUCCESS') {
           order.paymentStatus = 'SUCCESS';
-          order.orderStatus = 'PROCESSING';
+          order.orderStatus = 'PAYMENT_SUCCESS';
           order.remarks = nseData.order_remark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
           try {
             const eventNotificationService = require('../services/eventNotificationService');
@@ -2393,6 +2403,7 @@ exports.syncOrderStatus = async (req, res) => {
           allottedUnits,
           allottedNav: allottedNav || order.navAtOrder || 100.0,
           rtaReferenceNo: nseData.rta_ref_no || `RTA_${order.orderId}`,
+          folioNo: rawFolio || order.folioNo,
           source: 'NSE_ORDER_STATUS_REPORT',
         });
         if (allotResult.success) {
@@ -3356,6 +3367,28 @@ async function getDetailedUserSchemeHoldings(userId, schemeCode) {
     }
     if (holding.pendingRedemptionUnits && holding.pendingRedemptionUnits > pendingRedemptionUnits) {
       pendingRedemptionUnits = holding.pendingRedemptionUnits;
+    }
+  }
+
+  // Look up AMC-level folio fallback if scheme-level folio not found
+  if (!folioNo) {
+    const scheme = await MutualFundScheme.findOne({ schemeCode: code });
+    if (scheme?.amcCode) {
+      const amcOrder = await MfOrder.findOne({
+        user: userId,
+        amcCode: scheme.amcCode,
+        folioNo: { $nin: ['', null] },
+      });
+      if (amcOrder?.folioNo) {
+        folioNo = amcOrder.folioNo;
+      } else {
+        const amcHolding = await MfPortfolioHolding.findOne({
+          user: userId,
+          amcCode: scheme.amcCode,
+          folioNo: { $nin: ['', null] },
+        });
+        if (amcHolding?.folioNo) folioNo = amcHolding.folioNo;
+      }
     }
   }
 
@@ -4418,7 +4451,57 @@ exports.createRedemptionOrder = async (req, res) => {
 
     const orderId = `MFR${Date.now()}`;
     const user = await User.findById(userId);
-    const effectiveFolio = folioNo || holdings.folioNo || '';
+    let effectiveFolio = String(folioNo || holdings.folioNo || '').trim();
+
+    // If still missing, check existing scheme holding in DB
+    if (!effectiveFolio) {
+      const holdingDoc = await MfPortfolioHolding.findOne({
+        user: userId,
+        schemeCode: scheme.schemeCode,
+        folioNo: { $nin: ['', null] },
+      });
+      if (holdingDoc?.folioNo) effectiveFolio = String(holdingDoc.folioNo).trim();
+    }
+
+    // If still missing, check any order or holding under the same AMC
+    if (!effectiveFolio && scheme.amcCode) {
+      const amcOrder = (await MfOrder.findOne({
+        user: userId,
+        schemeCode: scheme.schemeCode,
+        folioNo: { $nin: ['', null] },
+      })) || (await MfOrder.findOne({
+        user: userId,
+        amcCode: scheme.amcCode,
+        folioNo: { $nin: ['', null] },
+      }));
+      if (amcOrder?.folioNo) effectiveFolio = String(amcOrder.folioNo).trim();
+
+      if (!effectiveFolio) {
+        const amcHolding = await MfPortfolioHolding.findOne({
+          user: userId,
+          amcCode: scheme.amcCode,
+          folioNo: { $nin: ['', null] },
+        });
+        if (amcHolding?.folioNo) effectiveFolio = String(amcHolding.folioNo).trim();
+      }
+    }
+
+    // NSE MFSS strictly mandates folio_no in physical mode (demat_physical: 'P').
+    // Fail fast with clear actionable error rather than dispatching a guaranteed-to-fail payload to exchange.
+    if (!effectiveFolio) {
+      return res.status(400).json({
+        success: false,
+        code: 'FOLIO_REQUIRED',
+        message: 'A valid Folio Number is mandatory for mutual fund redemption in Physical mode. Please enter your AMC Folio Number (found in your AMC account statement, SMS, or email).',
+        data: {
+          requiresFolio: true,
+          clientCode: ucc.clientCode,
+          schemeCode: scheme.schemeCode,
+          schemeName: scheme.schemeName,
+          amcName: scheme.amcName,
+        },
+      });
+    }
 
     // 3. Prepare NSE Redemption payload (Order Entry RED)
     const cleanRedeemRef = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
@@ -4426,7 +4509,7 @@ exports.createRedemptionOrder = async (req, res) => {
       order_ref_number: cleanRedeemRef,
       scheme_code: targetNseCode || scheme.schemeCode,
       trxn_type: 'R', // Redemption
-      buy_sell_type: effectiveFolio ? 'ADDITIONAL' : 'FRESH',
+      buy_sell_type: 'ADDITIONAL',
       client_code: ucc.clientCode,
       demat_physical: 'P',
       order_amount: allUnits ? '' : String(computedAmount),
@@ -4495,6 +4578,24 @@ exports.createRedemptionOrder = async (req, res) => {
       remarks: `Redeemed ${unitsToRedeem} units (${effectiveMode === 'AMOUNT' ? '₹' + computedAmount : 'by units'}). Payout of ₹${computedAmount.toLocaleString('en-IN')} will be credited directly to ${ucc.primaryBank?.bankName || 'registered bank account'} within 2-3 business days.`,
     });
 
+    // Persist effectiveFolio to MfPortfolioHolding and past orders for this scheme
+    if (effectiveFolio) {
+      try {
+        await Promise.all([
+          MfPortfolioHolding.updateOne(
+            { user: userId, schemeCode: scheme.schemeCode },
+            { $set: { folioNo: effectiveFolio } }
+          ),
+          MfOrder.updateMany(
+            { user: userId, schemeCode: scheme.schemeCode, folioNo: { $in: ['', null] } },
+            { $set: { folioNo: effectiveFolio } }
+          ),
+        ]);
+      } catch (folioErr) {
+        console.warn('[createRedemptionOrder] Folio persistence warning:', folioErr.message);
+      }
+    }
+
     // 6. Recalculate portfolio atomically to track pending redemption units (Section 11)
     await mfPortfolioEngine.recalculateUserPortfolio(userId);
 
@@ -4511,6 +4612,46 @@ exports.createRedemptionOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('[createRedemptionOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 13b. PUT /api/mutual-funds/portfolio/holdings/:schemeCode/folio (Update/Set Holding Folio Number) ──
+exports.updateHoldingFolio = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { schemeCode } = req.params;
+    const { folioNo } = req.body;
+
+    if (!folioNo || !String(folioNo).trim()) {
+      return res.status(400).json({ success: false, message: 'folioNo is required' });
+    }
+
+    const cleanFolio = String(folioNo).trim();
+    const searchCode = String(schemeCode || '').trim().toUpperCase();
+
+    const holding = await MfPortfolioHolding.findOneAndUpdate(
+      { user: userId, schemeCode: searchCode },
+      { $set: { folioNo: cleanFolio, lastUpdatedAt: new Date() } },
+      { new: true }
+    );
+
+    await MfOrder.updateMany(
+      { user: userId, schemeCode: searchCode, folioNo: { $in: ['', null] } },
+      { $set: { folioNo: cleanFolio } }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Folio number updated successfully',
+      data: {
+        schemeCode: searchCode,
+        folioNo: cleanFolio,
+        holding,
+      },
+    });
+  } catch (error) {
+    console.error('[updateHoldingFolio Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

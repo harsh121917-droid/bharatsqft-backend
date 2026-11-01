@@ -32,6 +32,7 @@ const {
   resetTestData,
   syncNavsNow,
   createRedemptionOrder,
+  updateHoldingFolio,
   createSwitchOrder,
   registerStpOrder,
   registerSwpOrder,
@@ -113,6 +114,7 @@ router.post('/sips/:id/cancel', cancelUserSip);
 router.get('/portfolio', getPortfolio);
 router.get('/portfolio/history', getPortfolioHistory);
 router.get('/portfolio/holdings/:schemeCode', getHoldingDetail);
+router.put('/portfolio/holdings/:schemeCode/folio', updateHoldingFolio);
 router.get('/transactions', getTransactions);
 router.get('/transactions/:id', getTransactionDetail);
 router.get('/tax/capital-gains', getCapitalGains);
