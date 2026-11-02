@@ -5200,6 +5200,7 @@ exports.setupUserMandate = async (req, res) => {
         const rawId = regItem?.mandate_id || regItem?.reg_id;
         let liveMandateId = (isValidId(rawId) && regItem?.reg_status !== 'REG_FAILED') ? String(rawId).trim() : null;
         let clActLink = null;
+        let isAuthConfirmedOnExchange = false;
 
         if (!nseRes?.success || !liveMandateId || regItem?.reg_status === 'REG_FAILED') {
           const errMsg = regItem?.reg_remark || nseRes?.data?.message || 'NSE Exchange rejected mandate registration';
