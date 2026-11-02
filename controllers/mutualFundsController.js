@@ -75,6 +75,43 @@ function getNseStateCode(stateName) {
   return STATE_CODE_MAP[clean] || (clean.length === 2 ? clean : 'MA');
 }
 
+const extractUrl = (obj) => {
+  if (!obj) return null;
+  const d = obj.data || obj;
+  const candidates = [
+    d?.firstHolderLink,
+    d?.short_url,
+    d?.payment_link,
+    d?.link,
+    d?.url,
+    d?.authUrl,
+    d?.auth_url,
+    d?.first_holder_link,
+    d?.firstHolderUrl,
+    d?.report_data?.[0]?.firstHolderLink,
+    d?.report_data?.[0]?.short_url,
+    d?.report_data?.[0]?.link,
+    d?.report_data?.[0]?.url,
+    d?.reg_data?.[0]?.firstHolderLink,
+    d?.reg_data?.[0]?.short_url,
+    d?.reg_data?.[0]?.link,
+    d?.reg_data?.[0]?.payment_link,
+    d?.reg_details?.[0]?.firstHolderLink,
+    d?.reg_details?.[0]?.short_url,
+    d?.reg_details?.[0]?.link,
+    d?.reg_details?.[0]?.auth_url,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string') {
+      const trimmed = c.trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
+      }
+    }
+  }
+  return null;
+};
+
 // In-memory cache for hidden AMCs (60s TTL) to accelerate getSchemes pagination
 let cachedHiddenAmcs = null;
 let cachedHiddenAmcsTime = 0;
@@ -1901,29 +1938,44 @@ exports.registerUserUcc = async (req, res) => {
     } catch (_) {}
 
     // Fetch official NSE direct authorization link (prefer CL_ACT for investor activation, or NOMINEE_AUTH)
-    let nseAuthUrl = null;
-    let clActLink = null;
-    try {
-      const linkRes = await nseClient.getShortLink('CL_ACT', clientCode);
-      if (linkRes?.success && linkRes?.data?.firstHolderLink) {
-        clActLink = linkRes.data.firstHolderLink;
-        nseAuthUrl = clActLink;
-      }
-    } catch (_) {}
+    let nseAuthUrl = extractUrl(uccRecord?.rawResponse);
+    let clActLink = nseAuthUrl;
+
+    if (!clActLink) {
+      try {
+        const linkRes = await nseClient.getShortLink('CL_ACT', clientCode);
+        clActLink = extractUrl(linkRes);
+        if (clActLink) nseAuthUrl = clActLink;
+      } catch (_) {}
+    }
+
+    // If NSE indexing is asynchronous, give it 800ms and retry once
+    if (!clActLink) {
+      try {
+        await new Promise((r) => setTimeout(r, 800));
+        const retryRes = await nseClient.getShortLink('CL_ACT', clientCode);
+        clActLink = extractUrl(retryRes);
+        if (clActLink) nseAuthUrl = clActLink;
+      } catch (_) {}
+    }
 
     if (!nseAuthUrl && nomineeName) {
       try {
         const nomRes = await nseClient.getShortLink('NOMINEE_AUTH', clientCode);
-        if (nomRes?.success && nomRes?.data?.firstHolderLink) {
-          nseAuthUrl = nomRes.data.firstHolderLink;
-        }
+        const nomLink = extractUrl(nomRes);
+        if (nomLink) nseAuthUrl = nomLink;
       } catch (_) {}
     }
 
     // Trigger RESEND_COMM to send official SMS/Email OTP to investor ONLY if direct link wasn't returned
     if (!nseAuthUrl) {
       try {
-        await nseClient.resendCommunication('CL_ACT', clientCode);
+        const resendRes = await nseClient.resendCommunication('CL_ACT', clientCode);
+        const resendLink = extractUrl(resendRes);
+        if (resendLink) {
+          clActLink = resendLink;
+          nseAuthUrl = resendLink;
+        }
       } catch (_) {}
     }
 
@@ -1956,14 +2008,21 @@ exports.resendUccActivation = async (req, res) => {
     let authUrl = null;
     try {
       const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
-      if (linkRes?.success && linkRes?.data?.firstHolderLink) {
-        authUrl = linkRes.data.firstHolderLink;
-      }
+      authUrl = extractUrl(linkRes);
     } catch (_) {}
 
     if (!authUrl) {
       try {
-        await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+        const resendRes = await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+        authUrl = extractUrl(resendRes);
+      } catch (_) {}
+    }
+
+    if (!authUrl) {
+      try {
+        await new Promise((r) => setTimeout(r, 800));
+        const retryRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
+        authUrl = extractUrl(retryRes);
       } catch (_) {}
     }
 
@@ -2185,9 +2244,7 @@ exports.createPurchaseOrder = async (req, res) => {
         let clActLink = null;
         try {
           const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
-          if (linkRes?.success && linkRes?.data?.firstHolderLink) {
-            clActLink = linkRes.data.firstHolderLink;
-          }
+          clActLink = extractUrl(linkRes);
         } catch (_) {}
 
         return res.status(400).json({
@@ -5277,15 +5334,14 @@ exports.setupUserMandate = async (req, res) => {
             // 2. Fetch UCC Registration Authorization link (CL_ACT)
             try {
               const linkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode);
-              if (linkRes?.success && linkRes?.data?.firstHolderLink) {
-                clActLink = linkRes.data.firstHolderLink;
-              }
+              clActLink = extractUrl(linkRes);
             } catch (_) {}
 
             // 3. Trigger RESEND_COMM to dispatch SMS/Email OTP to investor ONLY if direct link wasn't returned
             if (!clActLink) {
               try {
-                await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+                const resendRes = await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+                clActLink = extractUrl(resendRes);
               } catch (_) {}
             }
 
