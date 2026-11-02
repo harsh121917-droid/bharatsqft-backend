@@ -1985,10 +1985,14 @@ exports.registerUserUcc = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number.',
+      message: `UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number (${user?.phone || 'registered mobile'}).`,
       data: uccRecord,
       authUrl: nseAuthUrl,
       clActLink,
+      activationMode: nseAuthUrl ? 'DIRECT_WEB' : 'SMS_OTP',
+      instructions: nseAuthUrl
+        ? 'Open the authUrl in browser to complete authorization.'
+        : `Check the SMS received from NSE on ${user?.phone || 'your mobile'} or email to verify OTP and activate account on the exchange.`,
     });
   } catch (error) {
     console.error('[registerUserUcc Error]:', error);
