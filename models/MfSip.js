@@ -123,6 +123,10 @@ const MfSipSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    firstOrderToday: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

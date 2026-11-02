@@ -30,6 +30,7 @@ const MfCart = require('../models/MfCart');
 const mfInvestorReadinessService = require('../services/mfInvestorReadinessService');
 const mfNfoService = require('../services/mfNfoService');
 const NseConfig = require('../models/NseConfig');
+const Enquiry = require('../models/Enquiry');
 const STATE_CODE_MAP = {
   'ANDAMAN & NICOBAR': 'AN', 'ANDAMAN AND NICOBAR': 'AN', 'AN': 'AN',
   'ANDHRA PRADESH': 'AP', 'AP': 'AP',
@@ -3189,6 +3190,7 @@ exports.registerSipOrder = async (req, res) => {
       status: (firstOrderToday === 'Y' || paymentLink) ? 'PENDING_PAYMENT' : 'ACTIVE',
       paymentLink: paymentLink || null,
       authUrl: paymentLink || null,
+      firstOrderToday: firstOrderToday === 'Y',
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
     });
@@ -3302,29 +3304,32 @@ exports.verifySipPayment = async (req, res) => {
     const nav = scheme?.nav || null;
     const estimatedUnits = nav ? +(sip.installmentAmount / nav).toFixed(3) : null;
 
-    const initialOrderId = sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`;
-    let initialOrder = await MfOrder.findOne({ orderId: initialOrderId });
-    if (!initialOrder) {
-      initialOrder = await MfOrder.create({
-        user: userId,
-        clientCode: sip.clientCode,
-        orderId: initialOrderId,
-        schemeCode: sip.schemeCode,
-        schemeName: scheme?.schemeName || sip.schemeName,
-        transactionType: 'P',
-        buySellType: 'FRESH',
-        orderAmount: sip.installmentAmount,
-        estimatedUnits,
-        units: 0,
-        allottedUnits: 0,
-        allotmentStatus: 'PENDING',
-        navAtOrder: nav,
-        paymentMode: 'MANDATE',
-        paymentStatus: 'SUCCESS',
-        orderStatus: 'SUBMITTED',
-        nseStatus: 'SUBMITTED',
-        remarks: `First installment for SIP ${sip.sipRegNo} via NSE mandate`,
-      });
+    let initialOrder = null;
+    if (sip.firstOrderToday === true) {
+      const initialOrderId = sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`;
+      initialOrder = await MfOrder.findOne({ orderId: initialOrderId });
+      if (!initialOrder) {
+        initialOrder = await MfOrder.create({
+          user: userId,
+          clientCode: sip.clientCode,
+          orderId: initialOrderId,
+          schemeCode: sip.schemeCode,
+          schemeName: scheme?.schemeName || sip.schemeName,
+          transactionType: 'P',
+          buySellType: 'FRESH',
+          orderAmount: sip.installmentAmount,
+          estimatedUnits,
+          units: 0,
+          allottedUnits: 0,
+          allotmentStatus: 'PENDING',
+          navAtOrder: nav,
+          paymentMode: 'MANDATE',
+          paymentStatus: 'SUCCESS',
+          orderStatus: 'SUBMITTED',
+          nseStatus: 'SUBMITTED',
+          remarks: `First installment for SIP ${sip.sipRegNo} via NSE mandate`,
+        });
+      }
     }
 
     // Accurately count confirmed installments for this SIP/scheme
@@ -3336,7 +3341,7 @@ exports.verifySipPayment = async (req, res) => {
     });
 
     sip.status = 'ACTIVE';
-    sip.installmentsPaid = Math.max(1, confirmedOrdersCount);
+    sip.installmentsPaid = confirmedOrdersCount;
     sip.totalAmountPaid = sip.installmentsPaid * sip.installmentAmount;
     await sip.save();
 
@@ -3666,6 +3671,22 @@ exports.getUserSips = async (req, res) => {
   try {
     const userId = req.user._id;
     const sips = await MfSip.find({ user: userId }).sort({ createdAt: -1 });
+
+    // Auto-resolve SIPs that have a valid NSE registration number and approved mandate
+    for (const s of sips) {
+      if (s.status === 'PENDING_PAYMENT' && s.sipRegNo && s.firstOrderToday !== true) {
+        let mandateApproved = true;
+        if (s.mandateId) {
+          const m = await MfMandate.findOne({ mandateId: s.mandateId, user: userId });
+          if (m && m.status !== 'APPROVED') mandateApproved = false;
+        }
+        if (mandateApproved) {
+          s.status = 'ACTIVE';
+          await s.save();
+        }
+      }
+    }
+
     return res.json({ success: true, data: sips });
   } catch (error) {
     console.error('[getUserSips Error]:', error);
@@ -3682,6 +3703,20 @@ exports.getSipDetail = async (req, res) => {
     if (!sip) {
       return res.status(404).json({ success: false, message: 'SIP not found' });
     }
+
+    // Auto-activate if mandate approved and registered on exchange without same-day payment requirement
+    if (sip.status === 'PENDING_PAYMENT' && sip.sipRegNo && sip.firstOrderToday !== true) {
+      let mandateApproved = true;
+      if (sip.mandateId) {
+        const m = await MfMandate.findOne({ mandateId: sip.mandateId, user: userId });
+        if (m && m.status !== 'APPROVED') mandateApproved = false;
+      }
+      if (mandateApproved) {
+        sip.status = 'ACTIVE';
+        await sip.save();
+      }
+    }
+
     if (sip.status === 'PENDING_PAYMENT' && !sip.paymentLink && sip.sipRegNo) {
       try {
         const link = await fetchSipPaymentLink({ sipRegNo: sip.sipRegNo, clientCode: sip.clientCode });
@@ -7569,5 +7604,68 @@ exports.removeFromWatchlist = async (req, res) => {
   } catch (error) {
     console.error('[removeFromWatchlist Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// ── Submit Mutual Fund Support Ticket / Request ──
+exports.submitMfSupportRequest = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { category, subject, message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a description of your issue.',
+      });
+    }
+
+    // Resolve user's UCC details
+    const ucc = await MfClientUcc.findOne({ user: userId }).lean();
+    const clientCode = ucc?.clientCode || req.user.mfClientCode || 'NOT_REGISTERED';
+
+    const categoryLabels = {
+      'UCC_NOT_DONE': 'UCC Registration / Activation Pending',
+      'MANDATE_NOT_ACCEPTED': 'Mandate (AutoPay) Not Accepted / Failed',
+      'FIRST_SIP_NOT_CUT': 'First SIP Amount Not Deducted Today',
+      'PAYMENT_ISSUE': 'Order Payment Failed / Pending Units',
+      'OTHER': 'Other Mutual Fund Query',
+    };
+
+    const finalCategory = category || 'OTHER';
+    const categoryTitle = categoryLabels[finalCategory] || finalCategory;
+    const finalSubject = (subject && subject.trim()) ? subject.trim() : `MF Issue: ${categoryTitle}`;
+
+    const enquiry = await Enquiry.create({
+      name: req.user.name || 'Mutual Fund Investor',
+      email: req.user.email || 'user@vikaone.com',
+      phone: req.user.phone || '',
+      subject: finalSubject,
+      message: message.trim(),
+      type: 'mutual_fund',
+      source: 'app',
+      status: 'new',
+      userId: userId,
+      notes: `[Category: ${categoryTitle}] [UCC: ${clientCode}] [Phone: ${req.user.phone || 'N/A'}]`,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Your mutual fund support request has been submitted successfully. Our operations desk will review and assist you shortly.',
+      data: {
+        ticketId: enquiry._id,
+        category: finalCategory,
+        clientCode: clientCode,
+        createdAt: enquiry.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[submitMfSupportRequest Error]:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit support request. Please try again.',
+      error: error.message,
+    });
   }
 };

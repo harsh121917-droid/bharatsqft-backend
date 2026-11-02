@@ -1393,10 +1393,12 @@ function setEnquiryTab(tab) {
     currentEnquiryTab = tab;
     const btnAll = document.getElementById("btn-enquiry-all");
     const btnLeads = document.getElementById("btn-enquiry-leads");
+    const btnMf = document.getElementById("btn-enquiry-mf");
     const btnGen = document.getElementById("btn-enquiry-general");
 
     if (btnAll) btnAll.className = `btn btn-sm ${tab === 'all' ? 'btn-primary' : 'btn-secondary'}`;
     if (btnLeads) btnLeads.className = `btn btn-sm ${tab === 'leads' ? 'btn-primary' : 'btn-secondary'}`;
+    if (btnMf) btnMf.className = `btn btn-sm ${tab === 'mutual_fund' ? 'btn-primary' : 'btn-secondary'}`;
     if (btnGen) btnGen.className = `btn btn-sm ${tab === 'general' ? 'btn-primary' : 'btn-secondary'}`;
 
     filterEnquiries(document.querySelector("#page-enquiries .search-bar")?.value || "");
@@ -1419,6 +1421,15 @@ async function loadEnquiries() {
         const badge = document.getElementById("leads-count-badge");
         if (badge) badge.textContent = leadsCount;
 
+        const mfCount = allEnquiries.filter(e => e.type === "mutual_fund").length;
+        const mfBadge = document.getElementById("mf-count-badge");
+        if (mfBadge) mfBadge.textContent = mfCount;
+        const mfSideBadge = document.getElementById("mf-sidebar-badge");
+        if (mfSideBadge) {
+            mfSideBadge.textContent = mfCount;
+            mfSideBadge.style.display = mfCount > 0 ? "inline-block" : "none";
+        }
+
         filterEnquiries(document.querySelector("#page-enquiries .search-bar")?.value || "");
     } catch (err) {
         body.innerHTML = `<div class="loading-box"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><div>Network error loading enquiries</div></div>`;
@@ -1430,8 +1441,10 @@ function filterEnquiries(query) {
     let filtered = allEnquiries.filter(e => {
         if (currentEnquiryTab === "leads") {
             return e.type === "full_ownership_lead" || !!e.preferredDate;
+        } else if (currentEnquiryTab === "mutual_fund") {
+            return e.type === "mutual_fund";
         } else if (currentEnquiryTab === "general") {
-            return e.type !== "full_ownership_lead" && !e.preferredDate;
+            return e.type !== "full_ownership_lead" && e.type !== "mutual_fund" && !e.preferredDate;
         }
         return true;
     });
@@ -1494,16 +1507,27 @@ function renderEnquiryTable(enquiries) {
                 </div>
             </td>
             <td>
-                ${isFullOwnership ? `
+                ${e.type === 'mutual_fund' ? `
+                    <span class="badge" style="background:rgba(0,208,156,0.18);color:#00D09C;border:1px solid rgba(0,208,156,0.4);font-size:11px;font-weight:700">
+                        <i class="fas fa-chart-line"></i> MF Support Request
+                    </span>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text-main);margin-top:4px">
+                        📈 ${e.subject || 'Mutual Fund Issue'}
+                    </div>
+                    ${e.notes ? `<div style="font-size:11px;color:#38bdf8;margin-top:2px;font-family:monospace">${e.notes}</div>` : ''}
+                ` : isFullOwnership ? `
                     <span class="badge" style="background:rgba(99,102,241,0.25);color:#818cf8;border:1px solid rgba(99,102,241,0.4);font-size:11px;font-weight:700">
                         <i class="fas fa-crown"></i> Full Ownership Lead
                     </span>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text-main);margin-top:4px">
+                        🏢 ${e.propertyTitle || e.property?.title || e.subject || 'General'}
+                    </div>
                 ` : `
                     <span class="badge" style="background:rgba(255,255,255,0.08);color:var(--text-dim);font-size:11px">General Enquiry</span>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text-main);margin-top:4px">
+                        🏢 ${e.propertyTitle || e.property?.title || e.subject || 'General'}
+                    </div>
                 `}
-                <div style="font-size:12.5px;font-weight:600;color:var(--text-main);margin-top:4px">
-                    🏢 ${e.propertyTitle || e.property?.title || e.subject || 'General'}
-                </div>
             </td>
             <td>
                 ${(e.preferredDate || e.preferredTime) ? `
