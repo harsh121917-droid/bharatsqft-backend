@@ -1400,12 +1400,22 @@ exports.registerUserUcc = async (req, res) => {
       });
     }
 
-    // 0. Idempotency Check: if user already has an active UCC on NSE, return it immediately
-    const existingActiveUcc = await MfClientUcc.findOne({ user: userId, nseStatus: 'ACTIVE' });
+    // 0. Idempotency Check: if user or PAN already has an active UCC on NSE, return it immediately
+    const cleanPan = pan ? String(pan).trim().toUpperCase() : '';
+    const existingActiveUcc = await MfClientUcc.findOne({
+      $or: [
+        { user: userId, nseStatus: 'ACTIVE' },
+        ...(cleanPan ? [{ pan: cleanPan, nseStatus: 'ACTIVE' }] : []),
+      ],
+    });
     if (existingActiveUcc) {
+      if (!user.mfClientCode || user.mfClientCode !== existingActiveUcc.clientCode) {
+        user.mfClientCode = existingActiveUcc.clientCode;
+        await user.save().catch(() => {});
+      }
       return res.json({
         success: true,
-        message: 'Investor UCC is already registered and active on NSE MFSS.',
+        message: `Investor UCC is already registered and active on NSE MFSS with client code ${existingActiveUcc.clientCode}.`,
         data: existingActiveUcc,
         isDuplicate: true,
       });
@@ -1472,7 +1482,6 @@ exports.registerUserUcc = async (req, res) => {
     // Resolve & Validate Authoritative KYC details (ONLY for the exact matching PAN)
     const Kyc = require('../models/Kyc');
     const userKyc = await Kyc.findOne({ user: userId });
-    const cleanPan = pan.toUpperCase();
 
     const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'TYJPS0689R', 'PHOTO_SUBMITTED'];
 
