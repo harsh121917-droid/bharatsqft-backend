@@ -55,6 +55,7 @@ async function processAllotmentConfirmation({
   nav,
   allotmentDate = new Date(),
   rtaReferenceNo = null,
+  folioNo = null,
   idempotencyKey = null,
   source = 'EXCHANGE_ALLOTMENT_FEED',
 }) {
@@ -65,8 +66,17 @@ async function processAllotmentConfirmation({
     throw new Error(`Order ${orderId} not found`);
   }
 
-  // Idempotency check 1: already allotted
+  // If already allotted, check if folioNo was missing and can now be backfilled
   if (order.allotmentStatus === 'ALLOTTED') {
+    if (folioNo && !order.folioNo) {
+      order.folioNo = String(folioNo).trim();
+      await order.save();
+      const MfPortfolioHolding = mongoose.models.MfPortfolioHolding || require('../models/MfPortfolioHolding');
+      await MfPortfolioHolding.updateOne(
+        { user: order.user, schemeCode: order.schemeCode },
+        { $set: { folioNo: order.folioNo } }
+      );
+    }
     console.log(`[Idempotency] Order ${orderId} is already ALLOTTED. Skipping duplicate allotment.`);
     return {
       success: true,
@@ -120,7 +130,18 @@ async function processAllotmentConfirmation({
   order.units = parsedUnits;
   order.allotmentDate = new Date(allotmentDate);
   if (rtaReferenceNo) order.rtaReferenceNo = rtaReferenceNo;
+  if (folioNo) order.folioNo = String(folioNo).trim();
   await order.save();
+
+  if (order.folioNo) {
+    try {
+      const MfPortfolioHolding = mongoose.models.MfPortfolioHolding || require('../models/MfPortfolioHolding');
+      await MfPortfolioHolding.updateOne(
+        { user: order.user, schemeCode: order.schemeCode },
+        { $set: { folioNo: order.folioNo } }
+      );
+    } catch (_) {}
+  }
 
   // Authoritative notification for purchase / allotment
   try {

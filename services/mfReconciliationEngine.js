@@ -61,6 +61,16 @@ class MfReconciliationEngine {
           const nseData = report?.data?.orders?.[0];
 
           if (nseData) {
+            const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
+            if (rawFolio && !order.folioNo) {
+              order.folioNo = String(rawFolio).trim();
+              await order.save().catch(() => {});
+              await MfPortfolioHolding.updateOne(
+                { user: order.user?._id || order.user, schemeCode: order.schemeCode },
+                { $set: { folioNo: String(rawFolio).trim() } }
+              ).catch(() => {});
+            }
+
             const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
             const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || '0');
             const nseNav = parseFloat(nseData.nav || '0');

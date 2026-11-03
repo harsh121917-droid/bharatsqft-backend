@@ -2521,8 +2521,8 @@ exports.syncOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mutual fund order not found' });
     }
 
-    // Terminal state: if already ALLOTTED, return directly
-    if (order.allotmentStatus === 'ALLOTTED') {
+    // Terminal state: if already ALLOTTED and folioNo is present, return directly
+    if (order.allotmentStatus === 'ALLOTTED' && order.folioNo) {
       return res.json({
         success: true,
         message: 'Order already confirmed and allotted',
@@ -2573,10 +2573,19 @@ exports.syncOrderStatus = async (req, res) => {
       const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
       if (rawFolio && !order.folioNo) {
         order.folioNo = String(rawFolio).trim();
+        await order.save();
         await MfPortfolioHolding.updateOne(
           { user: order.user, schemeCode: order.schemeCode },
           { $set: { folioNo: String(rawFolio).trim() } }
         );
+      }
+
+      if (order.allotmentStatus === 'ALLOTTED') {
+        return res.json({
+          success: true,
+          message: 'Order already confirmed and allotted',
+          data: { order, isAuthoritative: true },
+        });
       }
 
       // Handle Confirmed Payment / Accepted Transaction (including 'VALID' and 'PROVISIONAL ORDER')
@@ -4714,6 +4723,26 @@ exports.createRedemptionOrder = async (req, res) => {
         });
         if (amcHolding?.folioNo) effectiveFolio = String(amcHolding.folioNo).trim();
       }
+    }
+
+    // Auto-Fetch: If still missing, query NSE live order status / report for client's allocated folio
+    if (!effectiveFolio && ucc?.clientCode && !nseClient.isMockMode()) {
+      try {
+        const statusRes = await nseClient.getOrderStatusReport({
+          client_code: ucc.clientCode,
+          scheme_code: targetNseCode || scheme.schemeCode,
+        });
+        const orders = statusRes?.data?.orders || statusRes?.data?.report_data || statusRes?.data?.transaction_details || [];
+        const match = Array.isArray(orders) ? orders.find((o) => (o.folio_no || o.folio_number || o.foliono || o.folio) && (o.status === 'ALLOTTED' || o.allotted_units)) : null;
+        const liveFolio = match?.folio_no || match?.folio_number || match?.foliono || match?.folio;
+        if (liveFolio) {
+          effectiveFolio = String(liveFolio).trim();
+          await MfPortfolioHolding.updateOne(
+            { user: userId, schemeCode: scheme.schemeCode },
+            { $set: { folioNo: effectiveFolio } }
+          );
+        }
+      } catch (_) {}
     }
 
     // NSE MFSS strictly mandates folio_no in physical mode (demat_physical: 'P').

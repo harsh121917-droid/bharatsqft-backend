@@ -1734,6 +1734,11 @@ exports.syncOrderWithNse = async (req, res) => {
     let nav = order.navAtOrder || null;
 
     const exchangeOrder = nseRes?.data?.orders?.[0] || nseRes?.data?.transaction_details?.[0] || nseRes?.data?.report_data?.[0];
+    const rawFolio = exchangeOrder?.folio_no || exchangeOrder?.folio_number || exchangeOrder?.foliono || exchangeOrder?.folio || '';
+    if (rawFolio && !order.folioNo) {
+      order.folioNo = String(rawFolio).trim();
+    }
+
     if (exchangeOrder) {
       exchangeStatus = exchangeOrder.order_status || exchangeOrder.status || 'ALLOTTED';
       if (exchangeOrder.allotted_units) allottedUnits = parseFloat(exchangeOrder.allotted_units);
@@ -1751,6 +1756,15 @@ exports.syncOrderWithNse = async (req, res) => {
     if (nav > 0) order.navAtOrder = nav;
     await order.save();
 
+    if (order.folioNo) {
+      try {
+        await MfPortfolioHolding.updateOne(
+          { user: order.user?._id || order.user, schemeCode: order.schemeCode },
+          { $set: { folioNo: order.folioNo } }
+        );
+      } catch (_) {}
+    }
+
     if (allottedUnits > 0 && order.allotmentStatus !== 'ALLOTTED' && (['ALLOTTED', 'SETTLED', 'VALID', 'SUCCESS'].includes(exchangeStatus) || order.paymentStatus === 'SUCCESS')) {
       const { processAllotmentConfirmation } = require('../services/mfIdempotencyService');
       await processAllotmentConfirmation({
@@ -1758,6 +1772,7 @@ exports.syncOrderWithNse = async (req, res) => {
         allottedUnits,
         allottedNav: nav || order.navAtOrder || 100.0,
         rtaReferenceNo: exchangeOrder?.rta_ref_no || order.nseTrxnOrderId,
+        folioNo: rawFolio || order.folioNo,
         source: 'NSE_ORDER_SYNC',
       });
     } else if (order.user) {

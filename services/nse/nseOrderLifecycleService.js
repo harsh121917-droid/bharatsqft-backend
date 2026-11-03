@@ -191,6 +191,19 @@ class NseOrderLifecycleService {
     const rawStatus = (nseData.order_status || nseData.status || '').toUpperCase();
     const allottedUnits = parseFloat(nseData.allotted_units || nseData.units || '0');
     const allottedNav = parseFloat(nseData.nav || '0');
+    const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
+
+    if (rawFolio && !order.folioNo) {
+      order.folioNo = String(rawFolio).trim();
+      await order.save().catch(() => {});
+      try {
+        const MfPortfolioHolding = require('../../models/MfPortfolioHolding');
+        await MfPortfolioHolding.updateOne(
+          { user: order.user, schemeCode: order.schemeCode },
+          { $set: { folioNo: String(rawFolio).trim() } }
+        );
+      } catch (_) {}
+    }
 
     return {
       synchronized: true,
@@ -198,6 +211,7 @@ class NseOrderLifecycleService {
       rawStatus,
       allottedUnits,
       allottedNav,
+      folioNo: rawFolio || order.folioNo,
       nseData,
     };
   }
