@@ -1600,6 +1600,21 @@ exports.registerUserUcc = async (req, res) => {
     if (!clientCode && user.mfClientCode) {
       clientCode = user.mfClientCode.trim().toUpperCase();
     }
+    if (!clientCode && cleanPan && !req.body.forceNewClientCode) {
+      try {
+        const masterRes = await nseClient.getClientMasterReport({ pan: cleanPan });
+        const list = masterRes?.data?.report_data;
+        if (Array.isArray(list) && list.length > 0) {
+          const match = list.find((c) => String(c.primary_holder_pan || c.PAN || '').trim().toUpperCase() === cleanPan);
+          if (match && match.client_code) {
+            clientCode = match.client_code.trim().toUpperCase();
+            console.log(`[registerUserUcc] Found existing registered UCC on NSE for PAN ${cleanPan}: ${clientCode}`);
+            user.mfClientCode = clientCode;
+            await user.save().catch(() => {});
+          }
+        }
+      } catch (_) {}
+    }
     if (!clientCode || req.body.forceNewClientCode) {
       const basePhoneDigits = user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-6) : user._id.toString().slice(-6).toUpperCase();
       const currentAttempt = user.mfClientCodeAttempt || 0;
@@ -1858,6 +1873,91 @@ exports.registerUserUcc = async (req, res) => {
 
     // If exchange rejected registration in non-mock mode, return controlled error
     if (!isSuccess && !nseClient.isMockMode()) {
+      // Auto-recovery for "PAN CAN NOT BE CHANGED":
+      // This happens if an attempt counter or admin reset generated a new UCC (e.g. VK088824),
+      // while NSE already has this PAN registered under an earlier UCC (e.g. VK088822).
+      if (/PAN CAN NOT BE CHANGED/i.test(nseRemarks) && cleanPan) {
+        try {
+          console.log(`[registerUserUcc] Attempting auto-recovery for PAN conflict on ${cleanPan}...`);
+          const masterRes = await nseClient.getClientMasterReport({ pan: cleanPan });
+          const list = masterRes?.data?.report_data;
+          if (Array.isArray(list) && list.length > 0) {
+            const match = list.find((c) => String(c.primary_holder_pan || c.PAN || '').trim().toUpperCase() === cleanPan);
+            const realClientCode = match?.client_code?.trim().toUpperCase();
+            if (realClientCode && realClientCode !== clientCode) {
+              console.log(`[registerUserUcc] Found existing authoritative client code on NSE: ${realClientCode}. Re-registering with correct UCC...`);
+              user.mfClientCode = realClientCode;
+              await user.save().catch(() => {});
+
+              nseUccPayload.client_code = realClientCode;
+              const retryRes = await nseClient.registerUcc([nseUccPayload]);
+              const retryDetail = retryRes?.data?.reg_details?.[0];
+              const retrySuccess = Boolean(
+                retryRes?.success && (
+                  retryDetail?.status === 'SUCCESS' ||
+                  retryDetail?.status === '100' ||
+                  retryDetail?.reg_status === 'REG_SUCCESS'
+                )
+              );
+              if (retrySuccess || /already registered/i.test(retryDetail?.reg_remark || '')) {
+                clientCode = realClientCode;
+                const activeRecord = await MfClientUcc.findOneAndUpdate(
+                  { user: userId },
+                  {
+                    $set: {
+                      clientCode: realClientCode,
+                      pan: cleanPan,
+                      fullName: resolvedFullName,
+                      holdingNature,
+                      taxStatus,
+                      occupationCode,
+                      gender,
+                      dob: effDob,
+                      primaryBank: {
+                        accountNo: effAccountNo,
+                        ifsc: effIfsc.toUpperCase(),
+                        bankName: effBankName,
+                        accountType: 'SB',
+                      },
+                      address: {
+                        address1: effAddress1,
+                        address2: effAddress2,
+                        city: effCity,
+                        state: effState,
+                        pincode: effPincode,
+                        country: 'INDIA',
+                      },
+                      nominee: {
+                        name: nomineeName || '',
+                        relation: nomineeRelation || '01',
+                        percentage: 100,
+                      },
+                      nseStatus: 'ACTIVE',
+                      nseRemarks: retryDetail?.reg_remark || 'APPROVED',
+                      rawResponse: retryRes?.data || retryRes,
+                      fatcaUploaded: true,
+                    },
+                  },
+                  { upsert: true, new: true }
+                );
+
+                return res.json({
+                  success: true,
+                  message: `Investor UCC (${realClientCode}) is active on NSE MFSS. Account synced and ready for investing.`,
+                  data: activeRecord,
+                  authUrl: null,
+                  clActLink: null,
+                  activationMode: 'ALREADY_ACTIVE',
+                  instructions: 'Your account is KYC verified and immediately active. You can start investing right away.',
+                });
+              }
+            }
+          }
+        } catch (recoverErr) {
+          console.warn('[registerUserUcc] Auto-recovery error:', recoverErr.message);
+        }
+      }
+
       return res.status(400).json({
         success: false,
         code: 'NSE_UCC_REGISTRATION_FAILED',
