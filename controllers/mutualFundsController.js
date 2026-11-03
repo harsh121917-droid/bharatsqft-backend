@@ -1708,7 +1708,7 @@ exports.registerUserUcc = async (req, res) => {
       pincode: effPincode.slice(0, 6),
       country: 'INDIA',
       email: user.email || `${clientCode.toLowerCase()}@client.nseinvest.com`,
-      communication_mode: 'E',
+      communication_mode: req.body.communicationMode || 'M',
       indian_mobile_no: user.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9876543210',
       primary_holder_kyc_type: userKyc?.ckycNumber ? 'C' : 'K',
       primary_holder_ckyc_number: userKyc?.ckycNumber || '',
@@ -1984,16 +1984,27 @@ exports.registerUserUcc = async (req, res) => {
     nseAuthUrl = nseAuthUrl || null;
     clActLink = clActLink || null;
 
+    const isAlreadyActive = isSuccess && nseStatus === 'ACTIVE' && !clActLink;
+    const activationMode = clActLink ? 'DIRECT_WEB' : (isAlreadyActive ? 'ALREADY_ACTIVE' : 'SMS_OTP');
+    const message = isAlreadyActive
+      ? `UCC successfully generated and ACTIVE on NSE MFSS for ${resolvedFullName}. Account is ready for investing.`
+      : (clActLink
+        ? 'UCC successfully generated. Please complete authorization via the link.'
+        : `UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number (${user?.phone || 'registered mobile'}).`);
+    const instructions = isAlreadyActive
+      ? 'Your account is KYC verified and immediately active. You can start investing right away.'
+      : (clActLink
+        ? 'Open the authUrl in browser to complete authorization.'
+        : `Check the SMS received from NSE on ${user?.phone || 'your mobile'} or email to verify OTP and activate account on the exchange.`);
+
     return res.json({
       success: true,
-      message: `UCC successfully generated and registered with NSE MFSS. NSE has dispatched official authentication SMS/OTP to your mobile number (${user?.phone || 'registered mobile'}).`,
+      message,
       data: uccRecord,
       authUrl: nseAuthUrl,
       clActLink,
-      activationMode: nseAuthUrl ? 'DIRECT_WEB' : 'SMS_OTP',
-      instructions: nseAuthUrl
-        ? 'Open the authUrl in browser to complete authorization.'
-        : `Check the SMS received from NSE on ${user?.phone || 'your mobile'} or email to verify OTP and activate account on the exchange.`,
+      activationMode,
+      instructions,
     });
   } catch (error) {
     console.error('[registerUserUcc Error]:', error);
@@ -2004,10 +2015,24 @@ exports.registerUserUcc = async (req, res) => {
 // ── 4b. POST /api/mutual-funds/ucc/resend-act (Resend Client Activation Communication & Link) ──
 exports.resendUccActivation = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const ucc = await MfClientUcc.findOne({ user: userId });
+    const userId = req.user?._id;
+    const requestedClientCode = req.body?.clientCode;
+    const query = requestedClientCode ? { clientCode: requestedClientCode } : { user: userId };
+    const ucc = await MfClientUcc.findOne(query);
     if (!ucc) {
       return res.status(404).json({ success: false, message: 'Investor profile not found' });
+    }
+
+    if (ucc.nseStatus === 'ACTIVE') {
+      return res.json({
+        success: true,
+        message: `Client ${ucc.clientCode} (${ucc.fullName}) is already ACTIVE on NSE MFSS. No activation OTP is required.`,
+        data: {
+          clientCode: ucc.clientCode,
+          nseStatus: ucc.nseStatus,
+          authUrl: null,
+        },
+      });
     }
 
     let authUrl = null;
@@ -5772,7 +5797,7 @@ exports.updateUserBank = async (req, res) => {
           pincode: (ucc.address?.pincode || '400001').toString().slice(0, 6),
           country: 'INDIA',
           email: user?.email || 'harsh121917@gmail.com',
-          communication_mode: 'E',
+          communication_mode: req.body.communicationMode || 'M',
           indian_mobile_no: user?.phone ? user.phone.replace(/[^0-9]/g, '').slice(-10) : '9997143005',
           primary_holder_kyc_type: 'K',
           primary_holder_ckyc_number: '',
