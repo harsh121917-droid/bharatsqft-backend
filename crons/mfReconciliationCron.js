@@ -50,26 +50,65 @@ async function syncPendingMandates() {
 }
 
 async function startReconciliationCron() {
-  // Run daily at 01:00 AM IST (19:30 UTC)
-  cron.schedule('0 1 * * *', async () => {
-    console.log('[Cron] ⏰ Triggering Daily Automated Mutual Fund Reconciliation...');
-    try {
-      await mfReconciliationEngine.runReconciliation('CRON_NIGHTLY');
-    } catch (err) {
-      console.error('[Cron] ❌ Daily Reconciliation failed:', err.message);
+  // 1. Run daily at 01:00 AM IST (Asia/Kolkata) sharp for full 6-point reconciliation
+  cron.schedule(
+    '0 1 * * *',
+    async () => {
+      console.log('[Cron] ⏰ Triggering Daily Automated Mutual Fund Reconciliation (01:00 AM IST)...');
+      try {
+        await mfReconciliationEngine.runReconciliation('CRON_NIGHTLY');
+      } catch (err) {
+        console.error('[Cron] ❌ Daily Reconciliation failed:', err.message);
+      }
+    },
+    {
+      timezone: 'Asia/Kolkata',
     }
-  });
+  );
 
-  // Run every 15 minutes during market hours to auto-sync bank mandates from NSE
-  cron.schedule('*/15 * * * *', async () => {
-    await syncPendingMandates();
-  });
+  // 2. Daytime Periodic Folio & Allotment Poller: Runs every 2 hours between 08:00 and 22:00 IST
+  cron.schedule(
+    '0 8-22/2 * * *',
+    async () => {
+      console.log('[Cron] 🔄 Triggering Periodic Daytime Folio & Allotment Sync (Asia/Kolkata)...');
+      try {
+        await mfReconciliationEngine.syncMissingFolios();
+      } catch (err) {
+        console.warn('[Cron] Daytime folio sync warning:', err.message);
+      }
+    },
+    {
+      timezone: 'Asia/Kolkata',
+    }
+  );
 
-  console.log('[Cron] Mutual Fund Daily Automated Reconciliation & Mandate Poller scheduled.');
+  // 3. Run every 15 minutes during market hours to auto-sync bank mandates from NSE
+  cron.schedule(
+    '*/15 * * * *',
+    async () => {
+      await syncPendingMandates();
+    },
+    {
+      timezone: 'Asia/Kolkata',
+    }
+  );
+
+  // 4. Initial non-blocking startup check: immediately resolve any pending missing folios
+  setTimeout(async () => {
+    try {
+      console.log('[Cron] 🚀 Running initial server startup check for missing folios...');
+      await mfReconciliationEngine.syncMissingFolios();
+    } catch (e) {
+      console.warn('[Cron] Initial startup folio sync note:', e.message);
+    }
+  }, 10000); // 10s after boot
+
+  console.log('[Cron] Mutual Fund Daily Automated Reconciliation, Folio Sync & Mandate Poller scheduled (Asia/Kolkata).');
 }
 
 module.exports = {
   startReconciliationCron,
   syncPendingMandates,
+  syncMissingFolios: (userId = null) => mfReconciliationEngine.syncMissingFolios(userId),
   runReconciliationNow: () => mfReconciliationEngine.runReconciliation('ADMIN_MANUAL'),
 };

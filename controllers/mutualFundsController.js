@@ -3729,6 +3729,16 @@ exports.getPortfolio = async (req, res) => {
   try {
     const userId = req.user._id;
     const portfolioData = await mfPortfolioEngine.recalculateUserPortfolio(userId);
+
+    // Auto-heal missing folios in background if any active holding lacks a folio
+    const hasMissingFolio = portfolioData?.holdings?.some((h) => h.totalUnits > 0 && (!h.folioNo || !h.folioNo.trim()));
+    if (hasMissingFolio) {
+      const mfReconciliationEngine = require('../services/mfReconciliationEngine');
+      mfReconciliationEngine.syncMissingFolios(userId).catch((err) => {
+        console.warn(`[getPortfolio] Background folio sync warning for ${userId}:`, err.message);
+      });
+    }
+
     return res.json({
       success: true,
       data: portfolioData,
@@ -4192,12 +4202,23 @@ exports.getMyOrders = async (req, res) => {
       }
     );
 
-    const orders = await MfOrder.find({ user: userId }).sort({ createdAt: -1 });
+    const [orders, userHoldings] = await Promise.all([
+      MfOrder.find({ user: userId }).sort({ createdAt: -1 }),
+      MfPortfolioHolding.find({ user: userId, folioNo: { $nin: ['', null, ' '] } }).lean(),
+    ]);
+
+    const holdingFolioMap = {};
+    for (const h of userHoldings) {
+      if (h.folioNo) holdingFolioMap[h.schemeCode] = h.folioNo;
+    }
 
     const formattedOrders = orders.map((ord) => {
       const orderDate = new Date(ord.createdAt);
       const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
       const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      // Fallback to active holding folio if order has empty folio
+      const resolvedFolio = ord.folioNo || holdingFolioMap[ord.schemeCode] || '';
 
       let displayStatus = 'Order Placed';
       let subStatus = '';
@@ -4220,6 +4241,7 @@ exports.getMyOrders = async (req, res) => {
 
       return {
         ...ord.toObject(),
+        folioNo: resolvedFolio,
         displayStatus,
         subStatus,
         expectedAllotmentDate: dayName,

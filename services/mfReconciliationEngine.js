@@ -46,6 +46,8 @@ class MfReconciliationEngine {
           { createdAt: { $gte: sinceDate } },
           { paymentStatus: 'PENDING' },
           { orderStatus: { $in: ['PAYMENT_SUCCESS', 'SUBMITTED', 'PROCESSING'] } },
+          { folioNo: '' },
+          { folioNo: null },
         ],
       }).populate('user', 'name email phone');
 
@@ -54,26 +56,101 @@ class MfReconciliationEngine {
       for (const order of orders) {
         try {
           const nseFilter = {
-            order_ref_number: order.orderId,
             client_code: order.clientCode,
+            order_ref_number: order.orderId,
+            order_ids: String(order.nseTrxnOrderId || order.orderId),
           };
-          const report = await nseClient.getOrderStatusReport(nseFilter);
-          const nseData = report?.data?.orders?.[0];
+          if (order.nseTrxnOrderId) {
+            nseFilter.trxn_no = String(order.nseTrxnOrderId);
+          }
+          if (order.remarks?.includes('SIP') || /^\d{15}$/.test(order.orderId)) {
+            nseFilter.reg_id = String(order.orderId);
+          }
+
+          let report = null;
+          try {
+            report = await nseClient.getOrderStatusReport(nseFilter);
+          } catch (rErr) {
+            console.warn(`[Reconciliation Engine] NSE report query error for ${order.orderId}:`, rErr.message);
+          }
+
+          const reportList = report?.data?.report_data || report?.data?.orders || report?.data?.transaction_details;
+          let nseData = null;
+          if (Array.isArray(reportList) && reportList.length > 0) {
+            nseData = reportList.find((item) => {
+              const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+              return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId));
+            }) || reportList[0];
+          }
+
+          // Fallback: If not found via single filter, try date range query
+          if (!nseData && order.clientCode) {
+            try {
+              const ordDate = new Date(order.createdAt || Date.now());
+              const d = String(ordDate.getDate()).padStart(2, '0');
+              const m = String(ordDate.getMonth() + 1).padStart(2, '0');
+              const y = ordDate.getFullYear();
+              const dateDash = `${d}-${m}-${y}`;
+              const fallbackReport = await nseClient.getOrderStatusReport({
+                client_code: order.clientCode,
+                from_date: dateDash,
+                to_date: dateDash,
+              });
+              const fbList = fallbackReport?.data?.report_data || fallbackReport?.data?.orders;
+              if (Array.isArray(fbList) && fbList.length > 0) {
+                nseData = fbList.find((item) => {
+                  const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+                  const itemScheme = String(item.scheme_code || item.schemecode || '');
+                  return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId)) || itemScheme === String(order.schemeCode);
+                });
+              }
+            } catch (_) {}
+          }
 
           if (nseData) {
-            const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
-            if (rawFolio && !order.folioNo) {
-              order.folioNo = String(rawFolio).trim();
-              await order.save().catch(() => {});
-              await MfPortfolioHolding.updateOne(
+            const rawFolio = String(nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || nseData.folio_num || '').trim();
+            if (rawFolio) {
+              if (!order.folioNo) {
+                order.folioNo = rawFolio;
+                await order.save().catch(() => {});
+              }
+              await MfPortfolioHolding.updateMany(
                 { user: order.user?._id || order.user, schemeCode: order.schemeCode },
-                { $set: { folioNo: String(rawFolio).trim() } }
+                { $set: { folioNo: rawFolio } }
               ).catch(() => {});
             }
 
             const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
-            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || '0');
-            const nseNav = parseFloat(nseData.nav || '0');
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || nseData.allottedqty || '0');
+            const nseNav = parseFloat(nseData.nav || nseData.allottednav || '0');
+
+            // Auto-heal and confirm allotment when exchange confirms
+            if (
+              ['ALLOTTED', 'SETTLED', 'SUCCESS'].includes(nseOrderStatus) &&
+              (nseAllottedUnits > 0 || order.estimatedUnits > 0) &&
+              order.allotmentStatus !== 'ALLOTTED'
+            ) {
+              const unitsToAllot = nseAllottedUnits > 0 ? nseAllottedUnits : (order.estimatedUnits || +(order.orderAmount / (nseNav || order.navAtOrder || 100)).toFixed(4));
+              const finalNav = nseNav > 0 ? nseNav : (order.navAtOrder || 100.0);
+              try {
+                const { processAllotmentConfirmation } = require('./mfIdempotencyService');
+                await processAllotmentConfirmation({
+                  orderId: order.orderId,
+                  allottedUnits: unitsToAllot,
+                  allottedNav: finalNav,
+                  rtaReferenceNo: nseData.rta_ref_no || order.nseTrxnOrderId,
+                  folioNo: rawFolio || order.folioNo,
+                  source: 'RECONCILIATION_ENGINE',
+                });
+                console.log(`[Reconciliation Engine] 🚀 Auto-allotted order ${order.orderId}: ${unitsToAllot} units @ NAV ${finalNav}, Folio: ${rawFolio || order.folioNo}`);
+                if (order.user) {
+                  const { recalculateUserPortfolio } = require('./mfPortfolioEngine');
+                  await recalculateUserPortfolio(order.user?._id || order.user);
+                }
+              } catch (allotErr) {
+                console.warn(`[Reconciliation Engine] Allotment confirmation warning for ${order.orderId}:`, allotErr.message);
+              }
+            }
 
             // Discrepancy Type A: Local Payment SUCCESS, but exchange rejected/failed
             if (
@@ -115,7 +192,7 @@ class MfReconciliationEngine {
                 units: nseAllottedUnits,
                 vikaoneStatus: order.orderStatus,
                 nseStatus: nseOrderStatus,
-                description: `Exchange confirmed allotment of ${nseAllottedUnits} units @ NAV ${nseNav}, but local order is ${order.orderStatus}. Requires authoritative allotment ingestion.`,
+                description: `Exchange confirmed allotment of ${nseAllottedUnits} units @ NAV ${nseNav}, but local order is ${order.orderStatus}. Ingestion auto-attempted.`,
                 resolved: false,
               });
             }
@@ -140,9 +217,17 @@ class MfReconciliationEngine {
             reg_id: sip.sipRegNo,
             client_code: sip.clientCode,
           });
-          const nseSipData = sipReport?.data?.orders?.[0];
+          const nseSipData = sipReport?.data?.report_data?.[0] || sipReport?.data?.orders?.[0] || sipReport?.data?.transaction_details?.[0];
 
           if (nseSipData) {
+            const rawSipFolio = String(nseSipData.folio_no || nseSipData.folio_number || nseSipData.foliono || nseSipData.folio || '').trim();
+            if (rawSipFolio) {
+              await MfPortfolioHolding.updateMany(
+                { user: sip.user?._id || sip.user, schemeCode: sip.schemeCode, $or: [{ folioNo: '' }, { folioNo: null }] },
+                { $set: { folioNo: rawSipFolio } }
+              ).catch(() => {});
+            }
+
             const nseSipStatus = (nseSipData.status || nseSipData.order_status || '').toUpperCase();
             if (sip.status === 'ACTIVE' && ['CANCELLED', 'REJECTED', 'FAILED'].includes(nseSipStatus)) {
               discrepancies.push({
@@ -354,6 +439,196 @@ class MfReconciliationEngine {
       message: `Discrepancy ${refId} marked RESOLVED with audit logging.`,
       discrepancy,
     };
+  }
+
+  /**
+   * Dedicated Folio Synchronization and Auto-Heal
+   * Fetches missing folios from NSE exchange or internal AMC mapping and updates Orders & Holdings
+   * @param {string} [filterUserId] - Optional user ID to scope sync to a single user
+   */
+  async syncMissingFolios(filterUserId = null) {
+    console.log(`[Folio Sync Engine] 🔍 Starting missing folio sync ${filterUserId ? `for user ${filterUserId}` : 'globally'}...`);
+    let internalInheritedCount = 0;
+    let exchangeFetchedCount = 0;
+    const touchedUsers = new Set();
+
+    try {
+      const holdingQuery = {
+        $or: [{ folioNo: '' }, { folioNo: null }],
+        holdingStatus: 'ACTIVE',
+        totalUnits: { $gt: 0 },
+      };
+      if (filterUserId) {
+        holdingQuery.user = filterUserId;
+      }
+
+      // Step 1: Internal AMC folio inheritance
+      // In Indian mutual funds, an investor's folios are anchored to the AMC (Fund House) under their PAN.
+      // If a user has a folio in one scheme of an AMC, any sibling scheme of that same AMC shares the same folio.
+      const holdingsWithoutFolio = await MfPortfolioHolding.find(holdingQuery);
+
+      for (const h of holdingsWithoutFolio) {
+        if (!h.amcName) continue;
+        const siblingHolding = await MfPortfolioHolding.findOne({
+          user: h.user,
+          amcName: h.amcName,
+          folioNo: { $nin: ['', null, ' '] },
+        });
+
+        if (siblingHolding && siblingHolding.folioNo) {
+          const inheritedFolio = String(siblingHolding.folioNo).trim();
+          h.folioNo = inheritedFolio;
+          await h.save();
+          await MfOrder.updateMany(
+            { user: h.user, schemeCode: h.schemeCode, $or: [{ folioNo: '' }, { folioNo: null }] },
+            { $set: { folioNo: inheritedFolio } }
+          );
+          internalInheritedCount++;
+          touchedUsers.add(String(h.user));
+          console.log(`[Folio Sync Engine] 🔗 Inherited folio ${inheritedFolio} for scheme ${h.schemeCode} (${h.amcName}) from sibling holding`);
+        }
+      }
+
+      // Step 2: Fetch missing folios from NSE exchange for recent and active orders
+      const ordersQuery = {
+        orderStatus: { $in: ['ALLOTTED', 'SUBMITTED', 'PAYMENT_SUCCESS', 'PROCESSING'] },
+        $or: [{ folioNo: '' }, { folioNo: null }],
+      };
+      if (filterUserId) {
+        ordersQuery.user = filterUserId;
+      }
+
+      const pendingOrders = await MfOrder.find(ordersQuery).sort({ createdAt: -1 }).limit(100);
+
+      for (const ord of pendingOrders) {
+        try {
+          const nseFilter = {
+            client_code: ord.clientCode,
+            order_ref_number: ord.orderId,
+            order_ids: String(ord.nseTrxnOrderId || ord.orderId),
+          };
+          if (ord.nseTrxnOrderId) {
+            nseFilter.trxn_no = String(ord.nseTrxnOrderId);
+          }
+          if (ord.remarks?.includes('SIP') || /^\d{15}$/.test(ord.orderId)) {
+            nseFilter.reg_id = String(ord.orderId);
+          }
+
+          let report = null;
+          try {
+            report = await nseClient.getOrderStatusReport(nseFilter);
+          } catch (rErr) {
+            console.warn(`[Folio Sync Engine] Report query error for ${ord.orderId}:`, rErr.message);
+          }
+
+          const reportList = report?.data?.report_data || report?.data?.orders || report?.data?.transaction_details;
+          let nseData = null;
+          if (Array.isArray(reportList) && reportList.length > 0) {
+            nseData = reportList.find((item) => {
+              const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+              return itemRef === String(ord.orderId) || (ord.nseTrxnOrderId && itemRef === String(ord.nseTrxnOrderId));
+            }) || reportList[0];
+          }
+
+          // Fallback date-range query if single filter returns nothing
+          if (!nseData && ord.clientCode) {
+            try {
+              const ordDate = new Date(ord.createdAt || Date.now());
+              const d = String(ordDate.getDate()).padStart(2, '0');
+              const m = String(ordDate.getMonth() + 1).padStart(2, '0');
+              const y = ordDate.getFullYear();
+              const dateDash = `${d}-${m}-${y}`;
+              const fbReport = await nseClient.getOrderStatusReport({
+                client_code: ord.clientCode,
+                from_date: dateDash,
+                to_date: dateDash,
+              });
+              const fbList = fbReport?.data?.report_data || fbReport?.data?.orders;
+              if (Array.isArray(fbList) && fbList.length > 0) {
+                nseData = fbList.find((item) => {
+                  const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+                  const itemScheme = String(item.scheme_code || item.schemecode || '');
+                  return itemRef === String(ord.orderId) || (ord.nseTrxnOrderId && itemRef === String(ord.nseTrxnOrderId)) || itemScheme === String(ord.schemeCode);
+                });
+              }
+            } catch (_) {}
+          }
+
+          if (nseData) {
+            const rawFolio = String(nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || nseData.folio_num || '').trim();
+            const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || nseData.allottedqty || '0');
+            const nseNav = parseFloat(nseData.nav || nseData.allottednav || '0');
+
+            if (rawFolio) {
+              ord.folioNo = rawFolio;
+              await ord.save();
+              await MfPortfolioHolding.updateMany(
+                { user: ord.user, schemeCode: ord.schemeCode },
+                { $set: { folioNo: rawFolio } }
+              );
+              exchangeFetchedCount++;
+              touchedUsers.add(String(ord.user));
+              console.log(`[Folio Sync Engine] ✅ Fetched folio ${rawFolio} from NSE for order ${ord.orderId}`);
+            }
+
+            // If confirmed on exchange, confirm allotment locally
+            if (
+              ['ALLOTTED', 'SETTLED', 'SUCCESS'].includes(nseOrderStatus) &&
+              (nseAllottedUnits > 0 || ord.estimatedUnits > 0) &&
+              ord.allotmentStatus !== 'ALLOTTED'
+            ) {
+              const unitsToAllot = nseAllottedUnits > 0 ? nseAllottedUnits : (ord.estimatedUnits || +(ord.orderAmount / (nseNav || ord.navAtOrder || 100)).toFixed(4));
+              const finalNav = nseNav > 0 ? nseNav : (ord.navAtOrder || 100.0);
+              try {
+                const { processAllotmentConfirmation } = require('./mfIdempotencyService');
+                await processAllotmentConfirmation({
+                  orderId: ord.orderId,
+                  allottedUnits: unitsToAllot,
+                  allottedNav: finalNav,
+                  rtaReferenceNo: nseData.rta_ref_no || ord.nseTrxnOrderId,
+                  folioNo: rawFolio || ord.folioNo,
+                  source: 'FOLIO_SYNC_ENGINE',
+                });
+                touchedUsers.add(String(ord.user));
+              } catch (allotErr) {
+                console.warn(`[Folio Sync Engine] Allotment confirmation warning for ${ord.orderId}:`, allotErr.message);
+              }
+            }
+          }
+        } catch (ordErr) {
+          console.warn(`[Folio Sync Engine] Order ${ord.orderId} check note:`, ordErr.message);
+        }
+      }
+
+      // Step 3: Recalculate portfolio for touched users
+      if (touchedUsers.size > 0) {
+        const { recalculateUserPortfolio } = require('./mfPortfolioEngine');
+        for (const uId of touchedUsers) {
+          try {
+            await recalculateUserPortfolio(uId);
+          } catch (_) {}
+        }
+      }
+
+      console.log(`[Folio Sync Engine] 🏁 Complete. Inherited: ${internalInheritedCount}, Fetched from NSE: ${exchangeFetchedCount}, Touched Users: ${touchedUsers.size}`);
+      return {
+        success: true,
+        internalInheritedCount,
+        exchangeFetchedCount,
+        totalUpdated: internalInheritedCount + exchangeFetchedCount,
+        touchedUsers: Array.from(touchedUsers),
+      };
+    } catch (err) {
+      console.error('[Folio Sync Engine Error]:', err.message);
+      return {
+        success: false,
+        error: err.message,
+        internalInheritedCount,
+        exchangeFetchedCount,
+        totalUpdated: internalInheritedCount + exchangeFetchedCount,
+      };
+    }
   }
 
   /**

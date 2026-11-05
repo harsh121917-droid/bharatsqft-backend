@@ -268,6 +268,21 @@ async function recalculateUserPortfolio(userId) {
     schemeLookup[s.schemeCode.toUpperCase()] = s;
   });
 
+  // 4b. Auto-heal missing folios across AMC siblings:
+  // In Indian mutual funds, folios belong to the AMC. If a user holds another scheme of the same AMC with an established folio, inherit it.
+  for (const sCode of schemeCodes) {
+    if (!holdingsMap[sCode].folioNo) {
+      const sDoc = schemeLookup[sCode];
+      const targetAmc = sDoc?.amcName || '';
+      if (targetAmc) {
+        const sibling = existingHoldings.find((eh) => eh.amcName === targetAmc && eh.folioNo && eh.folioNo.trim());
+        if (sibling && sibling.folioNo) {
+          holdingsMap[sCode].folioNo = sibling.folioNo.trim();
+        }
+      }
+    }
+  }
+
   let totalInvested = 0;
   let currentValuation = 0;
   let totalDayChangeAmount = 0;

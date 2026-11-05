@@ -2300,6 +2300,22 @@ exports.triggerReconciliationRun = async (req, res) => {
   }
 };
 
+// ── 20b. POST /api/admin/mutual-funds/reconciliation/sync-folios (Trigger Folio Sync) ──
+exports.syncMissingFolios = async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+    const result = await mfReconciliationEngine.syncMissingFolios(userId || null);
+    return res.json({
+      success: true,
+      message: `Folio sync completed. Updated ${result.totalUpdated} records.`,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[syncMissingFolios Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 21. POST /api/admin/mutual-funds/reconciliation/resolve/:discrepancyId (Resolve Alert) ──
 exports.resolveDiscrepancy = async (req, res) => {
   try {

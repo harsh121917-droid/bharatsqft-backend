@@ -371,21 +371,25 @@ class NseClient {
     if (endpoint.includes('ORDER_STATUS')) {
       const orderRef = payload.order_ref_number || '';
       const orderStatus = payload.mockStatus || 'SUCCESS';
+      const mockFolio = payload.mockFolio || `FOLIO_${timestamp.toString().slice(-6)}`;
+      const orderItem = {
+        order_ref_number: orderRef,
+        order_status: orderStatus,
+        status: orderStatus,
+        allotted_units: orderStatus === 'ALLOTTED' ? '100.000' : '0.000',
+        nav: '100.00',
+        folio_no: mockFolio,
+        folio_number: mockFolio,
+        rejection_reason: orderStatus === 'REJECTED' ? 'Payment timed out or rejected by bank' : '',
+      };
       return {
         success: true,
         status: 200,
         data: {
           status: '100',
-          orders: [
-            {
-              order_ref_number: orderRef,
-              order_status: orderStatus,
-              status: orderStatus,
-              allotted_units: orderStatus === 'ALLOTTED' ? '100.000' : '0.000',
-              nav: '100.00',
-              rejection_reason: orderStatus === 'REJECTED' ? 'Payment timed out or rejected by bank' : '',
-            },
-          ],
+          report_data_total: '1',
+          report_data: [orderItem],
+          orders: [orderItem],
         },
       };
     }

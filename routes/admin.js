@@ -255,6 +255,7 @@ router.get("/mutual-funds/audit-logs", adminMfController.getAuditLogs);
 // Daily Automated Reconciliation Reports & Alerts (Section 22)
 router.get("/mutual-funds/reconciliation", adminMfController.getReconciliationReport);
 router.post("/mutual-funds/reconciliation/run", adminMfController.triggerReconciliationRun);
+router.post("/mutual-funds/reconciliation/sync-folios", adminMfController.syncMissingFolios);
 router.post("/mutual-funds/reconciliation/resolve/:discrepancyId", adminMfController.resolveDiscrepancy);
 router.post("/mutual-funds/orders/:id/payout-status", adminMfController.updateMfOrderPayoutStatus);
 

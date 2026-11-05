@@ -73,11 +73,17 @@ async function syncMutualFundNavs() {
   }
 }
 
-// Schedule: Daily at 23:30 IST (18:00 UTC)
-cron.schedule('30 23 * * *', async () => {
-  console.log('⏰ [CRON] Triggering scheduled Mutual Funds Daily NAV Sync...');
-  await syncMutualFundNavs();
-});
+// Schedule: Daily at 23:30 IST (Asia/Kolkata)
+cron.schedule(
+  '30 23 * * *',
+  async () => {
+    console.log('⏰ [CRON] Triggering scheduled Mutual Funds Daily NAV Sync (23:30 IST)...');
+    await syncMutualFundNavs();
+  },
+  {
+    timezone: 'Asia/Kolkata',
+  }
+);
 
 module.exports = {
   syncMutualFundNavs,
