@@ -218,6 +218,16 @@ const MfOrderSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    sipRegNo: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    isFirstSipInstallment: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );

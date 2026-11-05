@@ -127,6 +127,15 @@ const MfSipSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    firstOrderId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    firstOrderNseId: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

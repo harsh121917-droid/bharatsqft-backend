@@ -2816,10 +2816,10 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // 1. Direct link in regItem
+  // 1. Direct payment link in regItem
   const directLink = extractUrl(regItem);
-  if (directLink) {
-    console.log('[fetchSipPaymentLink] Found direct link in regItem:', directLink);
+  if (directLink && !directLink.includes('trxnxsiprtaauthentication') && !directLink.includes('trxnauthorisation')) {
+    console.log('[fetchSipPaymentLink] Found direct payment link in regItem:', directLink);
     return directLink;
   }
 
@@ -2836,8 +2836,82 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
     } catch (_) {}
   }
 
-  // 3. GET_LINK API with XSIP / SIP product types with retries & RESEND_COMM trigger
   const sId = String(sipRegNo || '').trim();
+
+  // 3. Query PROV_ORDERS with proper NSE date formats (DD-MM-YYYY and DD/MM/YYYY)
+  // This fetches the provisional purchase order created by NSE for Day 1 and generates genuine PUR payment link
+  if (clientCode) {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = now.getFullYear();
+    const dateDash = `${d}-${m}-${y}`;
+    const dateSlash = `${d}/${m}/${y}`;
+
+    const dateFormats = [dateDash, dateSlash];
+    const orderTypes = ['ALL', 'XSP', 'SIP'];
+
+    for (const fmt of dateFormats) {
+      for (const oType of orderTypes) {
+        try {
+          const provRes = await nseClient.post('/nsemfdesk/api/v2/reports/PROV_ORDERS', {
+            from_date: fmt,
+            to_date: fmt,
+            trans_type: 'ALL',
+            order_type: oType,
+            client_code: clientCode,
+            ...(sId ? { sip_reg_nos: sId } : {}),
+          });
+          const reportList = provRes?.data?.report_data;
+          if (Array.isArray(reportList) && reportList.length > 0) {
+            const matched = (sId ? reportList.find((r) => String(r.sip_reg_no || r.sip_reg_nos || '') === sId) : null) || reportList[0];
+            const provUrl = extractUrl(matched);
+            if (provUrl && !provUrl.includes('trxnxsiprtaauthentication')) return provUrl;
+
+            const provOrderId = matched?.order_id || matched?.orderno || matched?.trxn_order_id;
+            if (provOrderId) {
+              const purRes = await nseClient.getShortLink('PUR', provOrderId);
+              const url = extractUrl(purRes);
+              if (url) {
+                console.log(`[fetchSipPaymentLink] Link resolved via PROV_ORDERS (${provOrderId}):`, url);
+                return url;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  // 4. Query ORDER_STATUS report as fallback
+  if (clientCode) {
+    try {
+      const now = new Date();
+      const d = String(now.getDate()).padStart(2, '0');
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const y = now.getFullYear();
+      const dateDash = `${d}-${m}-${y}`;
+      const statusRes = await nseClient.getOrderStatusReport({
+        client_code: clientCode,
+        from_date: dateDash,
+        to_date: dateDash,
+      });
+      const orders = statusRes?.data?.report_data;
+      if (Array.isArray(orders) && orders.length > 0) {
+        const matched = orders.find((o) => (sId && String(o.sip_reg_no || '') === sId) || ['PENDING', 'NEW', 'ACCEPTED'].includes(o.status || o.order_status));
+        if (matched) {
+          const ordId = matched.order_id || matched.orderno || matched.trxn_order_id;
+          if (ordId) {
+            const purRes = await nseClient.getShortLink('PUR', ordId);
+            const url = extractUrl(purRes);
+            if (url) return url;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 5. GET_LINK API with XSIP / SIP product types with retries & RESEND_COMM trigger (for 2FA Mandate/SIP OTP Authorization)
   if (sId) {
     const sipProductTypes = ['XSIP_REG', 'XSIP', 'SIP_REG', 'SIP', 'XSIP_AUTH'];
     const maxAttempts = isLive ? 3 : 1;
@@ -2865,78 +2939,6 @@ const fetchSipPaymentLink = async ({ sipRegNo, clientCode, regItem, isLive }) =>
         await delay(waitTime);
       }
     }
-  }
-
-  // 4. Query PROV_ORDERS with proper NSE date formats (DD-MM-YYYY and DD/MM/YYYY)
-  if (clientCode) {
-    const now = new Date();
-    const d = String(now.getDate()).padStart(2, '0');
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const y = now.getFullYear();
-    const dateDash = `${d}-${m}-${y}`;
-    const dateSlash = `${d}/${m}/${y}`;
-
-    const dateFormats = [dateDash, dateSlash];
-    const orderTypes = ['ALL', 'XSP', 'SIP'];
-
-    for (const fmt of dateFormats) {
-      for (const oType of orderTypes) {
-        try {
-          const provRes = await nseClient.post('/nsemfdesk/api/v2/reports/PROV_ORDERS', {
-            from_date: fmt,
-            to_date: fmt,
-            trans_type: 'ALL',
-            order_type: oType,
-            client_code: clientCode,
-            ...(sId ? { sip_reg_nos: sId } : {}),
-          });
-          const reportList = provRes?.data?.report_data;
-          if (Array.isArray(reportList) && reportList.length > 0) {
-            const matched = (sId ? reportList.find((r) => String(r.sip_reg_no || r.sip_reg_nos || '') === sId) : null) || reportList[0];
-            const provUrl = extractUrl(matched);
-            if (provUrl) return provUrl;
-
-            const provOrderId = matched?.order_id || matched?.orderno || matched?.trxn_order_id;
-            if (provOrderId) {
-              const purRes = await nseClient.getShortLink('PUR', provOrderId);
-              const url = extractUrl(purRes);
-              if (url) {
-                console.log(`[fetchSipPaymentLink] Link resolved via PROV_ORDERS (${provOrderId}):`, url);
-                return url;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-    }
-  }
-
-  // 5. Query ORDER_STATUS report as fallback
-  if (clientCode) {
-    try {
-      const now = new Date();
-      const d = String(now.getDate()).padStart(2, '0');
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const y = now.getFullYear();
-      const dateDash = `${d}-${m}-${y}`;
-      const statusRes = await nseClient.getOrderStatusReport({
-        client_code: clientCode,
-        from_date: dateDash,
-        to_date: dateDash,
-      });
-      const orders = statusRes?.data?.report_data;
-      if (Array.isArray(orders) && orders.length > 0) {
-        const matched = orders.find((o) => (sId && String(o.sip_reg_no || '') === sId) || ['PENDING', 'NEW', 'ACCEPTED'].includes(o.status || o.order_status));
-        if (matched) {
-          const ordId = matched.order_id || matched.orderno || matched.trxn_order_id;
-          if (ordId) {
-            const purRes = await nseClient.getShortLink('PUR', ordId);
-            const url = extractUrl(purRes);
-            if (url) return url;
-          }
-        }
-      }
-    } catch (_) {}
   }
 
   // 6. Fallback to existing active NSE 2FA Authentication URL for this investor
@@ -3080,25 +3082,43 @@ exports.registerSipOrder = async (req, res) => {
     const minBufferDays = 7;
     const minAllowedDate = new Date(today.getTime() + minBufferDays * 24 * 60 * 60 * 1000);
 
+    const isFirstOrderToday = reqFirstOrderToday !== undefined
+      ? (reqFirstOrderToday === true || reqFirstOrderToday === 'true' || reqFirstOrderToday === 'Y')
+      : true; // Modern fintech standard (Groww/Zerodha/AngelOne): start SIP with installment #1 paid today
+
     let chosenDate = startDate ? new Date(startDate) : new Date(today.getTime() + (normFreq === 'DAILY' ? 7 : (normFreq === 'WEEKLY' ? 7 : 30)) * 24 * 60 * 60 * 1000);
     let recurringStartDate = new Date(chosenDate);
     let bufferApplied = false;
 
-    if (recurringStartDate < minAllowedDate) {
-      bufferApplied = true;
+    if (isFirstOrderToday) {
+      // Modern Fintech Standard (Option 1): Installment #1 is placed as a concrete purchase order today.
+      // Therefore, the recurring mandate schedule begins on installment #2 (subsequent month/cycle),
+      // guaranteeing the required 7+ day mandate setup buffer and zero exchange rejections.
       if (normFreq === 'DAILY') {
         recurringStartDate = new Date(minAllowedDate);
-        if (recurringStartDate.getDay() === 6) recurringStartDate.setDate(recurringStartDate.getDate() + 2);
-        else if (recurringStartDate.getDay() === 0) recurringStartDate.setDate(recurringStartDate.getDate() + 1);
       } else if (normFreq === 'WEEKLY') {
         recurringStartDate = new Date(minAllowedDate);
-        if (recurringStartDate.getDay() === 6) recurringStartDate.setDate(recurringStartDate.getDate() + 2);
-        else if (recurringStartDate.getDay() === 0) recurringStartDate.setDate(recurringStartDate.getDate() + 1);
+      } else if (normFreq === 'QUARTERLY') {
+        const chosenDay = chosenDate.getDate();
+        recurringStartDate = new Date(today.getFullYear(), today.getMonth() + 3, chosenDay);
       } else {
-        // MONTHLY default
-        recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+        // MONTHLY default: installment #2 is in the next month on the chosen day
+        const chosenDay = chosenDate.getDate();
+        recurringStartDate = new Date(today.getFullYear(), today.getMonth() + 1, chosenDay);
         if (recurringStartDate < minAllowedDate) {
+          recurringStartDate = new Date(today.getFullYear(), today.getMonth() + 2, chosenDay);
+        }
+      }
+    } else {
+      if (recurringStartDate < minAllowedDate) {
+        bufferApplied = true;
+        if (normFreq === 'DAILY' || normFreq === 'WEEKLY') {
+          recurringStartDate = new Date(minAllowedDate);
+        } else {
           recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+          if (recurringStartDate < minAllowedDate) {
+            recurringStartDate = new Date(recurringStartDate.getFullYear(), recurringStartDate.getMonth() + 1, recurringStartDate.getDate());
+          }
         }
       }
     }
@@ -3134,30 +3154,11 @@ exports.registerSipOrder = async (req, res) => {
 
     const dpTxnMode = (sipMaster.sipTransactionMode === 'D') ? 'D' : 'P';
 
-    const isNseMarketHours = () => {
-      const now = new Date();
-      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const ist = new Date(utc + (3600000 * 5.5));
-      const day = ist.getDay(); // 0 is Sunday, 6 is Saturday
-      if (day === 0 || day === 6) return false;
-      const minutes = ist.getHours() * 60 + ist.getMinutes();
-      return minutes >= 9 * 60 && minutes < 15 * 60; // 09:00 - 15:00 IST
-    };
-
-    const marketOpen = isNseMarketHours();
-
-    let firstOrderToday = 'N';
-    if (marketOpen) {
-      firstOrderToday = reqFirstOrderToday !== undefined
-        ? ((reqFirstOrderToday === true || reqFirstOrderToday === 'Y') ? 'Y' : 'N')
-        : ((paymentMode === 'MANDATE' && !bufferApplied) ? 'N' : 'Y');
-    } else {
-      console.log(`[registerSipOrder] Request received outside NSE trading hours (IST). Automatically forcing first_order_today='N' to comply with exchange rules.`);
-    }
-
     const memberCode = String(process.env.NSE_MEMBER_CODE || nseClient.memberCode || '1031616');
 
     // 1. Prepare NSE XSIP payload with authoritative exchange codes
+    // In Option 1 (Fintech Standard): XSIP is registered with first_order_today='N'
+    // so recurring debits execute seamlessly via bank mandate from recurringStartDate without any market-hours or mandate race issues.
     const nseXsipPayload = {
       amc_code: authoritativeAmcCode,
       sch_code: authoritativeNseCode,
@@ -3173,7 +3174,7 @@ exports.registerSipOrder = async (req, res) => {
       member_code: memberCode,
       memberCode: memberCode,
       installment_no: normFreq === 'DAILY' ? '250' : (normFreq === 'WEEKLY' ? '104' : (normFreq === 'QUARTERLY' ? '20' : '60')),
-      first_order_today: firstOrderToday,
+      first_order_today: 'N',
       primary_holder_mobile: user.phone?.slice(-10) || '',
       primary_holder_email: user.email,
       step_up_required: stepUpRequired ? 'Y' : 'N',
@@ -3206,20 +3207,6 @@ exports.registerSipOrder = async (req, res) => {
           nseRes = stdRes;
         }
       }
-
-      // Reactive Auto-Retry: If exchange rejected due to FOT (First Order Today) after market hours:
-      checkItem = nseRes?.data?.reg_data?.[0];
-      isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
-      remark = checkItem?.reg_remark || '';
-      if (isFailed && (/after market hours/i.test(remark) || /fot.*market/i.test(remark) || /fot y/i.test(remark))) {
-        console.warn(`[registerSipOrder] NSE XSIP rejected due to FOT outside market hours (${remark}). Retrying with first_order_today='N'...`);
-        firstOrderToday = 'N';
-        nseXsipPayload.first_order_today = 'N';
-        const retryRes = await nseClient.registerXsip([nseXsipPayload]);
-        if (retryRes?.success && retryRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && retryRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
-          nseRes = retryRes;
-        }
-      }
     } else {
       // Standard broker SIP (Non-Mandate / Gateway)
       const standardSipPayload = { ...nseXsipPayload };
@@ -3233,20 +3220,6 @@ exports.registerSipOrder = async (req, res) => {
         const xsipRes = await nseClient.registerXsip([nseXsipPayload]);
         if (xsipRes?.success && xsipRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && xsipRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
           nseRes = xsipRes;
-        }
-      }
-
-      // Reactive Auto-Retry: If exchange rejected standard SIP due to FOT after market hours:
-      checkItem = nseRes?.data?.reg_data?.[0];
-      const isFailed = !nseRes?.success || checkItem?.status === 'FAILURE' || checkItem?.reg_status === 'REG_FAILED' || checkItem?.reg_id === '0' || checkItem?.reg_id === 0;
-      const remark = checkItem?.reg_remark || '';
-      if (isFailed && (/after market hours/i.test(remark) || /fot.*market/i.test(remark) || /fot y/i.test(remark))) {
-        console.warn(`[registerSipOrder] NSE standard SIP rejected due to FOT outside market hours (${remark}). Retrying with first_order_today='N'...`);
-        firstOrderToday = 'N';
-        standardSipPayload.first_order_today = 'N';
-        const retryStdRes = await nseClient.registerSip([standardSipPayload]);
-        if (retryStdRes?.success && retryStdRes?.data?.reg_data?.[0]?.status !== 'FAILURE' && retryStdRes?.data?.reg_data?.[0]?.reg_status !== 'REG_FAILED') {
-          nseRes = retryStdRes;
         }
       }
     }
@@ -3290,11 +3263,116 @@ exports.registerSipOrder = async (req, res) => {
 
     const sipRegNo = isSuccess ? String(rawRegId) : (nseClient.isMockMode() ? String(rawRegId || `TEST_SIP_${Date.now()}`) : '');
 
-    // 3. Request Official Payment / Authorization Link from NSE
+    // 3. Option 1: Create Day-1 Normal Purchase Order & Obtain Genuine Payment Link
     const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
     let paymentLink = null;
-    if (sipRegNo) {
+    let day1Order = null;
+    let day1OrderId = null;
+    let day1NseOrderId = null;
+
+    if (isFirstOrderToday) {
+      try {
+        const existingHolding = await MfPortfolioHolding.findOne({ user: userId, schemeCode: scheme.schemeCode });
+        const isAdditional = Boolean(existingHolding && existingHolding.folioNo);
+        const folioNo = req.body.folioNo || (isAdditional ? existingHolding.folioNo : '');
+        const buySellType = isAdditional || folioNo ? 'ADDITIONAL' : 'FRESH';
+
+        day1OrderId = `MFP${Date.now()}`;
+        const cleanOrderRef = day1OrderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
+
+        const nseOrderPayload = {
+          order_ref_number: cleanOrderRef,
+          scheme_code: authoritativeNseCode,
+          trxn_type: 'P',
+          buy_sell_type: buySellType,
+          client_code: ucc.clientCode,
+          demat_physical: 'P',
+          order_amount: String(installmentAmount),
+          folio_no: folioNo,
+          remarks: `SIP ${sipRegNo || sipRefNo} Day 1 Installment`,
+          kyc_flag: 'Y',
+          sub_broker_code: '',
+          euin_number: '',
+          euin_declaration: 'N',
+          min_redemption_flag: 'N',
+          dpc_flag: 'Y',
+          all_units: 'N',
+          redemption_units: '',
+          sub_broker_arn: '',
+          bank_ref_no: '',
+          account_no: ucc.primaryBank?.accountNo || '',
+          mobile_no: user.phone?.slice(-10) || '',
+          email: user.email,
+          mandate_id: '',
+          filler1: '',
+          member_unique_id: '',
+        };
+
+        const purRes = await nseClient.createNormalOrder([nseOrderPayload]);
+        const trxnItem = purRes?.data?.transaction_details?.[0];
+        const rawNseOrderId = trxnItem?.trxn_order_id;
+        const isPurSuccess = purRes?.success && (trxnItem?.trxn_status === 'TRXN SUCCESS' || trxnItem?.status === 'SUCCESS') && rawNseOrderId && rawNseOrderId !== '0' && rawNseOrderId !== 0;
+
+        if (isPurSuccess || nseClient.isMockMode()) {
+          day1NseOrderId = isPurSuccess ? String(rawNseOrderId) : `TEST_PUR_${Date.now()}`;
+
+          // Fetch genuine PUR payment link (trxnpaymentonline)
+          if (day1NseOrderId && !nseClient.isMockMode()) {
+            try {
+              const linkRes = await nseClient.getShortLink('PUR', day1NseOrderId);
+              if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
+                paymentLink = linkRes.data.firstHolderLink;
+              }
+            } catch (linkErr) {
+              console.warn('[registerSipOrder] getShortLink(PUR) warning:', linkErr.message);
+            }
+          }
+
+          if (!paymentLink && !isLive) {
+            paymentLink = `${backendUrl}/api/mutual-funds/checkout/${day1OrderId}?mode=sandbox`;
+          }
+
+          const estimatedUnits = scheme.nav && scheme.nav > 0 ? +(installmentAmount / scheme.nav).toFixed(3) : null;
+
+          day1Order = await MfOrder.create({
+            user: userId,
+            clientCode: ucc.clientCode,
+            orderId: day1OrderId,
+            schemeCode: scheme.schemeCode,
+            schemeName: scheme.schemeName,
+            isin: scheme.isin || '',
+            folioNo,
+            transactionType: 'P',
+            buySellType,
+            orderAmount: Number(installmentAmount),
+            estimatedUnits,
+            units: 0,
+            allottedUnits: 0,
+            allottedNav: null,
+            allotmentStatus: 'PENDING',
+            navAtOrder: scheme.nav,
+            paymentMode: 'NSE_PAYMENT_LINK',
+            paymentStatus: 'PENDING',
+            orderStatus: 'PAYMENT_PENDING',
+            paymentLink: paymentLink || '',
+            nseTrxnOrderId: day1NseOrderId,
+            nseStatus: isPurSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
+            sipRegNo: String(sipRegNo || ''),
+            isFirstSipInstallment: true,
+            remarks: `First installment for SIP ${sipRegNo || sipRefNo} via NSE Gateway.`,
+          });
+        } else {
+          const errMsg = trxnItem?.trxn_remark || purRes?.data?.message || 'Day-1 purchase order could not be placed';
+          console.warn(`[registerSipOrder] Day-1 purchase order failed on NSE: ${errMsg}`);
+        }
+      } catch (orderErr) {
+        console.error('[registerSipOrder] Error placing Day-1 purchase order:', orderErr);
+      }
+    }
+
+    // Fallback if day1Order was not placed or payment link still missing
+    if (!paymentLink && sipRegNo) {
       try {
         paymentLink = await fetchSipPaymentLink({
           sipRegNo,
@@ -3306,10 +3384,6 @@ exports.registerSipOrder = async (req, res) => {
         console.warn('[registerSipOrder] fetchSipPaymentLink warning:', linkErr.message);
       }
 
-      // Do NOT fall back to mandate auth link! An SIP order requires SIP payment or 2FA OTP, NEVER mandate setup.
-      // If paymentLink is null in live PROD, NSE MFSS has dispatched the official 2FA OTP/SMS to the investor.
-
-      // Strictly fallback to simulator ONLY in offline test/mock environments (never in live PROD)
       if (!paymentLink && !isLive) {
         paymentLink = `${backendUrl}/api/mutual-funds/checkout/${sipRegNo}?mode=sandbox`;
       }
@@ -3330,25 +3404,21 @@ exports.registerSipOrder = async (req, res) => {
       mandateId: effectiveMandateId,
       installmentsPaid: 0,
       totalAmountPaid: 0,
-      status: (firstOrderToday === 'Y' || paymentLink) ? 'PENDING_PAYMENT' : 'ACTIVE',
+      status: (isFirstOrderToday && paymentLink) ? 'PENDING_PAYMENT' : 'ACTIVE',
       paymentLink: paymentLink || null,
       authUrl: paymentLink || null,
-      firstOrderToday: firstOrderToday === 'Y',
+      firstOrderToday: isFirstOrderToday,
+      firstOrderId: day1OrderId || '',
+      firstOrderNseId: day1NseOrderId || '',
       stepUpRequired: Boolean(stepUpRequired),
       stepUpAmount: Number(stepUpAmount || 0),
     });
 
     let userExplanation = '';
-    if (firstOrderToday === 'Y') {
-      userExplanation = bufferApplied
-        ? `Installment #1 of ₹${installmentAmount} initiated for today. Per exchange rules, automated mandate AutoPay requires a 7-day setup buffer, so recurring ${freqDisplay.toLowerCase()} debits will start on ${dateFormatted}.`
-        : `Installment #1 of ₹${installmentAmount} initiated for today. Recurring ${freqDisplay.toLowerCase()} AutoPay debits will start on ${dateFormatted}.`;
+    if (isFirstOrderToday && paymentLink) {
+      userExplanation = `Installment #1 of ₹${installmentAmount} initiated for today. Please complete payment via official NSE Gateway. Recurring ${freqDisplay.toLowerCase()} AutoPay debits will start on ${dateFormatted}.`;
     } else {
-      userExplanation = bufferApplied
-        ? `${freqDisplay} SIP registered successfully! Per exchange rules, bank AutoPay requires a 7-day setup buffer. Your recurring debits will start on ${dateFormatted}.`
-        : (!marketOpen
-          ? `${freqDisplay} SIP registered successfully! Since exchange market is currently closed, your recurring ${freqDisplay.toLowerCase()} debit will start on ${dateFormatted} via Bank AutoPay.`
-          : `${freqDisplay} SIP registered! Your first automated debit will execute on ${dateFormatted} via Bank AutoPay.`);
+      userExplanation = `${freqDisplay} SIP registered successfully! Your recurring ${freqDisplay.toLowerCase()} debits will start on ${dateFormatted} via Bank AutoPay.`;
     }
 
     return res.json({
@@ -3358,8 +3428,10 @@ exports.registerSipOrder = async (req, res) => {
       data: {
         sip: sipRecord,
         sipId: sipRecord._id,
+        orderId: day1OrderId,
+        day1Order,
         paymentLink,
-        firstOrderToday: firstOrderToday === 'Y',
+        firstOrderToday: isFirstOrderToday,
         nextDebitDate: dateFormatted,
         bufferApplied,
         amount: Number(installmentAmount),
@@ -3449,29 +3521,41 @@ exports.verifySipPayment = async (req, res) => {
 
     let initialOrder = null;
     if (sip.firstOrderToday === true) {
-      const initialOrderId = sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`;
-      initialOrder = await MfOrder.findOne({ orderId: initialOrderId });
-      if (!initialOrder) {
-        initialOrder = await MfOrder.create({
-          user: userId,
-          clientCode: sip.clientCode,
-          orderId: initialOrderId,
-          schemeCode: sip.schemeCode,
-          schemeName: scheme?.schemeName || sip.schemeName,
-          transactionType: 'P',
-          buySellType: 'FRESH',
-          orderAmount: sip.installmentAmount,
-          estimatedUnits,
-          units: 0,
-          allottedUnits: 0,
-          allotmentStatus: 'PENDING',
-          navAtOrder: nav,
-          paymentMode: 'MANDATE',
-          paymentStatus: 'SUCCESS',
-          orderStatus: 'SUBMITTED',
-          nseStatus: 'SUBMITTED',
-          remarks: `First installment for SIP ${sip.sipRegNo} via NSE mandate`,
-        });
+      const initialOrderId = sip.firstOrderId || sip.exchangeOrderId || sip.sipRegNo || `SIP_INST_${sip._id}`;
+      initialOrder = await MfOrder.findOne({
+        $or: [
+          { orderId: initialOrderId },
+          { nseTrxnOrderId: sip.firstOrderNseId || undefined },
+          { sipRegNo: sip.sipRegNo, isFirstSipInstallment: true },
+        ].filter(Boolean),
+      });
+
+      if (initialOrder && initialOrder.paymentStatus !== 'SUCCESS' && !nseClient.isMockMode()) {
+        try {
+          const report = await nseClient.getOrderStatusReport({
+            order_ref_number: initialOrder.orderId,
+            client_code: sip.clientCode,
+          });
+          const nseData = report?.data?.orders?.[0];
+          if (nseData) {
+            const st = (nseData.order_status || nseData.status || '').toUpperCase();
+            if (st === 'SUCCESS' || st === 'ALLOTTED' || st === 'APPROVED' || st === 'VALID' || st === 'ORDER PLACED') {
+              initialOrder.paymentStatus = 'SUCCESS';
+              initialOrder.orderStatus = 'PAYMENT_SUCCESS';
+              initialOrder.nseStatus = st;
+              await initialOrder.save();
+            } else if (['REJECTED', 'FAILED', 'CANCELLED'].includes(st)) {
+              initialOrder.paymentStatus = 'FAILED';
+              initialOrder.orderStatus = 'REJECTED';
+              initialOrder.nseStatus = st;
+              await initialOrder.save();
+            }
+          }
+        } catch (_) {}
+      } else if (initialOrder && nseClient.isMockMode() && initialOrder.paymentStatus === 'PENDING') {
+        initialOrder.paymentStatus = 'SUCCESS';
+        initialOrder.orderStatus = 'PAYMENT_SUCCESS';
+        await initialOrder.save();
       }
     }
 
@@ -3483,8 +3567,23 @@ exports.verifySipPayment = async (req, res) => {
       transactionType: 'P',
     });
 
-    sip.status = 'ACTIVE';
-    sip.installmentsPaid = confirmedOrdersCount;
+    if (sip.firstOrderToday) {
+      if (initialOrder && initialOrder.paymentStatus === 'SUCCESS') {
+        sip.status = 'ACTIVE';
+        sip.installmentsPaid = Math.max(1, confirmedOrdersCount);
+      } else if (!initialOrder && confirmedOrdersCount > 0) {
+        sip.status = 'ACTIVE';
+        sip.installmentsPaid = confirmedOrdersCount;
+      } else {
+        // Still pending payment unless explicitly confirmed
+        sip.status = (initialOrder && initialOrder.paymentStatus === 'FAILED') ? 'CANCELLED' : 'PENDING_PAYMENT';
+        sip.installmentsPaid = confirmedOrdersCount;
+      }
+    } else {
+      sip.status = 'ACTIVE';
+      sip.installmentsPaid = confirmedOrdersCount;
+    }
+
     sip.totalAmountPaid = sip.installmentsPaid * sip.installmentAmount;
     await sip.save();
 
@@ -3515,6 +3614,12 @@ exports.abandonSipOrder = async (req, res) => {
     if (sip.status === 'PENDING_PAYMENT') {
       sip.status = 'CANCELLED';
       await sip.save();
+      if (sip.firstOrderId) {
+        await MfOrder.updateOne(
+          { orderId: sip.firstOrderId, orderStatus: 'PAYMENT_PENDING' },
+          { $set: { orderStatus: 'CANCELLED', paymentStatus: 'FAILED', remarks: 'SIP payment abandoned by investor' } }
+        );
+      }
     }
 
     return res.json({
