@@ -442,6 +442,37 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('ALLOTMENT_STATEMENT')) {
+      const isAllotted = payload.mockStatus ? payload.mockStatus === 'ALLOTTED' || payload.mockStatus === 'SUCCESS' : true;
+      const mockFolio = payload.mockFolio || `FOLIO_${timestamp.toString().slice(-6)}`;
+      return {
+        success: true,
+        status: 200,
+        data: {
+          allotment_list: isAllotted
+            ? [
+                {
+                  reportdate: new Date().toISOString().slice(0, 10),
+                  orderno: payload.order_ids || `ORD_${timestamp}`,
+                  foliono: mockFolio,
+                  folio_no: mockFolio,
+                  rtaschemecode: 'RTA_SCHEME',
+                  rtatransactionno: payload.order_ids || `ORD_${timestamp}`,
+                  clientcode: payload.client_code || 'VK046041',
+                  allottednav: payload.mockNav || '1961.8010',
+                  allottedqty: payload.mockUnits || '0.051',
+                  allottedamt: '100.00',
+                  validflag: 'Y',
+                  remarks: 'ALLOTMENT DONE',
+                  error_remark: '',
+                },
+              ]
+            : [],
+          error_remark: '',
+        },
+      };
+    }
+
     if (endpoint.includes('TRANSACTION_DETAIL_REPORT')) {
       const isApproved = payload.mockStatus ? payload.mockStatus === 'APPROVED' || payload.mockStatus === 'SUCCESS' || payload.mockStatus === 'ALLOTTED' : true;
       const isAllotted = payload.mockStatus === 'ALLOTTED' || isApproved;
@@ -735,9 +766,17 @@ class NseClient {
     });
   }
 
-  // ── 11. Order Status Report ──
-  async getOrderStatusReport(filter) {
-    return this.post('/nsemfdesk/api/v2/reports/ORDER_STATUS', filter);
+  // ── 11. Order Status Report (Doc Page 127) ──
+  async getOrderStatusReport(filter = {}) {
+    const payload = {
+      trans_type: filter.trans_type || filter.transType || 'ALL',
+      order_type: filter.order_type || filter.orderType || 'ALL',
+      sub_order_type: filter.sub_order_type || filter.subOrderType || 'ALL',
+      order_status: filter.order_status || filter.orderStatus || 'ALL',
+      settlement_type: filter.settlement_type || filter.settlementType || 'ALL',
+      ...filter,
+    };
+    return this.post('/nsemfdesk/api/v2/reports/ORDER_STATUS', payload);
   }
 
   // ── 11b. Order Lifecycle Report (Doc Page 129 - Authoritative Payment & Lifecycle Tracking) ──
@@ -765,6 +804,8 @@ class NseClient {
   async getTransactionDetailReport(filter = {}) {
     return this.post('/nsemfdesk/api/v2/reports/TRANSACTION_DETAIL_REPORT', {
       order_id: String(filter.orderId || ''),
+      product_id: String(filter.productId || filter.orderId || ''),
+      trxn_no: String(filter.trxnNo || filter.orderId || ''),
       client_code: filter.clientCode || '',
       from_date: filter.fromDate || '',
       to_date: filter.toDate || '',
@@ -772,6 +813,32 @@ class NseClient {
       date_type: filter.dateType || 'REQUEST_DATE',
       ...(filter.mockStatus ? { mockStatus: filter.mockStatus } : {}),
     });
+  }
+
+  // ── 11e. Allotment Statement Report (Doc Page 133 / NNF Spec - Authoritative for Folio Numbers & Allotted Units) ──
+  async getAllotmentStatement(filter = {}) {
+    const payload = {};
+    if (filter.orderIds || filter.order_ids) {
+      payload.order_ids = String(filter.orderIds || filter.order_ids);
+    }
+    if (filter.fromDate || filter.from_date) {
+      payload.from_date = String(filter.fromDate || filter.from_date);
+    }
+    if (filter.toDate || filter.to_date) {
+      payload.to_date = String(filter.toDate || filter.to_date);
+    }
+    if (filter.orderType || filter.order_type) {
+      payload.order_type = String(filter.orderType || filter.order_type);
+    }
+    if (filter.clientCode || filter.client_code) {
+      payload.client_code = String(filter.clientCode || filter.client_code);
+    }
+    if (filter.mockStatus) payload.mockStatus = filter.mockStatus;
+    if (filter.mockFolio) payload.mockFolio = filter.mockFolio;
+    if (filter.mockUnits) payload.mockUnits = filter.mockUnits;
+    if (filter.mockNav) payload.mockNav = filter.mockNav;
+
+    return this.post('/nsemfdesk/api/v2/reports/ALLOTMENT_STATEMENT', payload);
   }
 
   // ── 12. Scheme Master & NAV Download ──

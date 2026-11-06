@@ -1727,14 +1727,41 @@ exports.syncOrderWithNse = async (req, res) => {
     if (order.nseTrxnOrderId) {
       nseFilter.trxn_no = order.nseTrxnOrderId;
     }
-    let nseRes = await nseClient.getOrderStatusReport(nseFilter);
-    let exchangeOrder = nseRes?.data?.orders?.[0] || nseRes?.data?.transaction_details?.[0] || nseRes?.data?.report_data?.[0];
+
+    let exchangeOrder = null;
+    let nseRes = null;
+
+    // 1. Authoritative Allotment Statement Report (Directly fetches RTA foliono and allotted units)
+    if (order.nseTrxnOrderId || order.orderId) {
+      try {
+        const allotRes = await nseClient.getAllotmentStatement({
+          orderIds: String(order.nseTrxnOrderId || order.orderId),
+          clientCode: order.clientCode,
+        });
+        const allotList = allotRes?.data?.allotment_list;
+        if (Array.isArray(allotList) && allotList.length > 0) {
+          exchangeOrder = allotList.find((item) => {
+            const oNo = String(item.orderno || item.rtatransactionno || item.order_no || '');
+            return oNo === String(order.nseTrxnOrderId) || oNo === String(order.orderId);
+          }) || allotList[0];
+          nseRes = allotRes;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Query ORDER_STATUS report if not already found via Allotment Statement
+    if (!exchangeOrder) {
+      nseRes = await nseClient.getOrderStatusReport(nseFilter);
+      exchangeOrder = nseRes?.data?.orders?.[0] || nseRes?.data?.transaction_details?.[0] || nseRes?.data?.report_data?.[0];
+    }
 
     // Fallback: If not found via order status, query TRANSACTION_DETAIL_REPORT
     if (!exchangeOrder && (order.nseTrxnOrderId || order.orderId)) {
       try {
         const txRes = await nseClient.getTransactionDetailReport({
           orderId: String(order.nseTrxnOrderId || order.orderId),
+          productId: String(order.nseTrxnOrderId || order.orderId),
+          trxnNo: String(order.nseTrxnOrderId || order.orderId),
           clientCode: order.clientCode,
         });
         const txList = txRes?.data?.report_data || txRes?.data?.orders || txRes?.data?.transaction_details;
@@ -1752,9 +1779,26 @@ exports.syncOrderWithNse = async (req, res) => {
     let allottedUnits = order.units || 0;
     let nav = order.navAtOrder || null;
 
-    const rawFolio = exchangeOrder?.folio_no || exchangeOrder?.folio_number || exchangeOrder?.foliono || exchangeOrder?.folio || '';
-    if (rawFolio && !order.folioNo) {
-      order.folioNo = String(rawFolio).trim();
+    const rawFolio = String(
+      exchangeOrder?.foliono ||
+      exchangeOrder?.folio_no ||
+      exchangeOrder?.folio_number ||
+      exchangeOrder?.folio ||
+      exchangeOrder?.dp_folio_no ||
+      exchangeOrder?.DP_Folio_No ||
+      exchangeOrder?.Folio_No ||
+      exchangeOrder?.['Folio No'] ||
+      exchangeOrder?.['Folio No.'] ||
+      exchangeOrder?.folio_num ||
+      ''
+    ).trim();
+
+    if (rawFolio && !['-', '--', 'NA', 'N/A', 'NULL', 'UNDEFINED'].includes(rawFolio.toUpperCase())) {
+      order.folioNo = rawFolio;
+      await MfOrder.updateMany(
+        { user: order.user, schemeCode: order.schemeCode, $or: [{ folioNo: '' }, { folioNo: null }] },
+        { $set: { folioNo: rawFolio } }
+      ).catch(() => {});
     }
 
     if (exchangeOrder) {
@@ -2330,11 +2374,19 @@ exports.triggerReconciliationRun = async (req, res) => {
 // ── 20b. POST /api/admin/mutual-funds/reconciliation/sync-folios (Trigger Folio Sync) ──
 exports.syncMissingFolios = async (req, res) => {
   try {
-    const { userId } = req.body || {};
-    const result = await mfReconciliationEngine.syncMissingFolios(userId || null);
+    let { userId, clientCode, pan, orderId } = req.body || {};
+    if (!userId && (clientCode || pan)) {
+      const MfClientUcc = require('../models/MfClientUcc');
+      const queryList = [];
+      if (clientCode) queryList.push({ clientCode: String(clientCode).trim() });
+      if (pan) queryList.push({ pan: String(pan).trim().toUpperCase() });
+      const ucc = await MfClientUcc.findOne({ $or: queryList });
+      if (ucc?.user) userId = ucc.user;
+    }
+    const result = await mfReconciliationEngine.syncMissingFolios(userId || null, { orderId });
     return res.json({
       success: true,
-      message: `Folio sync completed. Updated ${result.totalUpdated} records.`,
+      message: `Folio sync completed. Updated ${result.totalUpdated || 0} records.`,
       data: result,
     });
   } catch (error) {

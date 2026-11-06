@@ -2530,29 +2530,74 @@ exports.syncOrderStatus = async (req, res) => {
       });
     }
 
-    // Query NSE ORDER_STATUS report
-    const ucc = await MfClientUcc.findOne({ user: userId });
+    // Query NSE ALLOTMENT_STATEMENT report first (specifically delivers foliono and allotted units)
+    let nseData = null;
+    if (order.nseTrxnOrderId || order.orderId) {
+      try {
+        const allotRes = await nseClient.getAllotmentStatement({
+          orderIds: String(order.nseTrxnOrderId || order.orderId),
+          clientCode: order.clientCode || ucc?.clientCode,
+          ...(req.body?.mockStatus ? { mockStatus: req.body.mockStatus } : {}),
+          ...(req.query?.mockStatus ? { mockStatus: req.query.mockStatus } : {}),
+          ...(req.body?.mockFolio ? { mockFolio: req.body.mockFolio } : {}),
+        });
+        const allotList = allotRes?.data?.allotment_list;
+        if (Array.isArray(allotList) && allotList.length > 0) {
+          nseData = allotList.find((item) => {
+            const oNo = String(item.orderno || item.rtatransactionno || item.order_no || '');
+            return oNo === String(order.nseTrxnOrderId) || oNo === String(order.orderId);
+          }) || allotList[0];
+        }
+      } catch (aErr) {
+        console.warn(`[syncOrderStatus] Allotment statement query warning for ${orderId}:`, aErr.message);
+      }
+    }
+
+    // Query NSE ORDER_STATUS report as secondary fallback
     const nseFilter = {
       order_ids: String(order.nseTrxnOrderId || order.orderId),
       order_ref_number: order.orderId,
       client_code: order.clientCode || ucc?.clientCode,
+      trans_type: 'ALL',
+      order_type: 'ALL',
+      sub_order_type: 'ALL',
       ...(req.body?.mockStatus ? { mockStatus: req.body.mockStatus } : {}),
       ...(req.query?.mockStatus ? { mockStatus: req.query.mockStatus } : {}),
     };
 
-    let nseData = null;
-    try {
-      const report = await nseClient.getOrderStatusReport(nseFilter);
-      nseData = report?.data?.report_data?.[0] || report?.data?.orders?.[0] || report?.data?.transaction_details?.[0];
-    } catch (err) {
-      console.warn(`[syncOrderStatus] NSE query warning for ${orderId}:`, err.message);
+    if (!nseData) {
+      try {
+        const report = await nseClient.getOrderStatusReport(nseFilter);
+        nseData = report?.data?.report_data?.[0] || report?.data?.orders?.[0] || report?.data?.transaction_details?.[0];
+      } catch (err) {
+        console.warn(`[syncOrderStatus] NSE query warning for ${orderId}:`, err.message);
+      }
+    }
+
+    // Query TRANSACTION_DETAIL_REPORT as tertiary fallback
+    if (!nseData && (order.nseTrxnOrderId || order.orderId)) {
+      try {
+        const txRes = await nseClient.getTransactionDetailReport({
+          orderId: String(order.nseTrxnOrderId || order.orderId),
+          productId: String(order.nseTrxnOrderId || order.orderId),
+          trxnNo: String(order.nseTrxnOrderId || order.orderId),
+          clientCode: order.clientCode || ucc?.clientCode,
+        });
+        const txList = txRes?.data?.report_data || txRes?.data?.orders || txRes?.data?.transaction_details;
+        if (Array.isArray(txList) && txList.length > 0) {
+          nseData = txList.find((item) => {
+            const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
+            return pId === String(order.nseTrxnOrderId) || pId === String(order.orderId);
+          }) || txList[0];
+        }
+      } catch (_) {}
     }
 
     if (nseData) {
-      const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
+      const nseOrderStatus = (nseData.order_status || nseData.status || nseData.validflag || '').toUpperCase();
       const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
-      const allottedUnits = parseFloat(nseData.allotted_units || nseData.allottedqty || '0');
-      const allottedNav = parseFloat(nseData.nav || nseData.allottednav || '0');
+      const allottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || '0');
+      const allottedNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
 
       order.nseStatus = nseOrderStatus || nseRemark || order.nseStatus;
 
@@ -2570,14 +2615,37 @@ exports.syncOrderStatus = async (req, res) => {
       }
 
       // Capture folio if provided by exchange in status/allotment feed
-      const rawFolio = nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || '';
-      if (rawFolio && !order.folioNo) {
-        order.folioNo = String(rawFolio).trim();
+      const rawFolioCandidate = String(
+        nseData.foliono ||
+        nseData.folio_no ||
+        nseData.folio_number ||
+        nseData.folio ||
+        nseData.dp_folio_no ||
+        nseData.DP_Folio_No ||
+        nseData.Folio_No ||
+        nseData['Folio No'] ||
+        nseData['Folio No.'] ||
+        nseData.FOLIO_NO ||
+        nseData.folio_num ||
+        ''
+      ).trim();
+      const rawFolio = ['-', '--', 'NA', 'N/A', 'NULL', 'UNDEFINED'].includes(rawFolioCandidate.toUpperCase()) ? '' : rawFolioCandidate;
+
+      if (rawFolio && (!order.folioNo || order.folioNo !== rawFolio)) {
+        order.folioNo = rawFolio;
         await order.save();
-        await MfPortfolioHolding.updateOne(
+        await MfOrder.updateMany(
+          { user: order.user, schemeCode: order.schemeCode, $or: [{ folioNo: '' }, { folioNo: null }] },
+          { $set: { folioNo: rawFolio } }
+        ).catch(() => {});
+        await MfPortfolioHolding.updateMany(
           { user: order.user, schemeCode: order.schemeCode },
-          { $set: { folioNo: String(rawFolio).trim() } }
-        );
+          { $set: { folioNo: rawFolio } }
+        ).catch(() => {});
+        try {
+          const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+          await recalculateUserPortfolio(order.user);
+        } catch (_) {}
       }
 
       if (order.allotmentStatus === 'ALLOTTED') {
