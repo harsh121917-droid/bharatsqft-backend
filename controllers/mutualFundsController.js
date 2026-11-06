@@ -2546,7 +2546,7 @@ exports.syncOrderStatus = async (req, res) => {
           nseData = allotList.find((item) => {
             const oNo = String(item.orderno || item.rtatransactionno || item.order_no || '');
             return oNo === String(order.nseTrxnOrderId) || oNo === String(order.orderId);
-          }) || allotList[0];
+          });
         }
       } catch (aErr) {
         console.warn(`[syncOrderStatus] Allotment statement query warning for ${orderId}:`, aErr.message);
@@ -2568,7 +2568,13 @@ exports.syncOrderStatus = async (req, res) => {
     if (!nseData) {
       try {
         const report = await nseClient.getOrderStatusReport(nseFilter);
-        nseData = report?.data?.report_data?.[0] || report?.data?.orders?.[0] || report?.data?.transaction_details?.[0];
+        const rList = report?.data?.report_data || report?.data?.orders || report?.data?.transaction_details;
+        if (Array.isArray(rList) && rList.length > 0) {
+          nseData = rList.find((item) => {
+            const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+            return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId));
+          });
+        }
       } catch (err) {
         console.warn(`[syncOrderStatus] NSE query warning for ${orderId}:`, err.message);
       }
@@ -2588,28 +2594,55 @@ exports.syncOrderStatus = async (req, res) => {
           nseData = txList.find((item) => {
             const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
             return pId === String(order.nseTrxnOrderId) || pId === String(order.orderId);
-          }) || txList[0];
+          });
         }
       } catch (_) {}
     }
 
     if (nseData) {
-      const nseOrderStatus = (nseData.order_status || nseData.status || nseData.validflag || '').toUpperCase();
-      const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
-      const allottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || '0');
-      const allottedNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
+      const nseOrderStatus = String(nseData.order_status || nseData.validflag || nseData.status || '').toUpperCase();
+      const nseRemark = String(nseData.order_remark || nseData.reg_remark || nseData.remarks || nseData.rejection_reason || nseData.error_remark || '').toUpperCase();
+      const nsePaymentStatus = String(nseData.payment_status || '').toUpperCase();
+      const amcPayoutUtr = String(nseData.amc_payout_utr_no || nseData.pg_mis_utr_no || '').trim();
+      const allottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || '0') || 0;
+      const allottedNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0') || 0;
 
-      order.nseStatus = nseOrderStatus || nseRemark || order.nseStatus;
+      order.nseStatus = `${nseOrderStatus} - ${nseRemark}`.trim();
 
-      // Handle Rejection / Failure
-      if (['REJECTED', 'FAILED', 'CANCELLED', 'INVALID'].includes(nseOrderStatus) && !['PROVISIONAL ORDER', 'ALLOTMENT DONE'].includes(nseRemark)) {
-        order.paymentStatus = 'FAILED';
-        order.orderStatus = 'REJECTED';
-        order.remarks = nseData.rejection_reason || nseRemark || 'Order rejected by NSE MFSS exchange';
+      // Handle Rejection / Invalidation / Expiration
+      const isInvalidOrExpired =
+        nseOrderStatus === 'INVALID' ||
+        nseOrderStatus === 'REJECTED' ||
+        nseOrderStatus === 'CANCELLED' ||
+        nseOrderStatus === 'FAILED' ||
+        nseData.validflag === 'N' ||
+        /EXPIRED|TRANSACTION FAIL|KYC STATUS IS NOT VERIFIED|KYC MODIFICATION NOT IN UNDER PROCESS|NOT COMPLIANT|REJECT/i.test(nseRemark);
+
+      if (isInvalidOrExpired) {
+        order.allotmentStatus = 'REJECTED';
+        order.allottedUnits = 0;
+        order.units = 0;
+
+        if (amcPayoutUtr || nsePaymentStatus === 'APPROVED' || /KYC/i.test(nseRemark)) {
+          order.orderStatus = 'REJECTED';
+          order.paymentStatus = 'SUCCESS';
+          order.orderStatus = 'REFUNDED';
+          order.remarks = nseRemark
+            ? `Exchange Invalidation: ${nseRemark}${amcPayoutUtr ? ` (Refund UTR: ${amcPayoutUtr})` : ''}`
+            : 'Order invalidated by exchange; refund processed.';
+        } else {
+          order.orderStatus = /EXPIRED/i.test(nseRemark) ? 'CANCELLED' : 'REJECTED';
+          order.paymentStatus = 'FAILED';
+          order.remarks = nseRemark || 'Order expired or rejected by exchange.';
+        }
+
         await order.save();
+        const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+        await recalculateUserPortfolio(order.user);
+
         return res.json({
           success: true,
-          message: `Order rejected by exchange: ${order.remarks}`,
+          message: `Order status from exchange: ${order.remarks}`,
           data: { order, isAuthoritative: true },
         });
       }
@@ -3543,12 +3576,18 @@ exports.verifyPurchasePayment = async (req, res) => {
       }
     } catch (_) {}
 
-    if (['REJECTED', 'FAILED', 'CANCELLED'].includes(nseStatus)) {
+    const isNseRejected =
+      ['REJECTED', 'FAILED', 'CANCELLED', 'INVALID'].includes(nseStatus);
+
+    if (isNseRejected) {
       order.paymentStatus = 'FAILED';
       order.orderStatus = 'REJECTED';
+      order.allotmentStatus = 'REJECTED';
+      order.allottedUnits = 0;
+      order.units = 0;
       order.nseStatus = nseStatus;
       await order.save();
-      return res.status(400).json({ success: false, message: 'Payment rejected by exchange', data: order });
+      return res.status(400).json({ success: false, message: 'Payment rejected or invalidated by exchange', data: order });
     }
 
     order.paymentStatus = 'SUCCESS';
@@ -8197,6 +8236,29 @@ exports.checkEkycStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('[checkEkycStatus Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── POST /api/mutual-funds/orders/sync-direct-nse ──
+exports.syncUserDirectTransactions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { clientCode, fromDate, toDate } = req.body || {};
+    const mfReconciliationEngine = require('../services/mfReconciliationEngine');
+    const result = await mfReconciliationEngine.syncUserTransactionsFromNse({
+      userId,
+      clientCode,
+      fromDate,
+      toDate,
+    });
+    return res.json({
+      success: true,
+      message: 'Direct NSE transaction synchronization completed',
+      data: result,
+    });
+  } catch (error) {
+    console.error('[syncUserDirectTransactions Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1743,7 +1743,7 @@ exports.syncOrderWithNse = async (req, res) => {
           exchangeOrder = allotList.find((item) => {
             const oNo = String(item.orderno || item.rtatransactionno || item.order_no || '');
             return oNo === String(order.nseTrxnOrderId) || oNo === String(order.orderId);
-          }) || allotList[0];
+          });
           nseRes = allotRes;
         }
       } catch (_) {}
@@ -1752,7 +1752,13 @@ exports.syncOrderWithNse = async (req, res) => {
     // 2. Query ORDER_STATUS report if not already found via Allotment Statement
     if (!exchangeOrder) {
       nseRes = await nseClient.getOrderStatusReport(nseFilter);
-      exchangeOrder = nseRes?.data?.orders?.[0] || nseRes?.data?.transaction_details?.[0] || nseRes?.data?.report_data?.[0];
+      const rList = nseRes?.data?.report_data || nseRes?.data?.orders || nseRes?.data?.transaction_details;
+      if (Array.isArray(rList) && rList.length > 0) {
+        exchangeOrder = rList.find((item) => {
+          const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
+          return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId));
+        });
+      }
     }
 
     // Fallback: If not found via order status, query TRANSACTION_DETAIL_REPORT
@@ -1769,14 +1775,14 @@ exports.syncOrderWithNse = async (req, res) => {
           exchangeOrder = txList.find((item) => {
             const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
             return pId === String(order.nseTrxnOrderId) || pId === String(order.orderId);
-          }) || txList[0];
+          });
           nseRes = txRes;
         }
       } catch (_) {}
     }
 
     let exchangeStatus = order.nseStatus || 'SUBMITTED';
-    let allottedUnits = order.units || 0;
+    let allottedUnits = 0;
     let nav = order.navAtOrder || null;
 
     const rawFolio = String(
@@ -1802,56 +1808,99 @@ exports.syncOrderWithNse = async (req, res) => {
     }
 
     if (exchangeOrder) {
-      exchangeStatus = exchangeOrder.order_status || exchangeOrder.status || 'ALLOTTED';
-      if (exchangeOrder.allotted_units || exchangeOrder.allotted_unit) {
-        allottedUnits = parseFloat(exchangeOrder.allotted_units || exchangeOrder.allotted_unit);
+      exchangeStatus = String(exchangeOrder.order_status || exchangeOrder.validflag || exchangeOrder.status || 'SUBMITTED').toUpperCase();
+      const nseRemark = String(exchangeOrder.order_remark || exchangeOrder.reg_remark || exchangeOrder.remarks || exchangeOrder.rejection_reason || '').toUpperCase();
+      const nsePaymentStatus = String(exchangeOrder.payment_status || '').toUpperCase();
+      const amcPayoutUtr = String(exchangeOrder.amc_payout_utr_no || exchangeOrder.pg_mis_utr_no || '').trim();
+
+      if (exchangeOrder.allotted_units || exchangeOrder.allotted_unit || exchangeOrder.allottedqty) {
+        allottedUnits = parseFloat(exchangeOrder.allotted_units || exchangeOrder.allotted_unit || exchangeOrder.allottedqty || '0') || 0;
       }
       if (exchangeOrder.nav || exchangeOrder.allotted_nav) {
-        nav = parseFloat(exchangeOrder.nav || exchangeOrder.allotted_nav);
+        nav = parseFloat(exchangeOrder.nav || exchangeOrder.allotted_nav || '0') || 0;
       }
-    } else if (order.paymentStatus === 'SUCCESS') {
-      exchangeStatus = order.nseStatus || 'ALLOTTED (NSE CONFIRMED)';
-    }
 
-    if ((!allottedUnits || allottedUnits <= 0) && (order.estimatedUnits > 0 || (order.orderAmount > 0 && (nav > 0 || order.navAtOrder > 0)))) {
-      allottedUnits = order.estimatedUnits || parseFloat((order.orderAmount / (nav || order.navAtOrder)).toFixed(4));
-    }
+      // Check for Invalidation / Expiration / Failure
+      const isInvalidOrExpired =
+        exchangeStatus === 'INVALID' ||
+        exchangeStatus === 'REJECTED' ||
+        exchangeStatus === 'CANCELLED' ||
+        exchangeStatus === 'FAILED' ||
+        exchangeOrder.validflag === 'N' ||
+        /EXPIRED|TRANSACTION FAIL|KYC STATUS IS NOT VERIFIED|KYC MODIFICATION NOT IN UNDER PROCESS|NOT COMPLIANT|REJECT/i.test(nseRemark);
 
-    order.nseStatus = exchangeStatus;
-    if (allottedUnits > 0) order.units = allottedUnits;
-    if (nav > 0) order.navAtOrder = nav;
-    await order.save();
+      if (isInvalidOrExpired) {
+        order.allotmentStatus = 'REJECTED';
+        order.allottedUnits = 0;
+        order.units = 0;
 
-    if (order.folioNo) {
-      try {
-        await MfPortfolioHolding.updateOne(
-          { user: order.user?._id || order.user, schemeCode: order.schemeCode },
-          { $set: { folioNo: order.folioNo } }
-        );
-      } catch (_) {}
-    }
+        if (amcPayoutUtr || nsePaymentStatus === 'APPROVED' || /KYC/i.test(nseRemark)) {
+          order.orderStatus = 'REJECTED';
+          order.paymentStatus = 'SUCCESS';
+          order.orderStatus = 'REFUNDED';
+          order.remarks = nseRemark
+            ? `Exchange Invalidation: ${nseRemark}${amcPayoutUtr ? ` (Refund UTR: ${amcPayoutUtr})` : ''}`
+            : 'Order invalidated by exchange; refund processed.';
+        } else {
+          order.orderStatus = /EXPIRED/i.test(nseRemark) ? 'CANCELLED' : 'REJECTED';
+          order.paymentStatus = 'FAILED';
+          order.remarks = nseRemark || 'Order expired or rejected by exchange.';
+        }
+        order.nseStatus = `${exchangeStatus} - ${nseRemark}`.trim();
+        await order.save();
 
-    const isAllottedOnExchange =
-      ['ALLOTTED', 'SETTLED', 'VALID', 'SUCCESS', 'APPROVED', 'VALIDATED'].includes(exchangeStatus) ||
-      /ALLOTMENT/i.test(exchangeOrder?.order_remark || '') ||
-      allottedUnits > 0;
+        if (order.user) {
+          const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+          await recalculateUserPortfolio(order.user);
+        }
 
-    if (allottedUnits > 0 && order.allotmentStatus !== 'ALLOTTED' && (isAllottedOnExchange || order.paymentStatus === 'SUCCESS')) {
-      const { processAllotmentConfirmation } = require('../services/mfIdempotencyService');
-      await processAllotmentConfirmation({
-        orderId: order.orderId,
-        allottedUnits,
-        allottedNav: nav || order.navAtOrder || 100.0,
-        rtaReferenceNo: exchangeOrder?.rta_ref_no || exchangeOrder?.amc_payout_utr_no || order.nseTrxnOrderId,
-        folioNo: rawFolio || order.folioNo,
-        source: 'NSE_ORDER_SYNC',
-      });
-    } else if (order.user) {
-      try {
-        const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
-        await recalculateUserPortfolio(order.user);
-      } catch (pErr) {
-        console.warn('[syncOrderWithNse] Portfolio recalculation warning:', pErr.message);
+        return res.json({
+          success: true,
+          message: `Order synchronized: Marked ${order.orderStatus} (${order.remarks})`,
+          data: { order, isAuthoritative: true },
+        });
+      }
+
+      const isAllottedOnExchange =
+        (exchangeStatus === 'ALLOTTED' || exchangeStatus === 'SETTLED' || exchangeStatus === 'VALID' || exchangeOrder.validflag === 'Y') &&
+        (/ALLOTMENT/i.test(nseRemark) || allottedUnits > 0);
+
+      order.nseStatus = `${exchangeStatus} - ${nseRemark}`.trim();
+
+      if (isAllottedOnExchange && allottedUnits > 0 && order.allotmentStatus !== 'ALLOTTED') {
+        const { processAllotmentConfirmation } = require('../services/mfIdempotencyService');
+        await processAllotmentConfirmation({
+          orderId: order.orderId,
+          allottedUnits,
+          allottedNav: nav || order.navAtOrder || 100.0,
+          rtaReferenceNo: exchangeOrder?.rta_ref_no || exchangeOrder?.amc_payout_utr_no || order.nseTrxnOrderId,
+          folioNo: rawFolio || order.folioNo,
+          source: 'NSE_ORDER_SYNC',
+        });
+      } else if (order.user) {
+        try {
+          const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+          await recalculateUserPortfolio(order.user);
+        } catch (pErr) {
+          console.warn('[syncOrderWithNse] Portfolio recalculation warning:', pErr.message);
+        }
+      }
+    } else {
+      // Local sanity check if no exchange order matched
+      if (
+        order.allotmentStatus === 'ALLOTTED' &&
+        (/Payment session expired|ORDER EXPIRED|Awaiting investor payment/i.test(order.remarks || '') || (order.allottedUnits || 0) <= 0)
+      ) {
+        order.allotmentStatus = 'REJECTED';
+        order.allottedUnits = 0;
+        order.units = 0;
+        order.orderStatus = /EXPIRED/i.test(order.remarks || '') ? 'CANCELLED' : 'REJECTED';
+        order.paymentStatus = 'FAILED';
+        await order.save();
+        if (order.user) {
+          const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+          await recalculateUserPortfolio(order.user);
+        }
       }
     }
 
@@ -2829,3 +2878,25 @@ exports.reverseOrder = async (req, res) => {
 
 
 
+
+// ── POST /api/admin/mutual-funds/reconciliation/sync-direct-nse ──
+exports.syncDirectNseTransactions = async (req, res) => {
+  try {
+    const { userId, clientCode, fromDate, toDate } = req.body || req.query || {};
+    const mfReconciliationEngine = require('../services/mfReconciliationEngine');
+    const result = await mfReconciliationEngine.syncUserTransactionsFromNse({
+      userId,
+      clientCode,
+      fromDate,
+      toDate,
+    });
+    return res.json({
+      success: true,
+      message: 'Direct NSE transaction synchronization completed',
+      data: result,
+    });
+  } catch (error) {
+    console.error('[adminMfController.syncDirectNseTransactions Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

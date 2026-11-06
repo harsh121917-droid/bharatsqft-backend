@@ -9,6 +9,7 @@ const {
   registerUserUcc,
   createPurchaseOrder,
   syncOrderStatus,
+  syncUserDirectTransactions,
   verifyPurchasePayment,
   registerSipOrder,
   verifySipPayment,
@@ -100,6 +101,7 @@ router.post('/ucc/register', registerUserUcc);
 router.post('/ucc/resend-act', resendUccActivation);
 router.post('/support', submitMfSupportRequest);
 router.post('/orders/purchase', createPurchaseOrder);
+router.post('/orders/sync-direct-nse', syncUserDirectTransactions);
 router.get('/orders/:orderId/status', syncOrderStatus);
 router.post('/orders/:orderId/sync-status', syncOrderStatus);
 router.post('/orders/verify', verifyPurchasePayment);

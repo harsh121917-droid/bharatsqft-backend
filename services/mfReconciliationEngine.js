@@ -109,7 +109,7 @@ class MfReconciliationEngine {
             nseData = reportList.find((item) => {
               const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
               return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId));
-            }) || reportList[0];
+            }) || null;
           }
 
           // Fallback: If not found via single filter, try date range query
@@ -129,9 +129,8 @@ class MfReconciliationEngine {
               if (Array.isArray(fbList) && fbList.length > 0) {
                 nseData = fbList.find((item) => {
                   const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
-                  const itemScheme = String(item.scheme_code || item.schemecode || '');
-                  return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId)) || itemScheme === String(order.schemeCode);
-                });
+                  return itemRef === String(order.orderId) || (order.nseTrxnOrderId && itemRef === String(order.nseTrxnOrderId));
+                }) || null;
               }
             } catch (_) {}
           }
@@ -141,6 +140,8 @@ class MfReconciliationEngine {
             try {
               const txReport = await nseClient.getTransactionDetailReport({
                 orderId: String(order.nseTrxnOrderId || order.orderId),
+                productId: String(order.nseTrxnOrderId || order.orderId),
+                trxnNo: String(order.nseTrxnOrderId || order.orderId),
                 clientCode: order.clientCode,
               });
               const txList = txReport?.data?.report_data || txReport?.data?.orders || txReport?.data?.transaction_details;
@@ -148,7 +149,7 @@ class MfReconciliationEngine {
                 const match = txList.find((item) => {
                   const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
                   return pId === String(order.nseTrxnOrderId) || pId === String(order.orderId);
-                }) || txList[0];
+                });
                 if (match) nseData = { ...match, ...(nseData || {}) };
               }
             } catch (_) {}
@@ -167,41 +168,102 @@ class MfReconciliationEngine {
               ).catch(() => {});
             }
 
-            const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
-            const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
-            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.units || nseData.allottedqty || '0');
-            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
+            const nseOrderStatus = String(nseData.order_status || nseData.validflag || nseData.status || '').toUpperCase();
+            const nseRemark = String(nseData.order_remark || nseData.reg_remark || nseData.remarks || nseData.rejection_reason || nseData.error_remark || '').toUpperCase();
+            const nsePaymentStatus = String(nseData.payment_status || '').toUpperCase();
+            const amcPayoutUtr = String(nseData.amc_payout_utr_no || nseData.pg_mis_utr_no || '').trim();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.units || nseData.allottedqty || '0') || 0;
+            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0') || 0;
 
-            // Auto-heal and confirm allotment when exchange confirms
+            // Check 1: Invalidation, Expiration, or KYC Rejection on Exchange (Strict Precedence)
+            const isInvalidOrExpired =
+              nseOrderStatus === 'INVALID' ||
+              nseOrderStatus === 'REJECTED' ||
+              nseOrderStatus === 'CANCELLED' ||
+              nseOrderStatus === 'FAILED' ||
+              nseData.validflag === 'N' ||
+              /EXPIRED|TRANSACTION FAIL|KYC STATUS IS NOT VERIFIED|KYC MODIFICATION NOT IN UNDER PROCESS|NOT COMPLIANT|REJECT/i.test(nseRemark) ||
+              /EXPIRED|UNPAID/i.test(order.remarks);
+
+            if (isInvalidOrExpired) {
+              const prevAllotment = order.allotmentStatus;
+              order.allotmentStatus = 'REJECTED';
+              order.allottedUnits = 0;
+              order.units = 0;
+
+              if (amcPayoutUtr || nsePaymentStatus === 'APPROVED' || /KYC/i.test(nseRemark)) {
+                order.orderStatus = 'REJECTED';
+                order.paymentStatus = 'SUCCESS';
+          order.orderStatus = 'REFUNDED';
+                order.remarks = nseRemark
+                  ? `Exchange Invalidation: ${nseRemark}${amcPayoutUtr ? ` (Refund UTR: ${amcPayoutUtr})` : ''}`
+                  : 'Order invalidated by exchange; refund processed.';
+              } else {
+                order.orderStatus = /EXPIRED/i.test(nseRemark) || /EXPIRED/i.test(order.remarks) ? 'CANCELLED' : 'REJECTED';
+                order.paymentStatus = 'FAILED';
+                order.remarks = nseRemark || order.remarks || 'Order expired or rejected by exchange.';
+              }
+              order.nseStatus = `${nseOrderStatus} - ${nseRemark}`.trim();
+              await order.save();
+
+              if (prevAllotment === 'ALLOTTED' && order.user) {
+                const { recalculateUserPortfolio } = require('./mfPortfolioEngine');
+                await recalculateUserPortfolio(order.user?._id || order.user);
+              }
+
+              discrepancies.push({
+                refId: order.orderId,
+                type: 'ORDER',
+                discrepancyStatus: 'RESOLVED',
+                user: order.user?._id || order.user,
+                userName: order.user?.name || 'Investor',
+                schemeCode: order.schemeCode,
+                schemeName: order.schemeName,
+                amount: order.orderAmount,
+                units: 0,
+                vikaoneStatus: order.orderStatus,
+                nseStatus: nseOrderStatus,
+                description: `Order ${order.orderId} invalidated by exchange: ${order.remarks}. Local state corrected.`,
+                resolved: true,
+              });
+              continue;
+            }
+
+            // Check 2: Authoritative Allotment Confirmation from Exchange (Units MUST be > 0)
             const isConfirmedAllotment =
-              ['ALLOTTED', 'SETTLED', 'SUCCESS', 'VALID', 'APPROVED', 'VALIDATED'].includes(nseOrderStatus) ||
-              /ALLOTMENT/i.test(nseRemark) ||
-              nseAllottedUnits > 0;
+              (nseOrderStatus === 'VALID' || nseOrderStatus === 'ALLOTTED' || nseOrderStatus === 'SETTLED' || nseData.validflag === 'Y') &&
+              (/ALLOTMENT/i.test(nseRemark) || nseAllottedUnits > 0);
 
             if (
               isConfirmedAllotment &&
-              (nseAllottedUnits > 0 || order.estimatedUnits > 0) &&
+              nseAllottedUnits > 0 &&
               order.allotmentStatus !== 'ALLOTTED'
             ) {
-              const unitsToAllot = nseAllottedUnits > 0 ? nseAllottedUnits : (order.estimatedUnits || +(order.orderAmount / (nseNav || order.navAtOrder || 100)).toFixed(4));
               const finalNav = nseNav > 0 ? nseNav : (order.navAtOrder || 100.0);
               try {
                 const { processAllotmentConfirmation } = require('./mfIdempotencyService');
                 await processAllotmentConfirmation({
                   orderId: order.orderId,
-                  allottedUnits: unitsToAllot,
+                  allottedUnits: nseAllottedUnits,
                   allottedNav: finalNav,
                   rtaReferenceNo: nseData.rta_ref_no || nseData.amc_payout_utr_no || order.nseTrxnOrderId,
                   folioNo: rawFolio || order.folioNo,
                   source: 'RECONCILIATION_ENGINE',
                 });
-                console.log(`[Reconciliation Engine] 🚀 Auto-allotted order ${order.orderId}: ${unitsToAllot} units @ NAV ${finalNav}, Folio: ${rawFolio || order.folioNo}`);
+                console.log(`[Reconciliation Engine] 🚀 Auto-allotted order ${order.orderId}: ${nseAllottedUnits} units @ NAV ${finalNav}, Folio: ${rawFolio || order.folioNo}`);
                 if (order.user) {
                   const { recalculateUserPortfolio } = require('./mfPortfolioEngine');
                   await recalculateUserPortfolio(order.user?._id || order.user);
                 }
               } catch (allotErr) {
                 console.warn(`[Reconciliation Engine] Allotment confirmation warning for ${order.orderId}:`, allotErr.message);
+              }
+            } else if (nseOrderStatus === 'VALID' && (nsePaymentStatus === 'APPROVED' || /AUTO VALIDATED|PROVISIONAL/i.test(nseRemark))) {
+              if (order.paymentStatus !== 'SUCCESS') {
+                order.paymentStatus = 'SUCCESS';
+                order.orderStatus = 'PAYMENT_SUCCESS';
+                order.remarks = nseRemark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
+                await order.save();
               }
             }
 
@@ -579,7 +641,7 @@ class MfReconciliationEngine {
                 const match = allotList.find((item) => {
                   const oNo = String(item.orderno || item.rtatransactionno || item.order_no || '');
                   return oNo === String(ord.nseTrxnOrderId) || oNo === String(ord.orderId);
-                }) || allotList[0];
+                });
                 if (match) {
                   nseData = match;
                   rawFolio = extractFolioFromNse(match);
@@ -625,7 +687,7 @@ class MfReconciliationEngine {
                 const match = reportList.find((item) => {
                   const itemRef = String(item.order_ref_number || item.order_no || item.order_id || item.reg_id || item.trxn_no || item.trxn_order_id || '');
                   return itemRef === String(ord.orderId) || (ord.nseTrxnOrderId && itemRef === String(ord.nseTrxnOrderId));
-                }) || reportList[0];
+                });
                 if (match) {
                   nseData = { ...match, ...(nseData || {}) };
                   rawFolio = extractFolioFromNse(match) || rawFolio;
@@ -661,7 +723,7 @@ class MfReconciliationEngine {
                 const match = txList.find((item) => {
                   const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
                   return pId === String(ord.nseTrxnOrderId) || pId === String(ord.orderId);
-                }) || txList[0];
+                });
                 if (match) {
                   nseData = { ...match, ...(nseData || {}) };
                   rawFolio = extractFolioFromNse(match) || rawFolio;
@@ -686,39 +748,111 @@ class MfReconciliationEngine {
             console.log(`[Folio Sync Engine] ✅ Fetched folio ${rawFolio} from NSE for order ${ord.orderId}`);
           }
 
-          if (nseData) {
-            const nseOrderStatus = (nseData.order_status || nseData.status || nseData.validflag || '').toUpperCase();
-            const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
-            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || nseData.units || '0');
-            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
+          // Internal Integrity Guard: If order was previously marked ALLOTTED but remarks explicitly indicate expiration or pending payment
+          if (
+            ord.allotmentStatus === 'ALLOTTED' &&
+            (/Payment session expired|ORDER EXPIRED|Awaiting investor payment/i.test(ord.remarks || '') || (ord.allottedUnits || 0) <= 0)
+          ) {
+            ord.allotmentStatus = 'REJECTED';
+            ord.allottedUnits = 0;
+            ord.units = 0;
+            ord.orderStatus = /EXPIRED/i.test(ord.remarks || '') ? 'CANCELLED' : 'REJECTED';
+            ord.paymentStatus = 'FAILED';
+            await ord.save();
+            touchedUsers.add(String(ord.user));
+            console.log(`[Folio Sync Engine] 🛑 Reversing erroneous allotment for expired order ${ord.orderId}`);
+          }
 
-            // If confirmed on exchange, confirm allotment locally
+          // Guard against premature allotment without folio or exchange confirmation
+          if (
+            ord.allotmentStatus === 'ALLOTTED' &&
+            (!ord.folioNo || ord.folioNo.trim() === '') &&
+            !/ALLOTMENT DONE/i.test(ord.remarks || '')
+          ) {
+            if (/First installment for SIP|Awaiting investor payment/i.test(ord.remarks || '')) {
+              ord.allotmentStatus = 'PENDING';
+              ord.allottedUnits = 0;
+              ord.units = 0;
+              ord.orderStatus = (ord.paymentStatus === 'SUCCESS') ? 'PAYMENT_SUCCESS' : 'SUBMITTED';
+              await ord.save();
+              touchedUsers.add(String(ord.user));
+              console.log(`[Folio Sync Engine] 🛑 Reverting premature allotment for pending SIP installment ${ord.orderId}`);
+            }
+          }
+
+          if (nseData) {
+            const nseOrderStatus = String(nseData.order_status || nseData.validflag || nseData.status || '').toUpperCase();
+            const nseRemark = String(nseData.order_remark || nseData.reg_remark || nseData.remarks || nseData.rejection_reason || nseData.error_remark || '').toUpperCase();
+            const nsePaymentStatus = String(nseData.payment_status || '').toUpperCase();
+            const amcPayoutUtr = String(nseData.amc_payout_utr_no || nseData.pg_mis_utr_no || '').trim();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || nseData.units || '0') || 0;
+            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0') || 0;
+
+            // Check 1: Invalidation, Expiration, or KYC Rejection on Exchange (Priority 1)
+            const isInvalidOrExpired =
+              nseOrderStatus === 'INVALID' ||
+              nseOrderStatus === 'REJECTED' ||
+              nseOrderStatus === 'CANCELLED' ||
+              nseOrderStatus === 'FAILED' ||
+              nseData.validflag === 'N' ||
+              /EXPIRED|TRANSACTION FAIL|KYC STATUS IS NOT VERIFIED|KYC MODIFICATION NOT IN UNDER PROCESS|NOT COMPLIANT|REJECT/i.test(nseRemark);
+
+            if (isInvalidOrExpired) {
+              ord.allotmentStatus = 'REJECTED';
+              ord.allottedUnits = 0;
+              ord.units = 0;
+
+              if (amcPayoutUtr || nsePaymentStatus === 'APPROVED' || /KYC/i.test(nseRemark)) {
+                ord.orderStatus = 'REJECTED';
+                ord.paymentStatus = 'SUCCESS';
+                ord.orderStatus = 'REFUNDED';
+                ord.remarks = nseRemark
+                  ? `Exchange Invalidation: ${nseRemark}${amcPayoutUtr ? ` (Refund UTR: ${amcPayoutUtr})` : ''}`
+                  : 'Order invalidated by exchange; refund processed by AMC.';
+              } else {
+                ord.orderStatus = /EXPIRED/i.test(nseRemark) ? 'CANCELLED' : 'REJECTED';
+                ord.paymentStatus = 'FAILED';
+                ord.remarks = nseRemark || 'Order expired or rejected by exchange.';
+              }
+              ord.nseStatus = `${nseOrderStatus} - ${nseRemark}`.trim();
+              await ord.save();
+              touchedUsers.add(String(ord.user));
+              console.log(`[Folio Sync Engine] 🛑 Marked order ${ord.orderId} as ${ord.orderStatus} (${ord.remarks})`);
+              continue;
+            }
+
+            // Check 2: Authoritative Allotment Confirmation from Exchange (Units MUST be > 0 confirmed by exchange)
             const isConfirmedAllotment =
-              ['ALLOTTED', 'SETTLED', 'SUCCESS', 'VALID', 'APPROVED', 'VALIDATED', 'Y'].includes(nseOrderStatus) ||
-              /ALLOTMENT/i.test(nseRemark) ||
-              nseAllottedUnits > 0;
+              (nseOrderStatus === 'VALID' || nseOrderStatus === 'ALLOTTED' || nseOrderStatus === 'SETTLED' || nseData.validflag === 'Y') &&
+              (/ALLOTMENT/i.test(nseRemark) || nseAllottedUnits > 0);
 
             if (
               isConfirmedAllotment &&
-              (nseAllottedUnits > 0 || ord.estimatedUnits > 0) &&
+              nseAllottedUnits > 0 &&
               ord.allotmentStatus !== 'ALLOTTED'
             ) {
-              const unitsToAllot = nseAllottedUnits > 0 ? nseAllottedUnits : (ord.estimatedUnits || +(ord.orderAmount / (nseNav || ord.navAtOrder || 100)).toFixed(4));
               const finalNav = nseNav > 0 ? nseNav : (ord.navAtOrder || 100.0);
               try {
                 const { processAllotmentConfirmation } = require('./mfIdempotencyService');
                 await processAllotmentConfirmation({
                   orderId: ord.orderId,
-                  allottedUnits: unitsToAllot,
+                  allottedUnits: nseAllottedUnits,
                   allottedNav: finalNav,
                   rtaReferenceNo: nseData.rta_ref_no || nseData.amc_payout_utr_no || nseData.rtatransactionno || ord.nseTrxnOrderId,
                   folioNo: rawFolio || ord.folioNo,
                   source: 'FOLIO_SYNC_ENGINE',
                 });
                 touchedUsers.add(String(ord.user));
-                console.log(`[Folio Sync Engine] 🚀 Auto-allotted order ${ord.orderId}: ${unitsToAllot} units @ NAV ${finalNav}`);
+                console.log(`[Folio Sync Engine] 🚀 Auto-allotted order ${ord.orderId}: ${nseAllottedUnits} units @ NAV ${finalNav}`);
               } catch (allotErr) {
                 console.warn(`[Folio Sync Engine] Allotment confirmation warning for ${ord.orderId}:`, allotErr.message);
+              }
+            } else if (nseOrderStatus === 'VALID' && (nsePaymentStatus === 'APPROVED' || /AUTO VALIDATED|PROVISIONAL/i.test(nseRemark))) {
+              if (ord.paymentStatus !== 'SUCCESS') {
+                ord.paymentStatus = 'SUCCESS';
+                ord.orderStatus = 'PAYMENT_SUCCESS';
+                ord.remarks = nseRemark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
+                await ord.save();
               }
             }
           }
@@ -771,6 +905,238 @@ class MfReconciliationEngine {
     return {
       lastRun: latest || null,
       unresolvedCount: unresolvedAlertsCount[0]?.unresolved || 0,
+    };
+  }
+
+  /**
+   * Direct synchronization against NSE MFSS TRANSACTION_DETAIL_REPORT and ORDER_STATUS
+   * Authoritatively reconciles all orders for a client code or user against the exchange's ledger.
+   * @param {object} params
+   * @param {string} [params.userId] - Optional Vikaone User ID
+   * @param {string} [params.clientCode] - Optional NSE Client Code (e.g. 'VK121917')
+   * @param {string} [params.fromDate] - Optional start date DD-MM-YYYY
+   * @param {string} [params.toDate] - Optional end date DD-MM-YYYY
+   */
+  async syncUserTransactionsFromNse({ userId, clientCode, fromDate, toDate } = {}) {
+    console.log(`[Direct NSE Sync] 🔄 Starting direct sync for ${clientCode || userId || 'all'}...`);
+    const MfClientUcc = require('../models/MfClientUcc');
+    const { recalculateUserPortfolio } = require('./mfPortfolioEngine');
+
+    const clientCodesToSync = new Set();
+    const userIdsToRecalculate = new Set();
+
+    if (clientCode) {
+      clientCodesToSync.add(String(clientCode).trim());
+    }
+
+    if (userId) {
+      userIdsToRecalculate.add(String(userId));
+      const uccRecords = await MfClientUcc.find({ user: userId });
+      uccRecords.forEach((u) => { if (u.clientCode) clientCodesToSync.add(u.clientCode); });
+      const distinctCodes = await MfOrder.distinct('clientCode', { user: userId });
+      distinctCodes.forEach((c) => { if (c) clientCodesToSync.add(c); });
+    }
+
+    if (clientCodesToSync.size === 0) {
+      const activeUccs = await MfClientUcc.find({ status: 'ACTIVE' }).limit(50);
+      activeUccs.forEach((u) => { if (u.clientCode) clientCodesToSync.add(u.clientCode); });
+    }
+
+    // Default 60-day date range in DD-MM-YYYY format
+    const now = new Date();
+    const past = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const d1 = String(past.getDate()).padStart(2, '0');
+    const m1 = String(past.getMonth() + 1).padStart(2, '0');
+    const y1 = past.getFullYear();
+    const d2 = String(now.getDate() + 1).padStart(2, '0');
+    const m2 = String(now.getMonth() + 1).padStart(2, '0');
+    const y2 = now.getFullYear();
+
+    const fDate = fromDate || `${d1}-${m1}-${y1}`;
+    const tDate = toDate || `${d2}-${m2}-${y2}`;
+
+    let totalOrdersChecked = 0;
+    let cancelledOrExpired = 0;
+    let rejectedOrRefunded = 0;
+    let allottedCount = 0;
+    const discrepanciesFound = [];
+
+    for (const cCode of clientCodesToSync) {
+      try {
+        console.log(`[Direct NSE Sync] Querying TRANSACTION_DETAIL_REPORT for ${cCode} (${fDate} to ${tDate})...`);
+        const txReport = await nseClient.getTransactionDetailReport({
+          clientCode: cCode,
+          fromDate: fDate,
+          toDate: tDate,
+        });
+
+        const txList = txReport?.data?.report_data || txReport?.data?.orders || txReport?.data?.transaction_details || [];
+
+        // Also query ORDER_STATUS report as secondary authoritative source
+        const osReport = await nseClient.getOrderStatusReport({
+          client_code: cCode,
+          from_date: fDate,
+          to_date: tDate,
+          trans_type: 'ALL',
+          order_type: 'ALL',
+          sub_order_type: 'ALL',
+        });
+        const osList = osReport?.data?.report_data || osReport?.data?.orders || osReport?.data?.transaction_details || [];
+
+        // Index all exchange records by identifier
+        const exchangeIndex = new Map();
+        for (const item of [...osList, ...txList]) {
+          const ids = [
+            item.product_id,
+            item.order_id,
+            item.order_ref_number,
+            item.order_no,
+            item.orderno,
+            item.trxn_no,
+            item.trxn_order_id,
+            item.rtatransactionno,
+          ].filter(Boolean).map(String);
+
+          for (const id of ids) {
+            if (!exchangeIndex.has(id)) {
+              exchangeIndex.set(id, item);
+            } else {
+              exchangeIndex.set(id, { ...item, ...exchangeIndex.get(id) });
+            }
+          }
+        }
+
+        // Fetch all local orders for this client code
+        const localOrders = await MfOrder.find({
+          clientCode: cCode,
+          createdAt: { $gte: past },
+        });
+
+        totalOrdersChecked += localOrders.length;
+
+        for (const ord of localOrders) {
+          if (ord.user) userIdsToRecalculate.add(String(ord.user));
+
+          const nseData =
+            (ord.nseTrxnOrderId && exchangeIndex.get(String(ord.nseTrxnOrderId))) ||
+            (ord.orderId && exchangeIndex.get(String(ord.orderId)));
+
+          if (nseData) {
+            const rawFolio = extractFolioFromNse(nseData);
+            if (rawFolio && !ord.folioNo) {
+              ord.folioNo = rawFolio;
+              await ord.save();
+              await MfPortfolioHolding.updateMany(
+                { user: ord.user, schemeCode: ord.schemeCode },
+                { $set: { folioNo: rawFolio } }
+              );
+            }
+
+            const nseOrderStatus = String(nseData.order_status || nseData.validflag || nseData.status || '').toUpperCase();
+            const nseRemark = String(nseData.order_remark || nseData.reg_remark || nseData.remarks || nseData.rejection_reason || nseData.error_remark || '').toUpperCase();
+            const nsePaymentStatus = String(nseData.payment_status || '').toUpperCase();
+            const amcPayoutUtr = String(nseData.amc_payout_utr_no || nseData.pg_mis_utr_no || '').trim();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.allottedqty || nseData.units || '0') || 0;
+            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0') || 0;
+
+            const isInvalidOrExpired =
+              nseOrderStatus === 'INVALID' ||
+              nseOrderStatus === 'REJECTED' ||
+              nseOrderStatus === 'CANCELLED' ||
+              nseOrderStatus === 'FAILED' ||
+              nseData.validflag === 'N' ||
+              /EXPIRED|TRANSACTION FAIL|KYC STATUS IS NOT VERIFIED|KYC MODIFICATION NOT IN UNDER PROCESS|NOT COMPLIANT|REJECT/i.test(nseRemark);
+
+            if (isInvalidOrExpired) {
+              ord.allotmentStatus = 'REJECTED';
+              ord.allottedUnits = 0;
+              ord.units = 0;
+
+              if (amcPayoutUtr || nsePaymentStatus === 'APPROVED' || /KYC/i.test(nseRemark)) {
+                ord.orderStatus = 'REJECTED';
+                ord.paymentStatus = 'SUCCESS';
+                ord.orderStatus = 'REFUNDED';
+                ord.remarks = nseRemark
+                  ? `Exchange Invalidation: ${nseRemark}${amcPayoutUtr ? ` (Refund UTR: ${amcPayoutUtr})` : ''}`
+                  : 'Order invalidated by exchange; refund processed by AMC.';
+                rejectedOrRefunded++;
+              } else {
+                ord.orderStatus = /EXPIRED/i.test(nseRemark) ? 'CANCELLED' : 'REJECTED';
+                ord.paymentStatus = 'FAILED';
+                ord.remarks = nseRemark || 'Order expired or rejected by exchange.';
+                cancelledOrExpired++;
+              }
+              ord.nseStatus = `${nseOrderStatus} - ${nseRemark}`.trim();
+              await ord.save();
+              console.log(`[Direct NSE Sync] 🛑 Order ${ord.orderId} synced to ${ord.orderStatus} (${ord.remarks})`);
+              continue;
+            }
+
+            const isConfirmedAllotment =
+              (nseOrderStatus === 'VALID' || nseOrderStatus === 'ALLOTTED' || nseOrderStatus === 'SETTLED' || nseData.validflag === 'Y') &&
+              (/ALLOTMENT/i.test(nseRemark) || nseAllottedUnits > 0);
+
+            if (isConfirmedAllotment && nseAllottedUnits > 0) {
+              ord.allotmentStatus = 'ALLOTTED';
+              ord.orderStatus = 'ALLOTTED';
+              ord.paymentStatus = 'SUCCESS';
+              ord.allottedUnits = nseAllottedUnits;
+              ord.allottedNav = nseNav > 0 ? nseNav : (ord.navAtOrder || 100);
+              ord.units = nseAllottedUnits;
+              if (rawFolio) ord.folioNo = rawFolio;
+              ord.remarks = nseRemark || 'ALLOTMENT DONE';
+              ord.nseStatus = 'VALID - ALLOTMENT DONE';
+              await ord.save();
+              allottedCount++;
+              console.log(`[Direct NSE Sync] ✅ Order ${ord.orderId} confirmed ALLOTTED: ${nseAllottedUnits} units @ NAV ${ord.allottedNav}`);
+            } else if (nseOrderStatus === 'VALID' && (nsePaymentStatus === 'APPROVED' || /AUTO VALIDATED|PROVISIONAL/i.test(nseRemark))) {
+              ord.orderStatus = 'PAYMENT_SUCCESS';
+              ord.paymentStatus = 'SUCCESS';
+              ord.allotmentStatus = 'PENDING';
+              ord.remarks = nseRemark || 'Payment confirmed on NSE. Allotment pending with AMC.';
+              await ord.save();
+            }
+          } else {
+            // If not found in date range, perform internal integrity check on local state
+            if (
+              ord.allotmentStatus === 'ALLOTTED' &&
+              (/Payment session expired|ORDER EXPIRED|Awaiting investor payment/i.test(ord.remarks || '') || (ord.allottedUnits || 0) <= 0)
+            ) {
+              ord.allotmentStatus = 'REJECTED';
+              ord.allottedUnits = 0;
+              ord.units = 0;
+              ord.orderStatus = /EXPIRED/i.test(ord.remarks || '') ? 'CANCELLED' : 'REJECTED';
+              ord.paymentStatus = 'FAILED';
+              await ord.save();
+              cancelledOrExpired++;
+              console.log(`[Direct NSE Sync] 🛑 Corrected unverified allotment for ${ord.orderId} to ${ord.orderStatus}`);
+            }
+          }
+        }
+      } catch (clientErr) {
+        console.warn(`[Direct NSE Sync] Warning syncing client ${cCode}:`, clientErr.message);
+      }
+    }
+
+    // Step 2: Recalculate portfolio for all touched users strictly from authentic data
+    for (const uId of userIdsToRecalculate) {
+      try {
+        await recalculateUserPortfolio(uId);
+        console.log(`[Direct NSE Sync] 📊 Recalculated portfolio for user ${uId}`);
+      } catch (pErr) {
+        console.warn(`[Direct NSE Sync] Portfolio recalculation warning for ${uId}:`, pErr.message);
+      }
+    }
+
+    console.log(`[Direct NSE Sync] 🏁 Finished. Checked: ${totalOrdersChecked}, Cancelled/Expired: ${cancelledOrExpired}, Refunded: ${rejectedOrRefunded}, Allotted: ${allottedCount}`);
+    return {
+      success: true,
+      totalOrdersChecked,
+      cancelledOrExpired,
+      rejectedOrRefunded,
+      allottedCount,
+      clientCodesSynced: Array.from(clientCodesToSync),
+      recalculatedUsersCount: userIdsToRecalculate.size,
     };
   }
 }
