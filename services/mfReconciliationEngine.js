@@ -107,6 +107,24 @@ class MfReconciliationEngine {
             } catch (_) {}
           }
 
+          // Fallback via Transaction Detail Report if not found or units missing
+          if ((!nseData || (!nseData.allotted_units && !nseData.allotted_unit)) && order.clientCode) {
+            try {
+              const txReport = await nseClient.getTransactionDetailReport({
+                orderId: String(order.nseTrxnOrderId || order.orderId),
+                clientCode: order.clientCode,
+              });
+              const txList = txReport?.data?.report_data || txReport?.data?.orders || txReport?.data?.transaction_details;
+              if (Array.isArray(txList) && txList.length > 0) {
+                const match = txList.find((item) => {
+                  const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
+                  return pId === String(order.nseTrxnOrderId) || pId === String(order.orderId);
+                }) || txList[0];
+                if (match) nseData = { ...match, ...(nseData || {}) };
+              }
+            } catch (_) {}
+          }
+
           if (nseData) {
             const rawFolio = String(nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || nseData.folio_num || '').trim();
             if (rawFolio) {
@@ -121,12 +139,18 @@ class MfReconciliationEngine {
             }
 
             const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
-            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || nseData.allottedqty || '0');
-            const nseNav = parseFloat(nseData.nav || nseData.allottednav || '0');
+            const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.units || nseData.allottedqty || '0');
+            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
 
             // Auto-heal and confirm allotment when exchange confirms
+            const isConfirmedAllotment =
+              ['ALLOTTED', 'SETTLED', 'SUCCESS', 'VALID', 'APPROVED', 'VALIDATED'].includes(nseOrderStatus) ||
+              /ALLOTMENT/i.test(nseRemark) ||
+              nseAllottedUnits > 0;
+
             if (
-              ['ALLOTTED', 'SETTLED', 'SUCCESS'].includes(nseOrderStatus) &&
+              isConfirmedAllotment &&
               (nseAllottedUnits > 0 || order.estimatedUnits > 0) &&
               order.allotmentStatus !== 'ALLOTTED'
             ) {
@@ -138,7 +162,7 @@ class MfReconciliationEngine {
                   orderId: order.orderId,
                   allottedUnits: unitsToAllot,
                   allottedNav: finalNav,
-                  rtaReferenceNo: nseData.rta_ref_no || order.nseTrxnOrderId,
+                  rtaReferenceNo: nseData.rta_ref_no || nseData.amc_payout_utr_no || order.nseTrxnOrderId,
                   folioNo: rawFolio || order.folioNo,
                   source: 'RECONCILIATION_ENGINE',
                 });
@@ -489,10 +513,14 @@ class MfReconciliationEngine {
         }
       }
 
-      // Step 2: Fetch missing folios from NSE exchange for recent and active orders
+      // Step 2: Fetch missing folios & confirm allotments from NSE exchange for recent and active orders
+      const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const ordersQuery = {
-        orderStatus: { $in: ['ALLOTTED', 'SUBMITTED', 'PAYMENT_SUCCESS', 'PROCESSING'] },
-        $or: [{ folioNo: '' }, { folioNo: null }],
+        createdAt: { $gte: sinceDate },
+        $or: [
+          { orderStatus: { $in: ['ALLOTTED', 'SUBMITTED', 'PAYMENT_SUCCESS', 'PROCESSING'] }, $or: [{ folioNo: '' }, { folioNo: null }] },
+          { nseTrxnOrderId: { $nin: ['', null, ' '] }, allotmentStatus: { $ne: 'ALLOTTED' } },
+        ],
       };
       if (filterUserId) {
         ordersQuery.user = filterUserId;
@@ -554,11 +582,30 @@ class MfReconciliationEngine {
             } catch (_) {}
           }
 
+          // Fallback via Transaction Detail Report if not found or units missing
+          if ((!nseData || (!nseData.allotted_units && !nseData.allotted_unit)) && ord.clientCode) {
+            try {
+              const txReport = await nseClient.getTransactionDetailReport({
+                orderId: String(ord.nseTrxnOrderId || ord.orderId),
+                clientCode: ord.clientCode,
+              });
+              const txList = txReport?.data?.report_data || txReport?.data?.orders || txReport?.data?.transaction_details;
+              if (Array.isArray(txList) && txList.length > 0) {
+                const match = txList.find((item) => {
+                  const pId = String(item.product_id || item.order_id || item.trxn_order_id || item.order_ref_number || '');
+                  return pId === String(ord.nseTrxnOrderId) || pId === String(ord.orderId);
+                }) || txList[0];
+                if (match) nseData = { ...match, ...(nseData || {}) };
+              }
+            } catch (_) {}
+          }
+
           if (nseData) {
             const rawFolio = String(nseData.folio_no || nseData.folio_number || nseData.foliono || nseData.folio || nseData.folio_num || '').trim();
             const nseOrderStatus = (nseData.order_status || nseData.status || '').toUpperCase();
-            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.units || nseData.allottedqty || '0');
-            const nseNav = parseFloat(nseData.nav || nseData.allottednav || '0');
+            const nseRemark = (nseData.order_remark || nseData.reg_remark || nseData.remarks || '').toUpperCase();
+            const nseAllottedUnits = parseFloat(nseData.allotted_units || nseData.allotted_unit || nseData.units || nseData.allottedqty || '0');
+            const nseNav = parseFloat(nseData.nav || nseData.allotted_nav || nseData.allottednav || '0');
 
             if (rawFolio) {
               ord.folioNo = rawFolio;
@@ -573,8 +620,13 @@ class MfReconciliationEngine {
             }
 
             // If confirmed on exchange, confirm allotment locally
+            const isConfirmedAllotment =
+              ['ALLOTTED', 'SETTLED', 'SUCCESS', 'VALID', 'APPROVED', 'VALIDATED'].includes(nseOrderStatus) ||
+              /ALLOTMENT/i.test(nseRemark) ||
+              nseAllottedUnits > 0;
+
             if (
-              ['ALLOTTED', 'SETTLED', 'SUCCESS'].includes(nseOrderStatus) &&
+              isConfirmedAllotment &&
               (nseAllottedUnits > 0 || ord.estimatedUnits > 0) &&
               ord.allotmentStatus !== 'ALLOTTED'
             ) {
@@ -586,11 +638,12 @@ class MfReconciliationEngine {
                   orderId: ord.orderId,
                   allottedUnits: unitsToAllot,
                   allottedNav: finalNav,
-                  rtaReferenceNo: nseData.rta_ref_no || ord.nseTrxnOrderId,
+                  rtaReferenceNo: nseData.rta_ref_no || nseData.amc_payout_utr_no || ord.nseTrxnOrderId,
                   folioNo: rawFolio || ord.folioNo,
                   source: 'FOLIO_SYNC_ENGINE',
                 });
                 touchedUsers.add(String(ord.user));
+                console.log(`[Folio Sync Engine] 🚀 Auto-allotted order ${ord.orderId}: ${unitsToAllot} units @ NAV ${finalNav}`);
               } catch (allotErr) {
                 console.warn(`[Folio Sync Engine] Allotment confirmation warning for ${ord.orderId}:`, allotErr.message);
               }

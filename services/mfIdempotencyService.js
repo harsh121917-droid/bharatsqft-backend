@@ -123,6 +123,7 @@ async function processAllotmentConfirmation({
   }
 
   // 1. Update Order
+  order.paymentStatus = 'SUCCESS';
   order.allotmentStatus = 'ALLOTTED';
   order.orderStatus = 'ALLOTTED';
   order.allottedUnits = parsedUnits;

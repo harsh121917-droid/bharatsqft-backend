@@ -3730,12 +3730,20 @@ exports.getPortfolio = async (req, res) => {
     const userId = req.user._id;
     const portfolioData = await mfPortfolioEngine.recalculateUserPortfolio(userId);
 
-    // Auto-heal missing folios in background if any active holding lacks a folio
-    const hasMissingFolio = portfolioData?.holdings?.some((h) => h.totalUnits > 0 && (!h.folioNo || !h.folioNo.trim()));
-    if (hasMissingFolio) {
+    // Auto-heal in background if any active holding lacks a folio OR if user has unallotted orders with NSE
+    const hasPendingCheck =
+      portfolioData?.holdings?.some((h) => h.totalUnits > 0 && (!h.folioNo || !h.folioNo.trim())) ||
+      (await MfOrder.exists({
+        user: userId,
+        nseTrxnOrderId: { $nin: ['', null, ' '] },
+        allotmentStatus: { $ne: 'ALLOTTED' },
+        createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+      }));
+
+    if (hasPendingCheck) {
       const mfReconciliationEngine = require('../services/mfReconciliationEngine');
       mfReconciliationEngine.syncMissingFolios(userId).catch((err) => {
-        console.warn(`[getPortfolio] Background folio sync warning for ${userId}:`, err.message);
+        console.warn(`[getPortfolio] Background sync warning for ${userId}:`, err.message);
       });
     }
 
@@ -4185,22 +4193,19 @@ exports.getMyOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Auto-expire abandoned unpaid orders older than 24 hours
-    const expirationCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    await MfOrder.updateMany(
-      {
-        user: userId,
-        orderStatus: 'PAYMENT_PENDING',
-        paymentStatus: 'PENDING',
-        createdAt: { $lt: expirationCutoff },
-      },
-      {
-        $set: {
-          orderStatus: 'CANCELLED',
-          remarks: 'Payment session expired by exchange (unpaid past validity window)',
-        },
-      }
-    );
+    // Auto-heal: If user has any orders with an NSE transaction ID awaiting allotment, trigger background exchange check
+    const hasUnallottedNseOrder = await MfOrder.exists({
+      user: userId,
+      nseTrxnOrderId: { $nin: ['', null, ' '] },
+      allotmentStatus: { $ne: 'ALLOTTED' },
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    });
+    if (hasUnallottedNseOrder) {
+      const mfReconciliationEngine = require('../services/mfReconciliationEngine');
+      mfReconciliationEngine.syncMissingFolios(userId).catch((err) => {
+        console.warn(`[getMyOrders] Background exchange order sync warning for ${userId}:`, err.message);
+      });
+    }
 
     const [orders, userHoldings] = await Promise.all([
       MfOrder.find({ user: userId }).sort({ createdAt: -1 }),

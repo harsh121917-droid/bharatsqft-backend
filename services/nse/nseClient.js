@@ -443,7 +443,8 @@ class NseClient {
     }
 
     if (endpoint.includes('TRANSACTION_DETAIL_REPORT')) {
-      const isApproved = payload.mockStatus ? payload.mockStatus === 'APPROVED' || payload.mockStatus === 'SUCCESS' : true;
+      const isApproved = payload.mockStatus ? payload.mockStatus === 'APPROVED' || payload.mockStatus === 'SUCCESS' || payload.mockStatus === 'ALLOTTED' : true;
+      const isAllotted = payload.mockStatus === 'ALLOTTED' || isApproved;
       return {
         success: true,
         status: 200,
@@ -465,7 +466,11 @@ class NseClient {
               reconciliation_status: isApproved ? 'SUCCESS' : '',
               amc_payout_utr_no: isApproved ? '2031471664' : '',
               order_status: isApproved ? 'VALID' : 'INVALID',
-              order_remark: isApproved ? 'AUTO VALIDATED BY RTA' : '2FA PENDING',
+              order_remark: isAllotted ? 'ALLOTMENT DONE' : (isApproved ? 'AUTO VALIDATED BY RTA' : '2FA PENDING'),
+              allotted_units: isAllotted ? (payload.mockUnits || '0.220') : '0.000',
+              allotted_unit: isAllotted ? (payload.mockUnits || '0.220') : '0.000',
+              allotted_nav: isAllotted ? (payload.mockNav || '454.8590') : '0.00',
+              folio_no: payload.mockFolio || '',
             },
           ],
         },

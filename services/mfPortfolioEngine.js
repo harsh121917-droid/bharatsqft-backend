@@ -123,6 +123,7 @@ async function recalculateUserPortfolio(userId) {
   const orders = await MfOrder.find({
     user: userId,
     $or: [
+      { transactionType: 'P', allotmentStatus: 'ALLOTTED' },
       { transactionType: 'P', paymentStatus: 'SUCCESS', orderStatus: { $nin: ['CANCELLED', 'REFUNDED', 'FAILED'] } },
       { transactionType: { $in: ['R', 'S'] } },
     ],
@@ -463,23 +464,6 @@ async function recalculateUserPortfolio(userId) {
     lastUpdatedAt: new Date(),
   };
 
-  // Auto-expire abandoned unpaid orders older than 24 hours (NSE cutoff expiration)
-  const expirationCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  await MfOrder.updateMany(
-    {
-      user: userId,
-      orderStatus: 'PAYMENT_PENDING',
-      paymentStatus: 'PENDING',
-      createdAt: { $lt: expirationCutoff },
-    },
-    {
-      $set: {
-        orderStatus: 'CANCELLED',
-        remarks: 'Payment session expired by exchange (unpaid past validity window)',
-      },
-    }
-  );
-
   // 5. In-progress / Processing Orders (ONLY orders where payment is completed, awaiting RTA unit allotment)
   const rawPendingOrders = await MfOrder.find({
     user: userId,
@@ -534,12 +518,13 @@ async function recalculateUserPortfolio(userId) {
     };
   });
 
-  // 5b. Recent Pending Payment Orders (created within 24h, user can still complete payment)
+  // 5b. Recent Pending Payment Orders (created within 48h window, user can still complete payment)
+  const recentWindow = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const rawPaymentPendingOrders = await MfOrder.find({
     user: userId,
     orderStatus: 'PAYMENT_PENDING',
     paymentStatus: 'PENDING',
-    createdAt: { $gte: expirationCutoff },
+    createdAt: { $gte: recentWindow },
   }).sort({ createdAt: -1 });
 
   const paymentPendingOrders = rawPaymentPendingOrders.map((ord) => ({
