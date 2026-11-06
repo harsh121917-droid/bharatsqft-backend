@@ -110,6 +110,63 @@ function getCategoryDayReturn(category, schemeCode = '') {
 }
 
 /**
+ * Calculates the expected allotment date in working/business days,
+ * skipping Saturdays, Sundays, and accounting for Indian market cutoff (15:00 IST).
+ * 
+ * - Debt/Liquid/Overnight funds settle in T+1 working day.
+ * - Equity/Hybrid/Gold funds settle in T+2 working days.
+ * 
+ * @param {Date|string} orderDate
+ * @param {string} schemeName
+ * @param {string} category
+ * @returns {string} Formatted date, e.g. "Mon, 9 Nov" or "Tue, 10 Nov"
+ */
+function computeExpectedAllotmentDate(orderDate, schemeName = '', category = '') {
+  const d = new Date(orderDate);
+  if (isNaN(d.getTime())) return '2-3 Working Days';
+
+  const nameOrCat = `${schemeName} ${category}`.toLowerCase();
+  const isDebtOrLiquid = /liquid|overnight|debt|bond|money market|treasury|arbitrage|floating rate|gilt/i.test(nameOrCat);
+  const settlementDays = isDebtOrLiquid ? 1 : 2;
+
+  // Convert to Indian Standard Time (UTC+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  let current = new Date(d.getTime() + istOffset);
+
+  const hours = current.getUTCHours();
+  const dayOfWeek = current.getUTCDay(); // 0 = Sun, 6 = Sat
+
+  // If order was placed on a weekend, trade date rolls to Monday
+  if (dayOfWeek === 6) { // Saturday
+    current.setUTCDate(current.getUTCDate() + 2);
+  } else if (dayOfWeek === 0) { // Sunday
+    current.setUTCDate(current.getUTCDate() + 1);
+  } else if (hours >= 15) {
+    // Placed after 3:00 PM IST cutoff on a weekday -> effective trade date rolls to next business day
+    current.setUTCDate(current.getUTCDate() + 1);
+    if (current.getUTCDay() === 6) current.setUTCDate(current.getUTCDate() + 2);
+    else if (current.getUTCDay() === 0) current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  // Add working days (skipping Sat=6 and Sun=0)
+  let addedDays = 0;
+  while (addedDays < settlementDays) {
+    current.setUTCDate(current.getUTCDate() + 1);
+    const day = current.getUTCDay();
+    if (day !== 0 && day !== 6) {
+      addedDays++;
+    }
+  }
+
+  return current.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC', // Date is already shifted to IST
+  });
+}
+
+/**
  * Recalculate portfolio holdings and summary strictly from confirmed allotments & redemptions.
  * Pending orders (where allottedUnits === 0 or allotmentStatus !== 'ALLOTTED') are strictly excluded.
  */
@@ -478,10 +535,8 @@ async function recalculateUserPortfolio(userId) {
   const inProgressOrders = rawPendingOrders.map((ord) => {
     const isPaymentDone = true;
     
-    // Calculate expected allotment date (T+1 or T+2 working days)
-    const orderDate = new Date(ord.createdAt);
-    const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
-    const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    // Calculate expected allotment date in business days (skipping weekends & respecting cutoff)
+    const dayName = computeExpectedAllotmentDate(ord.createdAt, ord.schemeName, ord.category);
 
     let displayStatus = 'In Progress';
     let subStatus = 'Allotment Pending';
@@ -566,5 +621,6 @@ async function recalculateUserPortfolio(userId) {
 
 module.exports = {
   calculateXirr,
+  computeExpectedAllotmentDate,
   recalculateUserPortfolio,
 };

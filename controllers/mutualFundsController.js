@@ -4325,9 +4325,8 @@ exports.getMyOrders = async (req, res) => {
     }
 
     const formattedOrders = orders.map((ord) => {
-      const orderDate = new Date(ord.createdAt);
-      const expectedDate = new Date(orderDate.getTime() + 2 * 24 * 60 * 60 * 1000);
-      const dayName = expectedDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      // Calculate expected allotment date in business days (skipping weekends & respecting cutoff)
+      const dayName = mfPortfolioEngine.computeExpectedAllotmentDate(ord.createdAt, ord.schemeName, ord.category);
 
       // Fallback to active holding folio if order has empty folio
       const resolvedFolio = ord.folioNo || holdingFolioMap[ord.schemeCode] || '';
