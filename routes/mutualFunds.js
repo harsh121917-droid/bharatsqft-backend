@@ -64,6 +64,8 @@ const {
   addToWatchlist,
   removeFromWatchlist,
   submitMfSupportRequest,
+  initiateEkyc,
+  checkEkycStatus,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -83,6 +85,8 @@ router.post('/sync-nav', syncNavsNow);
 router.use(protect);
 
 router.post('/pan/verify', verifyPanDetails);
+router.post('/kyc/initiate-ekyc', initiateEkyc);
+router.get('/kyc/status', checkEkycStatus);
 router.post('/bank/verify', verifyMfBankAccount);
 router.get('/onboarding-status', getOnboardingStatus);
 router.get('/mandates/my', getMyMandates);

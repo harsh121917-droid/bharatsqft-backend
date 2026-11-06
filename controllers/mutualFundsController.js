@@ -6524,6 +6524,9 @@ exports.verifyPanDetails = async (req, res) => {
           registeredName: freshName, // Cleanly empty string if first-time investor
           isValid: true,
           isFreshInvestor: true,
+          requiresEkyc: true,
+          kycCompliant: false,
+          canProceedToUcc: true, // Non-blocking: live production app can continue uninterrupted
           nseKycStatus: 'NEW',
           nseKycRemark: 'First-time Mutual Fund Investor (Fresh e-KYC)',
           kra: 'NONE',
@@ -6550,6 +6553,9 @@ exports.verifyPanDetails = async (req, res) => {
         hasUcc: isAlreadyRegistered,
         clientCode: finalClientCode,
         alreadyRegistered: isAlreadyRegistered,
+        requiresEkyc: !isNseVerified && !isKraVerified,
+        kycCompliant: Boolean(isNseVerified || isKraVerified),
+        canProceedToUcc: true, // Non-blocking: live production app can continue uninterrupted
         nseKycStatus: isNseVerified ? 'VERIFIED' : 'Y',
         nseKycRemark: nseRemark || 'KYC REGISTERED',
         kra: kraName || 'cvlkra',
@@ -8030,5 +8036,167 @@ exports.submitMfSupportRequest = async (req, res) => {
       message: 'Failed to submit support request. Please try again.',
       error: error.message,
     });
+  }
+};
+
+/**
+ * POST /api/mutual-funds/kyc/initiate-ekyc
+ * Initiate official NSE MFSS eKYC Fresh Registration (CAMS / KFintech portal redirect)
+ */
+exports.initiateEkyc = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { pan, mobileNo, invEmail, amcCode } = req.body;
+    const cleanPan = String(pan || user.panNumber || '').trim().toUpperCase();
+    if (!cleanPan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+      return res.status(400).json({ success: false, message: 'Valid 10-character PAN number is required' });
+    }
+
+    const cleanMobile = String(mobileNo || user.phone || '').replace(/[^0-9]/g, '').slice(-10);
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Valid 10-digit mobile number is required for eKYC OTP' });
+    }
+
+    const cleanEmail = String(invEmail || user.email || '').trim().toLowerCase();
+    if (!cleanEmail || !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      return res.status(400).json({ success: false, message: 'Valid email address is required to receive eKYC link' });
+    }
+
+    const effectiveAmc = String(amcCode || 'DSP').trim();
+
+    console.log(`[initiateEkyc] Requesting NSE eKYC link for PAN: ${cleanPan}, Email: ${cleanEmail}, AMC: ${effectiveAmc}`);
+
+    const nseRes = await nseClient.initiateEkycRegistration({
+      amcCode: effectiveAmc,
+      panNo: cleanPan,
+      mobileNo: cleanMobile,
+      invEmail: cleanEmail,
+    });
+
+    if (!nseRes || !nseRes.success || !nseRes.data) {
+      return res.status(nseRes?.status || 502).json({
+        success: false,
+        message: nseRes?.message || 'NSE eKYC gateway temporarily unavailable',
+        error: nseRes?.error,
+      });
+    }
+
+    const ekycLink = nseRes.data.link || '';
+    const message = nseRes.data.message || 'EKYC registration initiated successfully';
+
+    // Update local Kyc tracking record non-destructively
+    try {
+      const Kyc = require('../models/Kyc');
+      await Kyc.findOneAndUpdate(
+        { user: userId },
+        {
+          $set: {
+            panNumber: cleanPan,
+            'metadata.ekycLink': ekycLink,
+            'metadata.ekycInitiatedAt': new Date(),
+            'metadata.ekycAmc': effectiveAmc,
+            'metadata.ekycStatus': 'INITIATED',
+          },
+        },
+        { upsert: true }
+      );
+    } catch (saveErr) {
+      console.warn('[initiateEkyc] Non-fatal Kyc model update warning:', saveErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message,
+      data: {
+        pan: cleanPan,
+        link: ekycLink,
+        amcCode: effectiveAmc,
+        email: cleanEmail,
+        mobile: cleanMobile,
+      },
+    });
+  } catch (error) {
+    console.error('[initiateEkyc Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/mutual-funds/kyc/status
+ * Check official NSE MFSS / KRA KYC Status for investor
+ */
+exports.checkEkycStatus = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const user = await User.findById(userId);
+    const pan = String(req.query.pan || user?.panNumber || '').trim().toUpperCase();
+
+    if (!pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan)) {
+      return res.status(400).json({ success: false, message: 'Valid 10-character PAN is required' });
+    }
+
+    const nseRes = await nseClient.checkClientKycStatus(pan);
+    if (!nseRes || !nseRes.success || !nseRes.data) {
+      return res.status(nseRes?.status || 502).json({
+        success: false,
+        message: nseRes?.message || 'Failed to query KYC status from exchange',
+        error: nseRes?.error,
+      });
+    }
+
+    const kycData = nseRes.data;
+    const reportItem = Array.isArray(kycData.report_data) ? kycData.report_data[0] : null;
+    const rawStatus = String(reportItem?.kyc_status || kycData.kyc_status || '').toUpperCase();
+    const isCompliant = (rawStatus === 'S' || rawStatus === 'Y' || rawStatus === 'SUCCESS');
+    const remark = reportItem?.status_remark || kycData.kyc_status_remark || (isCompliant ? 'KYC COMPLIANT' : 'UNDER PROCESS');
+    const registeredName = (reportItem?.holder_name || kycData.name || '').trim().toUpperCase();
+    const existingUcc = reportItem?.client_code || '';
+
+    if (isCompliant && userId) {
+      try {
+        const Kyc = require('../models/Kyc');
+        await Kyc.findOneAndUpdate(
+          { user: userId },
+          {
+            $set: {
+              panNumber: pan,
+              panVerified: true,
+              panRegisteredName: registeredName || undefined,
+              verificationSource: 'NSE_MFSS_KYC_VERIFY',
+              status: 'approved',
+              'metadata.ekycStatus': 'VERIFIED',
+              'metadata.ekycCompletedAt': new Date(),
+            },
+          },
+          { upsert: true }
+        );
+        await User.findByIdAndUpdate(userId, {
+          panNumber: pan,
+          isKycVerified: true,
+          kycStatus: 'approved',
+        });
+      } catch (_) {}
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        pan,
+        isVerified: isCompliant,
+        kycStatus: isCompliant ? 'VERIFIED' : (rawStatus || 'PENDING'),
+        statusRemark: remark,
+        registeredName,
+        clientCode: existingUcc,
+        canProceedToUcc: true, // Non-blocking: live production app can continue uninterrupted
+      },
+    });
+  } catch (error) {
+    console.error('[checkEkycStatus Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

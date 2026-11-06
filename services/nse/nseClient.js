@@ -473,6 +473,19 @@ class NseClient {
       };
     }
 
+    if (endpoint.includes('EKYCREG')) {
+      const mockToken = Buffer.from(`${payload.panNo || 'PAN'}_${timestamp}`).toString('hex').slice(0, 32).toUpperCase();
+      const mockBase = this.env === 'PROD' ? 'https://www.nseinvest.com' : 'https://nseinvestuat.nseindia.com';
+      return {
+        success: true,
+        status: 200,
+        data: {
+          link: `${mockBase}/nsemfdesk/ekycVerifyByUser/${mockToken}`,
+          message: 'EKYC FRESH REGISTRATION REQUEST RECEVIED',
+        },
+      };
+    }
+
     if (endpoint.includes('TRANSACTION_DETAIL_REPORT')) {
       const isApproved = payload.mockStatus ? payload.mockStatus === 'APPROVED' || payload.mockStatus === 'SUCCESS' || payload.mockStatus === 'ALLOTTED' : true;
       const isAllotted = payload.mockStatus === 'ALLOTTED' || isApproved;
@@ -871,6 +884,17 @@ class NseClient {
     if (fromDate) payload.from_date = fromDate;
     if (toDate) payload.to_date = toDate;
     return this.post('/nsemfdesk/api/v2/reports/client_master_report', payload);
+  }
+
+  // ── 13d. Official NSE MFSS eKYC Fresh Registration (NNF v1.9.8 Doc page 170-171) ──
+  async initiateEkycRegistration({ amcCode = 'DSP', panNo, mobileNo, invEmail } = {}) {
+    const payload = {
+      amcCode: String(amcCode || 'DSP').trim(),
+      panNo: String(panNo || '').trim().toUpperCase(),
+      mobileNo: String(mobileNo || '').replace(/[^0-9]/g, '').slice(-10),
+      invEmail: String(invEmail || '').trim().toLowerCase(),
+    };
+    return this.post('/nsemfdesk/api/v1/EKYC/EKYCREG', payload);
   }
 
   // ── 14. Order Cancellation ──
