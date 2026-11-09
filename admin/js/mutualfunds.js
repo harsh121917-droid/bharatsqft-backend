@@ -2447,6 +2447,9 @@ function renderMfTestingInspectResults(data) {
 
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()" title="Refresh live database state"><i class="fas fa-sync-alt"></i> Refresh State</button>
+                    <button class="btn btn-sm" onclick="executeResetKycOnly('${escapeHtml(u._id || summary.userId || '')}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700" title="Delete KYC record and reset user KYC status to not_submitted">
+                        <i class="fas fa-user-slash"></i> Reset KYC
+                    </button>
                     <button class="btn btn-sm" onclick="executeResetSipsOnly()" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700" title="Delete all active SIP schedules only">
                         <i class="fas fa-redo"></i> Reset SIPs Only (${sips.length})
                     </button>
@@ -2506,15 +2509,23 @@ function renderMfTestingInspectResults(data) {
                     <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
                         <i class="fas fa-shield-alt" style="color:#3b82f6"></i> KYC & Legal Identity
                     </div>
-                    <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${kyc?.status==='approved'?'rgba(0,208,156,0.15)':'rgba(245,158,11,0.15)'};color:${kyc?.status==='approved'?'#00D09C':'#f59e0b'}">
-                        ${kyc ? escapeHtml(kyc.status.toUpperCase()) : 'NO KYC'}
+                    <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${(kyc?.status==='approved' || u?.kycStatus==='approved')?'rgba(0,208,156,0.15)':'rgba(245,158,11,0.15)'};color:${(kyc?.status==='approved' || u?.kycStatus==='approved')?'#00D09C':'#f59e0b'}">
+                        ${kyc ? escapeHtml(kyc.status.toUpperCase()) : (u?.kycStatus ? escapeHtml(u.kycStatus.toUpperCase()) : 'NO KYC')}
                     </span>
                 </div>
                 <div style="font-size:12px;line-height:1.8;color:var(--text-dim)">
-                    <div>KYC PAN: <b style="color:#fff;font-family:monospace">${escapeHtml(kyc?.panNumber || 'None')}</b></div>
-                    <div>Verified Legal Name: <b style="color:#fff">${escapeHtml(kyc?.panRegisteredName || kyc?.fullName || 'None')}</b></div>
-                    <div>PAN Verified: <span style="color:${kyc?.panVerified?'#00D09C':'#ef4444'}">${kyc?.panVerified ? 'Yes (Verified)' : 'No'}</span></div>
+                    <div>KYC PAN: <b style="color:#fff;font-family:monospace">${escapeHtml(kyc?.panNumber || u?.panNumber || ucc?.pan || 'None')}</b></div>
+                    <div>Verified Legal Name: <b style="color:#fff">${escapeHtml(kyc?.panRegisteredName || kyc?.fullName || u?.panRegisteredName || 'None')}</b></div>
+                    <div>PAN Verified: <span style="color:${(kyc?.panVerified || u?.isKycVerified)?'#00D09C':'#ef4444'}">${(kyc?.panVerified || u?.isKycVerified) ? 'Yes (Verified)' : 'No'}</span></div>
                     <div>Verification Source: <span style="color:#fff;background:#1e293b;padding:1px 6px;border-radius:4px;font-size:11px">${escapeHtml(kyc?.verificationSource || 'NONE')}</span></div>
+                    <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px;width:100%" onclick="executeTestUserKyc('${escapeHtml(u._id || summary.userId || '')}', '${escapeHtml(kyc?.panNumber || u?.panNumber || ucc?.pan || '')}')">
+                            <i class="fas fa-vial"></i> Test / Check KYC on NSE
+                        </button>
+                        <button class="btn btn-sm" style="font-size:11px;padding:4px 8px;width:100%;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="executeResetKycOnly('${escapeHtml(u._id || summary.userId || '')}')">
+                            <i class="fas fa-user-slash"></i> Reset KYC Only (Fresh State)
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -2778,6 +2789,55 @@ async function executeResetSipsOnly() {
     }
 }
 
+// ── 1-Click Action: Reset KYC Only ──
+async function executeResetKycOnly(targetUserId) {
+    const query = targetUserId || currentInspectedMfUser?.summary?.userId || currentInspectedMfUser?.summary?.phone || currentInspectedMfUser?.summary?.clientCode;
+    if (!query) {
+        toast('No user selected to reset KYC', 'warning');
+        return;
+    }
+
+    const userName = currentInspectedMfUser?.summary?.name || query;
+    const confirmMsg = `⚠️ Are you sure you want to RESET KYC for "${userName}" (${query})?\n\nThis will:\n• Delete the user's KYC record\n• Reset KYC status to 'not_submitted'\n• Clear verified PAN and legal name\n\nThis allows you to re-test the fresh e-KYC flow on the mobile app or in Admin without any leftover state.\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await api('/admin/mutual-funds/testing/reset-kyc', {
+            method: 'POST',
+            body: JSON.stringify({ query }),
+        });
+
+        if (res && res.success) {
+            toast(res.message || 'KYC reset successfully! 🎉 Ready for fresh testing.', 'success');
+            await searchMfTestUser(query);
+            if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
+        } else {
+            toast(res?.message || 'Failed to reset KYC', 'danger');
+        }
+    } catch (err) {
+        console.error('executeResetKycOnly error:', err);
+        toast(err.message || 'Error executing KYC reset', 'danger');
+    }
+}
+
+// ── 1-Click Action: Test User KYC on NSE ──
+async function executeTestUserKyc(targetUserId, panHint) {
+    let pan = (panHint || '').trim().toUpperCase();
+    if (!pan || pan === 'NONE') {
+        const promptVal = prompt('Enter 10-digit PAN to test against NSE MFSS / KRA:', currentInspectedMfUser?.summary?.kycPan || currentInspectedMfUser?.summary?.uccPan || '');
+        if (!promptVal) return;
+        pan = promptVal.trim().toUpperCase();
+    }
+
+    const panInput = document.getElementById('mf-test-pan-input');
+    if (panInput) {
+        panInput.value = pan;
+        panInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    await executeNsePanProbe();
+}
+
 // ── 1-Click Action: Reset UCC & Mandate Only ──
 async function executeResetUccMandateOnly() {
     if (!currentInspectedMfUser?.summary?.userId && !currentInspectedMfUser?.summary?.clientCode) {
@@ -2895,23 +2955,39 @@ async function executeNsePanProbe() {
         });
 
         if (res && res.success) {
+            const isCompliant = res.kycCompliant === true;
+            const legalName = res.registeredName || 'Not on exchange / Fresh Investor';
+            const kraName = res.kraName || (isCompliant ? 'NDML / CVL KRA' : 'NONE');
+            const nseRemark = res.nseRemark || 'No remarks from exchange';
+            const badgeColor = isCompliant ? '#00D09C' : '#f59e0b';
+            const badgeBg = isCompliant ? 'rgba(0,208,156,0.15)' : 'rgba(245,158,11,0.15)';
+            const statusLabel = isCompliant ? 'KYC COMPLIANT ✓' : 'NON-COMPLIANT / FRESH (e-KYC REQUIRED) ⚠️';
             const raw = res.nseResponse || {};
-            const nseData = raw.data || {};
 
             resultDiv.innerHTML = `
-                <div style="background:#090d16;border:1px solid #1e293b;border-radius:8px;padding:14px;margin-top:8px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-                        <div style="font-weight:700;color:#fff;font-size:13.5px">
-                            PAN: <span style="font-family:monospace;color:#00D09C">${pan}</span>
+                <div style="background:#090d16;border:1px solid #1e293b;border-radius:8px;padding:16px;margin-top:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;border-bottom:1px solid #1e293b;padding-bottom:10px">
+                        <div style="font-weight:700;color:#fff;font-size:14px">
+                            PAN: <span style="font-family:monospace;color:#38bdf8">${pan}</span>
+                            ${res.clientCode ? `<span style="font-size:11px;color:var(--text-dim);margin-left:8px">(Client Code: <code style="color:#fff">${escapeHtml(res.clientCode)}</code>)</span>` : ''}
                         </div>
-                        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${raw.success ? 'rgba(0,208,156,0.15)' : 'rgba(239,68,68,0.15)'};color:${raw.success ? '#00D09C' : '#ef4444'}">
-                            ${raw.success ? 'NSE RESPONDED (200 OK)' : 'NSE ERROR / REJECTED'}
+                        <span style="font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:12px;background:${badgeBg};color:${badgeColor}">
+                            ${statusLabel}
                         </span>
                     </div>
-                    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.6">
-                        <div>Registered Legal Name: <b style="color:#fff">${escapeHtml(nseData.registeredName || nseData.name || 'Not on exchange / Fresh')}</b></div>
-                        <div>KRA Status: <span style="color:#fff">${escapeHtml(nseData.kra || nseData.status || 'NONE')}</span></div>
-                        <div>Exchange Message: <span style="color:#fff">${escapeHtml(nseData.message || raw.message || 'No remarks')}</span></div>
+                    <div style="font-size:12.5px;color:var(--text-dim);line-height:1.8">
+                        <div>Verified Legal Name: <b style="color:#fff">${escapeHtml(legalName)}</b></div>
+                        <div>KRA Agency: <span style="color:#fff">${escapeHtml(kraName)}</span></div>
+                        <div>Exchange Remark: <span style="color:#fff">${escapeHtml(nseRemark)}</span></div>
+                        <div>Requires e-KYC: <span style="color:${res.requiresEkyc ? '#f87171' : '#00D09C'}">${res.requiresEkyc ? 'YES (Will show e-KYC prompt banner in mobile app)' : 'NO (Verified)'}</span></div>
+                    </div>
+                    <div style="margin-top:10px;padding:10px;background:#050811;border-radius:6px;border:1px solid #1e293b;font-size:12px">
+                        <b style="color:#38bdf8"><i class="fas fa-mobile-alt"></i> Mobile App Simulation:</b>
+                        <div style="color:#e2e8f0;margin-top:2px">
+                            ${isCompliant 
+                                ? '✓ When investor enters this PAN in the app, it locks in legal name <b>"' + escapeHtml(legalName) + '"</b> and proceeds immediately to UCC.' 
+                                : '⚠️ When investor enters this PAN, the app shows <b>"e-KYC Verification Required"</b> banner. Investor can click it to complete paperless KYC via CAMS portal.'}
+                        </div>
                     </div>
                     <details style="margin-top:10px;font-size:11px;color:var(--text-dim);cursor:pointer">
                         <summary style="outline:none">View Raw Exchange JSON</summary>
@@ -2966,6 +3042,8 @@ window.quickInspectActiveUser = quickInspectActiveUser;
 window.clearMfTestSearch = clearMfTestSearch;
 window.refreshMfTestingInspect = refreshMfTestingInspect;
 window.executeMfTestReset = executeMfTestReset;
+window.executeResetKycOnly = executeResetKycOnly;
+window.executeTestUserKyc = executeTestUserKyc;
 window.executeFullFreshSlateReset = executeFullFreshSlateReset;
 window.executeNsePanProbe = executeNsePanProbe;
 

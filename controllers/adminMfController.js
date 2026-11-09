@@ -861,6 +861,18 @@ exports.resetMfTestingUser = async (req, res) => {
       deleteTasks.push(
         Kyc.deleteMany({ user: targetUserId }).then(r => {
           results.kycReset = r.deletedCount > 0;
+        }),
+        User.findByIdAndUpdate(targetUserId, {
+          $set: {
+            kycStatus: 'not_submitted',
+            isKycVerified: false,
+            panNumber: '',
+          },
+          $unset: {
+            panRegisteredName: 1,
+          },
+        }).then(() => {
+          results.userKycReset = true;
         })
       );
     }
@@ -932,6 +944,76 @@ exports.resetMfTestingUser = async (req, res) => {
   }
 };
 
+// ── 7B-2. POST /api/admin/mutual-funds/testing/reset-kyc ──
+exports.resetUserKyc = async (req, res) => {
+  try {
+    const query = req.body?.query || req.body?.userId || req.body?.phone || req.body?.clientCode;
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'User identifier (name, phone, email, ID, or client code) is required.' });
+    }
+
+    const { user, ucc } = await resolveUserByQuery(query);
+    if (!user && !ucc) {
+      return res.status(404).json({ success: false, message: `User not found matching "${query}".` });
+    }
+
+    const targetUserId = user?._id || ucc?.user;
+    if (!targetUserId) {
+      return res.status(400).json({ success: false, message: 'Unable to identify user ID to reset KYC.' });
+    }
+
+    const [delKyc, updatedUser] = await Promise.all([
+      Kyc.deleteMany({ user: targetUserId }),
+      User.findByIdAndUpdate(
+        targetUserId,
+        {
+          $set: {
+            kycStatus: 'not_submitted',
+            isKycVerified: false,
+            panNumber: '',
+          },
+          $unset: {
+            panRegisteredName: 1,
+          },
+        },
+        { new: true }
+      ),
+    ]);
+
+    // If clearUcc flag passed, also clear test UCC
+    if (req.body?.clearUcc && (ucc || targetUserId)) {
+      await MfClientUcc.deleteMany({ $or: [{ user: targetUserId }, ...(ucc?.clientCode ? [{ clientCode: ucc.clientCode }] : [])] });
+    }
+
+    // Record audit log
+    try {
+      await MfAuditLog.create({
+        event: 'ADMIN_RESET_USER_KYC',
+        entityType: 'TRANSACTION',
+        entityId: String(targetUserId),
+        user: targetUserId,
+        source: 'ADMIN_MF_TESTING_TOOL',
+        actor: req.user?.name || req.user?.email || 'ADMIN',
+        reason: req.body?.reason || `Manual KYC reset executed from Admin MF Testing tool for ${user?.phone || user?.email || query}`,
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `KYC successfully reset for ${user?.name || user?.phone || query}. User is now in fresh 'not_submitted' state and ready for fresh e-KYC testing.`,
+      data: {
+        userId: targetUserId,
+        kycRecordsDeleted: delKyc.deletedCount,
+        kycStatus: updatedUser?.kycStatus || 'not_submitted',
+        isKycVerified: false,
+      },
+    });
+  } catch (error) {
+    console.error('[resetUserKyc Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 7C. POST /api/admin/mutual-funds/testing/generate-client-code ──
 exports.generateNewClientCode = async (req, res) => {
   try {
@@ -999,13 +1081,85 @@ exports.quickCheckPanOnNse = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid 10-character PAN format required (e.g. ABCDE1234F).' });
     }
 
-    const nseRes = await nseClient.checkClientKycStatus(pan);
+    const nseRes = await nseClient.checkKycStatus(pan);
+    const kycData = nseRes?.data || {};
+    const reportItem = Array.isArray(kycData.report_data) ? kycData.report_data[0] : null;
+
+    const rawStatus = String(reportItem?.kyc_status || kycData.kyc_status || '').toUpperCase();
+    const isCompliant = rawStatus === 'S' || rawStatus === 'Y' || rawStatus === 'SUCCESS';
+    const nseRemark = reportItem?.status_remark || kycData.kyc_status_remark || kycData.response_status_remarks || 'No remarks from exchange';
+    const kraName = kycData.kra_name || (isCompliant ? 'NDML/CVL KRA' : 'NONE');
+    const registeredName = (reportItem?.holder_name || kycData.name || kycData.client_name || '').trim().toUpperCase();
+    const clientCode = reportItem?.client_code || kycData.client_code || '';
+
     return res.json({
       success: true,
       pan,
+      kycCompliant: isCompliant,
+      requiresEkyc: !isCompliant,
+      registeredName,
+      kraName,
+      nseRemark,
+      clientCode,
       nseResponse: nseRes,
     });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 7C-2. POST /api/admin/mutual-funds/testing/test-kyc (Full KYC Diagnostic Probe) ──
+exports.testUserKyc = async (req, res) => {
+  try {
+    let pan = String(req.body?.pan || '').trim().toUpperCase();
+    const query = req.body?.query || req.body?.userId;
+
+    if (!pan && query) {
+      const { user, ucc } = await resolveUserByQuery(query);
+      const targetUserId = user?._id || ucc?.user;
+      const kyc = targetUserId ? await Kyc.findOne({ user: targetUserId }).lean() : null;
+      pan = (ucc?.pan || kyc?.panNumber || user?.panNumber || '').trim().toUpperCase();
+    }
+
+    if (!pan || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid 10-character PAN format required (e.g. ABCDE1234F or OZYPS8075Q).',
+      });
+    }
+
+    const nseRes = await nseClient.checkKycStatus(pan);
+    const kycData = nseRes?.data || {};
+    const reportItem = Array.isArray(kycData.report_data) ? kycData.report_data[0] : null;
+
+    const rawStatus = String(reportItem?.kyc_status || kycData.kyc_status || '').toUpperCase();
+    const isCompliant = rawStatus === 'S' || rawStatus === 'Y' || rawStatus === 'SUCCESS';
+    const nseRemark = reportItem?.status_remark || kycData.kyc_status_remark || kycData.response_status_remarks || 'No remarks from exchange';
+    const kraName = kycData.kra_name || (isCompliant ? 'NDML/CVL KRA' : 'NONE');
+    const legalName = (reportItem?.holder_name || kycData.name || kycData.client_name || '').trim().toUpperCase();
+    const clientCode = reportItem?.client_code || kycData.client_code || '';
+
+    return res.json({
+      success: true,
+      data: {
+        pan,
+        kycCompliant: isCompliant,
+        requiresEkyc: !isCompliant,
+        rawStatus,
+        nseRemark,
+        kraName,
+        legalName: legalName || (isCompliant ? 'REGISTERED INVESTOR' : 'Not Registered / Fresh'),
+        clientCode,
+        isFreshInvestor: !isCompliant,
+        canProceedToUcc: true,
+        appExperience: isCompliant
+          ? 'KYC Verified ✓ (Green badge, pre-fills verified legal name, skips eKYC webview)'
+          : 'e-KYC Required ⚠️ (Shows eKYC prompt banner, investor clicks to open CAMS eKYC portal)',
+        rawNseResponse: nseRes,
+      },
+    });
+  } catch (error) {
+    console.error('[testUserKyc Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

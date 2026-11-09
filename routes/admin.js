@@ -219,6 +219,8 @@ router.post("/mutual-funds/clean-all", adminMfController.cleanAllMfData);
 // MF Testing & Sandbox Diagnostics
 router.get("/mutual-funds/testing/inspect", adminMfController.inspectMfTestingUser);
 router.post("/mutual-funds/testing/reset-user", adminMfController.resetMfTestingUser);
+router.post("/mutual-funds/testing/reset-kyc", adminMfController.resetUserKyc);
+router.post("/mutual-funds/testing/test-kyc", adminMfController.testUserKyc);
 router.post("/mutual-funds/testing/generate-client-code", adminMfController.generateNewClientCode);
 router.post("/mutual-funds/testing/check-pan", adminMfController.quickCheckPanOnNse);
 
