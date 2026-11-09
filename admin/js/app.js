@@ -141,6 +141,7 @@ const pageTitles = {
     users: "Users",
     userdetails: "User Details",
     kyc: "KYC Management",
+    fees: "GST & Platform Fee Breakdown",
 
     // 2. Digi Gold
     userinvestments: "Digi Gold User Investments",
@@ -210,6 +211,9 @@ function showPage(pageId) {
             break;
         case "kyc":
             loadKyc("pending");
+            break;
+        case "fees":
+            if (typeof loadFeeBreakdown === "function") loadFeeBreakdown();
             break;
         case "userinvestments":
             loadUserInvestments();

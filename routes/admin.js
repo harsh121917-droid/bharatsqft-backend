@@ -39,6 +39,7 @@ const {
   syncUserPendingPayments,
   updateUserBank,
   oneClickApproveKyc,
+  getFeeBreakdown,
 } = require("../controllers/adminController");
 const {
   getAllProperties, getPropertyById,
@@ -93,6 +94,9 @@ router.post("/users/:id/sync-payments", syncUserPendingPayments);
 router.post("/transactions/:metal/:id/verify", verifyTransactionWithGateway);
 router.post("/transactions/:metal/:id/approve", manuallyApproveTransaction);
 router.post("/transactions/:metal/:id/reject", manuallyRejectTransaction);
+
+// GST & Platform Fee Breakdown
+router.get("/fee-breakdown", getFeeBreakdown);
 
 // Wallet Transaction Ledger & Audit Trail
 router.get("/wallet-ledger", getWalletLedger);

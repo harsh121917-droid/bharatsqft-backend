@@ -2295,18 +2295,59 @@ function renderUdInvestmentsTab(u) {
     mount.innerHTML = html;
 }
 
+let activeUdTxnCategory = "all";
+
+function setUdTxnCategoryFilter(cat) {
+    activeUdTxnCategory = cat;
+    if (currentUserDetailsData) {
+        renderUdTransactionsTab(currentUserDetailsData);
+    }
+}
+
 function renderUdTransactionsTab(u) {
     const mount = document.getElementById("ud-transactions-tab-content");
     if (!mount) return;
-    const txns = u.recentTransactions || [];
-    if (txns.length === 0) {
+    const allTxns = u.recentTransactions || [];
+    if (allTxns.length === 0) {
         mount.innerHTML = `<div style="padding:2rem;text-align:center;color:#64748b">No transaction history found for this user.</div>`;
         return;
     }
 
+    // Filter txns by category
+    let txns = allTxns;
+    if (activeUdTxnCategory === "digi_gold") {
+        txns = allTxns.filter(t => t.category === "digi_gold" || ["Gold", "Silver", "Copper"].includes(t.metal));
+    } else if (activeUdTxnCategory === "real_estate") {
+        txns = allTxns.filter(t => t.category === "real_estate" || t.metal === "Property");
+    }
+
+    // Compute live financial metrics for this user
+    let userTotalAmt = 0;
+    let userGstAmt = 0;
+    let userFeeAmt = 0;
+    let userNetAmt = 0;
+
+    txns.forEach(t => {
+        const isPaid = t.status === "success" || t.status === "paid";
+        if (isPaid && t.metal !== "Wallet") {
+            const tot = Number(t.totalAmount || t.amount || 0);
+            const gst = Number(t.gstAmt || 0);
+            const fee = Number(t.platformFee || 0);
+            const net = Number(t.netAmount || (tot - gst - fee));
+            userTotalAmt += tot;
+            userGstAmt += gst;
+            userFeeAmt += fee;
+            userNetAmt += net;
+        }
+    });
+
+    const goldCount = allTxns.filter(t => t.category === "digi_gold" || ["Gold", "Silver", "Copper"].includes(t.metal)).length;
+    const reCount = allTxns.filter(t => t.category === "real_estate" || t.metal === "Property").length;
     const pendingCount = txns.filter(t => t.status === "pending" || t.status === "processing").length;
 
     let html = "";
+
+    // 1. Pending Notice if any
     if (pendingCount > 0) {
         html += `
         <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -2323,19 +2364,69 @@ function renderUdTransactionsTab(u) {
         </div>`;
     }
 
+    // 2. 4 Customer Fee Breakdown KPI Cards
+    html += `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));gap:10px;margin-bottom:14px">
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 12px">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase">Transaction Amount</div>
+            <div style="font-size:17px;font-weight:800;color:#f59e0b;font-family:var(--font-mono);margin-top:3px">${formatINR(userTotalAmt)}</div>
+            <div style="font-size:10px;color:#cbd5e1">Gross Customer Purchases</div>
+        </div>
+        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:10px 12px">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase">GST Charged (3%)</div>
+            <div style="font-size:17px;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:3px">${formatINR(userGstAmt)}</div>
+            <div style="font-size:10px;color:#cbd5e1">Precious Metals Tax</div>
+        </div>
+        <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:8px;padding:10px 12px">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase">Platform Fee (1%)</div>
+            <div style="font-size:17px;font-weight:800;color:#c084fc;font-family:var(--font-mono);margin-top:3px">${formatINR(userFeeAmt)}</div>
+            <div style="font-size:10px;color:#cbd5e1">Real Estate Platform Fee</div>
+        </div>
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px 12px">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase">Net Asset Realized</div>
+            <div style="font-size:17px;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:3px">${formatINR(userNetAmt)}</div>
+            <div style="font-size:10px;color:#cbd5e1">Base Asset Value Credited</div>
+        </div>
+    </div>
+
+    <!-- 3. Category Filter Tabs -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:6px">
+            <button class="re-pill-btn ${activeUdTxnCategory === 'all' ? 'active' : ''}" onclick="setUdTxnCategoryFilter('all')" style="font-size:11px;padding:3px 10px">
+                <i class="fas fa-globe"></i> All (${allTxns.length})
+            </button>
+            <button class="re-pill-btn ${activeUdTxnCategory === 'digi_gold' ? 'active' : ''}" onclick="setUdTxnCategoryFilter('digi_gold')" style="font-size:11px;padding:3px 10px">
+                <i class="fas fa-coins" style="color:#f59e0b"></i> DIGI Gold (${goldCount})
+            </button>
+            <button class="re-pill-btn ${activeUdTxnCategory === 'real_estate' ? 'active' : ''}" onclick="setUdTxnCategoryFilter('real_estate')" style="font-size:11px;padding:3px 10px">
+                <i class="fas fa-building" style="color:#c084fc"></i> Real Estate (${reCount})
+            </button>
+        </div>
+        <div style="font-size:11px;color:#94a3b8">
+            Showing <b>${txns.length}</b> records
+        </div>
+    </div>`;
+
+    if (txns.length === 0) {
+        html += `<div style="padding:2rem;text-align:center;color:#64748b;font-size:12px">No transactions found under "${activeUdTxnCategory.replace('_', ' ').toUpperCase()}".</div>`;
+        mount.innerHTML = html;
+        return;
+    }
+
     html += `
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
             <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
                 <th style="padding:8px">Invoice / ID</th>
-                <th style="padding:8px">Type</th>
-                <th style="padding:8px">Asset / Metal</th>
-                <th style="padding:8px">Quantity</th>
-                <th style="padding:8px">Amount</th>
+                <th style="padding:8px">Category & Asset</th>
+                <th style="padding:8px;text-align:right">Total Amount</th>
+                <th style="padding:8px;text-align:right">GST Amount</th>
+                <th style="padding:8px;text-align:right">Platform Fee</th>
+                <th style="padding:8px;text-align:right">Net Amount</th>
                 <th style="padding:8px">Date & Time</th>
                 <th style="padding:8px">Status</th>
-                <th style="padding:8px;text-align:right">Resolution Actions</th>
+                <th style="padding:8px;text-align:right">Actions</th>
             </tr>
         </thead>
         <tbody>`;
@@ -2343,6 +2434,13 @@ function renderUdTransactionsTab(u) {
     txns.forEach(t => {
         const isPending = t.status === "pending" || t.status === "processing";
         const isSuccess = t.status === "success" || t.status === "paid";
+        const isGold = t.category === "digi_gold" || ["Gold", "Silver", "Copper"].includes(t.metal);
+        const isRe = t.category === "real_estate" || t.metal === "Property";
+
+        const total = Number(t.totalAmount || t.amount || 0);
+        const gst = Number(t.gstAmt || 0);
+        const fee = Number(t.platformFee || 0);
+        const net = Number(t.netAmount || (total - gst - fee));
 
         let statusPill = "";
         if (isPending) {
@@ -2358,32 +2456,62 @@ function renderUdTransactionsTab(u) {
             actionCell = `
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
                 <button class="btn btn-secondary btn-sm" onclick="verifyTransactionWithGateway('${t.metal}', '${t.id}')" title="Check payment status directly on Razorpay Gateway" style="padding:4px 8px;font-size:11px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:5px;font-weight:600;cursor:pointer">
-                    <i class="fas fa-sync-alt"></i> Verify Gateway
+                    <i class="fas fa-sync-alt"></i> Verify
                 </button>
                 <button class="btn btn-sm" onclick="approveTransactionManually('${t.metal}', '${t.id}', '${t.invoiceNo || ''}', '${t.amount}')" title="Customer completed payment — Mark as PAID and credit balance now" style="padding:4px 9px;font-size:11px;background:linear-gradient(135deg, #10b981, #059669);color:#ffffff;border:none;border-radius:5px;font-weight:700;box-shadow:0 2px 6px rgba(16,185,129,0.3);cursor:pointer">
-                    <i class="fas fa-check"></i> Approve & Credit
+                    <i class="fas fa-check"></i> Approve
                 </button>
                 <button class="btn btn-sm" onclick="rejectTransactionManually('${t.metal}', '${t.id}')" title="Mark as cancelled/failed" style="padding:4px 7px;font-size:11px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:5px;cursor:pointer">
                     <i class="fas fa-times"></i>
                 </button>
             </div>`;
         } else if (isSuccess) {
-            actionCell = `<span style="color:#10b981;font-size:11.5px;font-weight:600"><i class="fas fa-shield-check"></i> Credited to Vault</span>`;
+            actionCell = `<span style="color:#10b981;font-size:11px;font-weight:600"><i class="fas fa-shield-check"></i> Credited</span>`;
         } else {
-            actionCell = `<span style="color:#94a3b8;font-size:11px">No actions</span>`;
+            actionCell = `<span style="color:#94a3b8;font-size:11px">—</span>`;
+        }
+
+        let catBadge = "";
+        if (isGold) {
+            catBadge = `<span class="badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:9.5px;padding:1px 6px"><i class="fas fa-coins"></i> DIGI Gold</span>`;
+        } else if (isRe) {
+            catBadge = `<span class="badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:9.5px;padding:1px 6px"><i class="fas fa-building"></i> Real Estate</span>`;
+        } else {
+            catBadge = `<span class="badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:9.5px;padding:1px 6px">Wallet</span>`;
         }
 
         html += `
         <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
             <td style="padding:8px;font-family:var(--font-mono);color:#60a5fa">
-                <strong>${t.invoiceNo || (t.id ? t.id.slice(-6).toUpperCase() : '—')}</strong>
-                ${t.razorpayOrderId ? `<div style="font-size:10px;color:#64748b">${t.razorpayOrderId}</div>` : ''}
+                <strong>${escapeHtml(t.invoiceNo || (t.id ? t.id.slice(-6).toUpperCase() : '—'))}</strong>
+                ${t.razorpayOrderId ? `<div style="font-size:9.5px;color:#64748b">${escapeHtml(t.razorpayOrderId)}</div>` : ''}
             </td>
-            <td style="padding:8px"><span class="ud-status-pill active">${(t.type || 'buy').toUpperCase()}</span></td>
-            <td style="padding:8px;font-weight:700">${t.metal}</td>
-            <td style="padding:8px;font-family:var(--font-mono)">${t.metal === 'Property' ? `${t.grams} Bricks` : formatGrams(t.grams)}</td>
-            <td style="padding:8px;font-family:var(--font-mono);font-weight:700;color:#fff">${formatINR(t.amount)}</td>
-            <td style="padding:8px;color:#94a3b8">${formatDateTime(t.date)}</td>
+            <td style="padding:8px">
+                <div style="display:flex;align-items:center;gap:5px">
+                    ${catBadge}
+                    <strong style="color:#fff">${escapeHtml(t.metal)}</strong>
+                </div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                    ${t.metal === 'Property' ? (t.propertyTitle ? escapeHtml(t.propertyTitle) : `${t.grams} Bricks`) : `${formatGrams(t.grams)} (${(t.type || 'buy').toUpperCase()})`}
+                </div>
+            </td>
+            <!-- Total Amount -->
+            <td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:#f59e0b">
+                ${formatINR(total)}
+            </td>
+            <!-- GST Amount -->
+            <td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:#38bdf8">
+                ${gst > 0 ? formatINR(gst) : '<span style="color:#64748b;font-weight:400">₹0</span>'}
+            </td>
+            <!-- Platform Fee -->
+            <td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:#c084fc">
+                ${fee > 0 ? formatINR(fee) : '<span style="color:#64748b;font-weight:400">₹0</span>'}
+            </td>
+            <!-- Net Amount -->
+            <td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:800;color:#34d399">
+                ${formatINR(net)}
+            </td>
+            <td style="padding:8px;color:#94a3b8;font-size:11px">${formatDateTime(t.date)}</td>
             <td style="padding:8px">${statusPill}</td>
             <td style="padding:8px;text-align:right">${actionCell}</td>
         </tr>`;

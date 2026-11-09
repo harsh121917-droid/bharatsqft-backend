@@ -654,11 +654,11 @@ exports.getUserTransactions = async (req, res, next) => {
     try {
         const userId = req.params.id;
         const results = await Promise.allSettled([
-            GoldTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
-            SilverTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
-            CopperTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(50),
-            Investment.find({ user: userId }).populate("property").sort({ createdAt: -1 }).limit(50),
-            WalletTxn.find({ user: userId }).sort({ createdAt: -1 }).limit(50)
+            GoldTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(100),
+            SilverTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(100),
+            CopperTransaction.find({ user: userId }).sort({ createdAt: -1 }).limit(100),
+            Investment.find({ user: userId }).populate("property").sort({ createdAt: -1 }).limit(100),
+            WalletTxn.find({ user: userId }).sort({ createdAt: -1 }).limit(100)
         ]);
 
         const goldTxns = results[0].status === "fulfilled" ? (results[0].value || []) : [];
@@ -668,82 +668,185 @@ exports.getUserTransactions = async (req, res, next) => {
         const walletTxns = results[4].status === "fulfilled" ? (results[4].value || []) : [];
 
         const unified = [];
-        goldTxns.forEach(t => unified.push({
-            id: t._id,
-            type: t.type || "buy",
-            metal: "Gold",
-            grams: t.grams || 0,
-            amount: t.totalAmt || t.amount || 0,
-            ratePerGram: t.ratePerGram || 0,
-            date: t.createdAt,
-            status: t.status || "success",
-            invoiceNo: t.invoiceNo || "",
-            razorpayOrderId: t.razorpayOrderId || "",
-            razorpayPaymentId: t.razorpayPaymentId || "",
-            note: t.note || ""
-        }));
-        silverTxns.forEach(t => unified.push({
-            id: t._id,
-            type: t.type || "buy",
-            metal: "Silver",
-            grams: t.grams || 0,
-            amount: t.totalAmt || t.amount || 0,
-            ratePerGram: t.ratePerGram || 0,
-            date: t.createdAt,
-            status: t.status || "success",
-            invoiceNo: t.invoiceNo || "",
-            razorpayOrderId: t.razorpayOrderId || "",
-            razorpayPaymentId: t.razorpayPaymentId || "",
-            note: t.note || ""
-        }));
-        copperTxns.forEach(t => unified.push({
-            id: t._id,
-            type: t.type || "buy",
-            metal: "Copper",
-            grams: t.grams || 0,
-            amount: t.totalAmt || t.amount || 0,
-            ratePerGram: t.ratePerGram || 0,
-            date: t.createdAt,
-            status: t.status || "success",
-            invoiceNo: t.invoiceNo || "",
-            razorpayOrderId: t.razorpayOrderId || "",
-            razorpayPaymentId: t.razorpayPaymentId || "",
-            note: t.note || ""
-        }));
-        propTxns.forEach(p => unified.push({
-            id: p._id,
-            type: "brick_purchase",
-            metal: "Property",
-            grams: p.bricks || 0,
-            amount: p.totalAmount || 0,
-            ratePerGram: p.pricePerBrick || 0,
-            date: p.createdAt,
-            status: p.status || "paid",
-            invoiceNo: p.property?.title || "Property Brick",
-            razorpayOrderId: p.razorpayOrderId || "",
-            razorpayPaymentId: p.razorpayPaymentId || "",
-            note: ""
-        }));
-        walletTxns.forEach(w => unified.push({
-            id: w._id,
-            type: w.type || (w.entryType === "credit" ? "wallet_credit" : "wallet_debit"),
-            metal: "Wallet",
-            grams: 0,
-            amount: w.amount || 0,
-            ratePerGram: 0,
-            date: w.createdAt,
-            status: w.status || "success",
-            invoiceNo: w.txnId || "",
-            razorpayOrderId: w.razorpayOrderId || "",
-            razorpayPaymentId: w.razorpayPaymentId || "",
-            note: w.note || ""
-        }));
+
+        goldTxns.forEach(t => {
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.goldValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                type: t.type || "buy",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                metal: "Gold",
+                grams: t.grams || 0,
+                amount: total,
+                totalAmount: total,
+                gstAmt: gst,
+                platformFee: fee,
+                netAmount: net,
+                ratePerGram: t.ratePerGram || 0,
+                date: t.createdAt,
+                status: t.status || "success",
+                invoiceNo: t.invoiceNo || `GOLD-${t._id.toString().slice(-6).toUpperCase()}`,
+                razorpayOrderId: t.razorpayOrderId || "",
+                razorpayPaymentId: t.razorpayPaymentId || "",
+                note: t.note || ""
+            });
+        });
+
+        silverTxns.forEach(t => {
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.silverValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                type: t.type || "buy",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                metal: "Silver",
+                grams: t.grams || 0,
+                amount: total,
+                totalAmount: total,
+                gstAmt: gst,
+                platformFee: fee,
+                netAmount: net,
+                ratePerGram: t.ratePerGram || 0,
+                date: t.createdAt,
+                status: t.status || "success",
+                invoiceNo: t.invoiceNo || `SILVER-${t._id.toString().slice(-6).toUpperCase()}`,
+                razorpayOrderId: t.razorpayOrderId || "",
+                razorpayPaymentId: t.razorpayPaymentId || "",
+                note: t.note || ""
+            });
+        });
+
+        copperTxns.forEach(t => {
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.copperValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                type: t.type || "buy",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                metal: "Copper",
+                grams: t.grams || 0,
+                amount: total,
+                totalAmount: total,
+                gstAmt: gst,
+                platformFee: fee,
+                netAmount: net,
+                ratePerGram: t.ratePerGram || 0,
+                date: t.createdAt,
+                status: t.status || "success",
+                invoiceNo: t.invoiceNo || `COPPER-${t._id.toString().slice(-6).toUpperCase()}`,
+                razorpayOrderId: t.razorpayOrderId || "",
+                razorpayPaymentId: t.razorpayPaymentId || "",
+                note: t.note || ""
+            });
+        });
+
+        propTxns.forEach(p => {
+            const total = p.totalAmount || 0;
+            const fee = p.platformFee || (total && p.propertyPrice ? Math.max(0, +(total - p.propertyPrice).toFixed(2)) : 0);
+            const gst = p.gstAmt || 0;
+            const net = p.propertyPrice || (total > 0 ? Math.max(0, +(total - fee - gst).toFixed(2)) : 0);
+            unified.push({
+                id: p._id,
+                type: p.purchaseType === "direct" ? "direct_buy" : "brick_purchase",
+                category: "real_estate",
+                categoryLabel: "Real Estate",
+                metal: "Property",
+                grams: p.bricks || 0,
+                amount: total,
+                totalAmount: total,
+                gstAmt: gst,
+                platformFee: fee,
+                netAmount: net,
+                ratePerGram: p.pricePerBrick || 0,
+                date: p.createdAt,
+                status: p.status || "paid",
+                invoiceNo: `BSQFT-${p._id.toString().slice(-6).toUpperCase()}`,
+                propertyTitle: p.property?.title || "Property Brick",
+                razorpayOrderId: p.razorpayOrderId || "",
+                razorpayPaymentId: p.razorpayPaymentId || "",
+                note: ""
+            });
+        });
+
+        walletTxns.forEach(w => {
+            const amt = w.amount || 0;
+            unified.push({
+                id: w._id,
+                type: w.type || (w.entryType === "credit" ? "wallet_credit" : "wallet_debit"),
+                category: "wallet",
+                categoryLabel: "Wallet",
+                metal: "Wallet",
+                grams: 0,
+                amount: amt,
+                totalAmount: amt,
+                gstAmt: 0,
+                platformFee: 0,
+                netAmount: amt,
+                ratePerGram: 0,
+                date: w.createdAt,
+                status: w.status || "success",
+                invoiceNo: w.txnId || "",
+                razorpayOrderId: w.razorpayOrderId || "",
+                razorpayPaymentId: w.razorpayPaymentId || "",
+                note: w.note || ""
+            });
+        });
 
         unified.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Compute summary for customer
+        const summary = {
+            all: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0 },
+            digiGold: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0 },
+            realEstate: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0 }
+        };
+
+        unified.forEach(t => {
+            const isPaid = t.status === "success" || t.status === "paid";
+            if (isPaid && (t.category === "digi_gold" || t.category === "real_estate")) {
+                summary.all.totalAmount += t.totalAmount;
+                summary.all.totalGst += t.gstAmt;
+                summary.all.totalPlatformFee += t.platformFee;
+                summary.all.totalNet += t.netAmount;
+                summary.all.count += 1;
+
+                if (t.category === "digi_gold") {
+                    summary.digiGold.totalAmount += t.totalAmount;
+                    summary.digiGold.totalGst += t.gstAmt;
+                    summary.digiGold.totalPlatformFee += t.platformFee;
+                    summary.digiGold.totalNet += t.netAmount;
+                    summary.digiGold.count += 1;
+                } else if (t.category === "real_estate") {
+                    summary.realEstate.totalAmount += t.totalAmount;
+                    summary.realEstate.totalGst += t.gstAmt;
+                    summary.realEstate.totalPlatformFee += t.platformFee;
+                    summary.realEstate.totalNet += t.netAmount;
+                    summary.realEstate.count += 1;
+                }
+            }
+        });
+
+        ["all", "digiGold", "realEstate"].forEach(k => {
+            summary[k].totalAmount = parseFloat(summary[k].totalAmount.toFixed(2));
+            summary[k].totalGst = parseFloat(summary[k].totalGst.toFixed(2));
+            summary[k].totalPlatformFee = parseFloat(summary[k].totalPlatformFee.toFixed(2));
+            summary[k].totalNet = parseFloat(summary[k].totalNet.toFixed(2));
+        });
 
         res.json({
             success: true,
             count: unified.length,
+            summary,
             data: unified
         });
     } catch (err) {
@@ -4009,6 +4112,302 @@ exports.grantUserRewardCredit = async (req, res, next) => {
                 credit,
                 newRewardBalance: wallet.drxRewardBalance,
             },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ── GET GST & Platform Fee Breakdown (Customer-wise & Transaction-wise) ──
+exports.getFeeBreakdown = async (req, res, next) => {
+    try {
+        const { category = "all", search = "", limit = 300 } = req.query;
+
+        const maxLimit = Math.min(parseInt(limit, 10) || 300, 1000);
+
+        // Fetch paid transactions across Gold, Silver, Copper, and Real Estate
+        const [goldTxns, silverTxns, copperTxns, propTxns] = await Promise.all([
+            GoldTransaction.find({ status: { $in: ["success", "paid"] } })
+                .populate("user", "name email phone avatar profilePicture")
+                .sort({ createdAt: -1 })
+                .limit(maxLimit),
+            SilverTransaction.find({ status: { $in: ["success", "paid"] } })
+                .populate("user", "name email phone avatar profilePicture")
+                .sort({ createdAt: -1 })
+                .limit(maxLimit),
+            CopperTransaction.find({ status: { $in: ["success", "paid"] } })
+                .populate("user", "name email phone avatar profilePicture")
+                .sort({ createdAt: -1 })
+                .limit(maxLimit),
+            Investment.find({ status: { $in: ["paid", "success"] } })
+                .populate("user", "name email phone avatar profilePicture")
+                .populate("property", "title location brickPrice totalBricks")
+                .sort({ createdAt: -1 })
+                .limit(maxLimit)
+        ]);
+
+        const unified = [];
+
+        // 1. Process Gold
+        goldTxns.forEach(t => {
+            const user = t.user || {};
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.goldValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `GOLD-${t._id.toString().slice(-6).toUpperCase()}`,
+                orderId: t.razorpayOrderId || "",
+                paymentId: t.razorpayPaymentId || "",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                assetType: "Gold 24K",
+                transactionType: t.type || "buy",
+                quantity: `${t.grams || 0} g`,
+                ratePerGram: t.ratePerGram || 0,
+                totalAmount: total,
+                gstAmount: gst,
+                platformFee: fee,
+                netAmount: net,
+                status: t.status || "success",
+                date: t.createdAt,
+                customer: {
+                    id: user._id || null,
+                    name: user.name || "Customer",
+                    phone: user.phone || "",
+                    email: user.email || "",
+                    avatar: user.avatar || user.profilePicture || ""
+                }
+            });
+        });
+
+        // 2. Process Silver
+        silverTxns.forEach(t => {
+            const user = t.user || {};
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.silverValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `SILVER-${t._id.toString().slice(-6).toUpperCase()}`,
+                orderId: t.razorpayOrderId || "",
+                paymentId: t.razorpayPaymentId || "",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                assetType: "Silver 999",
+                transactionType: t.type || "buy",
+                quantity: `${t.grams || 0} g`,
+                ratePerGram: t.ratePerGram || 0,
+                totalAmount: total,
+                gstAmount: gst,
+                platformFee: fee,
+                netAmount: net,
+                status: t.status || "success",
+                date: t.createdAt,
+                customer: {
+                    id: user._id || null,
+                    name: user.name || "Customer",
+                    phone: user.phone || "",
+                    email: user.email || "",
+                    avatar: user.avatar || user.profilePicture || ""
+                }
+            });
+        });
+
+        // 3. Process Copper
+        copperTxns.forEach(t => {
+            const user = t.user || {};
+            const total = t.totalAmt || t.amount || 0;
+            const gst = t.gstAmt || 0;
+            const fee = t.platformFee || 0;
+            const net = t.copperValue || (total > 0 ? Math.max(0, +(total - gst - fee).toFixed(2)) : 0);
+            unified.push({
+                id: t._id,
+                invoiceNo: t.invoiceNo || `COPPER-${t._id.toString().slice(-6).toUpperCase()}`,
+                orderId: t.razorpayOrderId || "",
+                paymentId: t.razorpayPaymentId || "",
+                category: "digi_gold",
+                categoryLabel: "DIGI Gold",
+                assetType: "Copper 999",
+                transactionType: t.type || "buy",
+                quantity: `${t.grams || 0} g`,
+                ratePerGram: t.ratePerGram || 0,
+                totalAmount: total,
+                gstAmount: gst,
+                platformFee: fee,
+                netAmount: net,
+                status: t.status || "success",
+                date: t.createdAt,
+                customer: {
+                    id: user._id || null,
+                    name: user.name || "Customer",
+                    phone: user.phone || "",
+                    email: user.email || "",
+                    avatar: user.avatar || user.profilePicture || ""
+                }
+            });
+        });
+
+        // 4. Process Real Estate (Investment)
+        propTxns.forEach(p => {
+            const user = p.user || {};
+            const total = p.totalAmount || 0;
+            const fee = p.platformFee || (total && p.propertyPrice ? Math.max(0, +(total - p.propertyPrice).toFixed(2)) : 0);
+            const gst = p.gstAmt || 0;
+            const net = p.propertyPrice || (total > 0 ? Math.max(0, +(total - fee - gst).toFixed(2)) : 0);
+            unified.push({
+                id: p._id,
+                invoiceNo: `BSQFT-${p._id.toString().slice(-6).toUpperCase()}`,
+                orderId: p.razorpayOrderId || "",
+                paymentId: p.razorpayPaymentId || "",
+                category: "real_estate",
+                categoryLabel: "Real Estate",
+                assetType: "Real Estate Brick",
+                propertyTitle: p.property?.title || "Property Asset",
+                transactionType: p.purchaseType === "direct" ? "direct_buy" : "brick_investment",
+                quantity: `${p.bricks || 0} Bricks`,
+                ratePerGram: p.pricePerBrick || 0,
+                totalAmount: total,
+                gstAmount: gst,
+                platformFee: fee,
+                netAmount: net,
+                status: p.status || "paid",
+                date: p.createdAt,
+                customer: {
+                    id: user._id || null,
+                    name: user.name || "Customer",
+                    phone: user.phone || "",
+                    email: user.email || "",
+                    avatar: user.avatar || user.profilePicture || ""
+                }
+            });
+        });
+
+        // Sort all newest first
+        unified.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Compute summaries across All, DIGI Gold, and Real Estate
+        const summary = {
+            all: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0, uniqueCustomers: 0 },
+            digiGold: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0, uniqueCustomers: 0 },
+            realEstate: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, totalNet: 0, count: 0, uniqueCustomers: 0 },
+        };
+
+        const customerMap = new Map();
+        const goldCustomersSet = new Set();
+        const reCustomersSet = new Set();
+        const allCustomersSet = new Set();
+
+        unified.forEach(t => {
+            const cId = t.customer.id ? t.customer.id.toString() : (t.customer.phone || t.customer.name || "unknown");
+
+            allCustomersSet.add(cId);
+
+            summary.all.totalAmount += t.totalAmount;
+            summary.all.totalGst += t.gstAmount;
+            summary.all.totalPlatformFee += t.platformFee;
+            summary.all.totalNet += t.netAmount;
+            summary.all.count += 1;
+
+            if (t.category === "digi_gold") {
+                goldCustomersSet.add(cId);
+                summary.digiGold.totalAmount += t.totalAmount;
+                summary.digiGold.totalGst += t.gstAmount;
+                summary.digiGold.totalPlatformFee += t.platformFee;
+                summary.digiGold.totalNet += t.netAmount;
+                summary.digiGold.count += 1;
+            } else if (t.category === "real_estate") {
+                reCustomersSet.add(cId);
+                summary.realEstate.totalAmount += t.totalAmount;
+                summary.realEstate.totalGst += t.gstAmount;
+                summary.realEstate.totalPlatformFee += t.platformFee;
+                summary.realEstate.totalNet += t.netAmount;
+                summary.realEstate.count += 1;
+            }
+
+            if (!customerMap.has(cId)) {
+                customerMap.set(cId, {
+                    customerId: cId,
+                    customer: t.customer,
+                    totalAmount: 0,
+                    totalGst: 0,
+                    totalPlatformFee: 0,
+                    netAmount: 0,
+                    transactionCount: 0,
+                    lastDate: t.date,
+                    digiGold: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, netAmount: 0, count: 0 },
+                    realEstate: { totalAmount: 0, totalGst: 0, totalPlatformFee: 0, netAmount: 0, count: 0 },
+                    transactions: []
+                });
+            }
+
+            const cData = customerMap.get(cId);
+            cData.totalAmount += t.totalAmount;
+            cData.totalGst += t.gstAmount;
+            cData.totalPlatformFee += t.platformFee;
+            cData.netAmount += t.netAmount;
+            cData.transactionCount += 1;
+            cData.transactions.push(t);
+
+            if (t.category === "digi_gold") {
+                cData.digiGold.totalAmount += t.totalAmount;
+                cData.digiGold.totalGst += t.gstAmount;
+                cData.digiGold.totalPlatformFee += t.platformFee;
+                cData.digiGold.netAmount += t.netAmount;
+                cData.digiGold.count += 1;
+            } else if (t.category === "real_estate") {
+                cData.realEstate.totalAmount += t.totalAmount;
+                cData.realEstate.totalGst += t.gstAmount;
+                cData.realEstate.totalPlatformFee += t.platformFee;
+                cData.realEstate.netAmount += t.netAmount;
+                cData.realEstate.count += 1;
+            }
+        });
+
+        summary.all.uniqueCustomers = allCustomersSet.size;
+        summary.digiGold.uniqueCustomers = goldCustomersSet.size;
+        summary.realEstate.uniqueCustomers = reCustomersSet.size;
+
+        ["all", "digiGold", "realEstate"].forEach(k => {
+            summary[k].totalAmount = parseFloat(summary[k].totalAmount.toFixed(2));
+            summary[k].totalGst = parseFloat(summary[k].totalGst.toFixed(2));
+            summary[k].totalPlatformFee = parseFloat(summary[k].totalPlatformFee.toFixed(2));
+            summary[k].totalNet = parseFloat(summary[k].totalNet.toFixed(2));
+        });
+
+        const customerList = Array.from(customerMap.values()).map(c => ({
+            ...c,
+            totalAmount: parseFloat(c.totalAmount.toFixed(2)),
+            totalGst: parseFloat(c.totalGst.toFixed(2)),
+            totalPlatformFee: parseFloat(c.totalPlatformFee.toFixed(2)),
+            netAmount: parseFloat(c.netAmount.toFixed(2)),
+            digiGold: {
+                ...c.digiGold,
+                totalAmount: parseFloat(c.digiGold.totalAmount.toFixed(2)),
+                totalGst: parseFloat(c.digiGold.totalGst.toFixed(2)),
+                totalPlatformFee: parseFloat(c.digiGold.totalPlatformFee.toFixed(2)),
+                netAmount: parseFloat(c.digiGold.netAmount.toFixed(2)),
+            },
+            realEstate: {
+                ...c.realEstate,
+                totalAmount: parseFloat(c.realEstate.totalAmount.toFixed(2)),
+                totalGst: parseFloat(c.realEstate.totalGst.toFixed(2)),
+                totalPlatformFee: parseFloat(c.realEstate.totalPlatformFee.toFixed(2)),
+                netAmount: parseFloat(c.realEstate.netAmount.toFixed(2)),
+            }
+        }));
+
+        customerList.sort((a, b) => b.totalAmount - a.totalAmount);
+
+        res.json({
+            success: true,
+            summary,
+            totalTransactions: unified.length,
+            totalCustomers: customerList.length,
+            transactions: unified,
+            customers: customerList
         });
     } catch (err) {
         next(err);

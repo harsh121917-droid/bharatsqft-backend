@@ -761,7 +761,9 @@ function renderCustomerTransactionsLedger(allotments) {
                     <th>Property Project</th>
                     <th>Bricks</th>
                     <th>Price / Brick</th>
-                    <th>Total Amount</th>
+                    <th style="text-align:right">Total Amount</th>
+                    <th style="text-align:right">Platform Fee (1%)</th>
+                    <th style="text-align:right">Net Asset</th>
                     <th>Status</th>
                     <th>Date & Time</th>
                     <th style="text-align:right">Certificate</th>
@@ -773,6 +775,9 @@ function renderCustomerTransactionsLedger(allotments) {
         const p = inv.property || {};
         const isPaid = inv.status === "paid";
         const pricePerBrick = inv.pricePerBrick || (inv.bricks ? +(inv.totalAmount / inv.bricks).toFixed(2) : 0);
+        const total = inv.totalAmount || 0;
+        const fee = inv.platformFee || (total && inv.propertyPrice ? Math.max(0, +(total - inv.propertyPrice).toFixed(2)) : 0);
+        const net = inv.propertyPrice || (total > 0 ? Math.max(0, +(total - fee).toFixed(2)) : 0);
 
         html += `
         <tr>
@@ -789,7 +794,9 @@ function renderCustomerTransactionsLedger(allotments) {
                 </span>
             </td>
             <td style="font-family:var(--font-mono);color:#cbd5e1">${formatINR(pricePerBrick)}</td>
-            <td style="font-family:var(--font-mono);font-weight:800;color:#f59e0b">${formatINR(inv.totalAmount)}</td>
+            <td style="font-family:var(--font-mono);font-weight:800;color:#f59e0b;text-align:right">${formatINR(total)}</td>
+            <td style="font-family:var(--font-mono);font-weight:700;color:#c084fc;text-align:right">${fee > 0 ? formatINR(fee) : '<span style="color:#64748b;font-weight:400">₹0</span>'}</td>
+            <td style="font-family:var(--font-mono);font-weight:800;color:#34d399;text-align:right">${formatINR(net)}</td>
             <td>
                 <span class="re-status-pill ${isPaid ? 'paid' : 'pending'}">
                     <i class="fas ${isPaid ? 'fa-check-circle' : 'fa-clock'}"></i> ${(inv.status || 'paid').toUpperCase()}
@@ -870,7 +877,9 @@ function renderInvestmentsTableView(list, mount) {
                     <th>Property Project</th>
                     <th>Investor Customer</th>
                     <th>Bricks & Rate</th>
-                    <th>Total Capital</th>
+                    <th style="text-align:right">Total Capital</th>
+                    <th style="text-align:right">Platform Fee (1%)</th>
+                    <th style="text-align:right">Net Asset</th>
                     <th>Ownership %</th>
                     <th>Est. Rental Yield</th>
                     <th>Status & Date</th>
@@ -888,6 +897,10 @@ function renderInvestmentsTableView(list, mount) {
         const yieldPct = p.expectedRentalYield || 8.5;
         const ownershipPct = inv.ownershipPercent !== undefined ? inv.ownershipPercent : (p.totalBricks ? +((inv.bricks / p.totalBricks) * 100).toFixed(4) : 0);
         const coverImg = p.images?.find(i => i.isCover)?.url || p.images?.[0]?.url;
+
+        const total = inv.totalAmount || 0;
+        const fee = inv.platformFee || (total && inv.propertyPrice ? Math.max(0, +(total - inv.propertyPrice).toFixed(2)) : 0);
+        const net = inv.propertyPrice || (total > 0 ? Math.max(0, +(total - fee).toFixed(2)) : 0);
 
         html += `
         <tr>
@@ -932,10 +945,26 @@ function renderInvestmentsTableView(list, mount) {
             </td>
 
             <!-- Total Consideration -->
-            <td>
+            <td style="text-align:right">
                 <div style="font-family:var(--font-mono);font-size:14px;font-weight:800;color:#f59e0b">
-                    ${formatINR(inv.totalAmount)}
+                    ${formatINR(total)}
                 </div>
+            </td>
+
+            <!-- Platform Fee (1%) -->
+            <td style="text-align:right">
+                <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:#c084fc">
+                    ${fee > 0 ? formatINR(fee) : '<span style="color:#64748b;font-weight:400">₹0</span>'}
+                </div>
+                ${fee > 0 ? `<div style="font-size:9.5px;color:#a855f7">1% Fee</div>` : ''}
+            </td>
+
+            <!-- Net Asset Amount -->
+            <td style="text-align:right">
+                <div style="font-family:var(--font-mono);font-size:13.5px;font-weight:800;color:#34d399">
+                    ${formatINR(net)}
+                </div>
+                <div style="font-size:9.5px;color:#059669">Net Equity</div>
             </td>
 
             <!-- Ownership Progress Bar -->
