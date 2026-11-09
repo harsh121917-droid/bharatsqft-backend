@@ -13,6 +13,7 @@ const Kyc = require('../models/Kyc');
 const BankAccount = require('../models/BankAccount');
 const mfReconciliationEngine = require('../services/mfReconciliationEngine');
 const mfAdminService = require('../services/mfAdminService');
+const mfSipService = require('../services/mfSipService');
 const nseClient = require('../services/nse/nseClient');
 const nseEncryption = require('../services/nse/nseEncryption');
 const axios = require('axios');
@@ -308,9 +309,11 @@ exports.getMfSips = async (req, res) => {
       .limit(limit)
       .populate('user', 'name email phone');
 
+    const enrichedSips = await Promise.all(sips.map((s) => mfSipService.enrichSipObject(s)));
+
     return res.json({
       success: true,
-      data: sips,
+      data: enrichedSips,
       total,
       page,
       pages: Math.ceil(total / limit),
@@ -2087,26 +2090,8 @@ exports.syncSipWithNse = async (req, res) => {
       return res.status(404).json({ success: false, message: 'SIP not found' });
     }
 
-    // Reconcile installments with actual confirmed orders
-    const confirmedCount = await MfOrder.countDocuments({
-      user: sip.user?._id || sip.user,
-      schemeCode: sip.schemeCode,
-      paymentStatus: 'SUCCESS',
-      transactionType: 'P',
-    });
-
-    if (confirmedCount > 0 && sip.status === 'PENDING_PAYMENT') {
-      sip.status = 'ACTIVE';
-    }
-    sip.installmentsPaid = confirmedCount;
-    sip.totalAmountPaid = confirmedCount * sip.installmentAmount;
-    await sip.save();
-
-    return res.json({
-      success: true,
-      message: `SIP synced with exchange and local ledger (${confirmedCount} installments verified)`,
-      data: sip,
-    });
+    const syncResult = await mfSipService.syncSipWithNseExchange(sip);
+    return res.json(syncResult);
   } catch (error) {
     console.error('[syncSipWithNse Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
@@ -2866,6 +2851,8 @@ exports.getMfUserFullProfile = async (req, res) => {
     const totalReturns = totalCurrentValue - totalInvested;
     const returnsPercentage = totalInvested > 0 ? ((totalReturns / totalInvested) * 100).toFixed(2) : '0.00';
 
+    const enrichedSips = await Promise.all(sips.map((s) => mfSipService.enrichSipObject(s)));
+
     return res.json({
       success: true,
       data: {
@@ -2880,7 +2867,7 @@ exports.getMfUserFullProfile = async (req, res) => {
           holdings,
         },
         mandates,
-        sips,
+        sips: enrichedSips,
         recentOrders: orders,
         auditLogs,
       },

@@ -23,6 +23,7 @@ const amcSourceRegistry = require('../services/amcSourceRegistry');
 const mfPortfolioService = require('../services/mfPortfolioService');
 const mfAumService = require('../services/mfAumService');
 const mfMarketSyncService = require('../services/mfMarketSyncService');
+const mfSipService = require('../services/mfSipService');
 const MfSipSchemeMaster = require('../models/MfSipSchemeMaster');
 const MfRecentlyViewed = require('../models/MfRecentlyViewed');
 const MfWatchlist = require('../models/MfWatchlist');
@@ -3667,12 +3668,7 @@ exports.verifySipPayment = async (req, res) => {
     }
 
     // Accurately count confirmed installments for this SIP/scheme
-    const confirmedOrdersCount = await MfOrder.countDocuments({
-      user: userId,
-      schemeCode: sip.schemeCode,
-      paymentStatus: 'SUCCESS',
-      transactionType: 'P',
-    });
+    const confirmedOrdersCount = await mfSipService.countConfirmedInstallments(sip);
 
     if (sip.firstOrderToday) {
       if (initialOrder && initialOrder.paymentStatus === 'SUCCESS') {
@@ -4060,7 +4056,8 @@ exports.getUserSips = async (req, res) => {
       }
     }
 
-    return res.json({ success: true, data: sips });
+    const enrichedSips = await Promise.all(sips.map((s) => mfSipService.enrichSipObject(s)));
+    return res.json({ success: true, data: enrichedSips });
   } catch (error) {
     console.error('[getUserSips Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
@@ -4100,7 +4097,9 @@ exports.getSipDetail = async (req, res) => {
         }
       } catch (_) {}
     }
-    return res.json({ success: true, data: sip });
+
+    const enrichedSip = await mfSipService.enrichSipObject(sip);
+    return res.json({ success: true, data: enrichedSip });
   } catch (error) {
     console.error('[getSipDetail Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
@@ -4485,8 +4484,10 @@ exports.renderCheckoutSimulator = async (req, res) => {
     if (sip) {
       if (sip.status !== 'ACTIVE') {
         sip.status = 'ACTIVE';
-        sip.installmentsPaid = Math.max(sip.installmentsPaid || 0, 1);
-        sip.totalAmountPaid = Math.max(sip.totalAmountPaid || 0, sip.installmentAmount);
+        if (isExplicitSandbox) {
+          sip.installmentsPaid = Math.max(sip.installmentsPaid || 0, 1);
+          sip.totalAmountPaid = Math.max(sip.totalAmountPaid || 0, sip.installmentAmount);
+        }
         await sip.save();
 
         try {

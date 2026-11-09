@@ -438,7 +438,10 @@ async function loadMfSips(page = 1) {
                     <span class="badge badge-purple" style="font-size:11px">${s.frequency}</span>
                 </td>
                 <td style="font-size:12.5px;color:#fff">
-                    ${formatMfDate(s.nextDueDate || s.startDate)}
+                    <div style="font-weight:600">${s.nextDebitDateFormatted || formatMfDate(s.nextDueDate || s.startDate)}</div>
+                    <div style="font-size:11px;color:${s.isAutoPayActive ? '#00D09C' : 'var(--text-dim)'}">
+                        ${s.autoPayBank ? `<i class="fas fa-university"></i> ${s.autoPayBank} ${s.autoPayAccountMasked || ''}` : (s.paymentMethodLabel || 'AutoPay')}
+                    </div>
                 </td>
                 <td>
                     <div style="font-weight:700;color:#fff">${formatMfInr(s.totalAmountPaid)}</div>
@@ -1883,7 +1886,10 @@ function renderMfInvestorProfileContent(tab) {
                             <td><div style="font-weight:700;color:#fff">${s.schemeName}</div><div style="font-size:11px;color:var(--text-dim)">Reg No: ${s.sipRegNo}</div></td>
                             <td style="font-weight:700;color:#00D09C">${formatMfInr(s.installmentAmount)}</td>
                             <td>${s.installmentsPaid || 0} Paid</td>
-                            <td>${formatMfDate(s.nextDueDate)}</td>
+                            <td>
+                                <div>${s.nextDebitDateFormatted || formatMfDate(s.nextDueDate || s.startDate)}</div>
+                                ${s.autoPayBank ? `<div style="font-size:10.5px;color:#00D09C">${s.autoPayBank} ${s.autoPayAccountMasked || ''}</div>` : ''}
+                            </td>
                             <td><span class="badge ${s.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}">${s.status}</span></td>
                         </tr>`).join('')}
                     </tbody>

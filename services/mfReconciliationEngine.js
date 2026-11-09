@@ -20,6 +20,7 @@ const MfTransaction = require('../models/MfTransaction');
 const MfPortfolioHolding = require('../models/MfPortfolioHolding');
 const MfReconciliation = require('../models/MfReconciliation');
 const MfAuditLog = require('../models/MfAuditLog');
+const mfSipService = require('./mfSipService');
 
 /**
  * Normalizes and extracts authentic Folio Numbers from varied NSE API response formats.
@@ -328,6 +329,11 @@ class MfReconciliationEngine {
 
       for (const sip of sips) {
         try {
+          // Live Exchange Installment Reconciliation via TRANSACTION_DETAIL_REPORT & Local Ledger
+          await mfSipService.syncSipWithNseExchange(sip).catch((e) => {
+            console.warn(`[Reconciliation Engine] SIP installment sync warning for ${sip.sipRegNo}:`, e.message);
+          });
+
           const sipReport = await nseClient.getOrderStatusReport({
             reg_id: sip.sipRegNo,
             client_code: sip.clientCode,
