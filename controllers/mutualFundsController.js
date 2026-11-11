@@ -4862,25 +4862,50 @@ exports.createRedemptionOrder = async (req, res) => {
     let unitsToRedeem = 0;
     let computedAmount = 0;
     let effectiveMode = redeemMode ? redeemMode.toUpperCase() : 'UNITS';
+    const effectiveMinRedemption = Number(scheme.minRedemptionAmount) > 0 ? Number(scheme.minRedemptionAmount) : 500;
+    const maxRedeemableAmount = +(holdings.availableUnits * currentNav).toFixed(2);
 
     if (allUnits) {
       effectiveMode = 'UNITS';
       unitsToRedeem = holdings.availableUnits;
-      computedAmount = +(unitsToRedeem * currentNav).toFixed(2);
+      computedAmount = maxRedeemableAmount;
     } else if (effectiveMode === 'AMOUNT') {
       const requestedAmt = parseFloat(amount || explicitAmount);
       if (isNaN(requestedAmt) || requestedAmt <= 0) {
         return res.status(400).json({ success: false, message: 'Please specify a valid redemption amount greater than 0' });
       }
-      const maxRedeemableAmount = +(holdings.availableUnits * currentNav).toFixed(2);
       if (requestedAmt > maxRedeemableAmount) {
         return res.status(400).json({
           success: false,
           message: `Requested amount (₹${requestedAmt}) exceeds your available redeemable balance of ₹${maxRedeemableAmount} (${holdings.availableUnits} units).`,
         });
       }
-      computedAmount = requestedAmt;
-      unitsToRedeem = +(requestedAmt / currentNav).toFixed(4);
+
+      // Auto-promote to full folio exit if redeeming entire available balance
+      if (requestedAmt >= maxRedeemableAmount || Math.abs(requestedAmt - maxRedeemableAmount) < 1.0) {
+        allUnits = true;
+        unitsToRedeem = holdings.availableUnits;
+        computedAmount = maxRedeemableAmount;
+      } else {
+        computedAmount = requestedAmt;
+        unitsToRedeem = +(requestedAmt / currentNav).toFixed(4);
+
+        if (computedAmount < effectiveMinRedemption) {
+          return res.status(400).json({
+            success: false,
+            code: 'ORDER_AMOUNT_BELOW_MINIMUM',
+            message: `Minimum partial redemption amount for ${scheme.schemeName} is ₹${effectiveMinRedemption}. You entered ₹${computedAmount.toFixed(2)}. To redeem your entire remaining balance of ₹${maxRedeemableAmount.toFixed(2)} (${holdings.availableUnits} units), please select 'All Units' (allUnits: true).`,
+            data: {
+              schemeCode: scheme.schemeCode,
+              minRedemptionAmount: effectiveMinRedemption,
+              orderAmount: computedAmount,
+              availableUnits: holdings.availableUnits,
+              availableAmount: maxRedeemableAmount,
+              canRedeemAll: true,
+            },
+          });
+        }
+      }
     } else {
       // Mode: UNITS
       effectiveMode = 'UNITS';
@@ -4894,8 +4919,32 @@ exports.createRedemptionOrder = async (req, res) => {
           message: `Requested units (${requestedUnits}) exceed your available holdings (${holdings.availableUnits} units).`,
         });
       }
-      unitsToRedeem = requestedUnits;
-      computedAmount = +(unitsToRedeem * currentNav).toFixed(2);
+
+      // Auto-promote to full folio exit if redeeming all available units (or within fractional precision)
+      if (requestedUnits >= holdings.availableUnits || Math.abs(requestedUnits - holdings.availableUnits) < 0.0005) {
+        allUnits = true;
+        unitsToRedeem = holdings.availableUnits;
+        computedAmount = maxRedeemableAmount;
+      } else {
+        unitsToRedeem = requestedUnits;
+        computedAmount = +(unitsToRedeem * currentNav).toFixed(2);
+
+        if (computedAmount < effectiveMinRedemption) {
+          return res.status(400).json({
+            success: false,
+            code: 'ORDER_AMOUNT_BELOW_MINIMUM',
+            message: `Redemption order value (₹${computedAmount} for ${requestedUnits} units) is less than the minimum required for ${scheme.schemeName} (₹${effectiveMinRedemption}). To liquidate your full balance of ${holdings.availableUnits} units (₹${maxRedeemableAmount}), please select 'All Units' (allUnits: true).`,
+            data: {
+              schemeCode: scheme.schemeCode,
+              minRedemptionAmount: effectiveMinRedemption,
+              orderAmount: computedAmount,
+              availableUnits: holdings.availableUnits,
+              availableAmount: maxRedeemableAmount,
+              canRedeemAll: true,
+            },
+          });
+        }
+      }
     }
 
     // 2. Idempotency Guard (Section 15)
@@ -5012,7 +5061,7 @@ exports.createRedemptionOrder = async (req, res) => {
       client_code: ucc.clientCode,
       demat_physical: 'P',
       order_amount: allUnits ? '' : String(computedAmount),
-      allotment_units: effectiveMode === 'UNITS' ? String(unitsToRedeem) : '',
+      allotment_units: allUnits ? '' : (effectiveMode === 'UNITS' ? String(unitsToRedeem) : ''),
       all_units: allUnits ? 'Y' : 'N',
       folio_no: effectiveFolio,
       remarks: remarks || `Redemption via Vikaone app`,

@@ -433,6 +433,8 @@ async function recalculateUserPortfolio(userId) {
       day1ChangeAmount,
       day1ChangePct: day1Pct,
       pendingUnits: +h.pendingUnits.toFixed(3),
+      minRedemptionAmount: Number(schemeDoc?.minRedemptionAmount) > 0 ? Number(schemeDoc.minRedemptionAmount) : 500,
+      minRedemptionQty: Number(schemeDoc?.minRedemptionQty) > 0 ? Number(schemeDoc.minRedemptionQty) : null,
       holdingStatus: 'ACTIVE',
     };
 
