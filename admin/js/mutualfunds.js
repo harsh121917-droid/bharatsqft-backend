@@ -2457,8 +2457,8 @@ function renderMfTestingInspectResults(data) {
 
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <button class="btn btn-secondary btn-sm" onclick="refreshMfTestingInspect()" title="Refresh live database state"><i class="fas fa-sync-alt"></i> Refresh State</button>
-                    <button class="btn btn-sm" onclick="executeResetKycOnly('${escapeHtml(u._id || summary.userId || '')}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700" title="Delete KYC record and reset user KYC status to not_submitted">
-                        <i class="fas fa-user-slash"></i> Reset KYC
+                    <button class="btn btn-sm" onclick="executeResetKycOnly('${escapeHtml(u._id || summary.userId || '')}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700" title="Reset SEBI KYC to not_submitted & activate Fresh e-KYC Test Mode for mobile app">
+                        <i class="fas fa-user-slash"></i> Reset SEBI KYC
                     </button>
                     <button class="btn btn-sm" onclick="executeResetSipsOnly()" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700" title="Delete all active SIP schedules only">
                         <i class="fas fa-redo"></i> Reset SIPs Only (${sips.length})
@@ -2517,7 +2517,7 @@ function renderMfTestingInspectResults(data) {
             <div class="card" style="padding:16px;background:#0d1527;border:1px solid #1e293b;border-radius:10px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                     <div style="font-weight:700;color:#fff;font-size:13.5px;display:flex;align-items:center;gap:6px">
-                        <i class="fas fa-shield-alt" style="color:#3b82f6"></i> KYC & Legal Identity
+                        <i class="fas fa-shield-alt" style="color:#3b82f6"></i> SEBI KYC & Legal Identity
                     </div>
                     <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${(kyc?.status==='approved' || u?.kycStatus==='approved')?'rgba(0,208,156,0.15)':'rgba(245,158,11,0.15)'};color:${(kyc?.status==='approved' || u?.kycStatus==='approved')?'#00D09C':'#f59e0b'}">
                         ${kyc ? escapeHtml(kyc.status.toUpperCase()) : (u?.kycStatus ? escapeHtml(u.kycStatus.toUpperCase()) : 'NO KYC')}
@@ -2530,10 +2530,10 @@ function renderMfTestingInspectResults(data) {
                     <div>Verification Source: <span style="color:#fff;background:#1e293b;padding:1px 6px;border-radius:4px;font-size:11px">${escapeHtml(kyc?.verificationSource || 'NONE')}</span></div>
                     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
                         <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px;width:100%" onclick="executeTestUserKyc('${escapeHtml(u._id || summary.userId || '')}', '${escapeHtml(kyc?.panNumber || u?.panNumber || ucc?.pan || '')}')">
-                            <i class="fas fa-vial"></i> Test / Check KYC on NSE
+                            <i class="fas fa-vial"></i> Test / Check SEBI KYC on NSE
                         </button>
                         <button class="btn btn-sm" style="font-size:11px;padding:4px 8px;width:100%;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="executeResetKycOnly('${escapeHtml(u._id || summary.userId || '')}')">
-                            <i class="fas fa-user-slash"></i> Reset KYC Only (Fresh State)
+                            <i class="fas fa-user-slash"></i> Reset SEBI KYC (Fresh Test Mode)
                         </button>
                     </div>
                 </div>
@@ -2635,7 +2635,7 @@ function renderMfTestingInspectResults(data) {
                 <label style="display:flex;align-items:flex-start;gap:8px;color:#fca5a5;font-size:13px;cursor:pointer">
                     <input type="checkbox" id="mf-reset-chk-kyc" checked style="margin-top:3px;accent-color:#ef4444" />
                     <div>
-                        <b>Test KYC & PAN Record</b> (${kyc ? '1 record' : '0'})
+                        <b>SEBI KYC & PAN Record (Fresh Test Mode)</b> (${kyc ? '1 record' : '0'})
                         <div style="font-size:11px;color:#f87171">Clears test/dummy PAN & name to test fresh PAN onboarding without name conflicts</div>
                     </div>
                 </label>
@@ -2808,7 +2808,7 @@ async function executeResetKycOnly(targetUserId) {
     }
 
     const userName = currentInspectedMfUser?.summary?.name || query;
-    const confirmMsg = `⚠️ Are you sure you want to RESET KYC for "${userName}" (${query})?\n\nThis will:\n• Delete the user's KYC record\n• Reset KYC status to 'not_submitted'\n• Clear verified PAN and legal name\n\nThis allows you to re-test the fresh e-KYC flow on the mobile app or in Admin without any leftover state.\n\nProceed?`;
+    const confirmMsg = `⚠️ Are you sure you want to RESET SEBI KYC for "${userName}" (${query})?\n\nThis will:\n• Delete the user's KYC record\n• Reset SEBI KYC status to 'not_submitted'\n• Enable Fresh SEBI e-KYC Test Mode for mobile app\n• Clear verified PAN and legal name cache\n\nThis allows you to re-test the fresh CAMS / NSE paperless e-KYC flow directly in the mobile app without being skipped by existing KRA records.\n\nProceed?`;
     if (!confirm(confirmMsg)) return;
 
     try {
@@ -2818,7 +2818,7 @@ async function executeResetKycOnly(targetUserId) {
         });
 
         if (res && res.success) {
-            toast(res.message || 'KYC reset successfully! 🎉 Ready for fresh testing.', 'success');
+            toast(res.message || 'SEBI KYC reset successfully! 🎉 Fresh e-KYC Test Mode active for mobile app.', 'success');
             await searchMfTestUser(query);
             if (typeof loadMfInvestors === 'function') loadMfInvestors(1);
         } else {
