@@ -5051,7 +5051,7 @@ exports.createRedemptionOrder = async (req, res) => {
       });
     }
 
-    // 3. Prepare NSE Redemption payload (Order Entry RED)
+    // 3. Prepare NSE Redemption payload (Order Entry RED - NSE MFSS NNF Spec page 8)
     const cleanRedeemRef = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
     const nseRedemptionPayload = {
       order_ref_number: cleanRedeemRef,
@@ -5060,14 +5060,26 @@ exports.createRedemptionOrder = async (req, res) => {
       buy_sell_type: 'ADDITIONAL',
       client_code: ucc.clientCode,
       demat_physical: 'P',
-      order_amount: allUnits ? '' : String(computedAmount),
+      order_amount: allUnits ? '' : (effectiveMode === 'AMOUNT' ? String(computedAmount) : ''),
+      redemption_units: allUnits ? '' : (effectiveMode === 'UNITS' ? String(unitsToRedeem) : ''),
       allotment_units: allUnits ? '' : (effectiveMode === 'UNITS' ? String(unitsToRedeem) : ''),
       all_units: allUnits ? 'Y' : 'N',
       folio_no: effectiveFolio,
       remarks: remarks || `Redemption via Vikaone app`,
+      kyc_flag: 'Y',
+      kyc_declaration_flag: 'Y',
+      sub_broker_code: '',
+      euin_number: '',
+      euin_declaration: 'N',
+      min_redemption_flag: allUnits || (unitsToRedeem && unitsToRedeem < 50) ? 'Y' : 'N',
+      dpc_flag: 'Y',
+      sub_broker_arn: '',
+      bank_ref_no: '',
       account_no: ucc.primaryBank?.accountNo || '',
       mobile_no: user?.phone?.slice(-10) || '',
       email: user?.email || '',
+      mandate_id: '',
+      filler1: '',
       member_unique_id: '',
     };
 
@@ -5093,6 +5105,17 @@ exports.createRedemptionOrder = async (req, res) => {
 
     const nseTrxnOrderId = isSuccess ? String(rawOrderId) : (nseClient.isMockMode() ? String(rawOrderId || `TEST_RED_${Date.now()}`) : null);
 
+    // Fetch official NSE 2FA authorization link for redemption if generated
+    let redemptionAuthLink = '';
+    if (isSuccess && nseTrxnOrderId && !nseClient.isMockMode()) {
+      try {
+        const linkRes = await nseClient.getShortLink('RED', nseTrxnOrderId);
+        redemptionAuthLink = linkRes?.data?.firstHolderLink || linkRes?.firstHolderLink || '';
+      } catch (linkErr) {
+        console.warn('[createRedemptionOrder] getShortLink error:', linkErr.message);
+      }
+    }
+
     // 5. Save Redemption Order (Section 9)
     const redemptionOrder = await MfOrder.create({
       user: userId,
@@ -5113,6 +5136,7 @@ exports.createRedemptionOrder = async (req, res) => {
       navAtOrder: scheme.nav,
       paymentMode: 'DIRECT_AMC_PAYOUT',
       paymentStatus: 'SUCCESS', // Payment doesn't debit user; AMC settles payout directly to bank
+      paymentLink: redemptionAuthLink || '',
       payoutStatus: 'PENDING_AMC',
       orderStatus: isSuccess ? 'SUBMITTED' : (nseClient.isMockMode() ? 'SUBMITTED' : 'FAILED'),
       payoutBank: {
@@ -5156,6 +5180,8 @@ exports.createRedemptionOrder = async (req, res) => {
         totalConfirmedUnits: holdings.totalConfirmedUnits,
         estimatedPayout: computedAmount,
         payoutBank: redemptionOrder.payoutBank,
+        authLink: redemptionAuthLink || null,
+        redemptionAuthLink: redemptionAuthLink || null,
       },
     });
   } catch (error) {

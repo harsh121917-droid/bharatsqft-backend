@@ -674,6 +674,27 @@ class NseClient {
       if (sanitized.order_ref_number) {
         sanitized.order_ref_number = sanitized.order_ref_number.replace(/[^a-zA-Z0-9]/g, '').slice(0, 19);
       }
+      // Mandatory NSE MFSS transaction flags (NNF v1.9.8 Spec page 8)
+      if (!sanitized.kyc_flag) {
+        sanitized.kyc_flag = 'Y';
+      }
+      if (!sanitized.kyc_declaration_flag) {
+        sanitized.kyc_declaration_flag = sanitized.kyc_flag || 'Y';
+      }
+      if (!sanitized.euin_declaration) {
+        sanitized.euin_declaration = 'N';
+      }
+      if (!sanitized.dpc_flag) {
+        sanitized.dpc_flag = 'Y';
+      }
+      if (sanitized.min_redemption_flag === undefined || sanitized.min_redemption_flag === null || sanitized.min_redemption_flag === '') {
+        sanitized.min_redemption_flag = (sanitized.trxn_type === 'R' && (sanitized.all_units === 'Y' || Number(sanitized.redemption_units || sanitized.allotment_units) < 50)) ? 'Y' : 'N';
+      }
+      if (sanitized.trxn_type === 'R') {
+        if (!sanitized.redemption_units && sanitized.allotment_units) {
+          sanitized.redemption_units = sanitized.allotment_units;
+        }
+      }
       return sanitized;
     });
     return this.post('/nsemfdesk/api/v2/transaction/NORMAL', {
