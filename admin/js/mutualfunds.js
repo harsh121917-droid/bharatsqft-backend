@@ -1976,10 +1976,14 @@ async function resendCurrentInvestorUccAuth() {
         toast('Re-dispatching NSE authorization communication...', 'info');
         const res = await api(`/admin/mutual-funds/users/${encodeURIComponent(uid)}/resend-auth`, { method: 'POST' });
         if (res && res.success) {
-            toast('Official OTP Authorization SMS/Email sent to investor ✓', 'success');
-            if (res.data?.authLink) {
-                if (navigator.clipboard) await navigator.clipboard.writeText(res.data.authLink);
-                prompt('Official NSE Authorization Link (Share with investor):', res.data.authLink);
+            if (res.data?.isAlreadyActive && !res.data?.authLink) {
+                toast(res.message || `Client ${res.data?.clientCode || ''} is already ACTIVE on NSE MFSS ✓ (No activation required)`, 'success');
+            } else {
+                toast('Official OTP Authorization SMS/Email sent to investor ✓', 'success');
+                if (res.data?.authLink) {
+                    if (navigator.clipboard) await navigator.clipboard.writeText(res.data.authLink);
+                    prompt('Official NSE Authorization Link (Share with investor):', res.data.authLink);
+                }
             }
         } else {
             toast(res?.message || 'Failed to resend authorization communication', 'danger');

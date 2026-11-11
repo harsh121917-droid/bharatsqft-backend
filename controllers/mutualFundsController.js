@@ -1298,7 +1298,7 @@ exports.getUserUcc = async (req, res) => {
 
       // Filter out dummy/stale test PANs from prefill
       const dummyPans = ['ABCDE1234F', 'AAAAA0000A', 'XXXXX0000X', 'TYJPS0689R', 'PHOTO_SUBMITTED'];
-      const rawPan = kyc?.panNumber || user?.panNumber || '';
+      const rawPan = (user?.testFreshKyc) ? '' : (kyc?.panNumber || user?.panNumber || '');
       const cleanPan = dummyPans.includes(rawPan) ? '' : rawPan;
 
       let prefillDob = '';
@@ -1986,6 +1986,7 @@ exports.registerUserUcc = async (req, res) => {
         isKycVerified: true,
         kycStatus: 'approved',
         mfClientCode: clientCode,
+        testFreshKyc: false,
       }).catch(() => {});
 
       const Kyc = require('../models/Kyc');
@@ -6296,6 +6297,7 @@ exports.verifyPanDetails = async (req, res) => {
 
     const userId = req.user?._id;
     const user = userId ? await User.findById(userId).catch(() => null) : null;
+    const isTestFreshKyc = Boolean(user?.testFreshKyc || req.query?.testMode === 'fresh_kyc' || req.body?.testMode === 'fresh_kyc');
     let registeredName = '';
     let isNseVerified = false;
     let isKraVerified = false;
@@ -6310,7 +6312,7 @@ exports.verifyPanDetails = async (req, res) => {
           ...(userId ? [{ user: userId, pan: panClean }] : [])
         ]
       }).catch(() => null);
-      if (existingUcc && existingUcc.nseStatus === 'ACTIVE') {
+      if (existingUcc && existingUcc.nseStatus === 'ACTIVE' && !isTestFreshKyc) {
         isNseVerified = true;
         verifiedSource = 'NSE_UCC_ACTIVE';
       }
@@ -6332,15 +6334,17 @@ exports.verifyPanDetails = async (req, res) => {
         kraName = kycData.kra_name || 'ndmlkra';
         discoveredClientCode = reportItem?.client_code || kycData.client_code || '';
 
+        const candidateName = (reportItem?.holder_name || kycData.name || kycData.client_name || '').trim().toUpperCase();
+        if (candidateName) {
+          registeredName = candidateName;
+        }
+
         // Status 'S' / 'Y' = Success (KYC REGISTERED / Validated on KRA/NSE)
-        if (kycStatus === 'S' || kycStatus === 'Y') {
+        if ((kycStatus === 'S' || kycStatus === 'Y') && !isTestFreshKyc) {
           isNseVerified = true;
           isKraVerified = true;
           verifiedSource = 'NSE_MFSS_KYC_VERIFY';
-          const candidateName = (reportItem?.holder_name || kycData.name || kycData.client_name || '').trim().toUpperCase();
-          if (candidateName) {
-            registeredName = candidateName;
-          }
+          // registeredName already captured above for test mode and prefill
           if (userId && registeredName) {
             try {
               const Kyc = require('../models/Kyc');
@@ -6481,7 +6485,7 @@ exports.verifyPanDetails = async (req, res) => {
     }
 
     // 7. Decision Gate: Existing KRA Investor vs Fresh First-Time Investor
-    const isFreshInvestor = !isNseVerified && !isKraVerified;
+    const isFreshInvestor = isTestFreshKyc || (!isNseVerified && !isKraVerified);
 
     // Resolve saved bank details to attach to PAN response for instant UI pre-population
     let panBankDetails = null;
@@ -6544,16 +6548,18 @@ exports.verifyPanDetails = async (req, res) => {
                 panRegisteredName: freshName,
                 kraName: 'NONE',
                 verificationSource: 'NSE_MFSS_KYC_VERIFY',
-                status: 'approved',
+                status: isTestFreshKyc ? 'not_submitted' : 'approved',
               },
             },
             { upsert: true, new: true }
           );
-          await User.findByIdAndUpdate(userId, {
-            panNumber: panClean,
-            isKycVerified: true,
-            kycStatus: 'approved',
-          });
+          if (!isTestFreshKyc) {
+            await User.findByIdAndUpdate(userId, {
+              panNumber: panClean,
+              isKycVerified: true,
+              kycStatus: 'approved',
+            });
+          }
         } catch (_) {}
       }
       return res.json({

@@ -101,6 +101,10 @@ const UserSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    testFreshKyc: {
+      type: Boolean,
+      default: false,
+    },
     profilePicture: {
       type: String,
       default: "",

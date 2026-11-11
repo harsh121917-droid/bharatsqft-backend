@@ -870,6 +870,7 @@ exports.resetMfTestingUser = async (req, res) => {
             kycStatus: 'not_submitted',
             isKycVerified: false,
             panNumber: '',
+            testFreshKyc: true,
           },
           $unset: {
             panRegisteredName: 1,
@@ -974,6 +975,7 @@ exports.resetUserKyc = async (req, res) => {
             kycStatus: 'not_submitted',
             isKycVerified: false,
             panNumber: '',
+            testFreshKyc: true,
           },
           $unset: {
             panRegisteredName: 1,
@@ -1003,7 +1005,7 @@ exports.resetUserKyc = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `KYC successfully reset for ${user?.name || user?.phone || query}. User is now in fresh 'not_submitted' state and ready for fresh e-KYC testing.`,
+      message: `SEBI KYC successfully reset for ${user?.name || user?.phone || query}. User is now in fresh 'not_submitted' state and ready for fresh e-KYC testing.`,
       data: {
         userId: targetUserId,
         kycRecordsDeleted: delKyc.deletedCount,
@@ -2975,16 +2977,27 @@ exports.resendUccAuth = async (req, res) => {
       return res.status(404).json({ success: false, message: 'UCC record not found' });
     }
 
-    const resendRes = await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+    const isAlreadyActive = ucc.nseStatus === 'ACTIVE';
     const shortLinkRes = await nseClient.getShortLink('CL_ACT', ucc.clientCode).catch(() => null);
+    const authLink = shortLinkRes?.data?.short_url || shortLinkRes?.data?.url || null;
+
+    let resendRes = null;
+    try {
+      resendRes = await nseClient.resendCommunication('CL_ACT', ucc.clientCode);
+    } catch (_) {}
+
+    const message = isAlreadyActive && !authLink
+      ? `Client ${ucc.clientCode} (${ucc.fullName}) is already ACTIVE on NSE MFSS. No activation link or OTP is required.`
+      : `Authorization communication re-dispatched for client ${ucc.clientCode}`;
 
     return res.json({
       success: true,
-      message: `Authorization communication re-dispatched for client ${ucc.clientCode}`,
+      message,
       data: {
         resendRes,
-        authLink: shortLinkRes?.data?.short_url || shortLinkRes?.data?.url || null,
+        authLink,
         clientCode: ucc.clientCode,
+        isAlreadyActive,
       },
     });
   } catch (error) {
