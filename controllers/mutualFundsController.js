@@ -4240,6 +4240,89 @@ exports.cancelUserSip = async (req, res) => {
   }
 };
 
+// ── 7i-2. POST /api/mutual-funds/orders/:orderId/cancel (Cancel Pending Order & Release Units) ──
+exports.cancelOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { orderId } = req.params;
+
+    const order = await MfOrder.findOne({
+      user: userId,
+      $or: [
+        { orderId: orderId },
+        { _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null },
+        { nseTrxnOrderId: orderId },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.orderStatus === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Order is already cancelled' });
+    }
+
+    if (['ALLOTTED', 'PROCESSED', 'COMPLETED'].includes(order.orderStatus) || order.allotmentStatus === 'ALLOTTED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel an order that has already been allotted or settled by the exchange/AMC.',
+      });
+    }
+
+    let exchangeRemark = '';
+    // If order has an NSE transaction order ID and client code, send cancellation request to exchange
+    if (order.nseTrxnOrderId && order.clientCode) {
+      try {
+        const canRes = await nseClient.cancelOrder(order.clientCode, order.nseTrxnOrderId, 'Cancelled by investor');
+        console.log(`[cancelOrder] NSE cancel response for ${order.nseTrxnOrderId}:`, canRes);
+        const canItem = canRes?.data?.can_data?.[0];
+        if (canItem?.remarks || canItem?.can_remark) {
+          exchangeRemark = canItem.remarks || canItem.can_remark;
+        }
+      } catch (nseErr) {
+        console.warn(`[cancelOrder] NSE exchange cancel warning for ${order.nseTrxnOrderId}:`, nseErr.message);
+      }
+    }
+
+    const prevStatus = order.orderStatus;
+    order.orderStatus = 'CANCELLED';
+    order.remarks = `Cancelled by user. ${exchangeRemark ? '(' + exchangeRemark + ')' : ''}`.trim();
+    order.cancelledAt = new Date();
+    await order.save();
+
+    // Recalculate user portfolio so pending units immediately free up
+    await mfPortfolioEngine.recalculateUserPortfolio(userId);
+
+    // Audit log
+    await mfIdempotencyService.recordAuditLog({
+      event: 'ORDER_CANCELLED',
+      entityType: 'ORDER',
+      entityId: order._id,
+      user: userId,
+      previousState: { orderStatus: prevStatus },
+      newState: { orderStatus: order.orderStatus, cancelledAt: order.cancelledAt },
+      source: 'USER_ACTION',
+      actor: String(userId),
+      reason: 'Cancelled by investor',
+    });
+
+    return res.json({
+      success: true,
+      message: `Order ${order.orderId} cancelled successfully. Any pending units have been released back to your portfolio.`,
+      data: {
+        orderId: order.orderId,
+        schemeCode: order.schemeCode,
+        orderStatus: order.orderStatus,
+        unitsReleased: order.redemptionUnits || order.units || 0,
+      },
+    });
+  } catch (error) {
+    console.error('[cancelOrder Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 7j. GET /api/mutual-funds/tax/capital-gains (Realized Capital Gains Report) ──
 exports.getCapitalGains = async (req, res) => {
   try {
@@ -4852,10 +4935,61 @@ exports.createRedemptionOrder = async (req, res) => {
     }
 
     if (holdings.availableUnits <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: `All your ${holdings.totalConfirmedUnits} units in ${scheme.schemeName} are currently pending redemption. No additional units are available to redeem.`,
-      });
+      // Check if user has an existing pending redemption order for this scheme
+      const pendingRedemption = await MfOrder.findOne({
+        user: userId,
+        schemeCode: scheme.schemeCode,
+        transactionType: 'R',
+        orderStatus: { $in: ['SUBMITTED', 'PENDING', 'CREATED'] },
+      }).sort({ createdAt: -1 });
+
+      // If client explicitly requested cancellation of pending redemption to re-place fresh order
+      if (req.body.cancelPending === true || req.body.replacePending === true || req.body.force === true) {
+        if (pendingRedemption) {
+          try {
+            if (pendingRedemption.nseTrxnOrderId && pendingRedemption.clientCode) {
+              await nseClient.cancelOrder(pendingRedemption.clientCode, pendingRedemption.nseTrxnOrderId, 'Replaced by new redemption');
+            }
+          } catch (_) {}
+          pendingRedemption.orderStatus = 'CANCELLED';
+          pendingRedemption.remarks = 'Cancelled to place new redemption order';
+          pendingRedemption.cancelledAt = new Date();
+          await pendingRedemption.save();
+          await mfPortfolioEngine.recalculateUserPortfolio(userId);
+
+          const updatedHoldings = await getDetailedUserSchemeHoldings(userId, scheme.schemeCode);
+          holdings.availableUnits = updatedHoldings.availableUnits;
+        }
+      }
+
+      if (holdings.availableUnits <= 0) {
+        return res.status(400).json({
+          success: false,
+          code: 'PENDING_REDEMPTION_EXISTS',
+          message: `All your ${holdings.totalConfirmedUnits} units in ${scheme.schemeName} are currently pending redemption${pendingRedemption ? ` under order #${pendingRedemption.orderId}` : ''}. You can complete 2FA authorization using the authLink or cancel that order.`,
+          data: {
+            schemeCode: scheme.schemeCode,
+            schemeName: scheme.schemeName,
+            totalConfirmedUnits: holdings.totalConfirmedUnits,
+            pendingOrder: pendingRedemption
+              ? {
+                  orderId: pendingRedemption.orderId,
+                  nseTrxnOrderId: pendingRedemption.nseTrxnOrderId,
+                  units: pendingRedemption.units || pendingRedemption.redemptionUnits,
+                  orderStatus: pendingRedemption.orderStatus,
+                  authLink: pendingRedemption.paymentLink || null,
+                  redemptionAuthLink: pendingRedemption.paymentLink || null,
+                  paymentLink: pendingRedemption.paymentLink || null,
+                  createdAt: pendingRedemption.createdAt,
+                }
+              : null,
+            authLink: pendingRedemption?.paymentLink || null,
+            redemptionAuthLink: pendingRedemption?.paymentLink || null,
+            canCancel: !!pendingRedemption,
+            orderId: pendingRedemption?.orderId || null,
+          },
+        });
+      }
     }
 
     const currentNav = scheme.nav && scheme.nav > 0 ? scheme.nav : 10.0;

@@ -2628,6 +2628,54 @@ exports.updateMfOrderPayoutStatus = async (req, res) => {
   }
 };
 
+// ── 22b. POST /api/admin/mutual-funds/orders/:id/cancel (Admin Order Cancellation & Unit Release) ──
+exports.cancelMfOrderAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const nseClient = require('../services/nse/nseClient');
+    const order = await MfOrder.findOne({
+      $or: [
+        { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null },
+        { orderId: id },
+        { nseTrxnOrderId: id },
+      ],
+    });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    let exchangeRemark = '';
+    if (order.nseTrxnOrderId && order.clientCode) {
+      try {
+        const canRes = await nseClient.cancelOrder(order.clientCode, order.nseTrxnOrderId, 'Cancelled by admin');
+        const canItem = canRes?.data?.can_data?.[0];
+        if (canItem?.remarks || canItem?.can_remark) {
+          exchangeRemark = canItem.remarks || canItem.can_remark;
+        }
+      } catch (nseErr) {
+        console.warn(`[cancelMfOrderAdmin] NSE cancel warning for ${order.nseTrxnOrderId}:`, nseErr.message);
+      }
+    }
+
+    order.orderStatus = 'CANCELLED';
+    order.remarks = `Cancelled by administrator. ${exchangeRemark ? '(' + exchangeRemark + ')' : ''}`.trim();
+    order.cancelledAt = new Date();
+    await order.save();
+
+    if (order.user) {
+      const { recalculateUserPortfolio } = require('../services/mfPortfolioEngine');
+      await recalculateUserPortfolio(order.user);
+    }
+
+    return res.json({
+      success: true,
+      message: `Order ${order.orderId} cancelled by admin and portfolio units released.`,
+      data: { order },
+    });
+  } catch (error) {
+    console.error('[cancelMfOrderAdmin Error]:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── 23. POST /api/admin/mutual-funds/master/reconcile ──
 exports.reconcileNseMaster = async (req, res) => {
   try {

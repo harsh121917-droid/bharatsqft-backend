@@ -265,6 +265,7 @@ router.post("/mutual-funds/reconciliation/sync-folios", adminMfController.syncMi
 router.post("/mutual-funds/reconciliation/sync-direct-nse", adminMfController.syncDirectNseTransactions);
 router.post("/mutual-funds/reconciliation/resolve/:discrepancyId", adminMfController.resolveDiscrepancy);
 router.post("/mutual-funds/orders/:id/payout-status", adminMfController.updateMfOrderPayoutStatus);
+router.post("/mutual-funds/orders/:id/cancel", adminMfController.cancelMfOrderAdmin);
 
 // Business Opportunities Management
 const {

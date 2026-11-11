@@ -24,6 +24,7 @@ const {
   pauseUserSip,
   resumeUserSip,
   cancelUserSip,
+  cancelOrder,
   getCapitalGains,
   confirmOrderAllotment,
   settleRedemptionOrder,
@@ -106,6 +107,7 @@ router.get('/orders/:orderId/status', syncOrderStatus);
 router.post('/orders/:orderId/sync-status', syncOrderStatus);
 router.post('/orders/verify', verifyPurchasePayment);
 router.post('/orders/redeem', createRedemptionOrder);
+router.post('/orders/:orderId/cancel', cancelOrder);
 router.post('/orders/switch', createSwitchOrder);
 router.post('/orders/:orderId/confirm-allotment', confirmOrderAllotment);
 router.post('/orders/:orderId/settle-redemption', settleRedemptionOrder);
