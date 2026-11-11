@@ -6,6 +6,52 @@ const nseEncryption = require('./nseEncryption');
  * Client Gateway
  */
 
+// ── Official NSE MFSS RTA AMC Codes (NNF v1.9.8 Doc page 170-171: B, K, H, G, CR, O, UK and sample AXF) ──
+const RTA_AMC_CODE_MAP = {
+  // Direct NSE MFSS RTA AMC codes:
+  'H': 'H',       // HDFC Mutual Fund (CAMS - India's #1 fund house)
+  'G': 'G',       // DSP Mutual Fund (CAMS)
+  'B': 'B',       // Aditya Birla Sun Life Mutual Fund (CAMS)
+  'AXF': 'AXF',   // Axis Mutual Fund (CAMS)
+  'K': 'K',       // Kotak Mahindra Mutual Fund (KFintech)
+  'CR': 'CR',     // Canara Robeco Mutual Fund (CAMS)
+  'O': 'O',       // HSBC Mutual Fund (CAMS)
+  'UK': 'UK',     // UTI Mutual Fund (KFintech)
+
+  // Full name / Broker code aliases:
+  'DSP': 'G',
+  'DSP_MF': 'G',
+  'DSPBR': 'G',
+  'HDFC': 'H',
+  'HDFC_MF': 'H',
+  'BIRLA': 'B',
+  'ADITYA_BIRLA': 'B',
+  'ABSL': 'B',
+  'AXIS': 'AXF',
+  'AXIS_MF': 'AXF',
+  'KOTAK': 'K',
+  'KOTAK_MF': 'K',
+  'CANARA': 'CR',
+  'CANARA_ROBECO': 'CR',
+  'HSBC': 'O',
+  'UTI': 'UK',
+  'UTI_MF': 'UK',
+};
+
+const AUTHORIZED_RTA_AMC_CODES = ['H', 'G', 'B', 'AXF', 'K', 'CR', 'O', 'UK'];
+
+function resolveRtaAmcCode(input) {
+  if (!input) return 'H';
+  const clean = String(input).trim().toUpperCase();
+  if (RTA_AMC_CODE_MAP[clean]) {
+    return RTA_AMC_CODE_MAP[clean];
+  }
+  if (AUTHORIZED_RTA_AMC_CODES.includes(clean)) {
+    return clean;
+  }
+  return 'H';
+}
+
 class NseClient {
   constructor() {
     this.env = process.env.NSE_ENV || 'UAT'; // 'UAT' or 'PROD'
@@ -886,15 +932,72 @@ class NseClient {
     return this.post('/nsemfdesk/api/v2/reports/client_master_report', payload);
   }
 
+  resolveRtaAmcCode(input) {
+    return resolveRtaAmcCode(input);
+  }
+
   // ── 13d. Official NSE MFSS eKYC Fresh Registration (NNF v1.9.8 Doc page 170-171) ──
-  async initiateEkycRegistration({ amcCode = 'DSP', panNo, mobileNo, invEmail } = {}) {
-    const payload = {
-      amcCode: String(amcCode || 'DSP').trim(),
-      panNo: String(panNo || '').trim().toUpperCase(),
-      mobileNo: String(mobileNo || '').replace(/[^0-9]/g, '').slice(-10),
-      invEmail: String(invEmail || '').trim().toLowerCase(),
+  async initiateEkycRegistration({ amcCode = 'H', panNo, mobileNo, invEmail } = {}) {
+    const primaryAmc = resolveRtaAmcCode(amcCode);
+    const cleanPan = String(panNo || '').trim().toUpperCase();
+    const cleanMobile = String(mobileNo || '').replace(/[^0-9]/g, '').slice(-10);
+    const cleanEmail = String(invEmail || '').trim().toLowerCase();
+
+    // Mock mode handling
+    if (this.isMockMode()) {
+      const mockRes = this.getMockResponse('/nsemfdesk/api/v1/EKYC/EKYCREG', {
+        amcCode: primaryAmc,
+        panNo: cleanPan,
+        mobileNo: cleanMobile,
+        invEmail: cleanEmail,
+      });
+      mockRes.usedAmcCode = primaryAmc;
+      return mockRes;
+    }
+
+    const isAmcError = (res) => {
+      if (!res || res.success) return false;
+      const combined = `${res.message || ''} ${JSON.stringify(res.error || '')}`.toLowerCase();
+      return combined.includes('invalid rta amc code') || combined.includes('rta amc');
     };
-    return this.post('/nsemfdesk/api/v1/EKYC/EKYCREG', payload);
+
+    // Candidate list starting with primary resolved code, followed by remaining valid codes
+    const candidates = [
+      primaryAmc,
+      ...AUTHORIZED_RTA_AMC_CODES.filter((c) => c !== primaryAmc),
+    ];
+
+    let lastRes = null;
+    let usedAmc = primaryAmc;
+
+    for (const currentAmc of candidates) {
+      usedAmc = currentAmc;
+      const payload = {
+        amcCode: currentAmc,
+        panNo: cleanPan,
+        mobileNo: cleanMobile,
+        invEmail: cleanEmail,
+      };
+
+      console.log(`[NSE eKYC] Dispatching EKYCREG to NSE gateway with AMC code: '${currentAmc}' for PAN: ${cleanPan}`);
+      lastRes = await this.post('/nsemfdesk/api/v1/EKYC/EKYCREG', payload);
+
+      if (lastRes && lastRes.success) {
+        lastRes.usedAmcCode = usedAmc;
+        return lastRes;
+      }
+
+      if (!isAmcError(lastRes)) {
+        // If error is unrelated to AMC code (e.g., invalid PAN, network failure, 403, etc.), return immediately
+        if (lastRes) lastRes.usedAmcCode = usedAmc;
+        return lastRes;
+      }
+
+      console.warn(`[NSE eKYC] NSE gateway rejected amcCode '${currentAmc}' with Invalid RTA AMC error. Automatically trying next candidate...`);
+    }
+
+    if (lastRes) lastRes.usedAmcCode = usedAmc;
+    return lastRes;
   }
 
   // ── 14. Order Cancellation ──

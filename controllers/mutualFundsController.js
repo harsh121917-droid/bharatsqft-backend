@@ -8112,12 +8112,12 @@ exports.initiateEkyc = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid email address is required to receive eKYC link' });
     }
 
-    const effectiveAmc = String(amcCode || 'DSP').trim();
+    const resolvedAmc = nseClient.resolveRtaAmcCode ? nseClient.resolveRtaAmcCode(amcCode) : 'H';
 
-    console.log(`[initiateEkyc] Requesting NSE eKYC link for PAN: ${cleanPan}, Email: ${cleanEmail}, AMC: ${effectiveAmc}`);
+    console.log(`[initiateEkyc] Requesting NSE eKYC link for PAN: ${cleanPan}, Email: ${cleanEmail}, AMC: ${resolvedAmc}`);
 
     const nseRes = await nseClient.initiateEkycRegistration({
-      amcCode: effectiveAmc,
+      amcCode: resolvedAmc,
       panNo: cleanPan,
       mobileNo: cleanMobile,
       invEmail: cleanEmail,
@@ -8133,6 +8133,7 @@ exports.initiateEkyc = async (req, res) => {
 
     const ekycLink = nseRes.data.link || '';
     const message = nseRes.data.message || 'EKYC registration initiated successfully';
+    const effectiveAmc = nseRes.usedAmcCode || resolvedAmc;
 
     // Update local Kyc tracking record non-destructively
     try {
