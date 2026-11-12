@@ -87,6 +87,10 @@ const UserSchema = new mongoose.Schema(
       enum: ["not_submitted", "pending", "approved", "rejected"],
       default: "not_submitted",
     },
+    showCompanyBankDetails: {
+      type: Boolean,
+      default: false,
+    },
     avatar: {
       type: String,
       default: "",

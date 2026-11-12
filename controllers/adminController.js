@@ -1077,7 +1077,7 @@ exports.syncUserPendingPayments = async (req, res, next) => {
 
 exports.updateUser = async (req, res, next) => {
     try {
-        const allowed = ["name", "phone", "role", "isActive", "kycStatus"];
+        const allowed = ["name", "phone", "role", "isActive", "kycStatus", "showCompanyBankDetails"];
         const updates = {};
         allowed.forEach((k) => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
         const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
@@ -1089,6 +1089,22 @@ exports.updateUser = async (req, res, next) => {
         }
 
         res.json({ success: true, data: user });
+    } catch (err) { next(err); }
+};
+
+// ── TOGGLE COMPANY BANK & QR DETAILS VISIBILITY FOR A SPECIFIC USER ───────────
+exports.toggleCompanyBankVisibility = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        user.showCompanyBankDetails = !user.showCompanyBankDetails;
+        await user.save();
+        res.json({
+            success: true,
+            message: `Company QR & Bank Details ${user.showCompanyBankDetails ? "shown" : "hidden"} for ${user.name || "this user"}`,
+            data: user,
+            showCompanyBankDetails: user.showCompanyBankDetails
+        });
     } catch (err) { next(err); }
 };
 

@@ -981,6 +981,7 @@ async function saveUser() {
         role: document.getElementById("user-role")?.value || "user",
         kycStatus: document.getElementById("user-kyc-status")?.value || "not_submitted",
         isActive: document.getElementById("user-active")?.checked !== false,
+        showCompanyBankDetails: document.getElementById("user-show-company-bank")?.checked === true,
     };
 
     if (!payload.name) {
@@ -1110,6 +1111,8 @@ function syncUserModalFields(u) {
     if (urole) urole.value = u.role || "user";
     const uactive = document.getElementById("user-active");
     if (uactive) uactive.checked = u.isActive !== false;
+    const uShowBank = document.getElementById("user-show-company-bank");
+    if (uShowBank) uShowBank.checked = u.showCompanyBankDetails === true;
     const ukyc = document.getElementById("user-kyc-status");
     if (ukyc) ukyc.value = u.kycStatus || (u.kycVerified ? "approved" : "not_submitted");
 }
@@ -1533,6 +1536,56 @@ function renderUserDetailsContent(u) {
     renderUdTransactionsTab(u);
     renderUdWalletTab(u);
     renderUdKycTab(u);
+
+    // Update Company Bank & QR visibility button state
+    updateCompanyBankButton(u.showCompanyBankDetails === true);
+}
+
+function updateCompanyBankButton(isShown) {
+    const btn = document.getElementById("btn-ud-toggle-company-bank");
+    const icon = document.getElementById("icon-ud-toggle-company-bank");
+    const text = document.getElementById("text-ud-toggle-company-bank");
+    if (!btn) return;
+    if (isShown) {
+        btn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+        btn.style.color = "#fff";
+        btn.style.border = "none";
+        btn.title = "Company QR & Bank is currently SHOWN to this user in their app. Click to hide.";
+        if (text) text.textContent = "QR & Bank: Shown ✓";
+        if (icon) icon.className = "fas fa-eye";
+    } else {
+        btn.style.background = "rgba(212,160,23,0.12)";
+        btn.style.color = "var(--gold)";
+        btn.style.border = "1px solid rgba(212,160,23,0.3)";
+        btn.title = "Company QR & Bank is currently HIDDEN from this user. Click to show.";
+        if (text) text.textContent = "QR & Bank: Hidden ✕";
+        if (icon) icon.className = "fas fa-eye-slash";
+    }
+}
+
+async function toggleUserCompanyBankVisibility(id) {
+    id = id || activeUserId;
+    if (!id) return;
+    try {
+        const res = await api(`/admin/users/${id}/toggle-company-bank`, { method: "PATCH" });
+        if (res && res.success) {
+            const isShown = res.showCompanyBankDetails;
+            toast(res.message || (isShown ? "Company QR & Bank shown in mobile app" : "Company QR & Bank hidden in mobile app"), "success");
+            updateCompanyBankButton(isShown);
+            if (currentUserDetailsData) currentUserDetailsData.showCompanyBankDetails = isShown;
+            const cb = document.getElementById("user-show-company-bank");
+            if (cb) cb.checked = isShown;
+            // Also update in allUsers table cache if present
+            if (Array.isArray(allUsers)) {
+                const row = allUsers.find(x => String(x._id) === String(id));
+                if (row) row.showCompanyBankDetails = isShown;
+            }
+        } else {
+            toast(res?.message || "Failed to update QR & Bank visibility", "danger");
+        }
+    } catch (e) {
+        toast("Failed to toggle QR & Bank visibility: " + e.message, "danger");
+    }
 }
 
 async function viewUserDetails(id) {

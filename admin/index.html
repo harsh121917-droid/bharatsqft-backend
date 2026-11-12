@@ -890,6 +890,11 @@
                                 style="display:none;background:linear-gradient(135deg, #10b981, #059669);color:#fff;border:none;font-weight:700;padding:6px 14px;border-radius:6px;gap:6px;align-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.35);font-size:12px">
                                 <i class="fas fa-check-circle"></i> <span>1-Click Approve KYC</span>
                             </button>
+                            <button class="btn btn-sm" id="btn-ud-toggle-company-bank" onclick="toggleUserCompanyBankVisibility(activeUserId)"
+                                title="Show or Hide Company Bank & QR Details for this specific user in their app"
+                                style="background:rgba(212,160,23,0.12);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-weight:700;padding:6px 12px;border-radius:6px;gap:6px;display:inline-flex;align-items:center;cursor:pointer;font-size:12px">
+                                <i class="fas fa-qrcode" id="icon-ud-toggle-company-bank"></i> <span id="text-ud-toggle-company-bank">QR & Bank: Hidden</span>
+                            </button>
                             <button class="btn btn-secondary btn-sm" id="btn-sync-user-payments"
                                 onclick="syncUserPayments(activeUserId)" title="Sync all pending payments with Gateway"
                                 style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;padding:6px 12px;border-radius:6px">
@@ -4603,6 +4608,13 @@
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px">
                             <input type="checkbox" id="user-active" checked />
                             <span style="font-size:13px;font-weight:600;color:#fff">Active</span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="display:flex;flex-direction:column;justify-content:center">
+                        <label class="form-label">Company QR & Bank</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px" title="Allow this specific user to see your company bank details and QR code in their mobile app">
+                            <input type="checkbox" id="user-show-company-bank" />
+                            <span style="font-size:13px;font-weight:600;color:var(--gold)">Show in App</span>
                         </label>
                     </div>
                 </div>

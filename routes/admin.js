@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getAllUsers, getUserById, getUserTransactions, updateUser, deleteUser, clearUserLocation,
+  toggleCompanyBankVisibility,
   getAllEnquiries, updateEnquiry, deleteEnquiry,
   getDashboard,
   getWithdrawals, completeWithdrawal, rejectWithdrawal,
@@ -86,6 +87,7 @@ router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id/bank", updateUserBank);
 router.put("/users/:id/bank", updateUserBank);
 router.post("/users/:id/approve-kyc", oneClickApproveKyc);
+router.patch("/users/:id/toggle-company-bank", toggleCompanyBankVisibility);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
 
