@@ -186,8 +186,57 @@ async function recalculateUserPortfolio(userId) {
     ],
   }).sort({ createdAt: 1 });
 
-  // 2. Fetch active and pending-payment SIPs
-  const activeSips = await MfSip.find({ user: userId, status: { $in: ['ACTIVE', 'PENDING_PAYMENT'] } }).sort({ createdAt: -1 });
+  // 2. Fetch active and pending-payment SIPs with automatic stale cleanup
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // Auto-expire stale PENDING_PAYMENT SIPs older than 24h
+  await MfSip.updateMany(
+    {
+      user: userId,
+      status: 'PENDING_PAYMENT',
+      createdAt: { $lt: oneDayAgo },
+    },
+    {
+      $set: {
+        status: 'EXPIRED',
+        remarks: 'Payment link expired. First installment was not completed within the validity period.',
+      },
+    }
+  );
+
+  // Also expire any SIP whose Day-1 order failed or was cancelled
+  const failedDayOneOrders = await MfOrder.find({
+    user: userId,
+    sipRegNo: { $nin: ['', null, ' '] },
+    isFirstSipInstallment: true,
+    orderStatus: { $in: ['FAILED', 'CANCELLED', 'REJECTED'] },
+  }).select('sipRegNo');
+
+  if (failedDayOneOrders.length > 0) {
+    const failedRegNos = failedDayOneOrders.map((o) => o.sipRegNo);
+    await MfSip.updateMany(
+      {
+        user: userId,
+        sipRegNo: { $in: failedRegNos },
+        status: 'PENDING_PAYMENT',
+      },
+      {
+        $set: {
+          status: 'EXPIRED',
+          remarks: 'First installment payment failed or was cancelled.',
+        },
+      }
+    );
+  }
+
+  // Genuine active SIPs: ACTIVE anytime, or fresh PENDING_PAYMENT within last 24h
+  const activeSips = await MfSip.find({
+    user: userId,
+    $or: [
+      { status: 'ACTIVE' },
+      { status: 'PENDING_PAYMENT', createdAt: { $gte: oneDayAgo } },
+    ],
+  }).sort({ createdAt: -1 });
 
   // 3. Aggregate holdings scheme-by-scheme strictly from confirmed units
   const holdingsMap = {};

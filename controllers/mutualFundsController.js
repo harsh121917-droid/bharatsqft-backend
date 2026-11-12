@@ -4040,19 +4040,78 @@ exports.getTransactionDetail = async (req, res) => {
 exports.getUserSips = async (req, res) => {
   try {
     const userId = req.user._id;
+
+    // 1. Auto-cleanup: Transition stale PENDING_PAYMENT SIPs (>24h) to EXPIRED
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await MfSip.updateMany(
+      {
+        user: userId,
+        status: 'PENDING_PAYMENT',
+        createdAt: { $lt: oneDayAgo },
+      },
+      {
+        $set: {
+          status: 'EXPIRED',
+          remarks: 'Payment link expired. First installment was not completed within the validity period.',
+        },
+      }
+    );
+
+    // 2. Expire any SIP whose Day-1 order failed or was cancelled
+    const failedDayOneOrders = await MfOrder.find({
+      user: userId,
+      sipRegNo: { $nin: ['', null, ' '] },
+      isFirstSipInstallment: true,
+      orderStatus: { $in: ['FAILED', 'CANCELLED', 'REJECTED'] },
+    }).select('sipRegNo');
+
+    if (failedDayOneOrders.length > 0) {
+      const failedRegNos = failedDayOneOrders.map((o) => o.sipRegNo);
+      await MfSip.updateMany(
+        {
+          user: userId,
+          sipRegNo: { $in: failedRegNos },
+          status: 'PENDING_PAYMENT',
+        },
+        {
+          $set: {
+            status: 'EXPIRED',
+            remarks: 'First installment payment failed or was cancelled.',
+          },
+        }
+      );
+    }
+
     const sips = await MfSip.find({ user: userId }).sort({ createdAt: -1 });
 
     // Auto-resolve SIPs that have a valid NSE registration number and approved mandate
     for (const s of sips) {
-      if (s.status === 'PENDING_PAYMENT' && s.sipRegNo && s.firstOrderToday !== true) {
-        let mandateApproved = true;
-        if (s.mandateId) {
-          const m = await MfMandate.findOne({ mandateId: s.mandateId, user: userId });
-          if (m && m.status !== 'APPROVED') mandateApproved = false;
+      if (s.status === 'PENDING_PAYMENT') {
+        // If Day 1 order succeeded, activate the SIP
+        if (s.firstOrderToday === true && s.sipRegNo) {
+          const firstOrd = await MfOrder.findOne({
+            user: userId,
+            sipRegNo: s.sipRegNo,
+            isFirstSipInstallment: true,
+          });
+          if (firstOrd && (firstOrd.paymentStatus === 'SUCCESS' || firstOrd.allotmentStatus === 'ALLOTTED')) {
+            s.status = 'ACTIVE';
+            await s.save();
+            continue;
+          }
         }
-        if (mandateApproved) {
-          s.status = 'ACTIVE';
-          await s.save();
+
+        // If not requiring Day 1 order, verify mandate approval
+        if (s.sipRegNo && s.firstOrderToday !== true) {
+          let mandateApproved = true;
+          if (s.mandateId) {
+            const m = await MfMandate.findOne({ mandateId: s.mandateId, user: userId });
+            if (m && m.status !== 'APPROVED') mandateApproved = false;
+          }
+          if (mandateApproved) {
+            s.status = 'ACTIVE';
+            await s.save();
+          }
         }
       }
     }
