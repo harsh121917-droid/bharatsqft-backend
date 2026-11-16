@@ -137,6 +137,11 @@ exports.createSip = async (req, res, next) => {
             });
         }
 
+        const isVeerJawan = (goalCategory && goalCategory.toLowerCase() === "soldier") ||
+            /veer\s*jawan|soldier/i.test(goalTitle || "") ||
+            req.body.sipType === "veer_jawan";
+        const computedSipType = isVeerJawan ? "veer_jawan" : "simple";
+
         // Dedicated Soldier / Armed Forces verification check
         if (goalCategory && goalCategory.toLowerCase() === "soldier") {
             const user = await User.findById(userId).select("isSoldierVerified soldierKycStatus");
@@ -203,6 +208,7 @@ exports.createSip = async (req, res, next) => {
             user: userId,
             goalCategory: goalCategory.toLowerCase(),
             goalTitle: goalTitle || "Wealth Building",
+            sipType: computedSipType,
             metal: metalKey,
             frequency: frequency.toLowerCase(),
             installmentAmount: amount,
@@ -375,11 +381,26 @@ exports.getSipDetail = async (req, res, next) => {
             }
         }
 
+        const isVeerJawan = sip.sipType === "veer_jawan" || sip.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(sip.goalTitle || "");
+        const computedType = isVeerJawan ? "veer_jawan" : "simple";
+        const sipTypeLabel = isVeerJawan ? "Veer Jawan SIP" : "Simple SIP";
+        const u = sip.user;
+        const customerId = u ? ("USR" + u._id.toString().slice(-6).toUpperCase()) : "—";
+        const customerName = u?.name || "Customer";
+        const customerPhone = u?.phone || "—";
+        const customerEmail = u?.email || "—";
+
         res.json({
             success: true,
             data: {
                 sip: {
                     ...sip.toObject(),
+                    sipType: computedType,
+                    sipTypeLabel,
+                    customerId,
+                    customerName,
+                    customerPhone,
+                    customerEmail,
                     currentLiveRate: liveSellRate,
                     currentValuation,
                     returnsAmt,
@@ -561,19 +582,44 @@ exports.getAdminSips = async (req, res, next) => {
         const limit = parseInt(req.query.limit, 10) || 25;
         const skip = (page - 1) * limit;
 
-        const filter = {};
-        if (req.query.user) filter.user = req.query.user;
-        if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
-        if (req.query.metal && req.query.metal !== "all") filter.metal = req.query.metal;
-        if (req.query.frequency && req.query.frequency !== "all") filter.frequency = req.query.frequency;
+        const andConditions = [];
+        if (req.query.user) andConditions.push({ user: req.query.user });
+        if (req.query.status && req.query.status !== "all") andConditions.push({ status: req.query.status });
+        if (req.query.metal && req.query.metal !== "all") andConditions.push({ metal: req.query.metal });
+        if (req.query.frequency && req.query.frequency !== "all") andConditions.push({ frequency: req.query.frequency });
 
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search.trim(), "i");
             const matchingUsers = await User.find({
                 $or: [{ name: searchRegex }, { email: searchRegex }, { phone: searchRegex }],
             }).select("_id");
-            filter.user = { $in: matchingUsers.map((u) => u._id) };
+            andConditions.push({ user: { $in: matchingUsers.map((u) => u._id) } });
         }
+
+        if (req.query.sipType && req.query.sipType !== "all") {
+            const st = req.query.sipType.toLowerCase().trim();
+            if (st === "veer_jawan" || st === "soldier") {
+                andConditions.push({
+                    $or: [
+                        { sipType: "veer_jawan" },
+                        { goalCategory: "soldier" },
+                        { goalTitle: { $regex: /veer\s*jawan|soldier/i } },
+                    ],
+                });
+            } else if (st === "simple") {
+                andConditions.push({
+                    goalCategory: { $ne: "soldier" },
+                    goalTitle: { $not: { $regex: /veer\s*jawan|soldier/i } },
+                    $or: [
+                        { sipType: "simple" },
+                        { sipType: { $exists: false } },
+                        { sipType: null },
+                    ],
+                });
+            }
+        }
+
+        const filter = andConditions.length > 0 ? { $and: andConditions } : {};
 
         const rates = await fetchLiveRates();
 
@@ -596,8 +642,23 @@ exports.getAdminSips = async (req, res, next) => {
             const progressPct = sip.totalCycles > 0 ? parseFloat(((sip.cyclesCompleted / sip.totalCycles) * 100).toFixed(1)) : 0;
             const isDue = sip.status === "active" && sip.nextDueDate && new Date(sip.nextDueDate) <= new Date();
 
+            const isVeerJawan = sip.sipType === "veer_jawan" || sip.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(sip.goalTitle || "");
+            const computedType = isVeerJawan ? "veer_jawan" : "simple";
+            const sipTypeLabel = isVeerJawan ? "Veer Jawan SIP" : "Simple SIP";
+            const u = sip.user;
+            const customerId = u ? ("USR" + u._id.toString().slice(-6).toUpperCase()) : "—";
+            const customerName = u?.name || "Customer";
+            const customerPhone = u?.phone || "—";
+            const customerEmail = u?.email || "—";
+
             return {
                 ...sip.toObject(),
+                sipType: computedType,
+                sipTypeLabel,
+                customerId,
+                customerName,
+                customerPhone,
+                customerEmail,
                 currentLiveRate: liveSellRate,
                 currentValuation,
                 returnsAmt,
@@ -639,32 +700,98 @@ exports.getAdminSipsSummary = async (req, res, next) => {
         let totalGramsCopper = 0;
         let dueOrOverdueCount = 0;
 
+        const categories = {
+            veerJawan: {
+                totalSips: 0,
+                activeSips: 0,
+                pausedSips: 0,
+                completedSips: 0,
+                cancelledSips: 0,
+                totalInvested: 0,
+                totalMonthlyInflow: 0,
+                totalGramsGold: 0,
+                totalGramsSilver: 0,
+                totalGramsCopper: 0,
+                users: new Set(),
+            },
+            simple: {
+                totalSips: 0,
+                activeSips: 0,
+                pausedSips: 0,
+                completedSips: 0,
+                cancelledSips: 0,
+                totalInvested: 0,
+                totalMonthlyInflow: 0,
+                totalGramsGold: 0,
+                totalGramsSilver: 0,
+                totalGramsCopper: 0,
+                users: new Set(),
+            },
+        };
+
         allSips.forEach((s) => {
-            totalInvested += s.totalInvested || 0;
+            const isVJ = s.sipType === "veer_jawan" || s.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(s.goalTitle || "");
+            const cat = isVJ ? categories.veerJawan : categories.simple;
 
-            if (s.metal === "gold") totalGramsGold += s.totalGrams || 0;
-            else if (s.metal === "silver") totalGramsSilver += s.totalGrams || 0;
-            else if (s.metal === "copper") totalGramsCopper += s.totalGrams || 0;
+            cat.totalSips++;
+            if (s.user) cat.users.add(s.user.toString());
 
+            const inv = s.totalInvested || 0;
+            totalInvested += inv;
+            cat.totalInvested += inv;
+
+            const grams = s.totalGrams || 0;
+            if (s.metal === "gold") {
+                totalGramsGold += grams;
+                cat.totalGramsGold += grams;
+            } else if (s.metal === "silver") {
+                totalGramsSilver += grams;
+                cat.totalGramsSilver += grams;
+            } else if (s.metal === "copper") {
+                totalGramsCopper += grams;
+                cat.totalGramsCopper += grams;
+            }
+
+            let monthlyNorm = 0;
             if (s.status === "active") {
                 activeSips++;
-                // Monthly recurring normalized
-                if (s.frequency === "monthly") totalMonthlyInflow += s.installmentAmount || 0;
-                else if (s.frequency === "daily") totalMonthlyInflow += (s.installmentAmount || 0) * 30;
-                else if (s.frequency === "weekly") totalMonthlyInflow += (s.installmentAmount || 0) * 4;
-                else if (s.frequency === "quarterly") totalMonthlyInflow += (s.installmentAmount || 0) / 3;
-                else if (s.frequency === "yearly") totalMonthlyInflow += (s.installmentAmount || 0) / 12;
+                cat.activeSips++;
+                if (s.frequency === "monthly") monthlyNorm = s.installmentAmount || 0;
+                else if (s.frequency === "daily") monthlyNorm = (s.installmentAmount || 0) * 30;
+                else if (s.frequency === "weekly") monthlyNorm = (s.installmentAmount || 0) * 4;
+                else if (s.frequency === "quarterly") monthlyNorm = (s.installmentAmount || 0) / 3;
+                else if (s.frequency === "yearly") monthlyNorm = (s.installmentAmount || 0) / 12;
+
+                totalMonthlyInflow += monthlyNorm;
+                cat.totalMonthlyInflow += monthlyNorm;
 
                 if (s.nextDueDate && new Date(s.nextDueDate) <= now) {
                     dueOrOverdueCount++;
                 }
             } else if (s.status === "paused") {
                 pausedSips++;
+                cat.pausedSips++;
             } else if (s.status === "completed") {
                 completedSips++;
+                cat.completedSips++;
             } else if (s.status === "cancelled") {
                 cancelledSips++;
+                cat.cancelledSips++;
             }
+        });
+
+        const formatCategory = (c) => ({
+            totalSips: c.totalSips,
+            activeSips: c.activeSips,
+            pausedSips: c.pausedSips,
+            completedSips: c.completedSips,
+            cancelledSips: c.cancelledSips,
+            totalInvested: parseFloat(c.totalInvested.toFixed(2)),
+            totalMonthlyInflow: parseFloat(c.totalMonthlyInflow.toFixed(2)),
+            totalGramsGold: parseFloat(c.totalGramsGold.toFixed(4)),
+            totalGramsSilver: parseFloat(c.totalGramsSilver.toFixed(4)),
+            totalGramsCopper: parseFloat(c.totalGramsCopper.toFixed(4)),
+            uniqueCustomers: c.users.size,
         });
 
         res.json({
@@ -681,6 +808,10 @@ exports.getAdminSipsSummary = async (req, res, next) => {
                 totalGramsSilver: parseFloat(totalGramsSilver.toFixed(4)),
                 totalGramsCopper: parseFloat(totalGramsCopper.toFixed(4)),
                 dueOrOverdueCount,
+                categories: {
+                    veerJawan: formatCategory(categories.veerJawan),
+                    simple: formatCategory(categories.simple),
+                },
             },
         });
     } catch (err) {
@@ -943,6 +1074,11 @@ exports.createAutoPaySip = async (req, res, next) => {
             });
         }
 
+        const isVeerJawan = (goalCategory && goalCategory.toLowerCase() === "soldier") ||
+            /veer\s*jawan|soldier/i.test(goalTitle || "") ||
+            req.body.sipType === "veer_jawan";
+        const computedSipType = isVeerJawan ? "veer_jawan" : "simple";
+
         // Dedicated Soldier / Armed Forces verification check
         if (goalCategory && goalCategory.toLowerCase() === "soldier") {
             const user = await User.findById(userId).select("isSoldierVerified soldierKycStatus");
@@ -1115,12 +1251,18 @@ exports.verifyAutoPaySip = async (req, res, next) => {
         // Credit bullion to vault
         const txnId = await creditGramsToVault(userId, metalKey, gramsCredited, amount, metalRate, 1);
 
+        const isVeerJawan = (goalCategory && goalCategory.toLowerCase() === "soldier") ||
+            /veer\s*jawan|soldier/i.test(goalTitle || "") ||
+            req.body.sipType === "veer_jawan";
+        const computedSipType = isVeerJawan ? "veer_jawan" : "simple";
+
         // Create SIP Document
         const sip = new Sip({
             user: userId,
             metal: metalKey,
             goalCategory: goalCategory.toLowerCase(),
             goalTitle: goalTitle || "Wealth Building",
+            sipType: computedSipType,
             frequency: frequency.toLowerCase(),
             installmentAmount: amount,
             durationMonths: parseInt(durationMonths, 10) || 12,

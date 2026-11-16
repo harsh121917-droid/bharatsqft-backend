@@ -20,12 +20,18 @@ const SipSchema = new mongoose.Schema(
         },
         goalCategory: {
             type: String,
-            enum: ["baby", "travel", "wedding", "festival", "home", "education", "wealth", "custom"],
+            enum: ["baby", "travel", "wedding", "festival", "home", "education", "wealth", "soldier", "car", "custom"],
             default: "wealth",
         },
         goalTitle: {
             type: String,
             default: "Wealth Building",
+        },
+        sipType: {
+            type: String,
+            enum: ["veer_jawan", "simple"],
+            default: "simple",
+            index: true,
         },
         metal: {
             type: String,

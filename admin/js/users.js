@@ -2267,43 +2267,128 @@ function renderUdInvestmentsTab(u) {
     const mount = document.getElementById("ud-investments-tab-content");
     if (!mount) return;
 
+    const sips = u.sips || [];
+    const schemes = u.schemes || [];
+
+    let vjInvested = 0;
+    let vjCount = 0;
+    let simpleInvested = 0;
+    let simpleCount = 0;
+
+    sips.forEach(s => {
+        const isVJ = s.sipType === "veer_jawan" || s.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(s.goalTitle || "");
+        const inv = s.totalInvested || 0;
+        if (isVJ) {
+            vjInvested += inv;
+            if (s.status === "active") vjCount++;
+        } else {
+            simpleInvested += inv;
+            if (s.status === "active") simpleCount++;
+        }
+    });
+
+    const schemesInvested = schemes.reduce((sum, sc) => sum + (sc.totalInvested || 0), 0);
+
     let html = `
+    <!-- SIP Category Summary Cards for Customer -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:1rem;margin-bottom:1.5rem">
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#f59e0b;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-medal"></i> Veer Jawan SIP
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b;font-family:var(--font-mono);margin-top:2px">
+                ${formatINR(vjInvested)}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                ${vjCount > 0 ? `<span style="color:#10b981;font-weight:700">● ${vjCount} Active Plan(s)</span>` : 'No Active Plan'}
+            </div>
+        </div>
+
+        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#38bdf8;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-gem"></i> Simple Bullion SIP
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:2px">
+                ${formatINR(simpleInvested)}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                ${simpleCount > 0 ? `<span style="color:#10b981;font-weight:700">● ${simpleCount} Active Plan(s)</span>` : 'No Active Plan'}
+            </div>
+        </div>
+
+        <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);border-radius:10px;padding:12px">
+            <div style="font-size:11px;color:#c084fc;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-award"></i> Savings Schemes (11+1)
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;color:#c084fc;font-family:var(--font-mono);margin-top:2px">
+                ${formatINR(schemesInvested)}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                ${schemes.length} Scheme Enrollment(s)
+            </div>
+        </div>
+    </div>
+
     <div style="margin-bottom:1.5rem">
-        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px"><i class="fas fa-calendar-check" style="color:#38bdf8"></i> Active Systematic Investment Plans (SIP)</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+            <span><i class="fas fa-calendar-check" style="color:#38bdf8"></i> Customer SIP Enrollments (${sips.length})</span>
+            <span style="font-size:11.5px;color:#94a3b8">Veer Jawan & Simple SIP Tracking</span>
+        </div>
         <div id="ud-tab-sips-container">`;
 
-    if (!u.sips || u.sips.length === 0) {
-        html += `<div style="padding:1rem;color:#64748b;font-size:12px;text-align:center">No SIP investments enrolled.</div>`;
+    if (sips.length === 0) {
+        html += `<div style="padding:1.5rem;color:#64748b;font-size:12px;text-align:center;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.05)">No SIP investments enrolled for this customer.</div>`;
     } else {
         html += `
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
-                    <th style="padding:6px 8px">Goal Plan</th>
-                    <th style="padding:6px 8px">Metal</th>
-                    <th style="padding:6px 8px">Installment</th>
-                    <th style="padding:6px 8px">Cycles</th>
-                    <th style="padding:6px 8px">Accumulated</th>
-                    <th style="padding:6px 8px">Total Invested</th>
-                    <th style="padding:6px 8px">Next Due</th>
-                    <th style="padding:6px 8px">Status</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        u.sips.forEach(s => {
+        <div class="table-responsive">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
+                        <th style="padding:8px">SIP Type</th>
+                        <th style="padding:8px">Goal Plan</th>
+                        <th style="padding:8px">Metal</th>
+                        <th style="padding:8px">Installment</th>
+                        <th style="padding:8px">Start Date</th>
+                        <th style="padding:8px">Cycles</th>
+                        <th style="padding:8px">Accumulated</th>
+                        <th style="padding:8px">Total Invested</th>
+                        <th style="padding:8px">Status</th>
+                        <th style="padding:8px;text-align:right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        sips.forEach(s => {
+            const isVJ = s.sipType === "veer_jawan" || s.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(s.goalTitle || "");
+            const typeBadge = isVJ
+                ? `<span class="badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);font-weight:700;font-size:10px;padding:2px 6px"><i class="fas fa-medal"></i> Veer Jawan SIP</span>`
+                : `<span class="badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:10px;padding:2px 6px"><i class="fas fa-gem"></i> Simple SIP</span>`;
+
+            let startDate = "—";
+            if (s.startDate || s.createdAt) {
+                startDate = new Date(s.startDate || s.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+            }
+
+            const grams = s.accumulatedGrams !== undefined ? s.accumulatedGrams : (s.totalGrams || 0);
+
             html += `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-                <td style="padding:6px 8px;font-weight:700;color:#fff">${s.goalTitle || 'Wealth Accumulator'}</td>
-                <td style="padding:6px 8px;text-transform:capitalize">${s.metal || 'gold'}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono)">${formatINR(s.installmentAmount)} / ${s.frequency}</td>
-                <td style="padding:6px 8px">${s.cyclesCompleted || 0} / ${s.totalCycles || 12}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatGrams(s.accumulatedGrams || 0)}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono);color:#fff">${formatINR(s.totalInvested || 0)}</td>
-                <td style="padding:6px 8px;color:#94a3b8">${formatDate(s.nextInstallmentDate)}</td>
-                <td style="padding:6px 8px"><span class="ud-status-pill success">${s.status || 'Active'}</span></td>
+                <td style="padding:8px">${typeBadge}</td>
+                <td style="padding:8px;font-weight:700;color:#fff">${s.goalTitle || (isVJ ? 'Veer Jawan Goal' : 'Wealth Accumulator')}</td>
+                <td style="padding:8px;text-transform:capitalize">${s.metal || 'gold'}</td>
+                <td style="padding:8px;font-family:var(--font-mono)">${formatINR(s.installmentAmount)} / ${s.frequency || 'mo'}</td>
+                <td style="padding:8px;color:#cbd5e1">${startDate}</td>
+                <td style="padding:8px">${s.cyclesCompleted || 0} / ${s.totalCycles || 12}</td>
+                <td style="padding:8px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatGrams(grams)}</td>
+                <td style="padding:8px;font-family:var(--font-mono);font-weight:700;color:#fff">${formatINR(s.totalInvested || 0)}</td>
+                <td style="padding:8px"><span class="ud-status-pill ${s.status === 'active' ? 'success' : s.status === 'paused' ? 'warning' : 'info'}">${s.status || 'Active'}</span></td>
+                <td style="padding:8px;text-align:right">
+                    <button class="btn btn-secondary btn-sm" onclick="viewSipMilestones('${s._id}')" style="font-size:11px;padding:3px 8px;gap:4px" title="View Milestone Journey & Complete Transaction Records">
+                        <i class="fas fa-history" style="color:var(--gold)"></i> View Txns
+                    </button>
+                </td>
             </tr>`;
         });
-        html += `</tbody></table>`;
+        html += `</tbody></table></div>`;
     }
 
     html += `
@@ -2312,36 +2397,37 @@ function renderUdInvestmentsTab(u) {
         <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px"><i class="fas fa-gem" style="color:#a855f7"></i> Gold & Silver Savings Schemes</div>
         <div id="ud-tab-schemes-container">`;
 
-    if (!u.schemes || u.schemes.length === 0) {
-        html += `<div style="padding:1rem;color:#64748b;font-size:12px;text-align:center">No scheme enrollments found.</div>`;
+    if (!schemes || schemes.length === 0) {
+        html += `<div style="padding:1.5rem;color:#64748b;font-size:12px;text-align:center;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.05)">No scheme enrollments found.</div>`;
     } else {
         html += `
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
-                    <th style="padding:6px 8px">Scheme Name</th>
-                    <th style="padding:6px 8px">Metal</th>
-                    <th style="padding:6px 8px">Monthly Amt</th>
-                    <th style="padding:6px 8px">Paid</th>
-                    <th style="padding:6px 8px">Accumulated</th>
-                    <th style="padding:6px 8px">Total Invested</th>
-                    <th style="padding:6px 8px">Status</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        u.schemes.forEach(sc => {
+        <div class="table-responsive">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;text-align:left">
+                        <th style="padding:8px">Scheme Name</th>
+                        <th style="padding:8px">Metal</th>
+                        <th style="padding:8px">Monthly Amt</th>
+                        <th style="padding:8px">Paid</th>
+                        <th style="padding:8px">Accumulated</th>
+                        <th style="padding:8px">Total Invested</th>
+                        <th style="padding:8px">Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        schemes.forEach(sc => {
             html += `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-                <td style="padding:6px 8px;font-weight:700;color:#fff">${sc.schemeName}</td>
-                <td style="padding:6px 8px;text-transform:capitalize">${sc.metal}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono)">${formatINR(sc.monthlyAmount)}</td>
-                <td style="padding:6px 8px">${sc.installmentsPaid || 0} / ${sc.durationMonths || 11}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatGrams(sc.totalGoldGrams || 0)}</td>
-                <td style="padding:6px 8px;font-family:var(--font-mono);color:#fff">${formatINR(sc.totalInvested || 0)}</td>
-                <td style="padding:6px 8px"><span class="ud-status-pill success">${sc.status}</span></td>
+                <td style="padding:8px;font-weight:700;color:#fff">${sc.schemeName}</td>
+                <td style="padding:8px;text-transform:capitalize">${sc.metal}</td>
+                <td style="padding:8px;font-family:var(--font-mono)">${formatINR(sc.monthlyAmount)}</td>
+                <td style="padding:8px">${sc.installmentsPaid || 0} / ${sc.durationMonths || 11}</td>
+                <td style="padding:8px;font-family:var(--font-mono);font-weight:700;color:#f59e0b">${formatGrams(sc.totalGoldGrams || 0)}</td>
+                <td style="padding:8px;font-family:var(--font-mono);color:#fff">${formatINR(sc.totalInvested || 0)}</td>
+                <td style="padding:8px"><span class="ud-status-pill success">${sc.status}</span></td>
             </tr>`;
         });
-        html += `</tbody></table>`;
+        html += `</tbody></table></div>`;
     }
 
     html += `</div></div>`;

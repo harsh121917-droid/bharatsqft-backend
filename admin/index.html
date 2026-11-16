@@ -2236,14 +2236,19 @@
                 <div class="section-header">
                     <div>
                         <div class="section-title">
-                            <i class="fas fa-bullseye" style="color:var(--gold)"></i> SIP Plans & Subscriber Milestones
+                            <i class="fas fa-bullseye" style="color:var(--gold)"></i> Investment Tracking & SIP Management
                         </div>
                         <div class="section-subtitle">
-                            Monitor customer digital bullion SIP enrollments, track fulfillment milestones, and manage
-                            automated recurring savings
+                            Monitor customer digital bullion SIP enrollments, track Veer Jawan SIP vs Simple SIP collections, and manage automated recurring savings
                         </div>
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <button class="btn btn-secondary" onclick="exportSipsReport('csv')">
+                            <i class="fas fa-file-excel" style="color:#10b981"></i> Export Excel (CSV)
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportSipsReport('pdf')">
+                            <i class="fas fa-file-pdf" style="color:#ef4444"></i> Export PDF
+                        </button>
                         <button class="btn btn-warning" onclick="sendBulkSipReminders()">
                             <i class="fas fa-bell"></i> Bulk Remind Active
                         </button>
@@ -2253,56 +2258,78 @@
                     </div>
                 </div>
 
-                <!-- SIP KPI Summary Cards -->
+                <!-- SIP Category Switcher Tabs (1-Click Category Filter) -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem">
+                    <div class="chart-pill-group" style="display:inline-flex;background:var(--surface2);padding:4px;border-radius:10px;border:1px solid var(--border)">
+                        <button class="chart-pill-btn active sip-category-tab-btn" id="tab-sip-all-btn" onclick="switchSipCategoryTab('all')">
+                            <i class="fas fa-layer-group"></i> All SIPs
+                        </button>
+                        <button class="chart-pill-btn sip-category-tab-btn" id="tab-sip-veer-jawan-btn" onclick="switchSipCategoryTab('veer_jawan')" style="font-weight:700">
+                            <i class="fas fa-medal" style="color:#f59e0b"></i> Veer Jawan SIP
+                        </button>
+                        <button class="chart-pill-btn sip-category-tab-btn" id="tab-sip-simple-btn" onclick="switchSipCategoryTab('simple')" style="font-weight:700">
+                            <i class="fas fa-gem" style="color:#38bdf8"></i> Simple SIP
+                        </button>
+                    </div>
+                    <div id="sip-category-active-notice" style="font-size:12px;color:var(--text-dim)">
+                        Showing: <strong style="color:#fff" id="sip-current-category-label">All SIP Categories</strong>
+                    </div>
+                </div>
+
+                <!-- SIP KPI Summary Cards: Separate Category Breakdown -->
                 <div class="fulfillment-kpi-grid" style="grid-template-columns:repeat(4, 1fr);margin-bottom:1.5rem">
                     <div class="fulfillment-kpi-card card-purple">
                         <div class="fulfillment-card-top">
-                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-users"></i></div>
-                            <span class="fulfillment-tag tag-purple">Subscribers</span>
+                            <div class="fulfillment-icon-box icon-purple-glow"><i class="fas fa-wallet"></i></div>
+                            <span class="fulfillment-tag tag-purple">Overall Portfolio</span>
                         </div>
                         <div class="fulfillment-card-body">
-                            <div class="fulfillment-label">Active / Total SIPs</div>
-                            <div class="fulfillment-val val-purple" id="sip-kpi-active">0 / 0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-chart-line"></i> Recurring bullion plans
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="fulfillment-kpi-card card-green">
-                        <div class="fulfillment-card-top">
-                            <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-rupee-sign"></i></div>
-                            <span class="fulfillment-tag tag-green">Recurring Inflow</span>
-                        </div>
-                        <div class="fulfillment-card-body">
-                            <div class="fulfillment-label">Monthly SIP Volume</div>
-                            <div class="fulfillment-val val-green" id="sip-kpi-inflow">₹0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-calendar-alt"></i> Expected monthly inflow
+                            <div class="fulfillment-label">Total Investment Collected</div>
+                            <div class="fulfillment-val val-purple" id="sip-kpi-total-invested">₹0</div>
+                            <div class="fulfillment-subtext">
+                                <i class="fas fa-users"></i> <span id="sip-kpi-active">0 / 0</span> Active Subscribers
                             </div>
                         </div>
                     </div>
 
                     <div class="fulfillment-kpi-card card-gold">
                         <div class="fulfillment-card-top">
-                            <div class="fulfillment-icon-box icon-gold-glow"><i class="fas fa-coins"></i></div>
-                            <span class="fulfillment-tag tag-gold">Vault Bullion</span>
+                            <div class="fulfillment-icon-box icon-gold-glow"><i class="fas fa-medal"></i></div>
+                            <span class="fulfillment-tag tag-gold">Veer Jawan Category</span>
                         </div>
                         <div class="fulfillment-card-body">
-                            <div class="fulfillment-label">Gold Accumulated</div>
-                            <div class="fulfillment-val val-gold" id="sip-kpi-gold">0.0000 g</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-cubes"></i> Silver: <span
-                                    id="sip-kpi-silver">0.00 g</span></div>
+                            <div class="fulfillment-label">Veer Jawan SIP Total</div>
+                            <div class="fulfillment-val val-gold" id="sip-kpi-vj-invested">₹0</div>
+                            <div class="fulfillment-subtext">
+                                <i class="fas fa-user-shield"></i> <span id="sip-kpi-vj-count">0 Active (0 Total)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fulfillment-kpi-card card-green">
+                        <div class="fulfillment-card-top">
+                            <div class="fulfillment-icon-box icon-green-glow"><i class="fas fa-gem"></i></div>
+                            <span class="fulfillment-tag tag-green">Simple SIP Category</span>
+                        </div>
+                        <div class="fulfillment-card-body">
+                            <div class="fulfillment-label">Simple SIP Total</div>
+                            <div class="fulfillment-val val-green" id="sip-kpi-simple-invested">₹0</div>
+                            <div class="fulfillment-subtext">
+                                <i class="fas fa-user-check"></i> <span id="sip-kpi-simple-count">0 Active (0 Total)</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="fulfillment-kpi-card card-amber">
                         <div class="fulfillment-card-top">
-                            <div class="fulfillment-icon-box icon-amber-glow"><i class="fas fa-clock"></i></div>
-                            <span class="fulfillment-tag tag-amber">Due Action</span>
+                            <div class="fulfillment-icon-box icon-amber-glow"><i class="fas fa-coins"></i></div>
+                            <span class="fulfillment-tag tag-amber">Vault & Due</span>
                         </div>
                         <div class="fulfillment-card-body">
-                            <div class="fulfillment-label">Due / Overdue Today</div>
-                            <div class="fulfillment-val val-amber" id="sip-kpi-due">0</div>
-                            <div class="fulfillment-subtext"><i class="fas fa-bell"></i> Pending installment cycles
+                            <div class="fulfillment-label">Vault Gold Accumulated</div>
+                            <div class="fulfillment-val val-amber" id="sip-kpi-gold">0.0000 g</div>
+                            <div class="fulfillment-subtext">
+                                <i class="fas fa-cubes"></i> Silver: <span id="sip-kpi-silver">0.00 g</span> • Due: <strong id="sip-kpi-due" style="color:#ef4444">0</strong>
                             </div>
                         </div>
                     </div>
@@ -2313,15 +2340,20 @@
                     style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.25rem;background:var(--surface2);padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border)">
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1">
                         <input class="search-bar" id="sip-filter-search"
-                            placeholder="🔍 Search customer name, phone, email, or goal..." oninput="onSipSearchInput()"
+                            placeholder="🔍 Search customer name, ID, phone, email, or goal..." oninput="onSipSearchInput()"
                             style="min-width:280px;flex:1" />
-                        <select class="form-control" id="sip-filter-metal" onchange="loadSips(1)" style="width:130px">
+                        <select class="form-control" id="sip-filter-type" onchange="onSipTypeDropdownChange(this.value)" style="width:160px;font-weight:600">
+                            <option value="all">All SIP Types</option>
+                            <option value="veer_jawan">🎖️ Veer Jawan SIP</option>
+                            <option value="simple">💎 Simple SIP</option>
+                        </select>
+                        <select class="form-control" id="sip-filter-metal" onchange="loadSips(1)" style="width:125px">
                             <option value="all">All Metals</option>
                             <option value="gold">Gold (24K)</option>
                             <option value="silver">Silver (999)</option>
                             <option value="copper">Copper</option>
                         </select>
-                        <select class="form-control" id="sip-filter-freq" onchange="loadSips(1)" style="width:140px">
+                        <select class="form-control" id="sip-filter-freq" onchange="loadSips(1)" style="width:130px">
                             <option value="all">All Frequencies</option>
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
@@ -2329,7 +2361,7 @@
                             <option value="quarterly">Quarterly</option>
                             <option value="yearly">Yearly</option>
                         </select>
-                        <select class="form-control" id="sip-filter-status" onchange="loadSips(1)" style="width:140px">
+                        <select class="form-control" id="sip-filter-status" onchange="loadSips(1)" style="width:130px">
                             <option value="all">All Statuses</option>
                             <option value="active">● Active</option>
                             <option value="paused">⏸ Paused</option>
@@ -2337,8 +2369,10 @@
                             <option value="cancelled">✕ Cancelled</option>
                         </select>
                     </div>
-                    <button class="btn btn-secondary" onclick="loadSips(1)"><i class="fas fa-filter"></i> Apply
-                        Filters</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-secondary" onclick="resetSipFilters()"><i class="fas fa-undo"></i> Reset</button>
+                        <button class="btn btn-primary" onclick="loadSips(1)"><i class="fas fa-filter"></i> Apply Filters</button>
+                    </div>
                 </div>
 
                 <!-- SIP Subscribers Table -->

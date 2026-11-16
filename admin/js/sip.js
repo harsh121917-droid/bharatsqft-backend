@@ -6,6 +6,7 @@ let allSipsData = [];
 let currentSipPage = 1;
 let totalSipPages = 1;
 let activeSipDetail = null;
+let currentSipCategory = "all";
 
 // Goal Icons Dictionary
 const GOAL_ICONS = {
@@ -16,8 +17,65 @@ const GOAL_ICONS = {
     home: { icon: "fas fa-home", label: "Dream Home", color: "#3b82f6" },
     education: { icon: "fas fa-graduation-cap", label: "Higher Education", color: "#8b5cf6" },
     wealth: { icon: "fas fa-coins", label: "Wealth Building", color: "#10b981" },
+    soldier: { icon: "fas fa-medal", label: "Veer Jawan / Soldier Goal", color: "#f59e0b" },
+    car: { icon: "fas fa-car", label: "Dream Vehicle", color: "#06b6d4" },
     custom: { icon: "fas fa-bullseye", label: "Custom Bullion Goal", color: "#eab308" }
 };
+
+/**
+ * 1-Click Category Filter Switcher (All / Veer Jawan / Simple)
+ */
+function switchSipCategoryTab(category) {
+    currentSipCategory = category || "all";
+
+    // Update Tab UI
+    document.querySelectorAll(".sip-category-tab-btn").forEach((btn) => {
+        btn.classList.remove("active");
+    });
+    const targetBtn = document.getElementById(
+        category === "veer_jawan"
+            ? "tab-sip-veer-jawan-btn"
+            : category === "simple"
+            ? "tab-sip-simple-btn"
+            : "tab-sip-all-btn"
+    );
+    if (targetBtn) targetBtn.classList.add("active");
+
+    // Sync Dropdown
+    const typeSelect = document.getElementById("sip-filter-type");
+    if (typeSelect) typeSelect.value = currentSipCategory;
+
+    // Update Category Label Notice
+    const labelNotice = document.getElementById("sip-current-category-label");
+    if (labelNotice) {
+        labelNotice.textContent =
+            category === "veer_jawan"
+                ? "🎖️ Veer Jawan SIP (Soldier Welfare Plan)"
+                : category === "simple"
+                ? "💎 Simple SIP (Bullion Recurring Plans)"
+                : "All SIP Categories";
+    }
+
+    loadSips(1);
+}
+
+function onSipTypeDropdownChange(val) {
+    switchSipCategoryTab(val);
+}
+
+function resetSipFilters() {
+    const searchInput = document.getElementById("sip-filter-search");
+    const metalSelect = document.getElementById("sip-filter-metal");
+    const freqSelect = document.getElementById("sip-filter-freq");
+    const statusSelect = document.getElementById("sip-filter-status");
+
+    if (searchInput) searchInput.value = "";
+    if (metalSelect) metalSelect.value = "all";
+    if (freqSelect) freqSelect.value = "all";
+    if (statusSelect) statusSelect.value = "all";
+
+    switchSipCategoryTab("all");
+}
 
 /**
  * Load SIP high-level portfolio summary metrics
@@ -31,15 +89,28 @@ async function loadSipSummary() {
 
         if (res && res.success && res.data) {
             const d = res.data;
+            const elTotalInvested = document.getElementById("sip-kpi-total-invested");
             const elActive = document.getElementById("sip-kpi-active");
-            const elInflow = document.getElementById("sip-kpi-inflow");
+            const elVjInvested = document.getElementById("sip-kpi-vj-invested");
+            const elVjCount = document.getElementById("sip-kpi-vj-count");
+            const elSimpleInvested = document.getElementById("sip-kpi-simple-invested");
+            const elSimpleCount = document.getElementById("sip-kpi-simple-count");
             const elGold = document.getElementById("sip-kpi-gold");
             const elSilver = document.getElementById("sip-kpi-silver");
             const elDue = document.getElementById("sip-kpi-due");
             const badgeActive = document.getElementById("sips-active-badge");
 
+            if (elTotalInvested) elTotalInvested.textContent = formatINR(d.totalInvested || 0);
             if (elActive) elActive.textContent = `${d.activeSips || 0} / ${d.totalSips || 0}`;
-            if (elInflow) elInflow.textContent = formatINR(d.totalMonthlyInflow || 0);
+
+            const vj = d.categories?.veerJawan;
+            if (elVjInvested) elVjInvested.textContent = formatINR(vj?.totalInvested || 0);
+            if (elVjCount) elVjCount.textContent = `${vj?.activeSips || 0} Active (${vj?.totalSips || 0} Total)`;
+
+            const sm = d.categories?.simple;
+            if (elSimpleInvested) elSimpleInvested.textContent = formatINR(sm?.totalInvested || 0);
+            if (elSimpleCount) elSimpleCount.textContent = `${sm?.activeSips || 0} Active (${sm?.totalSips || 0} Total)`;
+
             if (elGold) elGold.textContent = `${(d.totalGramsGold || 0).toFixed(4)} g`;
             if (elSilver) elSilver.textContent = `${(d.totalGramsSilver || 0).toFixed(2)} g`;
             if (elDue) elDue.textContent = d.dueOrOverdueCount || 0;
@@ -76,6 +147,7 @@ async function loadSips(page = 1) {
     const metal = document.getElementById("sip-filter-metal")?.value || "all";
     const status = document.getElementById("sip-filter-status")?.value || "all";
     const frequency = document.getElementById("sip-filter-freq")?.value || "all";
+    const sipType = currentSipCategory || "all";
 
     const queryParams = new URLSearchParams({
         page,
@@ -84,6 +156,7 @@ async function loadSips(page = 1) {
         ...(metal !== "all" && { metal }),
         ...(status !== "all" && { status }),
         ...(frequency !== "all" && { frequency }),
+        ...(sipType !== "all" && { sipType }),
     });
 
     try {
@@ -126,7 +199,7 @@ function renderSips(sips) {
             <i class="fas fa-bullseye" style="font-size:36px;color:var(--text-dim);margin-bottom:10px"></i>
             <div style="font-size:15px;color:#fff;font-weight:700">No SIP Subscriptions Found</div>
             <div style="font-size:12px;color:var(--text-dim);margin-top:4px">
-                No user has enrolled with the current search/filter parameters.
+                No user has enrolled in ${currentSipCategory === 'veer_jawan' ? 'Veer Jawan SIP' : currentSipCategory === 'simple' ? 'Simple SIP' : 'SIP'} with the current search/filter parameters.
             </div>
         </div>`;
         return;
@@ -137,13 +210,14 @@ function renderSips(sips) {
         <table>
             <thead>
                 <tr>
-                    <th>Subscriber Customer</th>
+                    <th>Customer Name & ID</th>
+                    <th>SIP Type</th>
                     <th>Goal & Bullion</th>
-                    <th>Installment & Frequency</th>
+                    <th>Investment Amount</th>
+                    <th>SIP Start Date</th>
                     <th>Milestone Progress</th>
-                    <th>Accumulated Vault</th>
-                    <th>Next Due Date</th>
-                    <th>Status</th>
+                    <th>Total Invested</th>
+                    <th>SIP Status</th>
                     <th style="text-align:right">Actions</th>
                 </tr>
             </thead>
@@ -151,9 +225,16 @@ function renderSips(sips) {
 
     sips.forEach((sip) => {
         const u = sip.user || {};
-        const userName = u.name || "Customer";
-        const userContact = u.phone || u.email || "—";
+        const userName = sip.customerName || u.name || "Customer";
+        const userPhone = sip.customerPhone || u.phone || "—";
+        const userEmail = sip.customerEmail || u.email || "";
+        const customerId = sip.customerId || (u._id ? `USR${u._id.toString().slice(-6).toUpperCase()}` : "—");
         const userInitial = (userName[0] || "U").toUpperCase();
+
+        const isVeerJawan = sip.sipType === "veer_jawan" || sip.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(sip.goalTitle || "");
+        const sipTypeBadge = isVeerJawan
+            ? `<span class="badge" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);font-weight:700;font-size:11px;padding:4px 8px"><i class="fas fa-medal"></i> Veer Jawan SIP</span>`
+            : `<span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;font-size:11px;padding:4px 8px"><i class="fas fa-gem"></i> Simple SIP</span>`;
 
         const metal = (sip.metal || "gold").toLowerCase();
         const isGold = metal === "gold";
@@ -167,6 +248,12 @@ function renderSips(sips) {
         const totalCycles = sip.totalCycles || 12;
         const cyclesCompleted = sip.cyclesCompleted || 0;
         const progressPct = sip.progressPct || (totalCycles > 0 ? Math.min(Math.round((cyclesCompleted / totalCycles) * 100), 100) : 0);
+
+        let startDateText = "—";
+        if (sip.startDate || sip.createdAt) {
+            const sd = new Date(sip.startDate || sip.createdAt);
+            startDateText = sd.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        }
 
         const isDue = sip.isDue || (sip.status === "active" && sip.nextDueDate && new Date(sip.nextDueDate) <= new Date());
         let dueDateText = "—";
@@ -184,6 +271,8 @@ function renderSips(sips) {
             statusBadge = `<span class="badge badge-danger">✕ Cancelled</span>`;
         }
 
+        const uId = u._id || sip.user;
+
         html += `
         <tr>
             <td>
@@ -192,10 +281,20 @@ function renderSips(sips) {
                         ${userInitial}
                     </div>
                     <div>
-                        <div style="font-weight:700;color:#fff;font-size:13.5px">${userName}</div>
-                        <div style="font-size:11.5px;color:var(--text-dim)">${userContact}</div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <span style="font-weight:700;color:#fff;font-size:13.5px;cursor:pointer" onclick="${uId ? `openUserDetailsModal('${uId}')` : ''}" title="View customer profile">
+                                ${userName}
+                            </span>
+                            <span class="badge badge-secondary" style="font-size:9.5px;font-family:var(--font-mono);padding:1px 5px">${customerId}</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-dim)">
+                            <i class="fas fa-phone-alt" style="font-size:10px;margin-right:2px"></i> ${userPhone}
+                        </div>
                     </div>
                 </div>
+            </td>
+            <td>
+                ${sipTypeBadge}
             </td>
             <td>
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
@@ -217,6 +316,14 @@ function renderSips(sips) {
                     Per ${sip.frequency || "month"} (${sip.durationMonths || 12}M)
                 </div>
             </td>
+            <td>
+                <div style="font-size:12.5px;color:#fff;font-weight:600">
+                    <i class="fas fa-calendar-alt" style="color:var(--gold);font-size:11px;margin-right:4px"></i>${startDateText}
+                </div>
+                <div style="font-size:10.5px;color:var(--text-dim)">
+                    Next Due: <span style="color:${isDue ? '#f87171' : 'var(--text-dim)'};font-weight:${isDue ? '700' : 'normal'}">${dueDateText}</span>
+                </div>
+            </td>
             <td style="min-width:140px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11.5px">
                     <span style="font-weight:700;color:#fff">${cyclesCompleted} / ${totalCycles} Cycles</span>
@@ -227,20 +334,11 @@ function renderSips(sips) {
                 </div>
             </td>
             <td>
-                <div style="font-family:var(--font-mono);font-weight:800;color:var(--gold);font-size:13.5px">
-                    ${(sip.totalGrams || 0).toFixed(4)} g
+                <div style="font-family:var(--font-mono);font-weight:800;color:var(--gold);font-size:14px">
+                    ${formatINR(sip.totalInvested || 0)}
                 </div>
-                <div style="font-size:11px;color:var(--text-dim)">
-                    Invested: ${formatINR(sip.totalInvested || 0)}
-                </div>
-            </td>
-            <td>
-                <div style="font-size:12.5px;color:${isDue ? '#f87171' : '#fff'};font-weight:${isDue ? '700' : '500'}">
-                    ${isDue ? `<i class="fas fa-exclamation-circle" style="color:#ef4444;margin-right:3px"></i>` : ''}
-                    ${dueDateText}
-                </div>
-                <div style="font-size:10.5px;color:var(--text-dim)">
-                    ${isDue ? '<span style="color:#f87171;font-weight:700">Due / Overdue</span>' : 'Scheduled'}
+                <div style="font-size:11px;color:#94a3b8">
+                    Vault: <strong style="color:#fff">${(sip.totalGrams || 0).toFixed(4)} g</strong>
                 </div>
             </td>
             <td>
@@ -248,9 +346,264 @@ function renderSips(sips) {
             </td>
             <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px;align-items:center">
-                    <button class="btn btn-secondary btn-sm" onclick="viewSipMilestones('${sip._id}')" title="View Milestone Journey">
-                        <i class="fas fa-road"></i> Milestones
+                    <button class="btn btn-secondary btn-sm" onclick="viewSipMilestones('${sip._id}')" title="View Milestones & Complete Transaction History">
+                        <i class="fas fa-history" style="color:var(--gold)"></i> Milestones & Txns
                     </button>
+                    ${sip.status === 'active' ? `
+                    <button class="btn btn-warning btn-sm" onclick="sendSipReminder('${sip._id}', '${userName.replace(/'/g, "\\'")}')" title="Send Push Notification Reminder">
+                        <i class="fas fa-bell"></i>
+                    </button>` : ''}
+                    <button class="btn btn-secondary btn-sm" onclick="openSipStatusDropdown(event, '${sip._id}', '${sip.status}')" title="Change Status">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    body.innerHTML = html;
+}
+
+/**
+ * Export SIP Investment Reports in Excel (CSV) or PDF
+ */
+async function exportSipsReport(format = "csv") {
+    try {
+        toast(`Generating ${format.toUpperCase()} SIP Investment Report...`, "info");
+
+        const search = document.getElementById("sip-filter-search")?.value.trim() || "";
+        const metal = document.getElementById("sip-filter-metal")?.value || "all";
+        const status = document.getElementById("sip-filter-status")?.value || "all";
+        const frequency = document.getElementById("sip-filter-freq")?.value || "all";
+        const sipType = currentSipCategory || "all";
+
+        const queryParams = new URLSearchParams({
+            page: 1,
+            limit: 5000,
+            ...(search && { search }),
+            ...(metal !== "all" && { metal }),
+            ...(status !== "all" && { status }),
+            ...(frequency !== "all" && { frequency }),
+            ...(sipType !== "all" && { sipType }),
+        });
+
+        let res = await api(`/admin/sips?${queryParams.toString()}`);
+        if (!res || !res.success) {
+            res = await api(`/sip/admin/all?${queryParams.toString()}`);
+        }
+
+        const data = res?.data || allSipsData || [];
+        if (!data || data.length === 0) {
+            toast("No SIP records to export with current filters", "warning");
+            return;
+        }
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const categoryLabel = sipType === "veer_jawan" ? "Veer_Jawan_SIP" : sipType === "simple" ? "Simple_SIP" : "All_SIPs";
+
+        if (format === "csv") {
+            const headers = [
+                "Customer Name",
+                "Customer ID",
+                "Mobile Number",
+                "Email",
+                "SIP Type",
+                "Goal Plan",
+                "Metal",
+                "Installment Amount (INR)",
+                "Frequency",
+                "Duration (Months)",
+                "Completed Cycles",
+                "Total Cycles",
+                "Total Invested (INR)",
+                "Accumulated Grams",
+                "Current Valuation (INR)",
+                "Start Date",
+                "Next Due Date",
+                "Status",
+                "AutoPay Mandate"
+            ];
+
+            const rows = data.map((s) => {
+                const u = s.user || {};
+                const name = (s.customerName || u.name || "Customer").replace(/"/g, '""');
+                const id = s.customerId || (u._id ? `USR${u._id.toString().slice(-6).toUpperCase()}` : "");
+                const phone = s.customerPhone || u.phone || "";
+                const email = (s.customerEmail || u.email || "").replace(/"/g, '""');
+                const type = s.sipTypeLabel || (s.sipType === "veer_jawan" || s.goalCategory === "soldier" ? "Veer Jawan SIP" : "Simple SIP");
+                const goal = (s.goalTitle || s.goalCategory || "Wealth Building").replace(/"/g, '""');
+                const metal = (s.metal || "gold").toUpperCase();
+                const installment = s.installmentAmount || 0;
+                const freq = s.frequency || "monthly";
+                const duration = s.durationMonths || 12;
+                const completed = s.cyclesCompleted || 0;
+                const total = s.totalCycles || 12;
+                const invested = s.totalInvested || 0;
+                const grams = (s.totalGrams || 0).toFixed(4);
+                const valuation = s.currentValuation || 0;
+                const start = s.startDate || s.createdAt ? new Date(s.startDate || s.createdAt).toISOString().slice(0, 10) : "";
+                const due = s.nextDueDate ? new Date(s.nextDueDate).toISOString().slice(0, 10) : "";
+                const status = (s.status || "active").toUpperCase();
+                const autopay = s.isAutopay ? "YES" : "NO";
+
+                return [
+                    `"${name}"`,
+                    `"${id}"`,
+                    `"${phone}"`,
+                    `"${email}"`,
+                    `"${type}"`,
+                    `"${goal}"`,
+                    `"${metal}"`,
+                    installment,
+                    `"${freq}"`,
+                    duration,
+                    completed,
+                    total,
+                    invested,
+                    grams,
+                    valuation,
+                    `"${start}"`,
+                    `"${due}"`,
+                    `"${status}"`,
+                    `"${autopay}"`
+                ].join(",");
+            });
+
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Payvika_SIP_Report_${categoryLabel}_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast("✅ Excel (CSV) report downloaded successfully!", "success");
+        } else if (format === "pdf") {
+            const printWindow = window.open("", "_blank");
+            if (!printWindow) {
+                toast("Pop-up blocked. Please allow pop-ups to print/export PDF.", "warning");
+                return;
+            }
+
+            const totalInvestedSum = data.reduce((sum, item) => sum + (item.totalInvested || 0), 0);
+            const totalGramsSum = data.reduce((sum, item) => sum + (item.totalGrams || 0), 0);
+
+            let rowsHtml = "";
+            data.forEach((s, idx) => {
+                const u = s.user || {};
+                const name = s.customerName || u.name || "Customer";
+                const id = s.customerId || (u._id ? `USR${u._id.toString().slice(-6).toUpperCase()}` : "—");
+                const phone = s.customerPhone || u.phone || "—";
+                const type = s.sipTypeLabel || (s.sipType === "veer_jawan" || s.goalCategory === "soldier" ? "Veer Jawan SIP" : "Simple SIP");
+                const goal = s.goalTitle || s.goalCategory || "Wealth Building";
+                const metal = (s.metal || "gold").toUpperCase();
+                const installment = `₹${(s.installmentAmount || 0).toLocaleString("en-IN")} / ${s.frequency || "mo"}`;
+                const invested = `₹${(s.totalInvested || 0).toLocaleString("en-IN")}`;
+                const grams = `${(s.totalGrams || 0).toFixed(4)} g`;
+                const start = s.startDate || s.createdAt ? new Date(s.startDate || s.createdAt).toLocaleDateString("en-IN") : "—";
+                const status = (s.status || "active").toUpperCase();
+
+                rowsHtml += `
+                <tr style="border-bottom:1px solid #e2e8f0;font-size:12px;">
+                    <td style="padding:8px 6px;">${idx + 1}</td>
+                    <td style="padding:8px 6px;"><strong>${name}</strong><br/><span style="font-size:10px;color:#64748b;">${id}</span></td>
+                    <td style="padding:8px 6px;">${phone}</td>
+                    <td style="padding:8px 6px;"><strong style="color:${type.includes('Veer') ? '#d97706' : '#0284c7'}">${type}</strong></td>
+                    <td style="padding:8px 6px;">${goal}<br/><span style="font-size:10px;color:#64748b;">${metal}</span></td>
+                    <td style="padding:8px 6px;">${installment}</td>
+                    <td style="padding:8px 6px;">${start}</td>
+                    <td style="padding:8px 6px;text-align:right;"><strong>${invested}</strong><br/><span style="font-size:10px;color:#64748b;">${grams}</span></td>
+                    <td style="padding:8px 6px;text-align:center;">
+                        <span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;background:${status === 'ACTIVE' ? '#dcfce7;color:#166534;' : status === 'PAUSED' ? '#fef3c7;color:#92400e;' : '#f1f5f9;color:#475569;'}">${status}</span>
+                    </td>
+                </tr>`;
+            });
+
+            printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Payvika - SIP Investment Report (${categoryLabel})</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 24px; color: #0f172a; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+                    .title { font-size: 22px; font-weight: 800; color: #0f172a; }
+                    .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+                    .kpi-row { display: flex; gap: 16px; margin-bottom: 20px; }
+                    .kpi-box { flex: 1; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; background: #f8fafc; }
+                    .kpi-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+                    .kpi-val { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 2px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th { background: #f1f5f9; color: #334155; font-size: 11px; text-transform: uppercase; text-align: left; padding: 8px 6px; border-bottom: 2px solid #cbd5e1; }
+                    @media print {
+                        body { margin: 0; }
+                        @page { margin: 1.5cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div>
+                        <div class="title">Payvika / Bharat SQFT — SIP Investment Report</div>
+                        <div class="subtitle">Category: <strong>${categoryLabel.replace(/_/g, " ")}</strong> • Generated: ${new Date().toLocaleString("en-IN")}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:12px;color:#64748b;">Confidential Admin Audit Report</div>
+                        <div style="font-size:14px;font-weight:700;">Records: ${data.length} Customers</div>
+                    </div>
+                </div>
+
+                <div class="kpi-row">
+                    <div class="kpi-box">
+                        <div class="kpi-label">Total Subscriptions</div>
+                        <div class="kpi-val">${data.length} Enrolled</div>
+                    </div>
+                    <div class="kpi-box">
+                        <div class="kpi-label">Total Investment Collected</div>
+                        <div class="kpi-val">₹${totalInvestedSum.toLocaleString("en-IN")}</div>
+                    </div>
+                    <div class="kpi-box">
+                        <div class="kpi-label">Total Bullion Accumulated</div>
+                        <div class="kpi-val">${totalGramsSum.toFixed(4)} g</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Customer Name & ID</th>
+                            <th>Mobile</th>
+                            <th>SIP Type</th>
+                            <th>Goal & Bullion</th>
+                            <th>Installment</th>
+                            <th>Start Date</th>
+                            <th style="text-align:right;">Invested & Bullion</th>
+                            <th style="text-align:center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                        }, 500);
+                    };
+                </script>
+            </body>
+            </html>`);
+            printWindow.document.close();
+            toast("✅ PDF print preview opened!", "success");
+        }
+    } catch (err) {
+        toast("Error generating export report", "danger");
+    }
+}
                     ${sip.status === 'active' ? `
                     <button class="btn btn-warning btn-sm" onclick="sendSipReminder('${sip._id}', '${userName.replace(/'/g, "\\'")}')" title="Send Push Notification Reminder">
                         <i class="fas fa-bell"></i>
@@ -349,12 +702,16 @@ function renderSipMilestoneModalContent(sip, journey) {
     if (!body) return;
 
     const u = sip.user || {};
-    const userName = u.name || "Customer";
-    const userPhone = u.phone || "—";
-    const userEmail = u.email || "—";
+    const userName = sip.customerName || u.name || "Customer";
+    const userPhone = sip.customerPhone || u.phone || "—";
+    const userEmail = sip.customerEmail || u.email || "—";
+    const customerId = sip.customerId || (u._id ? `USR${u._id.toString().slice(-6).toUpperCase()}` : "—");
     const metal = (sip.metal || "gold").toLowerCase();
     const isGold = metal === "gold";
     const isSilver = metal === "silver";
+
+    const isVeerJawan = sip.sipType === "veer_jawan" || sip.goalCategory === "soldier" || /veer\s*jawan|soldier/i.test(sip.goalTitle || "");
+    const sipTypeLabel = isVeerJawan ? "🎖️ Veer Jawan SIP" : "💎 Simple SIP";
 
     const goalCat = (sip.goalCategory || "wealth").toLowerCase();
     const goalMeta = GOAL_ICONS[goalCat] || GOAL_ICONS.wealth;
@@ -369,6 +726,11 @@ function renderSipMilestoneModalContent(sip, journey) {
     const returnsPct = sip.returnsPct || 0;
     const isPositive = returnsAmt >= 0;
 
+    let startDateText = "—";
+    if (sip.startDate || sip.createdAt) {
+        startDateText = new Date(sip.startDate || sip.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    }
+
     let html = `
     <!-- Top Subscriber & Goal Banner -->
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:1.25rem">
@@ -378,9 +740,17 @@ function renderSipMilestoneModalContent(sip, journey) {
                     <i class="${goalMeta.icon}"></i>
                 </div>
                 <div>
-                    <div style="font-size:16px;font-weight:800;color:#fff">${sip.goalTitle || goalMeta.label}</div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:16px;font-weight:800;color:#fff">${sip.goalTitle || goalMeta.label}</span>
+                        <span class="badge" style="background:${isVeerJawan ? 'rgba(245,158,11,0.2)' : 'rgba(56,189,248,0.2)'};color:${isVeerJawan ? '#f59e0b' : '#38bdf8'};border:1px solid ${isVeerJawan ? 'rgba(245,158,11,0.4)' : 'rgba(56,189,248,0.4)'};font-weight:700;font-size:11px;padding:3px 8px">
+                            ${sipTypeLabel}
+                        </span>
+                    </div>
                     <div style="font-size:12.5px;color:var(--text-dim);margin-top:2px">
-                        Subscriber: <strong style="color:#fff">${userName}</strong> • ${userPhone} • ${userEmail}
+                        Customer: <strong style="color:#fff">${userName}</strong> <span class="badge badge-secondary" style="font-size:9.5px;font-family:var(--font-mono);margin-left:4px">${customerId}</span> • <i class="fas fa-phone-alt" style="font-size:10px"></i> ${userPhone} • ${userEmail}
+                    </div>
+                    <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">
+                        <i class="fas fa-calendar-check" style="color:var(--gold);font-size:11px"></i> Started: <strong>${startDateText}</strong>
                     </div>
                 </div>
             </div>
