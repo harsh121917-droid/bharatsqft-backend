@@ -1130,9 +1130,20 @@ exports.verifyCashfreePan = async (req, res, next) => {
             const errMsg = (errData && errData.message) ? errData.message : String(apiErr.message || "");
             console.error("Cashfree PAN API Error:", JSON.stringify(errData));
 
+            if (errData && (errData.code === "ip_validation_failed" || /ip not whitelisted/i.test(errMsg))) {
+                return res.status(502).json({
+                    success: false,
+                    code: "CASHFREE_IP_NOT_WHITELISTED",
+                    message: errMsg || "Server IP is not whitelisted in Cashfree Dashboard. Please whitelist your server's outbound IP in Cashfree Verification settings.",
+                    details: errData
+                });
+            }
+
             return res.status(502).json({
                 success: false,
-                message: errMsg || "PAN verification failed via Cashfree. Please try again."
+                code: errData?.code || "CASHFREE_GATEWAY_ERROR",
+                message: errMsg || "PAN verification failed via Cashfree. Please try again.",
+                details: errData
             });
         }
     } catch (err) {
