@@ -1088,7 +1088,10 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
 
         res.json({
             success: true,
-            message: "KYC Verified successfully via Cashfree!",
+            message: "Aadhaar verified successfully!",
+            name: details.fullName,
+            dob: details.dob,
+            address: details.address,
             data: kyc
         });
     } catch (err) {

@@ -192,28 +192,62 @@ exports.verifyBankAccount = async (req, res, next) => {
                 isVerified = true;
                 statusMessage = `₹1 deposited successfully! Account verified under ${verifiedName}.`;
 
-                // Update BankAccount in DB with authoritative provenance
-                await BankAccount.findOneAndUpdate(
+                // Update BankAccount in DB with authoritative provenance and sync with KYC
+                const bankDoc = await BankAccount.findOneAndUpdate(
                     { user: req.user._id, accountNumber: cleanAcc },
                     {
+                        user: req.user._id,
+                        bankName,
+                        accountHolder: verifiedName,
+                        accountNumber: cleanAcc,
+                        ifsc: cleanIfsc,
+                        branch,
                         isVerified: true,
                         verifiedName,
                         verificationSource: "CASHFREE_PENNY_DROP",
-                        accountStatus: accStatus,
+                        accountStatus: accStatus || "ACTIVE",
                         verifiedAt: new Date()
-                    }
+                    },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
                 );
+                await syncUserBank(req.user._id, bankDoc);
             } catch (cfErr) {
-                console.warn("[Bank Verification Cashfree Warning]:", cfErr.response?.data?.message || cfErr.message);
+                const errData = cfErr.response ? cfErr.response.data : { message: cfErr.message };
+                const errMsg = (errData && errData.message) ? errData.message : String(cfErr.message || "");
+                console.warn("[Bank Verification Cashfree Warning]:", JSON.stringify(errData));
+
+                if (errData && (errData.code === "ip_validation_failed" || /ip not whitelisted/i.test(errMsg))) {
+                    return res.status(502).json({
+                        success: false,
+                        isVerified: false,
+                        code: "CASHFREE_IP_NOT_WHITELISTED",
+                        message: errMsg || "Server IP is not whitelisted in Cashfree Dashboard. Please whitelist your server's outbound IP in Cashfree Verification settings.",
+                        details: errData
+                    });
+                }
+
                 return res.status(502).json({
                     success: false,
                     isVerified: false,
-                    message: cfErr.response?.data?.message || "Bank account verification failed with bank verification provider. Please try again."
+                    code: errData?.code || "CASHFREE_GATEWAY_ERROR",
+                    message: errMsg || "Bank account verification failed with bank verification provider. Please try again.",
+                    details: errData
                 });
             }
         }
 
         if (isVerified) {
+            await Kyc.findOneAndUpdate(
+                { user: req.user._id },
+                {
+                    $set: {
+                        "bankDetails.accountHolderName": verifiedName,
+                        "bankDetails.accountNumber": cleanAcc,
+                        "bankDetails.ifscCode": cleanIfsc,
+                        "bankDetails.bankName": bankName,
+                    }
+                }
+            );
             try {
                 const eventNotificationService = require("../services/eventNotificationService");
                 eventNotificationService.notifyBankVerified(req.user._id, {
