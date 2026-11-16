@@ -73,6 +73,7 @@ exports.submitKyc = async (req, res, next) => {
                 ifscCode: ifscCode || kyc?.bankDetails?.ifscCode || "",
                 bankName: bankName || kyc?.bankDetails?.bankName || "",
             },
+            verificationSource: "MANUAL_PHOTO_UPLOAD",
             status: "pending",
             rejectionReason: undefined,
             reviewedBy: undefined,
@@ -176,6 +177,37 @@ exports.getMyKyc = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+function resolveKycMethodInfo(k) {
+    if (!k) return { kycMethod: "manual_upload", kycMethodLabel: "📸 Photo Upload", kycMethodBadge: "badge-amber" };
+    const src = (k.verificationSource || "").toUpperCase();
+    const panUrl = k.panImage?.url || "";
+    let kycMethod = "manual_upload";
+    let kycMethodLabel = "📸 Photo Upload";
+    let kycMethodBadge = "badge-amber";
+
+    if (src.includes("CASHFREE") || panUrl === "cashfree_verified" || panUrl === "cashfree_pan_verified") {
+        kycMethod = "cashfree";
+        const isAadhaar = src.includes("AADHAAR");
+        kycMethodLabel = isAadhaar ? "⚡ Cashfree Aadhaar" : "⚡ Cashfree PAN";
+        kycMethodBadge = "badge-success";
+    } else if (src.includes("NSE") || src.includes("MFSS") || src.includes("KRA") || k.kraName) {
+        kycMethod = "mutual_funds";
+        kycMethodLabel = "📈 Mutual Funds (NSE/KRA)";
+        kycMethodBadge = "badge-purple";
+    } else if (src.includes("DIGIO")) {
+        kycMethod = "digio";
+        kycMethodLabel = "✍️ Digio e-Sign";
+        kycMethodBadge = "badge-blue";
+    } else if (src.includes("ADMIN")) {
+        kycMethod = "admin";
+        kycMethodLabel = "🛡️ Admin Manual";
+        kycMethodBadge = "badge-secondary";
+    }
+
+    return { kycMethod, kycMethodLabel, kycMethodBadge };
+}
+exports.resolveKycMethodInfo = resolveKycMethodInfo;
+
 /* ─────────────────────────────────────────
    GET /api/admin/kyc
    Admin: list all KYC submissions (filter by status)
@@ -219,6 +251,26 @@ exports.getAllKyc = async (req, res, next) => {
             ];
         }
 
+        if (req.query.method && req.query.method !== "all") {
+            const m = req.query.method.toLowerCase();
+            if (m === "cashfree") {
+                filter.$or = [
+                    { verificationSource: { $in: ["CASHFREE_GOVT_NSDL", "CASHFREE_AADHAAR_OKYC"] } },
+                    { "panImage.url": { $in: ["cashfree_verified", "cashfree_pan_verified"] } }
+                ];
+            } else if (m === "mutual_funds" || m === "mf") {
+                filter.$or = [
+                    { verificationSource: "NSE_MFSS_KYC_VERIFY" },
+                    { kraName: { $exists: true, $ne: "" } }
+                ];
+            } else if (m === "manual_upload" || m === "photo") {
+                filter.$or = [
+                    { verificationSource: "MANUAL_PHOTO_UPLOAD" },
+                    { "panImage.url": { $regex: /^uploads\// } }
+                ];
+            }
+        }
+
         const [items, total, pendingCount, approvedCount, rejectedCount, revokedCount, soldierPendingCount] = await Promise.all([
             Kyc.find(filter)
                 .populate("user", "name email phone isSoldierVerified soldierKycStatus")
@@ -233,6 +285,14 @@ exports.getAllKyc = async (req, res, next) => {
             Kyc.countDocuments({ "soldierDetails.status": "pending" }),
         ]);
 
+        const enrichedItems = items.map(k => {
+            const methodInfo = resolveKycMethodInfo(k);
+            return {
+                ...k.toObject(),
+                ...methodInfo,
+            };
+        });
+
         res.json({
             success: true,
             total,
@@ -243,7 +303,7 @@ exports.getAllKyc = async (req, res, next) => {
             rejectedCount,
             revokedCount,
             soldierPendingCount,
-            data: items,
+            data: enrichedItems,
         });
     } catch (err) { next(err); }
 };
@@ -258,7 +318,8 @@ exports.getKycById = async (req, res, next) => {
             .populate("reviewedBy", "name email")
             .select("+aadhaarNumber");
         if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
-        res.json({ success: true, data: kyc });
+        const methodInfo = resolveKycMethodInfo(kyc);
+        res.json({ success: true, data: { ...kyc.toObject(), ...methodInfo } });
     } catch (err) { next(err); }
 };
 
@@ -851,10 +912,23 @@ exports.initiateCashfreeOtp = async (req, res, next) => {
             }
         } catch (apiErr) {
             const errData = apiErr.response ? apiErr.response.data : { message: apiErr.message };
+            const errMsg = (errData && errData.message) ? errData.message : String(apiErr.message || "");
             console.error("Cashfree OTP API Error:", JSON.stringify(errData));
+
+            if (errData && (errData.code === "ip_validation_failed" || /ip not whitelisted/i.test(errMsg))) {
+                return res.status(502).json({
+                    success: false,
+                    code: "CASHFREE_IP_NOT_WHITELISTED",
+                    message: errMsg || "Server IP is not whitelisted in Cashfree Dashboard. Please whitelist your server's outbound IP in Cashfree Verification settings.",
+                    details: errData
+                });
+            }
+
             return res.status(502).json({
                 success: false,
-                message: errData.message || "Failed to send OTP via Cashfree. Please try again.",
+                code: errData?.code || "CASHFREE_GATEWAY_ERROR",
+                message: errMsg || "Failed to send OTP via Cashfree. Please try again.",
+                details: errData,
                 debug: process.env.NODE_ENV !== "production" ? errData : undefined
             });
         }
@@ -947,10 +1021,23 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                 }
             } catch (apiErr) {
                 const errData = apiErr.response ? apiErr.response.data : { message: apiErr.message };
+                const errMsg = (errData && errData.message) ? errData.message : String(apiErr.message || "");
                 console.error("Cashfree Verify API Error:", JSON.stringify(errData));
+
+                if (errData && (errData.code === "ip_validation_failed" || /ip not whitelisted/i.test(errMsg))) {
+                    return res.status(502).json({
+                        success: false,
+                        code: "CASHFREE_IP_NOT_WHITELISTED",
+                        message: errMsg || "Server IP is not whitelisted in Cashfree Dashboard. Please whitelist your server's outbound IP in Cashfree Verification settings.",
+                        details: errData
+                    });
+                }
+
                 return res.status(502).json({
                     success: false,
-                    message: errData.message || "OTP verification failed via Cashfree. Please try again.",
+                    code: errData?.code || "CASHFREE_GATEWAY_ERROR",
+                    message: errMsg || "OTP verification failed via Cashfree. Please try again.",
+                    details: errData,
                     debug: process.env.NODE_ENV !== "production" ? errData : undefined
                 });
             }

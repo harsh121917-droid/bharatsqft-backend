@@ -88,10 +88,12 @@ const KycSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "NONE",
+                "MANUAL_PHOTO_UPLOAD",
                 "NSE_MFSS_KYC_VERIFY",
                 "CASHFREE_GOVT_NSDL",
                 "UIDAI_XML",
                 "CASHFREE_AADHAAR_OKYC",
+                "DIGIO_DIGITAL_KYC",
                 "ADMIN_DOCUMENT_VERIFIED",
                 "MOCK_TEST_VERIFIED"
             ],

@@ -6,6 +6,7 @@ const { SilverBalance, SilverTransaction } = require("../models/Silver");
 const { CopperBalance, CopperTransaction } = require("../models/Copper");
 const { GoldScheme, SchemeEnrollment } = require("../models/Scheme");
 const Kyc = require("../models/Kyc");
+const { resolveKycMethodInfo } = require("./kycController");
 const Saving = require("../models/Saving");
 const Coupon = require("../models/Coupon");
 
@@ -612,7 +613,7 @@ exports.getUserById = async (req, res, next) => {
                     returnsPct,
                     walletBalance
                 },
-                kyc: kycDoc || null,
+                kyc: kycDoc ? { ...kycDoc.toObject(), ...(typeof resolveKycMethodInfo === "function" ? resolveKycMethodInfo(kycDoc) : {}) } : null,
                 bank: bankDoc ? {
                     bankName: bankDoc.bankName || "Linked Bank",
                     accountHolder: bankDoc.accountHolder || user.name,

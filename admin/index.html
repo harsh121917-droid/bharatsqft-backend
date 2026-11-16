@@ -1718,7 +1718,14 @@
                     </div>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                         <input class="search-bar" id="kyc-search" placeholder="🔍 Search name, phone, PAN..."
-                            oninput="debouncedSearchKyc(this.value)" style="max-width:260px" />
+                            oninput="debouncedSearchKyc(this.value)" style="max-width:240px" />
+                        <select class="form-control" id="kyc-filter-method" onchange="setKycMethodFilter(this.value)" style="width:170px;height:34px;font-size:12px;background:var(--surface2);font-weight:600">
+                            <option value="all">All Channels</option>
+                            <option value="cashfree">⚡ Cashfree Instant KYC</option>
+                            <option value="mutual_funds">📈 Mutual Funds (NSE/KRA)</option>
+                            <option value="manual_upload">📸 Manual Photo Upload</option>
+                            <option value="digio">✍️ Digio Digital KYC</option>
+                        </select>
                         <div class="chart-pill-group">
                             <button class="chart-pill-btn kyc-filter-pill active" id="kyc-pill-pending"
                                 onclick="setKycFilter('pending')">

@@ -4,6 +4,7 @@
 
 let currentKycId = null;
 let currentKycFilter = "pending";
+let currentKycMethod = "all";
 let kycSearchQuery = "";
 let kycSearchDebounce = null;
 
@@ -14,12 +15,38 @@ function setKycFilter(status) {
     loadKyc(status);
 }
 
+function setKycMethodFilter(method) {
+    currentKycMethod = method || "all";
+    loadKyc(currentKycFilter);
+}
+
 function debouncedSearchKyc(query) {
     kycSearchQuery = (query || "").trim();
     clearTimeout(kycSearchDebounce);
     kycSearchDebounce = setTimeout(() => {
         loadKyc(currentKycFilter);
     }, 300);
+}
+
+function getKycMethodBadgeHtml(k) {
+    if (!k) return '';
+    const src = (k.verificationSource || "").toUpperCase();
+    const panUrl = k.panImage?.url || "";
+
+    if (src.includes("CASHFREE") || panUrl === "cashfree_verified" || panUrl === "cashfree_pan_verified") {
+        const isAadhaar = src.includes("AADHAAR");
+        return `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700">⚡ Cashfree ${isAadhaar ? 'Aadhaar' : 'PAN'}</span>`;
+    }
+    if (src.includes("NSE") || src.includes("MFSS") || src.includes("KRA") || k.kraName) {
+        return `<span class="badge" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.35);font-size:11px;font-weight:700">📈 Mutual Funds (NSE/KRA)</span>`;
+    }
+    if (src.includes("DIGIO")) {
+        return `<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:11px;font-weight:700">✍️ Digio e-Sign</span>`;
+    }
+    if (src.includes("ADMIN")) {
+        return `<span class="badge" style="background:rgba(148,163,184,0.15);color:#cbd5e1;border:1px solid rgba(148,163,184,0.35);font-size:11px;font-weight:700">🛡️ Admin Manual</span>`;
+    }
+    return `<span class="badge" style="background:rgba(212,160,23,0.12);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-size:11px;font-weight:700">📸 Photo Upload</span>`;
 }
 
 async function loadKyc(status = currentKycFilter) {
@@ -31,6 +58,9 @@ async function loadKyc(status = currentKycFilter) {
     try {
         let url = `/admin/kyc?status=${status}`;
         if (kycSearchQuery) url += `&search=${encodeURIComponent(kycSearchQuery)}`;
+        if (currentKycMethod && currentKycMethod !== "all") {
+            url += `&method=${encodeURIComponent(currentKycMethod)}`;
+        }
 
         const res = await api(url);
         if (!res.success) {
@@ -86,6 +116,7 @@ function renderKycTable(kycList) {
                         <input type="checkbox" id="kyc-select-all" onchange="toggleSelectAllKyc(this.checked)" title="Select All Submissions" style="cursor:pointer;width:16px;height:16px" />
                     </th>
                     <th>Customer</th>
+                    <th>KYC Method</th>
                     <th>PAN Number</th>
                     <th>City / State</th>
                     <th>Bank Details</th>
@@ -133,6 +164,9 @@ function renderKycTable(kycList) {
             <td>
                 <div style="font-weight:600;color:#fff">${k.fullName || u.name || '—'}</div>
                 <div style="font-size:12px;color:var(--text-dim)">${u.email || ''} • ${u.phone || ''}</div>
+            </td>
+            <td>
+                ${getKycMethodBadgeHtml(k)}
             </td>
             <td>${k.panNumber === 'PHOTO_SUBMITTED' ? '<span class="badge" style="background:rgba(212,160,23,0.15);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-size:11px"><i class="fas fa-camera"></i> Photo KYC</span>' : `<span style="font-family:var(--font-mono);font-weight:600;color:var(--gold)">${k.panNumber || '—'}</span>`}</td>
             <td style="font-size:12.5px">${k.address?.city || '—'}, ${k.address?.state || '—'}</td>
@@ -331,6 +365,23 @@ async function openKycModal(id) {
                 <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${u.email || 'No email'} • ${u.phone || 'No phone'}</div>
                 <div style="font-size:13px;color:var(--text-dim);margin-top:4px"><strong>DOB:</strong> ${formatDate(k.dob)}</div>
                 <div style="font-size:13px;color:var(--text-dim);margin-top:2px"><strong>Address:</strong> ${addr.line1 || ''}, ${addr.city || ''}, ${addr.state || ''} - ${addr.pincode || ''}</div>
+            </div>
+
+            <!-- KYC Verification Source / Channel -->
+            <div style="background:linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.85));padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:18px">
+                        ${(k.verificationSource || '').includes('CASHFREE') ? '⚡' : ((k.verificationSource || '').includes('NSE') ? '📈' : '📸')}
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">KYC Verification Method / Channel</div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+                            ${getKycMethodBadgeHtml(k)}
+                            <span style="font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono)">${k.verificationSource || 'MANUAL_PHOTO_UPLOAD'}</span>
+                        </div>
+                    </div>
+                </div>
+                ${k.kraName ? `<div style="font-size:12px;color:#a78bfa"><strong>KRA:</strong> ${k.kraName} ${k.kraStatus ? `(${k.kraStatus})` : ''}</div>` : ''}
             </div>
 
             <!-- Documents Section -->

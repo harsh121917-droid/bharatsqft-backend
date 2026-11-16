@@ -2768,9 +2768,37 @@ function renderUdKycTab(u) {
     if (!mount) return;
     const k = u.kyc || {};
 
+    const src = (k.verificationSource || "").toUpperCase();
+    const panUrl = k.panImage?.url || "";
+    let methodBadgeHtml = "";
+
+    if (src.includes("CASHFREE") || panUrl === "cashfree_verified" || panUrl === "cashfree_pan_verified") {
+        const isAadhaar = src.includes("AADHAAR");
+        methodBadgeHtml = `<span class="badge" style="background:rgba(16,185,129,0.2);color:#10b981;border:1px solid rgba(16,185,129,0.4);font-size:12px;font-weight:700;padding:4px 10px"><i class="fas fa-bolt"></i> Cashfree Verified (${isAadhaar ? 'Aadhaar OTP' : 'Govt NSDL PAN'})</span>`;
+    } else if (src.includes("NSE") || src.includes("MFSS") || src.includes("KRA") || k.kraName) {
+        methodBadgeHtml = `<span class="badge" style="background:rgba(139,92,246,0.2);color:#a78bfa;border:1px solid rgba(139,92,246,0.4);font-size:12px;font-weight:700;padding:4px 10px"><i class="fas fa-chart-line"></i> Mutual Funds Verified (${k.kraName || 'NSE/KRA'})</span>`;
+    } else if (src.includes("DIGIO")) {
+        methodBadgeHtml = `<span class="badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:12px;font-weight:700;padding:4px 10px"><i class="fas fa-signature"></i> Digio Digital e-Sign</span>`;
+    } else if (src.includes("ADMIN")) {
+        methodBadgeHtml = `<span class="badge" style="background:rgba(148,163,184,0.2);color:#cbd5e1;border:1px solid rgba(148,163,184,0.4);font-size:12px;font-weight:700;padding:4px 10px"><i class="fas fa-user-shield"></i> Admin Verified</span>`;
+    } else if (k._id || k.panNumber || k.panImage?.url || k.aadhaarFront?.url) {
+        methodBadgeHtml = `<span class="badge" style="background:rgba(212,160,23,0.18);color:var(--gold);border:1px solid rgba(212,160,23,0.4);font-size:12px;font-weight:700;padding:4px 10px"><i class="fas fa-camera"></i> Manual Photo Upload</span>`;
+    } else {
+        methodBadgeHtml = `<span class="badge" style="background:rgba(100,116,139,0.15);color:#94a3b8;font-size:12px">Not Submitted</span>`;
+    }
+
     mount.innerHTML = `
     <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem">
         <div>
+            <!-- KYC Method / Origin Banner -->
+            <div style="background:linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.85));border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">KYC Verification Method</div>
+                    <div style="margin-top:4px">${methodBadgeHtml}</div>
+                </div>
+                ${k.verificationSource ? `<div style="font-size:11px;color:#94a3b8;font-family:var(--font-mono)">Source: ${k.verificationSource}</div>` : ''}
+            </div>
+
             <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:1rem"><i class="fas fa-file-invoice" style="color:#10b981"></i> KYC Document Previews</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
