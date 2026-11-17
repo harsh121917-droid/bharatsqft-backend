@@ -1241,6 +1241,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 panAadhaarNameMatched = true;
             }
 
+            const hasBank = !!(kyc?.bankDetails?.accountNumber);
+            const finalStatus = (panAadhaarNameMatched && hasBank) ? "approved" : "pending";
+
             const kycPayload = {
                 user: req.user._id,
                 fullName: registeredName,
@@ -1249,9 +1252,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 panRegisteredName: registeredName,
                 panAadhaarNameMatched: panAadhaarNameMatched,
                 verificationSource: "MOCK_TEST_VERIFIED",
-                status: "approved",
+                status: finalStatus,
                 submittedAt: kyc?.submittedAt || new Date(),
-                reviewedAt: new Date()
+                reviewedAt: finalStatus === "approved" ? new Date() : undefined
             };
 
             if (kyc) {
@@ -1261,8 +1264,8 @@ exports.verifyCashfreePan = async (req, res, next) => {
             }
 
             const User = require("../models/User");
-            await User.findByIdAndUpdate(req.user._id, { kycStatus: "approved", name: registeredName });
-            if (req.user) req.user.kycStatus = "approved";
+            await User.findByIdAndUpdate(req.user._id, { kycStatus: finalStatus, name: registeredName });
+            if (req.user) req.user.kycStatus = finalStatus;
 
             return res.json({
                 success: true,
@@ -1270,7 +1273,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 registeredName,
                 panAadhaarNameMatched: panAadhaarNameMatched,
                 data: sanitizeKycDto(kyc),
-                message: "PAN verified & KYC approved successfully (Test Mode)"
+                message: finalStatus === "approved"
+                    ? "PAN verified & KYC approved successfully (Test Mode)"
+                    : "PAN verified successfully! Please proceed to Bank Account verification."
             });
         }
 
@@ -1315,6 +1320,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     panAadhaarNameMatched = true;
                 }
 
+                const hasBank = !!(kyc?.bankDetails?.accountNumber);
+                const finalStatus = (panAadhaarNameMatched && hasBank) ? "approved" : "pending";
+
                 const kycPayload = {
                     user: req.user._id,
                     fullName: registeredName,
@@ -1324,9 +1332,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     panAadhaarNameMatched: panAadhaarNameMatched,
                     verificationSource: "CASHFREE_GOVT_NSDL",
                     rawPanData: data,
-                    status: "approved",
+                    status: finalStatus,
                     submittedAt: kyc?.submittedAt || new Date(),
-                    reviewedAt: new Date()
+                    reviewedAt: finalStatus === "approved" ? new Date() : undefined
                 };
 
                 if (kyc) {
@@ -1336,13 +1344,15 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 }
 
                 const User = require("../models/User");
-                await User.findByIdAndUpdate(req.user._id, { kycStatus: "approved", name: registeredName });
-                if (req.user) req.user.kycStatus = "approved";
+                await User.findByIdAndUpdate(req.user._id, { kycStatus: finalStatus, name: registeredName });
+                if (req.user) req.user.kycStatus = finalStatus;
 
-                try {
-                    const eventNotificationService = require("../services/eventNotificationService");
-                    eventNotificationService.notifyKycCompleted(req.user._id);
-                } catch (_) {}
+                if (finalStatus === "approved") {
+                    try {
+                        const eventNotificationService = require("../services/eventNotificationService");
+                        eventNotificationService.notifyKycCompleted(req.user._id);
+                    } catch (_) {}
+                }
 
                 return res.json({
                     success: true,
@@ -1350,7 +1360,9 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     registeredName,
                     panAadhaarNameMatched: panAadhaarNameMatched,
                     data: sanitizeKycDto(kyc),
-                    message: "PAN verified & KYC approved successfully via Cashfree!"
+                    message: finalStatus === "approved"
+                        ? "PAN verified & KYC approved successfully via Cashfree!"
+                        : "PAN verified successfully! Please proceed to Bank Account verification."
                 });
             } else {
                 return res.status(400).json({

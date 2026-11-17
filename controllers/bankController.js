@@ -237,16 +237,29 @@ exports.verifyBankAccount = async (req, res, next) => {
         }
 
         if (isVerified) {
+            const User = require("../models/User");
+            const existingKyc = await Kyc.findOne({ user: req.user._id });
+            const canApprove = existingKyc && existingKyc.panVerified && (existingKyc.aadhaarVerified || existingKyc.panAadhaarNameMatched);
+
+            const updateFields = {
+                "bankDetails.accountHolderName": verifiedName,
+                "bankDetails.accountNumber": cleanAcc,
+                "bankDetails.ifscCode": cleanIfsc,
+                "bankDetails.bankName": bankName,
+            };
+            if (canApprove) {
+                updateFields.status = "approved";
+                updateFields.reviewedAt = new Date();
+                await User.findByIdAndUpdate(req.user._id, { kycStatus: "approved" });
+                try {
+                    const eventNotificationService = require("../services/eventNotificationService");
+                    eventNotificationService.notifyKycCompleted(req.user._id);
+                } catch (_) {}
+            }
+
             await Kyc.findOneAndUpdate(
                 { user: req.user._id },
-                {
-                    $set: {
-                        "bankDetails.accountHolderName": verifiedName,
-                        "bankDetails.accountNumber": cleanAcc,
-                        "bankDetails.ifscCode": cleanIfsc,
-                        "bankDetails.bankName": bankName,
-                    }
-                }
+                { $set: updateFields }
             );
             try {
                 const eventNotificationService = require("../services/eventNotificationService");
