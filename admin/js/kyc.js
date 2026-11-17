@@ -646,6 +646,9 @@ async function openKycModal(id) {
 
             footer.innerHTML = `
                 <button class="btn btn-secondary" onclick="closeKycModal()">Close</button>
+                <button class="btn btn-sm" onclick="resetKycFromReviewModal('${k.user?._id || k.user}', '${escapeHtml(k.fullName || '')}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:700;margin-left:auto" title="Completely reset KYC, Cashfree Aadhaar & PAN verification">
+                    <i class="fas fa-undo-alt"></i> Reset KYC (Cashfree)
+                </button>
                 ${actionButtons}
             `;
         }
@@ -659,6 +662,29 @@ function closeKycModal() {
     if (modal) modal.style.display = "none";
     currentKycId = null;
 }
+
+async function resetKycFromReviewModal(userId, name) {
+    if (!userId) {
+        toast("User ID not found for this KYC", "warning");
+        return;
+    }
+    const confirmMsg = `⚠️ Are you sure you want to RESET KYC for "${name || 'this customer'}"?\n\nThis will:\n• Clear Cashfree Aadhaar, PAN & Bank verification records\n• Delete the customer's KYC document\n• Reset customer's KYC status to 'Not Submitted'\n• Allow the customer to start fresh verification in the mobile app\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await api(`/admin/users/${userId}/reset-kyc`, { method: "POST" });
+        if (res && res.success) {
+            toast(res.message || "KYC reset successfully! Cashfree verification cleared.", "success");
+            closeKycModal();
+            loadKyc(currentKycFilter);
+        } else {
+            toast(res?.message || "Failed to reset KYC", "danger");
+        }
+    } catch (e) {
+        toast("Error resetting KYC: " + (e.message || e), "danger");
+    }
+}
+window.resetKycFromReviewModal = resetKycFromReviewModal;
 
 async function quickReviewKyc(id, decision) {
     currentKycId = id;

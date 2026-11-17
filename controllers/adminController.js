@@ -1290,6 +1290,61 @@ exports.oneClickApproveKyc = async (req, res, next) => {
     }
 };
 
+// ── RESET CUSTOMER KYC (CASHFREE & DIGITAL KYC) FROM USER DETAILS ──
+exports.resetUserKyc = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        const previousKyc = await Kyc.findOne({ user: userId });
+        const previousMethod = previousKyc?.verificationSource || (user.kycStatus === 'approved' ? 'VERIFIED' : 'PENDING');
+        const previousPan = previousKyc?.panNumber || user.panNumber;
+
+        // 1. Delete all KYC records for this user (clearing Cashfree Aadhaar, PAN, and address)
+        await Kyc.deleteMany({ user: userId });
+
+        // 2. Reset user's KYC fields in User model
+        user.kycStatus = "not_submitted";
+        user.isSoldierVerified = false;
+        user.soldierKycStatus = "not_submitted";
+        user.panNumber = undefined;
+        user.panRegisteredName = undefined;
+        user.isKycVerified = false;
+        user.kycVerified = false;
+        user.testFreshKyc = true;
+        if (user.bank) {
+            user.bank.isVerified = false;
+            user.bank.verifiedName = undefined;
+            user.bank.verificationSource = undefined;
+        }
+        await user.save();
+
+        // 3. Reset verification flag on BankAccount documents so user can re-verify bank in Step 3
+        try {
+            const BankAccount = require("../models/BankAccount");
+            await BankAccount.updateMany(
+                { user: userId },
+                {
+                    $set: { isVerified: false, verificationSource: "RESET_BY_ADMIN" },
+                    $unset: { verifiedName: 1, verifiedAt: 1 }
+                }
+            );
+        } catch (_) {}
+
+        return res.json({
+            success: true,
+            message: `KYC for ${user.name || user.phone || 'customer'} successfully reset! Cashfree Aadhaar, PAN and verification records cleared. Customer can now perform fresh verification in the mobile app.`,
+            data: {
+                kycStatus: "not_submitted",
+                kyc: null
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.clearUserLocation = async (req, res, next) => {
     try {
         const user = await User.findByIdAndUpdate(

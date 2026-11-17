@@ -40,6 +40,7 @@ const {
   syncUserPendingPayments,
   updateUserBank,
   oneClickApproveKyc,
+  resetUserKyc,
   getFeeBreakdown,
 } = require("../controllers/adminController");
 const {
@@ -87,6 +88,7 @@ router.post("/users/:id/reset-all", resetAllUserData);
 router.patch("/users/:id/bank", updateUserBank);
 router.put("/users/:id/bank", updateUserBank);
 router.post("/users/:id/approve-kyc", oneClickApproveKyc);
+router.post("/users/:id/reset-kyc", resetUserKyc);
 router.patch("/users/:id/toggle-company-bank", toggleCompanyBankVisibility);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);

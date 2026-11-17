@@ -890,6 +890,11 @@
                                 style="display:none;background:linear-gradient(135deg, #10b981, #059669);color:#fff;border:none;font-weight:700;padding:6px 14px;border-radius:6px;gap:6px;align-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.35);font-size:12px">
                                 <i class="fas fa-check-circle"></i> <span>1-Click Approve KYC</span>
                             </button>
+                            <button class="btn btn-sm" id="btn-ud-reset-kyc" onclick="resetUserKycAction(activeUserId)"
+                                title="Reset KYC for this Customer (Cashfree & Identifiers)"
+                                style="display:none;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;padding:6px 14px;border-radius:6px;gap:6px;align-items:center;cursor:pointer;font-size:12px">
+                                <i class="fas fa-undo-alt"></i> <span>Reset KYC</span>
+                            </button>
                             <button class="btn btn-sm" id="btn-ud-toggle-company-bank" onclick="toggleUserCompanyBankVisibility(activeUserId)"
                                 title="Show or Hide Company Bank & QR Details for this specific user in their app"
                                 style="background:rgba(212,160,23,0.12);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-weight:700;padding:6px 12px;border-radius:6px;gap:6px;display:inline-flex;align-items:center;cursor:pointer;font-size:12px">
@@ -926,6 +931,9 @@
                                     <div class="ud-dropdown-divider"></div>
                                     <button class="ud-dropdown-item" onclick="clearUserLocation(activeUserId, event)">
                                         <i class="fas fa-map-marker-slash" style="color:#fbbf24"></i> Delete Location
+                                    </button>
+                                    <button class="ud-dropdown-item danger" onclick="resetUserKycAction(activeUserId)">
+                                        <i class="fas fa-undo-alt" style="color:#f87171"></i> Reset KYC (Cashfree & Identifiers)
                                     </button>
                                     <button class="ud-dropdown-item danger" onclick="resetUserWalletData(activeUserId)">
                                         <i class="fas fa-coins"></i> Reset Wallet (₹0)

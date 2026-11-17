@@ -1391,6 +1391,7 @@ function renderUserDetailsContent(u) {
 
     const btnOneClickKyc = document.getElementById("btn-ud-oneclick-kyc");
     const btnCardApproveKyc = document.getElementById("btn-ud-card-approve-kyc");
+    const btnResetKyc = document.getElementById("btn-ud-reset-kyc");
 
     if (rawKyc === "approved" || rawKyc === "verified" || u.kycVerified === true) {
         if (kycPill) kycPill.className = "ud-kyc-status-pill verified";
@@ -1400,9 +1401,13 @@ function renderUserDetailsContent(u) {
         if (kycDate) kycDate.textContent = formatDate(u.kyc?.updatedAt || u.updatedAt);
         if (btnOneClickKyc) btnOneClickKyc.style.display = "none";
         if (btnCardApproveKyc) btnCardApproveKyc.style.display = "none";
+        if (btnResetKyc) btnResetKyc.style.display = "inline-flex";
     } else {
         if (btnOneClickKyc) btnOneClickKyc.style.display = "inline-flex";
         if (btnCardApproveKyc) btnCardApproveKyc.style.display = "inline-flex";
+        if (btnResetKyc) {
+            btnResetKyc.style.display = (rawKyc === "not_submitted" && !u.kyc?._id && !u.panNumber) ? "none" : "inline-flex";
+        }
 
         if (rawKyc === "pending") {
             if (kycPill) kycPill.className = "ud-kyc-status-pill pending";
@@ -2825,6 +2830,21 @@ function renderUdKycTab(u) {
                 </div>
             </div>
 
+            <!-- Reset KYC (Cashfree & Digital KYC) Action Card -->
+            <div style="background:linear-gradient(135deg, rgba(239,68,68,0.08), rgba(15,23,42,0.8));border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:12px 14px;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div style="max-width:320px">
+                    <div style="font-size:12px;font-weight:700;color:#f87171;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-undo-alt"></i> Reset Customer KYC
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:3px;line-height:1.4">
+                        Wipes Cashfree Aadhaar, PAN & Bank verifications so the customer can start a fresh verification from scratch in the app.
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm" onclick="resetUserKycAction('${u._id}')" style="background:#ef4444;color:#fff;border:none;font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(239,68,68,0.3)">
+                    <i class="fas fa-trash-restore-alt"></i> Reset KYC
+                </button>
+            </div>
+
             <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:1rem"><i class="fas fa-file-invoice" style="color:#10b981"></i> KYC Document Previews</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">
@@ -2851,13 +2871,18 @@ function renderUdKycTab(u) {
         </div>
 
         <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
                 <div style="font-size:13px;font-weight:700;color:#fff"><i class="fas fa-user-edit" style="color:#60a5fa"></i> Account Settings & Verification</div>
-                ${(u.kycStatus !== 'approved' && !u.kycVerified) ? `
-                    <button type="button" class="btn btn-sm btn-success" onclick="oneClickApproveKyc('${u._id}')" style="font-size:11.5px;font-weight:700;padding:4px 10px;background:#10b981;border:none;color:#fff;display:inline-flex;align-items:center;gap:4px;border-radius:4px;cursor:pointer">
-                        <i class="fas fa-check-circle"></i> 1-Click Approve
+                <div style="display:flex;gap:6px;align-items:center">
+                    <button type="button" class="btn btn-sm" onclick="resetUserKycAction('${u._id}')" style="font-size:11.5px;font-weight:700;padding:4px 10px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#f87171;display:inline-flex;align-items:center;gap:4px;border-radius:4px;cursor:pointer" title="Reset KYC and clear Cashfree / Digital verification">
+                        <i class="fas fa-undo-alt"></i> Reset KYC
                     </button>
-                ` : `<span class="badge badge-success"><i class="fas fa-check"></i> Approved</span>`}
+                    ${(u.kycStatus !== 'approved' && !u.kycVerified) ? `
+                        <button type="button" class="btn btn-sm btn-success" onclick="oneClickApproveKyc('${u._id}')" style="font-size:11.5px;font-weight:700;padding:4px 10px;background:#10b981;border:none;color:#fff;display:inline-flex;align-items:center;gap:4px;border-radius:4px;cursor:pointer">
+                            <i class="fas fa-check-circle"></i> 1-Click Approve
+                        </button>
+                    ` : `<span class="badge badge-success"><i class="fas fa-check"></i> Approved</span>`}
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label" style="font-size:11.5px">Customer Name</label>
@@ -3001,6 +3026,75 @@ async function oneClickApproveKyc(targetUserId) {
         }
     }
 }
+
+// ── RESET CUSTOMER KYC (CASHFREE & IDENTIFIERS) FROM USER DETAILS ──
+async function resetUserKycAction(targetUserId) {
+    const uid = targetUserId || activeUserId;
+    if (!uid) {
+        toast("No active customer selected", "warning");
+        return;
+    }
+
+    const userName = currentUserDetailsData?.name || "this customer";
+    const confirmMsg = `⚠️ Are you sure you want to RESET KYC for "${userName}"?\n\nThis will:\n• Clear Cashfree Aadhaar & PAN verification records\n• Delete the customer's KYC document\n• Reset customer's KYC status to 'Not Submitted'\n• Allow the customer to start fresh KYC from scratch in the mobile app\n\nProceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    const btnTop = document.getElementById("btn-ud-reset-kyc");
+    const originalTopHtml = btnTop ? btnTop.innerHTML : "";
+    if (btnTop) {
+        btnTop.disabled = true;
+        btnTop.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Resetting...`;
+    }
+
+    try {
+        const res = await api(`/admin/users/${uid}/reset-kyc`, {
+            method: "POST"
+        });
+
+        if (res && res.success) {
+            toast(res.message || "Customer KYC successfully reset! Cashfree & identity records cleared.", "success");
+
+            if (currentUserDetailsData && String(currentUserDetailsData._id) === String(uid)) {
+                currentUserDetailsData.kycStatus = "not_submitted";
+                currentUserDetailsData.kycVerified = false;
+                currentUserDetailsData.isKycVerified = false;
+                currentUserDetailsData.panNumber = "";
+                currentUserDetailsData.kyc = null;
+                if (currentUserDetailsData.bank) {
+                    currentUserDetailsData.bank.isVerified = false;
+                }
+                renderUserDetailsContent(currentUserDetailsData);
+            } else {
+                viewUserDetails(uid);
+            }
+
+            // Sync Users table row in memory
+            const tableUser = (allUsers || []).find(x => String(x._id) === String(uid));
+            if (tableUser) {
+                tableUser.kycStatus = "not_submitted";
+                tableUser.kycVerified = false;
+                tableUser.isKycVerified = false;
+                tableUser.panNumber = "";
+                renderUsersTable(allUsers);
+            }
+
+            // If KYC tab or queue counters exist, refresh them
+            if (typeof loadKyc === "function" && document.getElementById("page-kyc")?.classList.contains("active")) {
+                loadKyc();
+            }
+        } else {
+            toast(res?.message || "Failed to reset KYC", "danger");
+        }
+    } catch (err) {
+        toast("Error resetting KYC: " + (err.message || err), "danger");
+    } finally {
+        if (btnTop) {
+            btnTop.disabled = false;
+            btnTop.innerHTML = originalTopHtml;
+        }
+    }
+}
+window.resetUserKycAction = resetUserKycAction;
 
 // ── EDIT / UPDATE BANK DETAILS IN USER DETAILS ───────────────
 function openUdEditBankModal() {
