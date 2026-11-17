@@ -2799,6 +2799,32 @@ function renderUdKycTab(u) {
                 ${k.verificationSource ? `<div style="font-size:11px;color:#94a3b8;font-family:var(--font-mono)">Source: ${k.verificationSource}</div>` : ''}
             </div>
 
+            <!-- Verified Government Identifiers Card -->
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 14px;margin-bottom:1rem">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">
+                        <i class="fas fa-id-card" style="color:var(--gold)"></i> Verified Government Identifiers
+                    </div>
+                    ${k.panAadhaarNameMatched ? `
+                        <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:10px;padding:2px 6px">
+                            ✓ Names Matched
+                        </span>
+                    ` : ''}
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div style="background:rgba(0,0,0,0.25);padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
+                        <div style="font-size:10.5px;color:#94a3b8">PAN Number</div>
+                        <div style="font-family:var(--font-mono);font-size:13.5px;font-weight:700;color:var(--gold)">${k.panNumber || '—'}</div>
+                        ${k.panRegisteredName ? `<div style="font-size:11px;color:#cbd5e1;margin-top:2px">Name: ${k.panRegisteredName}</div>` : ''}
+                    </div>
+                    <div style="background:rgba(0,0,0,0.25);padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
+                        <div style="font-size:10.5px;color:#94a3b8">Aadhaar (Masked)</div>
+                        <div style="font-family:var(--font-mono);font-size:13.5px;font-weight:700;color:#60a5fa">${k.maskedAadhaar || (k.aadhaarNumber ? 'XXXX-XXXX-' + k.aadhaarNumber.slice(-4) : '—')}</div>
+                        ${k.aadhaarRegisteredName ? `<div style="font-size:11px;color:#cbd5e1;margin-top:2px">Name: ${k.aadhaarRegisteredName}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+
             <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:1rem"><i class="fas fa-file-invoice" style="color:#10b981"></i> KYC Document Previews</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px">

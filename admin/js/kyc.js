@@ -117,7 +117,7 @@ function renderKycTable(kycList) {
                     </th>
                     <th>Customer</th>
                     <th>KYC Method</th>
-                    <th>PAN Number</th>
+                    <th>PAN / Aadhaar</th>
                     <th>City / State</th>
                     <th>Bank Details</th>
                     <th>Submitted</th>
@@ -168,7 +168,11 @@ function renderKycTable(kycList) {
             <td>
                 ${getKycMethodBadgeHtml(k)}
             </td>
-            <td>${k.panNumber === 'PHOTO_SUBMITTED' ? '<span class="badge" style="background:rgba(212,160,23,0.15);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-size:11px"><i class="fas fa-camera"></i> Photo KYC</span>' : `<span style="font-family:var(--font-mono);font-weight:600;color:var(--gold)">${k.panNumber || '—'}</span>`}</td>
+            <td>
+                <div>${k.panNumber === 'PHOTO_SUBMITTED' ? '<span class="badge" style="background:rgba(212,160,23,0.15);color:var(--gold);border:1px solid rgba(212,160,23,0.3);font-size:11px"><i class="fas fa-camera"></i> Photo KYC</span>' : `<span style="font-family:var(--font-mono);font-weight:600;color:var(--gold)">${k.panNumber || '—'}</span>`}</div>
+                ${k.maskedAadhaar ? `<div style="font-size:11px;color:#94a3b8;font-family:var(--font-mono);margin-top:3px"><i class="fas fa-fingerprint" style="color:#10b981;font-size:10px"></i> ${k.maskedAadhaar}</div>` : ''}
+                ${k.panAadhaarNameMatched ? `<div style="margin-top:3px"><span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:9.5px;padding:2px 5px;border:1px solid rgba(16,185,129,0.3)">✓ Names Matched</span></div>` : ''}
+            </td>
             <td style="font-size:12.5px">${k.address?.city || '—'}, ${k.address?.state || '—'}</td>
             <td>
                 <div style="font-size:12.5px;font-weight:500">${bank.bankName || '—'}</div>
@@ -382,6 +386,40 @@ async function openKycModal(id) {
                     </div>
                 </div>
                 ${k.kraName ? `<div style="font-size:12px;color:#a78bfa"><strong>KRA:</strong> ${k.kraName} ${k.kraStatus ? `(${k.kraStatus})` : ''}</div>` : ''}
+            </div>
+
+            <!-- Verified Government Identifiers & Cross-Matching Card -->
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px">
+                        <i class="fas fa-id-card" style="color:var(--gold)"></i> Verified Government Identifiers
+                    </div>
+                    <div>
+                        ${k.panAadhaarNameMatched ? `
+                            <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:11px;padding:3px 8px">
+                                <i class="fas fa-check-double"></i> Verified Identity: PAN-Aadhaar Name Matched
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;font-size:13px">
+                    <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+                        <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px">Permanent Account Number (PAN)</div>
+                        <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--gold)">${k.panNumber || '—'}</div>
+                        ${k.panRegisteredName ? `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">Name on PAN: <strong style="color:#fff">${k.panRegisteredName}</strong></div>` : ''}
+                        <div style="margin-top:4px">
+                            ${k.panVerified ? '<span style="font-size:10.5px;color:#10b981"><i class="fas fa-check-circle"></i> NSDL / ITD Verified</span>' : '<span style="font-size:10.5px;color:#f59e0b"><i class="fas fa-clock"></i> Unverified PAN</span>'}
+                        </div>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+                        <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px">Aadhaar (UIDAI Masked)</div>
+                        <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:#60a5fa">${k.maskedAadhaar || (k.aadhaarNumber ? 'XXXX-XXXX-' + k.aadhaarNumber.slice(-4) : '—')}</div>
+                        ${k.aadhaarRegisteredName ? `<div style="font-size:11.5px;color:#94a3b8;margin-top:2px">Name on Aadhaar: <strong style="color:#fff">${k.aadhaarRegisteredName}</strong></div>` : ''}
+                        <div style="margin-top:4px">
+                            ${k.aadhaarVerified ? '<span style="font-size:10.5px;color:#10b981"><i class="fas fa-check-circle"></i> UIDAI OTP Verified</span>' : '<span style="font-size:10.5px;color:#94a3b8"><i class="fas fa-info-circle"></i> ' + (k.aadhaarFront?.url ? 'Photo Submitted' : 'Not Provided') + '</span>'}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Documents Section -->

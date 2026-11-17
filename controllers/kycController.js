@@ -51,6 +51,19 @@ exports.submitKyc = async (req, res, next) => {
         let kyc = await Kyc.findOne({ user: req.user._id });
 
         const resolvedFullName = (fullName && fullName.trim()) ? fullName.trim() : (req.user?.name || "Account Holder");
+
+        if (accountHolderName && accountHolderName.trim() && resolvedFullName) {
+            const { isStrongBankNameMatch } = require("../services/nameMatchingService");
+            const bankMatch = isStrongBankNameMatch(resolvedFullName, accountHolderName.trim());
+            if (!bankMatch.match) {
+                return res.status(400).json({
+                    success: false,
+                    code: "BANK_NAME_MISMATCH",
+                    message: `Bank account holder name '${accountHolderName.trim()}' does not match applicant name '${resolvedFullName}'. Bank account must belong to the applicant.`
+                });
+            }
+        }
+
         const resolvedPan = (panNumber && panNumber.trim()) ? panNumber.trim().toUpperCase() : "PHOTO_SUBMITTED";
         const resolvedAadhaar = (aadhaarNumber && aadhaarNumber.trim()) ? aadhaarNumber.trim() : "PHOTO_SUBMITTED";
         const resolvedLine1 = (line1 && line1.trim()) ? line1.trim() : "Document Photo Uploaded (Review Required)";
@@ -128,19 +141,35 @@ function sanitizeKycDto(kyc) {
         ? `${doc.panNumber.slice(0, 2)}******${doc.panNumber.slice(-2)}`
         : undefined;
 
+    const rawAadhaar = doc.aadhaarNumber || "";
+    const maskedAadhaar = rawAadhaar && rawAadhaar.length >= 4
+        ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+        : (rawAadhaar ? "XXXX-XXXX-XXXX" : undefined);
+
     return {
         _id: doc._id,
         fullName: doc.fullName,
+        panNumber: doc.panNumber,
         panNumberMasked: maskedPan,
         panVerified: Boolean(doc.panVerified),
+        panRegisteredName: doc.panRegisteredName || "",
+        aadhaarNumber: maskedAadhaar,
+        aadhaarNumberMasked: maskedAadhaar,
+        maskedAadhaar,
+        aadhaarVerified: Boolean(doc.aadhaarVerified),
+        aadhaarRegisteredName: doc.aadhaarRegisteredName || "",
+        panAadhaarNameMatched: Boolean(doc.panAadhaarNameMatched),
         status: doc.status,
         verificationSource: doc.verificationSource || "NONE",
         evidenceReference: doc.evidenceReference || undefined,
         address: doc.address ? {
+            line1: doc.address.line1,
             city: doc.address.city,
             state: doc.address.state,
             pincode: doc.address.pincode,
         } : undefined,
+        bankDetails: doc.bankDetails,
+        soldierDetails: doc.soldierDetails,
         submittedAt: doc.submittedAt,
         reviewedAt: doc.reviewedAt,
     };
@@ -155,7 +184,7 @@ exports.getMyKyc = async (req, res, next) => {
     try {
         const User = require("../models/User");
         const [kyc, user] = await Promise.all([
-            Kyc.findOne({ user: req.user._id }),
+            Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber"),
             User.findById(req.user._id).select("isSoldierVerified soldierKycStatus kycStatus"),
         ]);
         if (!kyc) {
@@ -287,8 +316,15 @@ exports.getAllKyc = async (req, res, next) => {
 
         const enrichedItems = items.map(k => {
             const methodInfo = resolveKycMethodInfo(k);
+            const obj = k.toObject();
+            const rawAadhaar = obj.aadhaarNumber || "";
+            const maskedAadhaar = rawAadhaar && rawAadhaar.length >= 4
+                ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+                : (rawAadhaar ? "XXXX-XXXX-XXXX" : "");
+            delete obj.aadhaarNumber;
             return {
-                ...k.toObject(),
+                ...obj,
+                maskedAadhaar,
                 ...methodInfo,
             };
         });
@@ -319,7 +355,13 @@ exports.getKycById = async (req, res, next) => {
             .select("+aadhaarNumber");
         if (!kyc) return res.status(404).json({ success: false, message: "KYC not found" });
         const methodInfo = resolveKycMethodInfo(kyc);
-        res.json({ success: true, data: { ...kyc.toObject(), ...methodInfo } });
+        const obj = kyc.toObject();
+        const rawAadhaar = obj.aadhaarNumber || "";
+        const maskedAadhaar = rawAadhaar && rawAadhaar.length >= 4
+            ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+            : (rawAadhaar ? "XXXX-XXXX-XXXX" : "");
+        delete obj.aadhaarNumber;
+        res.json({ success: true, data: { ...obj, maskedAadhaar, ...methodInfo } });
     } catch (err) { next(err); }
 };
 
@@ -1004,8 +1046,17 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                         }
                     }
 
+                    let resolvedAadhaar = aadhaarNumber || "";
+                    if (cfData.aadhaar_number) {
+                        resolvedAadhaar = String(cfData.aadhaar_number);
+                    } else if (!resolvedAadhaar) {
+                        resolvedAadhaar = "123456789012";
+                    }
+
+                    const aadhaarFullName = (cfData.name || req.user.name || "INVESTOR").trim().toUpperCase();
+
                     details = {
-                        fullName: cfData.name || req.user.name,
+                        fullName: aadhaarFullName,
                         dob: parsedDob,
                         address: {
                             line1,
@@ -1013,8 +1064,8 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
                             state,
                             pincode
                         },
-                        panNumber: panNumber || "ABCDE1234F",
-                        aadhaarNumber: aadhaarNumber || "123456789012"
+                        panNumber: panNumber || "",
+                        aadhaarNumber: resolvedAadhaar
                     };
                 } else {
                     return res.status(400).json({ success: false, message: resData.message || "Invalid OTP or verification failed" });
@@ -1053,46 +1104,90 @@ exports.verifyCashfreeOtp = async (req, res, next) => {
             });
         }
 
-        let kyc = await Kyc.findOne({ user: req.user._id });
+        const { isStrongBankNameMatch } = require("../services/nameMatchingService");
+        let kyc = await Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber");
+
+        const panName = kyc?.panRegisteredName || (kyc?.panVerified ? kyc.fullName : null);
+        let isApproved = false;
+        let panAadhaarMatched = false;
+
+        // Strict cross-name validation: If PAN was already verified, Aadhaar must match PAN
+        if (kyc?.panVerified && panName) {
+            const matchResult = isStrongBankNameMatch(details.fullName, panName);
+            if (!matchResult.match) {
+                console.warn(`[KYC Security] PAN-Aadhaar mismatch on Aadhaar verification: Aadhaar name '${details.fullName}' vs PAN name '${panName}'. Reason: ${matchResult.reason}`);
+                return res.status(400).json({
+                    success: false,
+                    valid: false,
+                    code: "PAN_AADHAAR_NAME_MISMATCH",
+                    message: `Name mismatch: Aadhaar name '${details.fullName}' does not match your verified PAN name '${panName}'. PAN and Aadhaar must belong to the same person.`,
+                    aadhaarName: details.fullName,
+                    panName: panName,
+                    reason: matchResult.reason
+                });
+            }
+            isApproved = true;
+            panAadhaarMatched = true;
+        }
+
         const kycPayload = {
             user: req.user._id,
             fullName: details.fullName,
             dob: details.dob,
             address: details.address,
-            panNumber: details.panNumber,
             aadhaarNumber: details.aadhaarNumber,
-            panImage: { url: "cashfree_verified", uploadedAt: new Date() },
+            aadhaarVerified: true,
+            aadhaarRegisteredName: details.fullName,
+            panAadhaarNameMatched: panAadhaarMatched,
+            panImage: kyc?.panImage?.url ? kyc.panImage : { url: "cashfree_verified", uploadedAt: new Date() },
             aadhaarFront: { url: "cashfree_verified", uploadedAt: new Date() },
             aadhaarBack: { url: "cashfree_verified", uploadedAt: new Date() },
             verificationSource: "CASHFREE_AADHAAR_OKYC",
-            status: "approved",
-            submittedAt: new Date(),
-            reviewedAt: new Date()
+            status: isApproved ? "approved" : (kyc?.status === "approved" ? "approved" : "pending"),
+            submittedAt: kyc?.submittedAt || new Date(),
+            reviewedAt: isApproved ? new Date() : undefined
         };
 
+        if (kyc?.panNumber) {
+            kycPayload.panNumber = kyc.panNumber;
+            kycPayload.panVerified = kyc.panVerified;
+            kycPayload.panRegisteredName = kyc.panRegisteredName;
+        } else if (panNumber && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNumber.toUpperCase())) {
+            kycPayload.panNumber = panNumber.toUpperCase();
+        }
+
         if (kyc) {
-            kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true });
+            kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true }).select("+aadhaarNumber");
         } else {
             kyc = await Kyc.create(kycPayload);
         }
 
-        if (req.user) {
+        if (isApproved && req.user) {
             req.user.kycStatus = "approved";
+            await req.user.save();
+            try {
+                const eventNotificationService = require("../services/eventNotificationService");
+                eventNotificationService.notifyKycCompleted(req.user._id);
+            } catch (_) {}
+        } else if (req.user && req.user.kycStatus !== "approved") {
+            req.user.kycStatus = "pending";
             await req.user.save();
         }
 
-        try {
-            const eventNotificationService = require("../services/eventNotificationService");
-            eventNotificationService.notifyKycCompleted(req.user._id);
-        } catch (_) {}
+        const rawAadhaar = kycPayload.aadhaarNumber || "";
+        const maskedAadhaar = rawAadhaar && rawAadhaar.length >= 4
+            ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+            : (rawAadhaar ? "XXXX-XXXX-XXXX" : "");
 
         res.json({
             success: true,
-            message: "Aadhaar verified successfully!",
+            message: isApproved ? "Aadhaar verified & KYC approved successfully!" : "Aadhaar verified successfully! Please proceed to PAN verification.",
             name: details.fullName,
             dob: details.dob,
             address: details.address,
-            data: kyc
+            aadhaarVerified: true,
+            maskedAadhaar,
+            data: sanitizeKycDto(kyc)
         });
     } catch (err) {
         next(err);
@@ -1123,21 +1218,44 @@ exports.verifyCashfreePan = async (req, res, next) => {
             }
 
             const registeredName = name ? name.toUpperCase() : (req.user.name || "TEST INVESTOR");
-            let kyc = await Kyc.findOne({ user: req.user._id });
+            let kyc = await Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber");
+            const aadhaarName = kyc?.aadhaarRegisteredName || (kyc?.aadhaarVerified ? kyc.fullName : null);
+
+            let panAadhaarNameMatched = false;
+            // Strict cross-name validation: If Aadhaar was already verified, PAN registered name must match
+            if (aadhaarName) {
+                const { isStrongBankNameMatch } = require("../services/nameMatchingService");
+                const matchResult = isStrongBankNameMatch(registeredName, aadhaarName);
+                if (!matchResult.match) {
+                    console.warn(`[KYC Security Test Mode] PAN-Aadhaar mismatch: PAN registered name '${registeredName}' vs Aadhaar verified name '${aadhaarName}'. Reason: ${matchResult.reason}`);
+                    return res.status(400).json({
+                        success: false,
+                        valid: false,
+                        code: "PAN_AADHAAR_NAME_MISMATCH",
+                        message: `Name mismatch: PAN card belongs to '${registeredName}', which does not match your verified Aadhaar name '${aadhaarName}'. PAN and Aadhaar must belong to the same person.`,
+                        panName: registeredName,
+                        aadhaarName: aadhaarName,
+                        reason: matchResult.reason
+                    });
+                }
+                panAadhaarNameMatched = true;
+            }
+
             const kycPayload = {
                 user: req.user._id,
                 fullName: registeredName,
                 panNumber: panClean,
                 panVerified: true,
                 panRegisteredName: registeredName,
+                panAadhaarNameMatched: panAadhaarNameMatched,
                 verificationSource: "MOCK_TEST_VERIFIED",
                 status: "approved",
-                submittedAt: new Date(),
+                submittedAt: kyc?.submittedAt || new Date(),
                 reviewedAt: new Date()
             };
 
             if (kyc) {
-                kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true });
+                kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true }).select("+aadhaarNumber");
             } else {
                 kyc = await Kyc.create(kycPayload);
             }
@@ -1150,6 +1268,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                 success: true,
                 valid: true,
                 registeredName,
+                panAadhaarNameMatched: panAadhaarNameMatched,
                 data: sanitizeKycDto(kyc),
                 message: "PAN verified & KYC approved successfully (Test Mode)"
             });
@@ -1173,22 +1292,45 @@ exports.verifyCashfreePan = async (req, res, next) => {
             if (data.valid === true || data.pan_status === "VALID") {
                 const registeredName = (data.registered_name || data.name_pan_card || name || req.user.name).trim().toUpperCase();
 
-                let kyc = await Kyc.findOne({ user: req.user._id });
+                let kyc = await Kyc.findOne({ user: req.user._id }).select("+aadhaarNumber");
+                const aadhaarName = kyc?.aadhaarRegisteredName || (kyc?.aadhaarVerified ? kyc.fullName : null);
+
+                let panAadhaarNameMatched = false;
+                // Strict cross-name validation: If Aadhaar was already verified, PAN registered name must match
+                if (aadhaarName) {
+                    const { isStrongBankNameMatch } = require("../services/nameMatchingService");
+                    const matchResult = isStrongBankNameMatch(registeredName, aadhaarName);
+                    if (!matchResult.match) {
+                        console.warn(`[KYC Security] PAN-Aadhaar mismatch: PAN registered name '${registeredName}' vs Aadhaar verified name '${aadhaarName}'. Reason: ${matchResult.reason}`);
+                        return res.status(400).json({
+                            success: false,
+                            valid: false,
+                            code: "PAN_AADHAAR_NAME_MISMATCH",
+                            message: `Name mismatch: PAN card belongs to '${registeredName}', which does not match your verified Aadhaar name '${aadhaarName}'. PAN and Aadhaar must belong to the same person.`,
+                            panName: registeredName,
+                            aadhaarName: aadhaarName,
+                            reason: matchResult.reason
+                        });
+                    }
+                    panAadhaarNameMatched = true;
+                }
+
                 const kycPayload = {
                     user: req.user._id,
                     fullName: registeredName,
                     panNumber: panClean,
                     panVerified: true,
                     panRegisteredName: registeredName,
+                    panAadhaarNameMatched: panAadhaarNameMatched,
                     verificationSource: "CASHFREE_GOVT_NSDL",
                     rawPanData: data,
                     status: "approved",
-                    submittedAt: new Date(),
+                    submittedAt: kyc?.submittedAt || new Date(),
                     reviewedAt: new Date()
                 };
 
                 if (kyc) {
-                    kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true });
+                    kyc = await Kyc.findByIdAndUpdate(kyc._id, kycPayload, { new: true }).select("+aadhaarNumber");
                 } else {
                     kyc = await Kyc.create(kycPayload);
                 }
@@ -1206,6 +1348,7 @@ exports.verifyCashfreePan = async (req, res, next) => {
                     success: true,
                     valid: true,
                     registeredName,
+                    panAadhaarNameMatched: panAadhaarNameMatched,
                     data: sanitizeKycDto(kyc),
                     message: "PAN verified & KYC approved successfully via Cashfree!"
                 });

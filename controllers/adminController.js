@@ -404,7 +404,7 @@ exports.getUserById = async (req, res, next) => {
             SilverBalance.findOne({ user: user._id }),
             CopperBalance.findOne({ user: user._id }),
             Investment.find({ user: user._id }).populate("property").sort({ createdAt: -1 }),
-            Kyc.findOne({ user: user._id }),
+            Kyc.findOne({ user: user._id }).select("+aadhaarNumber"),
             BankAccount.findOne({ user: user._id }).sort({ isDefault: -1, updatedAt: -1, createdAt: -1 }),
             Sip.find({ user: user._id }).sort({ createdAt: -1 }),
             SchemeEnrollment.find({ user: user._id }).sort({ createdAt: -1 }),
@@ -613,7 +613,21 @@ exports.getUserById = async (req, res, next) => {
                     returnsPct,
                     walletBalance
                 },
-                kyc: kycDoc ? { ...kycDoc.toObject(), ...(typeof resolveKycMethodInfo === "function" ? resolveKycMethodInfo(kycDoc) : {}) } : null,
+                kyc: (() => {
+                    if (!kycDoc) return null;
+                    const kycObj = kycDoc.toObject();
+                    const rawAadhaar = kycObj.aadhaarNumber || "";
+                    const maskedAadhaar = rawAadhaar && rawAadhaar.length >= 4
+                        ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+                        : (rawAadhaar ? "XXXX-XXXX-XXXX" : "");
+                    delete kycObj.aadhaarNumber;
+                    const methodInfo = typeof resolveKycMethodInfo === "function" ? resolveKycMethodInfo(kycDoc) : {};
+                    return {
+                        ...kycObj,
+                        maskedAadhaar,
+                        ...methodInfo
+                    };
+                })(),
                 bank: bankDoc ? {
                     bankName: bankDoc.bankName || "Linked Bank",
                     accountHolder: bankDoc.accountHolder || user.name,
