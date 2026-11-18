@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="css/user-details.css" />
     <link rel="stylesheet" href="css/investments.css" />
+    <link rel="stylesheet" href="css/fixed_deposits.css?v=2.0" />
 </head>
 
 <body>
@@ -4611,103 +4612,163 @@
             </div>
 
             <!-- ══════════════════════════════════════════════════════════
-                 PAGE: FIXED DEPOSITS (IRIS PORTAL INTEGRATION)
+                 PAGE: FIXED DEPOSITS (EXECUTIVE IRIS DESK)
                  ══════════════════════════════════════════════════════════ -->
             <div class="page" id="page-fixeddeposits">
-                <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <!-- Executive Hero Header -->
+                <div class="fd-hero-banner">
                     <div>
-                        <h2 class="page-title" style="margin:0;font-size:22px;color:#fff;font-weight:800">
-                            <i class="fas fa-piggy-bank" style="color:#f59e0b;margin-right:10px"></i> Corporate Fixed Deposits (IRIS Portal)
+                        <div class="fd-hero-badge">
+                            <span class="fd-pulse-dot"></span> IRIS INTEGRATION LIVE
+                        </div>
+                        <h2 class="fd-hero-title">
+                            <i class="fas fa-landmark" style="color:#f59e0b"></i> Corporate Fixed Deposits
                         </h2>
-                        <div class="section-subtitle" style="color:var(--text-dim);font-size:12.5px;margin-top:4px">
-                            Review and process Fixed Deposit applications for Bajaj Finance, Shriram Finance, and Mahindra Finance. 1-click copy formatted data to fill directly in IRIS portal.
+                        <div class="fd-hero-subtitle">
+                            Review, verify, and process high-yield corporate fixed deposits across Bajaj Finance, Shriram Finance, and Mahindra Finance. 1-click structured copy for instant punching on the IRIS distribution platform.
                         </div>
                     </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <button class="btn btn-secondary btn-sm" onclick="exportFdCsv()"><i class="fas fa-file-csv"></i> Export CSV</button>
-                        <button class="btn btn-primary btn-sm" onclick="loadFixedDeposits(currentFdPage)"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    <div class="fd-hero-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="openFdSchemeModal()" style="display:inline-flex;align-items:center;gap:7px;font-weight:700">
+                            <i class="fas fa-layer-group" style="color:#fbbf24"></i> Scheme Catalog
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportFdCsv()" style="display:inline-flex;align-items:center;gap:7px;font-weight:700">
+                            <i class="fas fa-file-csv" style="color:#38bdf8"></i> Export CSV
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="loadFixedDeposits(currentFdPage)" id="btn-fd-refresh" style="display:inline-flex;align-items:center;gap:7px;font-weight:800;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0b0e14;border:none">
+                            <i class="fas fa-sync-alt"></i> Refresh Desk
+                        </button>
                     </div>
                 </div>
 
-                <!-- KPI Metric Cards -->
-                <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px">
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Total Applications</div>
-                        <div class="stat-value" id="fd-stat-total-apps" style="font-size:24px;font-weight:700;color:#fff;margin-top:4px">0</div>
+                <!-- Modern KPI Metric Cards -->
+                <div class="fd-metrics-grid">
+                    <div class="fd-stat-card accent-gold">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Total Applications</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-file-signature"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-total-apps">0</div>
+                        <div class="fd-stat-subtext"><i class="fas fa-users"></i> Across all partner NBFCs</div>
                     </div>
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Total Deposit Volume</div>
-                        <div class="stat-value" id="fd-stat-total-amount" style="font-size:24px;font-weight:700;color:#00D09C;margin-top:4px">₹0</div>
+
+                    <div class="fd-stat-card accent-emerald">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Total Deposit Volume</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-vault"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-total-amount" style="color:#34d399">₹0</div>
+                        <div class="fd-stat-subtext"><i class="fas fa-chart-line"></i> Cumulative investment principal</div>
                     </div>
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:#f59e0b;text-transform:uppercase;letter-spacing:0.5px">Pending IRIS Punching</div>
-                        <div class="stat-value" id="fd-stat-pending-iris" style="font-size:24px;font-weight:700;color:#f59e0b;margin-top:4px">0</div>
+
+                    <div class="fd-stat-card accent-amber">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Needs IRIS Punching</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-exclamation-circle"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-pending-iris" style="color:#f59e0b">0</div>
+                        <div class="fd-stat-subtext"><i class="fas fa-clock"></i> New submissions pending on IRIS</div>
                     </div>
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Bajaj Finance</div>
-                        <div class="stat-value" id="fd-stat-bajaj-count" style="font-size:22px;font-weight:700;color:#38bdf8;margin-top:4px">0</div>
+
+                    <div class="fd-stat-card accent-cyan">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Bajaj Finance</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-shield-alt"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-bajaj-count" style="color:#38bdf8">0</div>
+                        <div class="fd-stat-subtext">CRISIL AAA Rated • Up to 8.65%</div>
                     </div>
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Shriram Finance</div>
-                        <div class="stat-value" id="fd-stat-shriram-count" style="font-size:22px;font-weight:700;color:#a855f7;margin-top:4px">0</div>
+
+                    <div class="fd-stat-card accent-purple">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Shriram Finance</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-star"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-shriram-count" style="color:#c084fc">0</div>
+                        <div class="fd-stat-subtext">CRISIL AA+ Rated • Up to 9.40%</div>
                     </div>
-                    <div class="stat-card" style="padding:16px">
-                        <div class="stat-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Mahindra Finance</div>
-                        <div class="stat-value" id="fd-stat-mahindra-count" style="font-size:22px;font-weight:700;color:#f43f5e;margin-top:4px">0</div>
+
+                    <div class="fd-stat-card accent-rose">
+                        <div class="fd-stat-header">
+                            <span class="fd-stat-title">Mahindra Finance</span>
+                            <div class="fd-stat-icon-wrap"><i class="fas fa-building"></i></div>
+                        </div>
+                        <div class="fd-stat-number" id="fd-stat-mahindra-count" style="color:#fb7185">0</div>
+                        <div class="fd-stat-subtext">CRISIL AAA Rated • Up to 8.05%</div>
                     </div>
                 </div>
 
-                <!-- Filters & Search Toolbar -->
-                <div class="card" style="padding:14px 18px;margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07)">
-                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                        <div style="position:relative;width:260px">
-                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px"></i>
-                            <input class="form-control" id="fd-search-input" type="text"
-                                placeholder="Search Name, PAN, App ID..."
-                                onkeyup="if(event.key==='Enter')loadFixedDeposits(1)"
-                                style="padding-left:34px;height:36px;font-size:13px" />
+                <!-- Modern Controls & Filter Toolbar -->
+                <div class="fd-toolbar-container">
+                    <!-- Status Filter Tabs -->
+                    <div class="fd-status-tabs" id="fd-status-tabs-bar">
+                        <button class="fd-status-tab-btn active" data-status="ALL" onclick="filterFdStatus('ALL')">
+                            <i class="fas fa-list"></i> All Applications <span class="fd-status-count-pill" id="fd-tab-count-all">0</span>
+                        </button>
+                        <button class="fd-status-tab-btn" data-status="SUBMITTED" onclick="filterFdStatus('SUBMITTED')">
+                            <i class="fas fa-bolt" style="color:#f59e0b"></i> New / Pending IRIS <span class="fd-status-count-pill" id="fd-tab-count-pending">0</span>
+                        </button>
+                        <button class="fd-status-tab-btn" data-status="APPLIED_ON_IRIS" onclick="filterFdStatus('APPLIED_ON_IRIS')">
+                            <i class="fas fa-paper-plane" style="color:#c084fc"></i> Applied on IRIS <span class="fd-status-count-pill" id="fd-tab-count-applied">0</span>
+                        </button>
+                        <button class="fd-status-tab-btn" data-status="APPROVED" onclick="filterFdStatus('APPROVED')">
+                            <i class="fas fa-check-double" style="color:#34d399"></i> Approved (FDR Active) <span class="fd-status-count-pill" id="fd-tab-count-approved">0</span>
+                        </button>
+                        <button class="fd-status-tab-btn" data-status="REJECTED" onclick="filterFdStatus('REJECTED')">
+                            <i class="fas fa-times-circle" style="color:#f87171"></i> Rejected / Cancelled
+                        </button>
+                    </div>
+
+                    <!-- Company Filter Chips & Real-time Search -->
+                    <div class="fd-filter-row">
+                        <div class="fd-company-chips">
+                            <button class="fd-chip-btn active" data-company="ALL" onclick="filterFdCompany('ALL')">
+                                <i class="fas fa-globe"></i> All Companies
+                            </button>
+                            <button class="fd-chip-btn" data-company="BAJAJ_FINANCE" onclick="filterFdCompany('BAJAJ_FINANCE')">
+                                <i class="fas fa-shield-alt" style="color:#38bdf8"></i> Bajaj Finance
+                            </button>
+                            <button class="fd-chip-btn shriram" data-company="SHRIRAM_FINANCE" onclick="filterFdCompany('SHRIRAM_FINANCE')">
+                                <i class="fas fa-star" style="color:#fbbf24"></i> Shriram Finance
+                            </button>
+                            <button class="fd-chip-btn mahindra" data-company="MAHINDRA_FINANCE" onclick="filterFdCompany('MAHINDRA_FINANCE')">
+                                <i class="fas fa-building" style="color:#fb7185"></i> Mahindra Finance
+                            </button>
                         </div>
-                        <select class="form-control" id="fd-company-filter" onchange="loadFixedDeposits(1)" style="height:36px;width:170px;font-size:13px">
-                            <option value="ALL">All FD Companies</option>
-                            <option value="BAJAJ">Bajaj Finance</option>
-                            <option value="SHRIRAM">Shriram Finance</option>
-                            <option value="MAHINDRA">Mahindra Finance</option>
-                        </select>
-                        <select class="form-control" id="fd-status-filter" onchange="loadFixedDeposits(1)" style="height:36px;width:180px;font-size:13px">
-                            <option value="ALL">All Statuses</option>
-                            <option value="SUBMITTED">Submitted (Pending IRIS)</option>
-                            <option value="APPLIED_ON_IRIS">Applied on IRIS</option>
-                            <option value="PAYMENT_PENDING">Payment Pending</option>
-                            <option value="APPROVED">Approved / FDR Issued</option>
-                            <option value="REJECTED">Rejected</option>
-                        </select>
-                        <button class="btn btn-secondary btn-sm" onclick="loadFixedDeposits(1)" style="height:36px"><i class="fas fa-filter"></i> Apply</button>
+
+                        <div class="fd-search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="fd-search-input" placeholder="Search Applicant Name, PAN, Mobile, App ID, IRIS Ref..." onkeyup="handleFdSearchKey(event)" />
+                            <button type="button" class="clear-btn" id="fd-search-clear" onclick="clearFdSearch()" style="display:none"><i class="fas fa-times"></i></button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Applications Data Table -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.07)">
+                <div class="fd-table-card">
                     <div class="table-responsive">
-                        <table class="table" style="width:100%;margin:0;font-size:13px">
+                        <table class="fd-table">
                             <thead>
-                                <tr style="background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.08)">
-                                    <th style="padding:12px 16px">App ID / Date</th>
-                                    <th style="padding:12px 16px">Applicant & PAN</th>
-                                    <th style="padding:12px 16px">Company</th>
-                                    <th style="padding:12px 16px">Deposit Amount</th>
-                                    <th style="padding:12px 16px">Tenure & Rate</th>
-                                    <th style="padding:12px 16px">Payout Type</th>
-                                    <th style="padding:12px 16px">Maturity Approx.</th>
-                                    <th style="padding:12px 16px">Status</th>
-                                    <th style="padding:12px 16px;text-align:right">Action</th>
+                                <tr>
+                                    <th style="width:23%">Applicant & Contact</th>
+                                    <th style="width:18%">Company & Scheme</th>
+                                    <th style="width:16%">Principal & Tenure</th>
+                                    <th style="width:16%">Rate & Maturity</th>
+                                    <th style="width:13%">Status & Submission</th>
+                                    <th style="width:14%;text-align:right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="fd-table-body">
-                                <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading...</td></tr>
+                                <tr>
+                                    <td colspan="6" style="text-align:center;padding:3.5rem 1rem;color:var(--text-muted)">
+                                        <i class="fas fa-spinner fa-spin fa-2x" style="color:#f59e0b;margin-bottom:12px;display:block"></i>
+                                        <div style="font-weight:700;color:#fff;font-size:14px">Loading Fixed Deposit Applications...</div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
-                    <div id="fd-pagination" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.06)"></div>
+                    <div id="fd-pagination" style="padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.15)"></div>
                 </div>
             </div>
 
@@ -7807,27 +7868,99 @@
     </div>
 
     <!-- 6. Fixed Deposit Review & IRIS Punching Modal -->
-    <div class="modal-overlay" id="fd-review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
-        <div class="modal modal-xl" style="max-width:1000px;width:95%;max-height:92vh;display:flex;flex-direction:column;background:#0d1815;border:1px solid rgba(212,175,55,0.3);box-shadow:0 25px 60px rgba(0,0,0,0.85);border-radius:14px;overflow:hidden">
-            <div class="modal-header" style="background:#091410;padding:16px 22px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center">
+    <div class="modal-overlay" id="fd-review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+        <div class="fd-modal-dialog">
+            <div class="fd-modal-header">
                 <div style="display:flex;align-items:center;gap:12px">
-                    <div style="width:36px;height:36px;border-radius:8px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;color:#f59e0b">
+                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;color:#fbbf24;font-size:18px">
                         <i class="fas fa-landmark"></i>
                     </div>
                     <div>
-                        <div class="modal-title" style="font-size:16px;font-weight:700;color:#fff" id="fd-modal-title">FD Application Details</div>
-                        <div style="font-size:12px;color:var(--text-muted)">IRIS Punching Helper & KYC Verifier</div>
+                        <div class="modal-title" style="font-size:16px;font-weight:800;color:#fff" id="fd-modal-title">Fixed Deposit Application Review</div>
+                        <div style="font-size:12px;color:#94a3b8">IRIS Distribution Platform Direct Punching Dossier</div>
                     </div>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px">
-                    <button class="btn btn-primary btn-sm" onclick="copyCompleteFdForIris()" style="background:#00D09C;color:#000;font-weight:700">
-                        <i class="fas fa-copy"></i> Copy All for IRIS
+                <div style="display:flex;align-items:center;gap:12px">
+                    <button class="btn btn-primary btn-sm" onclick="copyCompleteFdForIris()" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#0b0e14;font-weight:800;border:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 15px rgba(245,158,11,0.3)">
+                        <i class="fas fa-paste"></i> Copy All for IRIS
                     </button>
-                    <button class="modal-close" onclick="closeFdReviewModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">×</button>
+                    <button class="modal-close" onclick="closeFdReviewModal()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;line-height:1">×</button>
                 </div>
             </div>
             <div class="modal-body" id="fd-modal-body" style="padding:22px;overflow-y:auto;flex:1">
                 <!-- Dynamically loaded by fixed_deposits.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. Fixed Deposit Partner Scheme Catalog Modal -->
+    <div class="modal-overlay" id="fd-scheme-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+        <div class="modal modal-lg" style="max-width:920px;width:95%;max-height:90vh;display:flex;flex-direction:column;background:#0d121c;border:1px solid rgba(245,158,11,0.3);box-shadow:0 30px 80px rgba(0,0,0,0.9);border-radius:16px;overflow:hidden">
+            <div class="modal-header" style="background:#090e17;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:38px;height:38px;border-radius:10px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;color:#fbbf24">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#fff">Corporate Fixed Deposit Schemes Catalog</div>
+                        <div style="font-size:12px;color:#94a3b8">Active interest rates, ratings & tenures across all 3 issuers</div>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeFdSchemeModal()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">×</button>
+            </div>
+            <div class="modal-body" style="padding:22px;overflow-y:auto;flex:1">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px">
+                    <!-- Bajaj Finance Card -->
+                    <div style="background:rgba(2,132,199,0.06);border:1px solid rgba(2,132,199,0.25);border-radius:12px;padding:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <span class="fd-badge-company bajaj"><i class="fas fa-shield-alt"></i> Bajaj Finance</span>
+                            <span style="font-size:11px;color:#38bdf8;font-weight:700">CRISIL AAA</span>
+                        </div>
+                        <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Up to 8.65% <span style="font-size:12px;color:#94a3b8">p.a.</span></div>
+                        <div style="font-size:12px;color:#cbd5e1;margin-bottom:12px">+0.25% extra for Senior Citizens</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+                            <div>• <strong>Min Amount:</strong> ₹15,000</div>
+                            <div>• <strong>Tenures:</strong> 12, 15, 24, 36, 44, 60 Months</div>
+                            <div>• <strong>Payout:</strong> Monthly, Quarterly, Half-Yearly, Annually, or at Maturity</div>
+                            <div>• <strong>Special Tenure:</strong> 44 Months @ 8.65%</div>
+                        </div>
+                    </div>
+
+                    <!-- Shriram Finance Card -->
+                    <div style="background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.25);border-radius:12px;padding:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <span class="fd-badge-company shriram"><i class="fas fa-star"></i> Shriram Finance</span>
+                            <span style="font-size:11px;color:#fbbf24;font-weight:700">CRISIL AA+</span>
+                        </div>
+                        <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Up to 9.40% <span style="font-size:12px;color:#94a3b8">p.a.</span></div>
+                        <div style="font-size:12px;color:#cbd5e1;margin-bottom:12px">+0.50% extra for Senior Citizens (+0.10% Women)</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+                            <div>• <strong>Min Amount:</strong> ₹5,000</div>
+                            <div>• <strong>Tenures:</strong> 12, 24, 36, 50, 60 Months</div>
+                            <div>• <strong>Payout:</strong> Monthly, Quarterly, Half-Yearly, Annually, Cumulative</div>
+                            <div>• <strong>Special Tenure:</strong> 50 Months @ 9.40%</div>
+                        </div>
+                    </div>
+
+                    <!-- Mahindra Finance Card -->
+                    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <span class="fd-badge-company mahindra"><i class="fas fa-building"></i> Mahindra Finance</span>
+                            <span style="font-size:11px;color:#f87171;font-weight:700">CRISIL AAA</span>
+                        </div>
+                        <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Up to 8.05% <span style="font-size:12px;color:#94a3b8">p.a.</span></div>
+                        <div style="font-size:12px;color:#cbd5e1;margin-bottom:12px">+0.25% extra for Senior Citizens</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+                            <div>• <strong>Min Amount:</strong> ₹10,000</div>
+                            <div>• <strong>Tenures:</strong> 12, 24, 36, 48, 60 Months</div>
+                            <div>• <strong>Payout:</strong> Quarterly, Half-Yearly, Annually, Cumulative</div>
+                            <div>• <strong>Special Tenure:</strong> Samruddhi Cumulative Scheme</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:14px 24px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:flex-end">
+                <button class="btn btn-secondary btn-sm" onclick="closeFdSchemeModal()">Close Catalog</button>
             </div>
         </div>
     </div>
@@ -7854,7 +7987,7 @@
             <script src="js/legalpolicies.js?v=1.0"></script>
             <script src="js/homevideos.js?v=1.0"></script>
             <script src="js/mutualfunds.js?v=2.6"></script>
-            <script src="js/fixed_deposits.js?v=1.0"></script>
+            <script src="js/fixed_deposits.js?v=2.0"></script>
             <script src="js/app.js?v=2.2"></script>
 </body>
 

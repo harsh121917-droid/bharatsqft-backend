@@ -11,7 +11,11 @@ exports.getAllFdApplications = async (req, res, next) => {
         const filter = {};
 
         if (req.query.company && req.query.company !== "ALL") {
-            filter.company = req.query.company;
+            const comp = req.query.company.toUpperCase();
+            if (comp.includes("BAJAJ")) filter.company = "BAJAJ_FINANCE";
+            else if (comp.includes("SHRIRAM")) filter.company = "SHRIRAM_FINANCE";
+            else if (comp.includes("MAHINDRA")) filter.company = "MAHINDRA_FINANCE";
+            else filter.company = req.query.company;
         }
 
         if (req.query.status && req.query.status !== "ALL") {
