@@ -54,8 +54,6 @@ exports.getAllFdApplications = async (req, res, next) => {
                         bajajCount: { $sum: { $cond: [{ $eq: ["$company", "BAJAJ_FINANCE"] }, 1, 0] } },
                         shriramCount: { $sum: { $cond: [{ $eq: ["$company", "SHRIRAM_FINANCE"] }, 1, 0] } },
                         mahindraCount: { $sum: { $cond: [{ $eq: ["$company", "MAHINDRA_FINANCE"] }, 1, 0] } },
-                        pnbCount: { $sum: { $cond: [{ $eq: ["$company", "PNB_HOUSING"] }, 1, 0] } },
-                        licCount: { $sum: { $cond: [{ $eq: ["$company", "LIC_HOUSING"] }, 1, 0] } },
                         pendingIrisCount: { $sum: { $cond: [{ $eq: ["$status", "SUBMITTED"] }, 1, 0] } },
                         appliedIrisCount: { $sum: { $cond: [{ $eq: ["$status", "APPLIED_ON_IRIS"] }, 1, 0] } },
                         approvedCount: { $sum: { $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0] } }
@@ -69,8 +67,6 @@ exports.getAllFdApplications = async (req, res, next) => {
             bajajCount: 0,
             shriramCount: 0,
             mahindraCount: 0,
-            pnbCount: 0,
-            licCount: 0,
             pendingIrisCount: 0,
             appliedIrisCount: 0,
             approvedCount: 0
