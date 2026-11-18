@@ -288,4 +288,11 @@ router.put("/business/:id", updateBusinessOpportunity);
 router.patch("/business/:id/toggle-status", toggleBusinessStatus);
 router.delete("/business/:id", deleteBusinessOpportunity);
 
+// Fixed Deposit Applications (IRIS Platform Management)
+const adminFdController = require("../controllers/adminFixedDepositController");
+router.get("/fixed-deposits", adminFdController.getAllFdApplications);
+router.get("/fixed-deposits/export-csv", adminFdController.exportFdApplicationsCsv);
+router.get("/fixed-deposits/:id", adminFdController.getFdApplicationDetails);
+router.patch("/fixed-deposits/:id", adminFdController.updateFdApplicationStatus);
+
 module.exports = router;

@@ -176,7 +176,10 @@ const pageTitles = {
     mfamcs: "Mutual Fund Companies & AMC Visibility 🏢",
     mfmandates: "Mutual Funds Mandates (eNACH / AutoPay)",
     mfsettings: "NSE MFSS Gateway Credentials & Health-Check",
-    mftesting: "MF Testing & Sandbox Diagnostics 🧪"
+    mftesting: "MF Testing & Sandbox Diagnostics 🧪",
+
+    // 5. Fixed Deposits
+    fixeddeposits: "Corporate Fixed Deposits (IRIS Integration) 🏦"
 };
 
 function showPage(pageId) {
@@ -306,6 +309,9 @@ function showPage(pageId) {
             break;
         case "mftesting":
             if (typeof initMfTestingPage === "function") initMfTestingPage();
+            break;
+        case "fixeddeposits":
+            if (typeof loadFixedDeposits === "function") loadFixedDeposits(1);
             break;
     }
 }
