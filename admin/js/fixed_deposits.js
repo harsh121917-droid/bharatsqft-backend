@@ -131,8 +131,24 @@ function updateFdStats(stats, total) {
 
 // ── Render Individual Table Row ──────────────────────────────
 function renderFdRow(app) {
-    const companyClass = app.company === 'BAJAJ_FINANCE' ? 'bajaj' : (app.company === 'SHRIRAM_FINANCE' ? 'shriram' : 'mahindra');
-    const companyIcon = app.company === 'BAJAJ_FINANCE' ? 'shield-alt' : (app.company === 'SHRIRAM_FINANCE' ? 'star' : 'building');
+    const companyClass = app.company === 'BAJAJ_FINANCE' ? 'bajaj' :
+        (app.company === 'SHRIRAM_FINANCE' ? 'shriram' :
+        (app.company === 'MAHINDRA_FINANCE' ? 'mahindra' :
+        (app.company === 'PNB_HOUSING' ? 'pnb' : 'lic')));
+
+    const companyIcon = app.company === 'BAJAJ_FINANCE' ? 'shield-alt' :
+        (app.company === 'SHRIRAM_FINANCE' ? 'star' :
+        (app.company === 'MAHINDRA_FINANCE' ? 'building' :
+        (app.company === 'PNB_HOUSING' ? 'home' : 'award')));
+
+    const logoMap = {
+        'BAJAJ_FINANCE': 'images/fd/bajaj_finance.png',
+        'SHRIRAM_FINANCE': 'images/fd/shriram_finance.png',
+        'MAHINDRA_FINANCE': 'images/fd/mahindra_finance.png',
+        'PNB_HOUSING': 'images/fd/pnb_housing.png',
+        'LIC_HOUSING': 'images/fd/lic_housing.png'
+    };
+    const logoSrc = logoMap[app.company] || '';
 
     const statusMap = {
         SUBMITTED: { label: 'New (Punch on IRIS)', class: 'submitted', icon: 'bolt' },
@@ -172,18 +188,21 @@ function renderFdRow(app) {
             </div>
         </td>
 
-        <!-- 2. Company & Scheme -->
+        <!-- 2. Selected FD Plan & Company -->
         <td>
-            <div>
+            <div style="display:flex;align-items:center;gap:8px">
+                ${logoSrc ? `<img src="${logoSrc}" alt="${escapeHtml(app.companyName)}" style="width:26px;height:26px;object-fit:contain;background:#ffffff;border-radius:6px;padding:2px;box-shadow:0 2px 6px rgba(0,0,0,0.3);flex-shrink:0">` : ''}
                 <span class="fd-badge-company ${companyClass}">
                     <i class="fas fa-${companyIcon}"></i> ${escapeHtml(app.companyName)}
                 </span>
             </div>
-            <div style="font-size:11.5px;color:#cbd5e1;margin-top:4px;font-weight:600">
-                ${escapeHtml(app.schemeName || 'Corporate FD')}
+            <div style="margin-top:6px">
+                <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:5px">
+                    <i class="fas fa-certificate" style="font-size:10px"></i> ${escapeHtml(app.schemeName || 'Corporate FD')}
+                </span>
             </div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px">
-                ${app.depositType === 'CUMULATIVE' ? 'Cumulative (On Maturity)' : 'Non-Cumulative (' + app.payoutFrequency + ')'}
+            <div style="font-size:11px;color:#94a3b8;margin-top:3px;font-weight:500">
+                ${app.depositType === 'CUMULATIVE' ? 'Cumulative (On Maturity)' : 'Non-Cumulative (' + (app.payoutFrequency || 'Monthly') + ')'}
             </div>
         </td>
 
@@ -361,7 +380,19 @@ function renderFdModalContent(app) {
     const isApplied = ['APPLIED_ON_IRIS', 'APPROVED'].includes(app.status);
     const isApproved = app.status === 'APPROVED';
 
-    const companyClass = app.company === 'BAJAJ_FINANCE' ? 'bajaj' : (app.company === 'SHRIRAM_FINANCE' ? 'shriram' : 'mahindra');
+    const companyClass = app.company === 'BAJAJ_FINANCE' ? 'bajaj' :
+        (app.company === 'SHRIRAM_FINANCE' ? 'shriram' :
+        (app.company === 'MAHINDRA_FINANCE' ? 'mahindra' :
+        (app.company === 'PNB_HOUSING' ? 'pnb' : 'lic')));
+
+    const logoMap = {
+        'BAJAJ_FINANCE': 'images/fd/bajaj_finance.png',
+        'SHRIRAM_FINANCE': 'images/fd/shriram_finance.png',
+        'MAHINDRA_FINANCE': 'images/fd/mahindra_finance.png',
+        'PNB_HOUSING': 'images/fd/pnb_housing.png',
+        'LIC_HOUSING': 'images/fd/lic_housing.png'
+    };
+    const logoSrc = logoMap[app.company] || '';
 
     body.innerHTML = `
     <!-- 1. Sticky Quick-Copy Action Strip -->
@@ -420,26 +451,51 @@ function renderFdModalContent(app) {
         </div>
     </div>
 
-    <!-- 3. Key Metrics Overview Row -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-bottom:20px">
-        <div class="fd-field-box">
-            <div class="fd-field-label">Application ID</div>
-            <div class="fd-field-val-row">
-                <span style="font-family:'JetBrains Mono',monospace;color:#fbbf24;font-size:14px;font-weight:800">${app.applicationId}</span>
-                <button type="button" class="fd-inline-copy-btn" onclick="copyFdText('${app.applicationId}')"><i class="far fa-copy"></i></button>
+    <!-- 3. Customer Selected Plan & Overview Banner -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:12px;margin-bottom:20px">
+        <div class="fd-field-box" style="background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(15,23,42,0.6));border:1px solid rgba(245,158,11,0.35)">
+            <div class="fd-field-label" style="color:#fbbf24;font-weight:800;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-certificate"></i> Customer Selected Plan
+            </div>
+            <div style="font-size:14px;font-weight:800;color:#ffffff;margin-top:4px;line-height:1.3">
+                ${escapeHtml(app.schemeName || 'Corporate Fixed Deposit')}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                ${logoSrc ? `<img src="${logoSrc}" alt="${escapeHtml(app.companyName)}" style="height:18px;background:#fff;border-radius:4px;padding:1px">` : ''}
+                <span class="fd-badge-company ${companyClass}" style="font-size:10.5px;padding:2px 7px">
+                    ${escapeHtml(app.companyName)}
+                </span>
             </div>
         </div>
+
         <div class="fd-field-box">
-            <div class="fd-field-label">Deposit Amount</div>
-            <div style="font-family:'JetBrains Mono',monospace;color:#34d399;font-size:16px;font-weight:800">₹${Number(app.amount).toLocaleString('en-IN')}</div>
+            <div class="fd-field-label">Deposit Principal</div>
+            <div style="font-family:'JetBrains Mono',monospace;color:#34d399;font-size:17px;font-weight:800;margin-top:4px">
+                ₹${Number(app.amount).toLocaleString('en-IN')}
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:4px">
+                <i class="far fa-clock"></i> ${app.tenureMonths} Months (${(app.tenureMonths / 12).toFixed(1)} Yrs)
+            </div>
         </div>
+
         <div class="fd-field-box">
-            <div class="fd-field-label">Company & Scheme</div>
-            <div style="color:#ffffff;font-size:13.5px;font-weight:800">${escapeHtml(app.companyName)} (${app.tenureMonths}M)</div>
+            <div class="fd-field-label">Yield & Payout Mode</div>
+            <div style="color:#38bdf8;font-size:17px;font-weight:800;margin-top:4px">
+                ${app.interestRate}% <span style="font-size:12px;font-weight:600;color:#94a3b8">p.a.</span>
+            </div>
+            <div style="font-size:11.5px;color:#cbd5e1;margin-top:4px">
+                ${app.depositType === 'CUMULATIVE' ? 'Cumulative (Compounded)' : 'Non-Cumulative (' + (app.payoutFrequency || 'Monthly') + ')'}
+            </div>
         </div>
+
         <div class="fd-field-box">
-            <div class="fd-field-label">Interest Rate & Payout</div>
-            <div style="color:#38bdf8;font-size:14px;font-weight:800">${app.interestRate}% p.a. • ${app.payoutFrequency}</div>
+            <div class="fd-field-label">Maturity Returns</div>
+            <div style="font-family:'JetBrains Mono',monospace;color:#fbbf24;font-size:17px;font-weight:800;margin-top:4px">
+                ₹${Number(app.maturityAmount || app.amount).toLocaleString('en-IN')}
+            </div>
+            <div style="font-size:11.5px;color:#34d399;margin-top:4px">
+                ${app.seniorCitizen ? '★ Senior Citizen Benefit Included' : 'Standard Citizen Terms'}
+            </div>
         </div>
     </div>
 
@@ -449,16 +505,23 @@ function renderFdModalContent(app) {
         <div>
             <!-- Section 1: Scheme & Deposit Parameters -->
             <div class="fd-modal-sec-card">
-                <div class="fd-modal-sec-head">
-                    <span><i class="fas fa-coins" style="color:#fbbf24;margin-right:6px"></i> 1. Scheme & Deposit Parameters</span>
+                <div class="fd-modal-sec-head" style="display:flex;align-items:center;justify-content:space-between">
+                    <span><i class="fas fa-coins" style="color:#fbbf24;margin-right:6px"></i> 1. Selected Scheme & Deposit Parameters</span>
+                    ${logoSrc ? `<img src="${logoSrc}" alt="${escapeHtml(app.companyName)}" style="height:22px;background:#ffffff;border-radius:4px;padding:2px">` : ''}
                 </div>
                 <div class="fd-grid-fields">
                     ${renderFieldBox("Company Name", app.companyName)}
-                    ${renderFieldBox("Scheme Name", app.schemeName)}
+                    ${renderFieldBox("Selected Scheme", app.schemeName)}
                     ${renderFieldBox("Deposit Type", app.depositType)}
                     ${renderFieldBox("Payout Frequency", app.payoutFrequency)}
                     ${renderFieldBox("Principal Amount", "₹" + Number(app.amount).toLocaleString('en-IN'), String(app.amount))}
                     ${renderFieldBox("Tenure (Months)", `${app.tenureMonths} Months`, String(app.tenureMonths))}
+                    ${renderFieldBox("Interest Rate", `${app.interestRate}% p.a.`, String(app.interestRate))}
+                    ${renderFieldBox("Maturity Value", "₹" + Number(app.maturityAmount).toLocaleString('en-IN'), String(app.maturityAmount))}
+                    ${renderFieldBox("Auto Renewal Option", app.autoRenewal)}
+                    ${renderFieldBox("Senior Citizen Benefit", app.seniorCitizen ? "YES (+Special Extra Rate)" : "NO")}
+                </div>
+            </div>
                     ${renderFieldBox("Interest Rate", `${app.interestRate}% p.a.`, String(app.interestRate))}
                     ${renderFieldBox("Maturity Value", "₹" + Number(app.maturityAmount).toLocaleString('en-IN'), String(app.maturityAmount))}
                     ${renderFieldBox("Auto Renewal Option", app.autoRenewal)}

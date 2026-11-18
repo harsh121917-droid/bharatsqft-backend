@@ -76,12 +76,14 @@ describe('Fixed Deposits & IRIS Application Suite', () => {
 
         assert.equal(statusCode, 200);
         assert.equal(responseData.success, true);
-        assert.equal(responseData.companies.length, 3);
+        assert.equal(responseData.companies.length, 5);
 
         const companyCodes = responseData.companies.map(c => c.code);
         assert.ok(companyCodes.includes('BAJAJ_FINANCE'), 'Should include Bajaj Finance');
         assert.ok(companyCodes.includes('SHRIRAM_FINANCE'), 'Should include Shriram Finance');
         assert.ok(companyCodes.includes('MAHINDRA_FINANCE'), 'Should include Mahindra Finance');
+        assert.ok(companyCodes.includes('PNB_HOUSING'), 'Should include PNB Housing');
+        assert.ok(companyCodes.includes('LIC_HOUSING'), 'Should include LIC Housing');
 
         // Check rates and schemes present
         const bajaj = responseData.companies.find(c => c.code === 'BAJAJ_FINANCE');
@@ -99,7 +101,7 @@ describe('Fixed Deposits & IRIS Application Suite', () => {
         await getBondsConfig(req, res, () => {});
 
         assert.equal(responseData.success, true);
-        assert.equal(responseData.websiteUrl, 'https://www.vikaone.com/bonds');
+        assert.equal(responseData.websiteUrl, 'https://www.bondbazaar.com/open-trading-account/?param=UlZTMTM%3D');
         assert.ok(responseData.bonds.length >= 4, 'Should return at least 4 bond categories');
     });
 

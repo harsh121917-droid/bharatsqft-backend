@@ -170,6 +170,96 @@ const FD_COMPANIES = [
         ],
         color: "#DC2626",
         badgeBg: "rgba(220, 38, 38, 0.15)"
+    },
+    {
+        id: "PNB_HOUSING",
+        code: "PNB_HOUSING",
+        name: "PNB Housing Finance Limited",
+        shortName: "PNB Housing",
+        rating: "CRISIL AA+ / CARE AA+",
+        ratingAgency: "CRISIL & CARE",
+        ratingDescription: "High Safety • Subsidiary of Punjab National Bank",
+        logo: "assets/images/fd/pnb_housing.png",
+        minAmount: 10000,
+        maxRate: 7.95,
+        baseRate: 7.70,
+        seniorCitizenExtra: 0.25,
+        womenExtra: 0.0,
+        specialTenureMonths: 36,
+        availableTenures: [12, 24, 36, 48, 60],
+        schemes: [
+            {
+                name: "PNB Housing Cumulative Scheme",
+                type: "CUMULATIVE",
+                tenureMonths: 36,
+                baseRate: 7.70,
+                seniorRate: 7.95,
+                payoutFrequency: "AT_MATURITY",
+                description: "Annual compounding deposit from one of India's largest housing finance companies."
+            },
+            {
+                name: "PNB Housing Regular Monthly Payout",
+                type: "NON_CUMULATIVE",
+                tenureMonths: 24,
+                baseRate: 7.35,
+                seniorRate: 7.60,
+                payoutFrequency: "MONTHLY",
+                description: "Dependable monthly interest directly to your account for retired individuals."
+            }
+        ],
+        highlights: [
+            "Promoted by Punjab National Bank with 35+ years of excellence",
+            "CRISIL AA+ Stable rating guaranteeing high safety",
+            "Flexible compounding and payout options from 1 to 5 years",
+            "Full electronic lifecycle through IRIS platform"
+        ],
+        color: "#991B1B",
+        badgeBg: "rgba(153, 27, 27, 0.15)"
+    },
+    {
+        id: "LIC_HOUSING",
+        code: "LIC_HOUSING",
+        name: "LIC Housing Finance Limited",
+        shortName: "LIC Housing",
+        rating: "CRISIL AAA / CARE AAA",
+        ratingAgency: "CRISIL & CARE",
+        ratingDescription: "Highest Safety • Sovereign Trust of Life Insurance Corp",
+        logo: "assets/images/fd/lic_housing.png",
+        minAmount: 20000,
+        maxRate: 8.00,
+        baseRate: 7.75,
+        seniorCitizenExtra: 0.25,
+        womenExtra: 0.0,
+        specialTenureMonths: 60,
+        availableTenures: [12, 18, 24, 36, 60],
+        schemes: [
+            {
+                name: "LIC HFL Sanchay Cumulative Scheme",
+                type: "CUMULATIVE",
+                tenureMonths: 60,
+                baseRate: 7.75,
+                seniorRate: 8.00,
+                payoutFrequency: "AT_MATURITY",
+                description: "Highest safety AAA deposit with capital growth backed by LIC brand equity."
+            },
+            {
+                name: "LIC HFL Sanchay Monthly Payout",
+                type: "NON_CUMULATIVE",
+                tenureMonths: 36,
+                baseRate: 7.45,
+                seniorRate: 7.70,
+                payoutFrequency: "MONTHLY",
+                description: "Monthly interest payout ideal for senior citizens and steady income seekers."
+            }
+        ],
+        highlights: [
+            "Backed by Life Insurance Corporation of India (LIC)",
+            "CRISIL AAA rating signifying maximum degree of safety",
+            "Seamless electronic renewal and direct credit to bank account",
+            "Zero market risk with guaranteed compounded interest"
+        ],
+        color: "#1E3A8A",
+        badgeBg: "rgba(30, 58, 138, 0.15)"
     }
 ];
 
@@ -445,7 +535,7 @@ exports.getFdApplicationById = async (req, res, next) => {
 // ── BONDS CONFIGURATION & INFORMATION ────────────────────────────────────────
 exports.getBondsConfig = async (req, res, next) => {
     try {
-        const websiteUrl = process.env.BONDS_WEBSITE_URL || "https://www.vikaone.com/bonds";
+        const websiteUrl = process.env.BONDS_WEBSITE_URL || "https://www.bondbazaar.com/open-trading-account/?param=UlZTMTM%3D";
 
         const bondCategories = [
             {

@@ -19,7 +19,7 @@ const FixedDepositApplicationSchema = new mongoose.Schema(
         company: {
             type: String,
             required: true,
-            enum: ["BAJAJ_FINANCE", "SHRIRAM_FINANCE", "MAHINDRA_FINANCE"],
+            enum: ["BAJAJ_FINANCE", "SHRIRAM_FINANCE", "MAHINDRA_FINANCE", "PNB_HOUSING", "LIC_HOUSING"],
         },
         companyName: {
             type: String,

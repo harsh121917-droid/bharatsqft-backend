@@ -292,6 +292,18 @@
     box-shadow: 0 0 12px rgba(190, 18, 60, 0.4);
 }
 
+.fd-chip-btn.active.pnb {
+    background: #b45309;
+    border-color: #f59e0b;
+    box-shadow: 0 0 12px rgba(180, 83, 9, 0.4);
+}
+
+.fd-chip-btn.active.lic {
+    background: #0e7490;
+    border-color: #22d3ee;
+    box-shadow: 0 0 12px rgba(14, 116, 144, 0.4);
+}
+
 .fd-search-box {
     position: relative;
     min-width: 280px;
@@ -464,6 +476,18 @@
     background: rgba(239, 68, 68, 0.15);
     color: #f87171;
     border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.fd-badge-company.pnb {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.fd-badge-company.lic {
+    background: rgba(6, 182, 212, 0.15);
+    color: #22d3ee;
+    border: 1px solid rgba(6, 182, 212, 0.35);
 }
 
 /* Amount & Rate Display */
