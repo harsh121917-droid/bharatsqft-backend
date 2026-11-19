@@ -73,8 +73,9 @@ async function startReconciliationCron() {
       console.log('[Cron] 🔄 Triggering Periodic Daytime Folio & Allotment Sync (Asia/Kolkata)...');
       try {
         await mfReconciliationEngine.syncMissingFolios();
+        await mfReconciliationEngine.syncUserTransactionsFromNse();
       } catch (err) {
-        console.warn('[Cron] Daytime folio sync warning:', err.message);
+        console.warn('[Cron] Daytime folio & transaction sync warning:', err.message);
       }
     },
     {
@@ -82,7 +83,23 @@ async function startReconciliationCron() {
     }
   );
 
-  // 3. Run every 15 minutes during market hours to auto-sync bank mandates from NSE
+  // 3. Daytime NSE Direct Order & Transaction Sync: Runs every 2 hours during market hours (09:30 to 18:30 IST)
+  cron.schedule(
+    '30 9-18/2 * * 1-5',
+    async () => {
+      console.log('[Cron] 📡 Triggering Daytime NSE Exchange Order & Transaction Poller (Asia/Kolkata)...');
+      try {
+        await mfReconciliationEngine.syncUserTransactionsFromNse();
+      } catch (err) {
+        console.warn('[Cron] Daytime NSE sync warning:', err.message);
+      }
+    },
+    {
+      timezone: 'Asia/Kolkata',
+    }
+  );
+
+  // 4. Run every 15 minutes during market hours to auto-sync bank mandates from NSE
   cron.schedule(
     '*/15 * * * *',
     async () => {
@@ -111,4 +128,5 @@ module.exports = {
   syncPendingMandates,
   syncMissingFolios: (userId = null) => mfReconciliationEngine.syncMissingFolios(userId),
   runReconciliationNow: () => mfReconciliationEngine.runReconciliation('ADMIN_MANUAL'),
+  syncTransactionsFromNseNow: () => mfReconciliationEngine.syncUserTransactionsFromNse(),
 };

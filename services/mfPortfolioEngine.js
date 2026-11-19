@@ -173,6 +173,60 @@ function computeExpectedAllotmentDate(orderDate, schemeName = '', category = '')
 async function recalculateUserPortfolio(userId) {
   if (!userId) return null;
 
+  // Self-heal: Ensure any confirmed transactions in MfTransaction have matching MfOrder records
+  try {
+    const MfTransaction = require('../models/MfTransaction');
+    const confirmedTxns = await MfTransaction.find({ user: userId, status: 'CONFIRMED' }).lean();
+    if (confirmedTxns && confirmedTxns.length > 0) {
+      for (const tx of confirmedTxns) {
+        const orderExists = await MfOrder.exists({
+          $or: [
+            { _id: tx.order },
+            { nseTrxnOrderId: tx.externalReference },
+            { orderId: `MFP_${tx.externalReference}` },
+          ],
+        });
+        if (!orderExists) {
+          const MutualFundScheme = require('../models/MutualFundScheme');
+          const scheme = await MutualFundScheme.findOne({ schemeCode: tx.schemeCode }).lean();
+          await MfOrder.create({
+            _id: tx.order || new mongoose.Types.ObjectId(),
+            user: userId,
+            clientCode: tx.clientCode || 'NOT_REGISTERED',
+            orderId: `MFP_${tx.externalReference || Date.now()}`,
+            schemeCode: tx.schemeCode,
+            schemeName: tx.schemeName,
+            isin: scheme?.isin || '',
+            amcName: scheme?.amcName || '',
+            category: scheme?.category || '',
+            transactionType: tx.transactionType === 'REDEMPTION' ? 'R' : 'P',
+            buySellType: 'FRESH',
+            orderAmount: tx.orderAmount || 100,
+            amount: tx.orderAmount || 100,
+            estimatedUnits: tx.units,
+            allottedUnits: tx.units,
+            units: tx.units,
+            allottedNav: tx.nav,
+            navAtOrder: tx.nav,
+            allotmentDate: tx.transactionDate || tx.createdAt,
+            orderStatus: 'ALLOTTED',
+            allotmentStatus: 'ALLOTTED',
+            paymentStatus: 'SUCCESS',
+            paymentMode: 'NETBANKING',
+            nseTrxnOrderId: tx.externalReference || '',
+            nsePaymentRefNo: tx.externalReference || '',
+            nsePaymentStatus: 'APPROVED',
+            nseStatus: 'VALID - ALLOTMENT DONE',
+            remarks: tx.remarks || 'Allotment confirmed',
+            planType: tx.planType || 'REGULAR',
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (healErr) {
+    console.warn('[recalculateUserPortfolio] Self-heal warning:', healErr.message);
+  }
+
   // 1. Fetch all confirmed orders
   // P: Purchase (only ALLOTTED orders count as holdings)
   // R: Redemption (settled or confirmed orders reduce holdings)

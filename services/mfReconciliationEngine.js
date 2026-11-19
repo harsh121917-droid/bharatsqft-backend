@@ -944,8 +944,14 @@ class MfReconciliationEngine {
     }
 
     if (clientCodesToSync.size === 0) {
-      const activeUccs = await MfClientUcc.find({ status: 'ACTIVE' }).limit(50);
+      const activeUccs = await MfClientUcc.find({
+        $or: [{ nseStatus: 'ACTIVE' }, { status: 'ACTIVE' }],
+      }).sort({ updatedAt: -1 }).limit(100);
       activeUccs.forEach((u) => { if (u.clientCode) clientCodesToSync.add(u.clientCode); });
+
+      const User = require('../models/User');
+      const userCodes = await User.distinct('mfClientCode', { mfClientCode: { $nin: ['', null, ' '] } });
+      userCodes.forEach((c) => { if (c) clientCodesToSync.add(c); });
     }
 
     // Default 60-day date range in DD-MM-YYYY format
@@ -1178,6 +1184,64 @@ class MfReconciliationEngine {
                 userIdsToRecalculate.add(String(sipDoc.user));
                 allottedCount++;
                 console.log(`[Direct NSE Sync] ✅ Auto-ingested new XSIP installment ${pId} for SIP ${sipReg}`);
+              }
+            } else if (isAllotted && !sipReg) {
+              // Auto-ingest regular/lump-sum purchase from NSE
+              try {
+                let targetUser = await MfClientUcc.findOne({ clientCode: cCode }).select('user');
+                let targetUserId = targetUser?.user;
+                if (!targetUserId) {
+                  const User = require('../models/User');
+                  const uDoc = await User.findOne({ mfClientCode: cCode }).select('_id');
+                  targetUserId = uDoc?._id;
+                }
+                if (targetUserId) {
+                  const MutualFundScheme = require('../models/MutualFundScheme');
+                  const itemSchemeCode = String(item.scheme_code || item.schemecode || '').trim();
+                  const schemeDoc = await MutualFundScheme.findOne({
+                    $or: [{ nseSchemeCode: itemSchemeCode }, { schemeCode: itemSchemeCode }]
+                  });
+                  const allottedUnits = parseFloat(item.alloted_unit || item.allotted_units || '0') || 0;
+                  const allottedNav = parseFloat(item.alloted_nav || item.allotted_nav || '0') || 0;
+                  const allottedAmt = parseFloat(item.alloted_amount || item.order_amount || '0') || (allottedUnits * allottedNav) || 100;
+                  const rawFolio = extractFolioFromNse(item) || '';
+
+                  await MfOrder.create({
+                    user: targetUserId,
+                    clientCode: cCode,
+                    orderId: `NSE_${pId}`,
+                    schemeCode: schemeDoc?.schemeCode || itemSchemeCode,
+                    schemeName: schemeDoc?.schemeName || item.scheme_name || 'Mutual Fund Purchase',
+                    isin: schemeDoc?.isin || '',
+                    amcName: schemeDoc?.amcName || '',
+                    category: schemeDoc?.category || '',
+                    transactionType: 'P',
+                    buySellType: 'FRESH',
+                    orderAmount: allottedAmt,
+                    amount: allottedAmt,
+                    estimatedUnits: allottedUnits,
+                    allottedUnits: allottedUnits,
+                    units: allottedUnits,
+                    allottedNav: allottedNav,
+                    navAtOrder: allottedNav,
+                    allotmentDate: item.reg_date ? new Date(item.reg_date) : new Date(),
+                    orderStatus: 'ALLOTTED',
+                    planType: 'REGULAR',
+                    allotmentStatus: 'ALLOTTED',
+                    folioNo: rawFolio,
+                    paymentMode: 'NETBANKING',
+                    paymentStatus: 'SUCCESS',
+                    nseTrxnOrderId: pId,
+                    nseStatus: 'ALLOTMENT DONE',
+                    remarks: ordRemark || 'NSE DIRECT ALLOTMENT - SYNCED',
+                  });
+
+                  userIdsToRecalculate.add(String(targetUserId));
+                  allottedCount++;
+                  console.log(`[Direct NSE Sync] ✅ Auto-ingested direct NSE purchase ${pId} for client ${cCode}`);
+                }
+              } catch (ingestErr) {
+                console.warn(`[Direct NSE Sync] Direct order ingest warning for ${pId}:`, ingestErr.message);
               }
             }
           }
