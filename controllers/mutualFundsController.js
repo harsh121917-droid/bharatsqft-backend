@@ -2193,7 +2193,7 @@ exports.createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid schemeCode and orderAmount are required' });
     }
 
-    const isUpi = (paymentMode === 'UPI');
+    const isUpi = (paymentMode === 'UPI' || paymentMode === 'UPI_COLLECT');
     if (isUpi) {
       if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
         return res.status(400).json({
@@ -2504,6 +2504,8 @@ exports.createPurchaseOrder = async (req, res) => {
         currency: 'INR',
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
         vpa: isUpi ? vpa.trim() : null,
+        nsePaymentRefNo: order.nsePaymentRefNo || nsePaymentRefNo,
+        nseTrxnOrderId: order.nseTrxnOrderId || nseOrderId,
       },
     });
   } catch (error) {
@@ -7207,7 +7209,7 @@ exports.checkoutCart = async (req, res) => {
       vpa,
     } = req.body;
 
-    const isUpi = (paymentMode === 'UPI');
+    const isUpi = (paymentMode === 'UPI' || paymentMode === 'UPI_COLLECT');
     if (isUpi) {
       if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
         return res.status(400).json({
