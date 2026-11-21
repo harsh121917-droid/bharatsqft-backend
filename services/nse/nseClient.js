@@ -1,4 +1,8 @@
 const axios = require('axios');
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 const nseEncryption = require('./nseEncryption');
 
 /**
@@ -825,16 +829,25 @@ class NseClient {
     return this.post('/nsemfdesk/api/v2/reports/MANDATE_STATUS', payload);
   }
 
-  // ── 8. Purchase Order Payment Execution ──
+  // ── 8. Purchase Order Payment Execution (Doc Page 166-167) ──
   async initiatePurchasePayment(paymentData) {
-    return this.post('/nsemfdesk/api/v2/payments/purchase_payment', paymentData);
+    const payload = {
+      payment_mode: paymentData.payment_mode || 'UPI',
+      client_code: String(paymentData.client_code || '').trim(),
+      order_ids: String(paymentData.order_ids || '').trim(),
+      bank_account_no: String(paymentData.bank_account_no || '').trim(),
+      ifsc: String(paymentData.ifsc || '').trim().toUpperCase(),
+      vpa: String(paymentData.vpa || '').trim(),
+      callback_url: String(paymentData.callback_url || '').trim(),
+    };
+    return this.post('/nsemfdesk/api/v2/payments/purchase_payment', payload);
   }
 
-  // ── 9. UPI Payment Status Check ──
+  // ── 9. UPI Payment Status Check (Doc Page 169) ──
   async checkUpiStatus(nseUpiRefNo, clientCode) {
     return this.post('/nsemfdesk/api/v2/payments/upi_status_check', {
-      nse_upi_ref_no: String(nseUpiRefNo),
-      client_code: clientCode,
+      nse_upi_ref_no: String(nseUpiRefNo || '').trim(),
+      client_code: String(clientCode || '').trim(),
     });
   }
 

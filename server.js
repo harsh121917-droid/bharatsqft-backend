@@ -1,4 +1,8 @@
 require("dotenv").config();
+const dns = require("dns");
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 /* ============================================================
    Bharat SQFT — Server Entry Point

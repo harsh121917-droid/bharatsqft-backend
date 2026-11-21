@@ -2425,21 +2425,39 @@ exports.createPurchaseOrder = async (req, res) => {
 
     if (isUpi && nseOrderId && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
       try {
+        let bankAccNo = ucc.primaryBank?.accountNo || ucc.bankDetails?.accountNo || '';
+        let ifscCode = ucc.primaryBank?.ifsc || ucc.bankDetails?.ifsc || '';
+
+        if (!bankAccNo || !ifscCode) {
+          try {
+            const BankAccount = require('../models/BankAccount');
+            const primaryBank = (await BankAccount.findOne({ user: userId, isPrimary: true })) || (await BankAccount.findOne({ user: userId }));
+            if (primaryBank) {
+              bankAccNo = bankAccNo || primaryBank.accountNumber;
+              ifscCode = ifscCode || primaryBank.ifsc;
+            }
+          } catch (_) {}
+        }
+
         const upiPayload = {
           payment_mode: 'UPI',
           client_code: ucc.clientCode,
           order_ids: String(nseOrderId),
-          bank_account_no: ucc.primaryBank?.accountNo || ucc.bankDetails?.accountNo || '',
-          ifsc: ucc.primaryBank?.ifsc || ucc.bankDetails?.ifsc || '',
+          bank_account_no: bankAccNo,
+          ifsc: ifscCode,
           vpa: vpa.trim(),
           callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
         };
+        console.log('[createPurchaseOrder] Dispatching UPI Collect to NSE MFSS:', upiPayload);
         const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
-        if (upiRes?.success && (upiRes?.data?.status === 'success' || upiRes?.data?.status === '100')) {
+        console.log('[createPurchaseOrder] NSE UPI initiatePurchasePayment response:', upiRes);
+        if (upiRes?.success && (String(upiRes?.data?.status).toLowerCase() === 'success' || upiRes?.data?.status === '100')) {
           nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
           if (upiRes.data.short_url) {
             paymentLink = upiRes.data.short_url;
           }
+        } else {
+          console.warn('[createPurchaseOrder] NSE UPI initiatePurchasePayment failed or unwhitelisted IP:', upiRes?.error || upiRes?.data);
         }
       } catch (upiErr) {
         console.warn(`[createPurchaseOrder] NSE UPI initiatePurchasePayment error:`, upiErr.message);
@@ -2506,6 +2524,7 @@ exports.createPurchaseOrder = async (req, res) => {
         amount: Number(orderAmount),
         currency: 'INR',
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
+        requiresUpiApproval: isUpi,
         vpa: isUpi && vpa ? vpa.trim() : null,
         nsePaymentRefNo: order.nsePaymentRefNo || nsePaymentRefNo,
         nseTrxnOrderId: order.nseTrxnOrderId || nseOrderId,
@@ -7635,6 +7654,7 @@ exports.checkoutCart = async (req, res) => {
           paymentStatus: o.paymentStatus,
         })),
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
+        requiresUpiApproval: isUpi,
         vpa: isUpi && vpa ? vpa.trim() : null,
         nsePaymentRefNo,
         remainingCartCount: cart.items.length,
