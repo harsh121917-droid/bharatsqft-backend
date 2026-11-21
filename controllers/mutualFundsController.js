@@ -2194,8 +2194,8 @@ exports.createPurchaseOrder = async (req, res) => {
     }
 
     const isUpi = (paymentMode === 'UPI' || paymentMode === 'UPI_COLLECT');
-    if (isUpi) {
-      if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
+    if (isUpi && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
+      if (!vpa.includes('@') || vpa.trim().length < 4) {
         return res.status(400).json({
           success: false,
           code: 'INVALID_UPI_ID',
@@ -2423,7 +2423,7 @@ exports.createPurchaseOrder = async (req, res) => {
     let paymentLink = null;
     let nsePaymentRefNo = '';
 
-    if (isUpi && nseOrderId) {
+    if (isUpi && nseOrderId && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
       try {
         const upiPayload = {
           payment_mode: 'UPI',
@@ -2484,20 +2484,20 @@ exports.createPurchaseOrder = async (req, res) => {
       paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
       paymentStatus: 'PENDING',
       orderStatus: 'PAYMENT_PENDING',
-      vpa: isUpi ? vpa.trim() : '',
+      vpa: isUpi && vpa ? vpa.trim() : '',
       paymentLink,
       nseTrxnOrderId: nseOrderId,
       nsePaymentRefNo,
       nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
       remarks: isUpi
-        ? `UPI Collect request dispatched to ${vpa.trim()} by NSE Clearing Limited. Awaiting approval in UPI app.`
+        ? `UPI order placed on NSE MFSS. Complete payment via UPI (Google Pay, PhonePe, Paytm) or NSE Clearing gateway.`
         : 'Order placed on NSE MFSS. Awaiting investor payment through official NSE payment gateway.',
     });
 
     return res.json({
       success: true,
       message: isUpi
-        ? `UPI Collect request sent to ${vpa.trim()} by NSE Clearing Limited. Please approve in your UPI app.`
+        ? 'Mutual fund order created. Please complete UPI payment (Google Pay / PhonePe / Paytm).'
         : 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.',
       data: {
         order,
@@ -2506,7 +2506,7 @@ exports.createPurchaseOrder = async (req, res) => {
         amount: Number(orderAmount),
         currency: 'INR',
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
-        vpa: isUpi ? vpa.trim() : null,
+        vpa: isUpi && vpa ? vpa.trim() : null,
         nsePaymentRefNo: order.nsePaymentRefNo || nsePaymentRefNo,
         nseTrxnOrderId: order.nseTrxnOrderId || nseOrderId,
       },
@@ -7234,8 +7234,8 @@ exports.checkoutCart = async (req, res) => {
     } = req.body;
 
     const isUpi = (paymentMode === 'UPI' || paymentMode === 'UPI_COLLECT');
-    if (isUpi) {
-      if (!vpa || typeof vpa !== 'string' || !vpa.includes('@') || vpa.trim().length < 4) {
+    if (isUpi && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
+      if (!vpa.includes('@') || vpa.trim().length < 4) {
         return res.status(400).json({
           success: false,
           code: 'INVALID_UPI_ID',
@@ -7584,7 +7584,7 @@ exports.checkoutCart = async (req, res) => {
 
     // 5. If UPI payment mode with multiple orders, initiate basket payment
     let nsePaymentRefNo = '';
-    if (isUpi && nseOrderIds.length > 0) {
+    if (isUpi && nseOrderIds.length > 0 && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
       try {
         const upiPayload = {
           payment_mode: 'UPI',
@@ -7618,7 +7618,7 @@ exports.checkoutCart = async (req, res) => {
     return res.json({
       success: true,
       message: isUpi
-        ? `UPI Collect request sent for all ${placedOrders.length} mutual funds to ${vpa.trim()}. Please approve in your UPI app.`
+        ? `Orders created for ${placedOrders.length + placedSips.length} mutual funds. Please complete UPI payment.`
         : `Orders created for ${placedOrders.length + placedSips.length} mutual funds. Please complete payment through official NSE gateway.`,
       data: {
         totalAmount: totalInvestedAmount,
@@ -7635,7 +7635,7 @@ exports.checkoutCart = async (req, res) => {
           paymentStatus: o.paymentStatus,
         })),
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
-        vpa: isUpi ? vpa.trim() : null,
+        vpa: isUpi && vpa ? vpa.trim() : null,
         nsePaymentRefNo,
         remainingCartCount: cart.items.length,
         failedOrders: failedOrders.length > 0 ? failedOrders : undefined,
