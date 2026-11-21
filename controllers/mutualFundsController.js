@@ -2301,6 +2301,67 @@ exports.createPurchaseOrder = async (req, res) => {
     }).sort({ createdAt: -1 });
 
     if (existingPending) {
+      // If user selected UPI and supplied a VPA, attempt to dispatch UPI Collect for this pending order
+      if (isUpi && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
+        console.log(`[createPurchaseOrder] Dispatching UPI Collect for recent pending order ${existingPending.orderId} (${existingPending.nseTrxnOrderId})`);
+        const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+        let bankAccNo = ucc.primaryBank?.accountNo || ucc.bankDetails?.accountNo || '';
+        let ifscCode = ucc.primaryBank?.ifsc || ucc.bankDetails?.ifsc || '';
+
+        if (!bankAccNo || !ifscCode) {
+          try {
+            const BankAccount = require('../models/BankAccount');
+            const primaryBank = (await BankAccount.findOne({ user: userId, isPrimary: true })) || (await BankAccount.findOne({ user: userId }));
+            if (primaryBank) {
+              bankAccNo = bankAccNo || primaryBank.accountNumber;
+              ifscCode = ifscCode || primaryBank.ifsc;
+            }
+          } catch (_) {}
+        }
+
+        const upiPayload = {
+          payment_mode: 'UPI',
+          client_code: ucc.clientCode,
+          order_ids: String(existingPending.nseTrxnOrderId || existingPending.orderId),
+          bank_account_no: bankAccNo,
+          ifsc: ifscCode,
+          vpa: vpa.trim(),
+          callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
+        };
+        const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
+        console.log(`[createPurchaseOrder] Existing pending UPI response:`, JSON.stringify(upiRes));
+        const isSuccess = upiRes?.success && (String(upiRes?.data?.status).toLowerCase() === 'success' || upiRes?.data?.status === '100');
+
+        if (isSuccess) {
+          existingPending.nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
+          existingPending.vpa = vpa.trim();
+          existingPending.paymentMode = 'UPI';
+          if (upiRes.data.short_url) {
+            existingPending.paymentLink = upiRes.data.short_url;
+          }
+          existingPending.remarks = `UPI collect request dispatched to ${vpa.trim()}`;
+          await existingPending.save();
+
+          return res.json({
+            success: true,
+            message: `UPI Collect request sent to ${vpa.trim()}. Please approve the payment in your UPI app.`,
+            data: {
+              order: existingPending,
+              orderId: existingPending.orderId,
+              paymentLink: existingPending.paymentLink,
+              amount: existingPending.orderAmount,
+              currency: 'INR',
+              paymentMode: 'UPI',
+              requiresUpiApproval: true,
+              vpa: vpa.trim(),
+              nsePaymentRefNo: existingPending.nsePaymentRefNo,
+              nseTrxnOrderId: existingPending.nseTrxnOrderId,
+              isDuplicate: false,
+            },
+          });
+        }
+      }
+
       console.log(`[createPurchaseOrder] Idempotent return for recent pending order ${existingPending.orderId}`);
       return res.json({
         success: true,
@@ -2311,6 +2372,7 @@ exports.createPurchaseOrder = async (req, res) => {
           amount: existingPending.orderAmount,
           currency: 'INR',
           paymentMode: existingPending.paymentMode || 'NSE_PAYMENT_LINK',
+          requiresUpiApproval: Boolean(isUpi && existingPending.nsePaymentRefNo),
           isDuplicate: true,
         },
       });
@@ -2422,6 +2484,7 @@ exports.createPurchaseOrder = async (req, res) => {
     const isLive = process.env.NSE_ENV === 'PROD' && !nseClient.isMockMode();
     let paymentLink = null;
     let nsePaymentRefNo = '';
+    let upiErrorDetails = null;
 
     if (isUpi && nseOrderId && vpa && typeof vpa === 'string' && vpa.trim().length > 0) {
       try {
@@ -2450,16 +2513,19 @@ exports.createPurchaseOrder = async (req, res) => {
         };
         console.log('[createPurchaseOrder] Dispatching UPI Collect to NSE MFSS:', upiPayload);
         const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
-        console.log('[createPurchaseOrder] NSE UPI initiatePurchasePayment response:', upiRes);
-        if (upiRes?.success && (String(upiRes?.data?.status).toLowerCase() === 'success' || upiRes?.data?.status === '100')) {
+        console.log('[createPurchaseOrder] NSE UPI initiatePurchasePayment response:', JSON.stringify(upiRes));
+        const isUpiSuccess = upiRes?.success && (String(upiRes?.data?.status).toLowerCase() === 'success' || upiRes?.data?.status === '100');
+        if (isUpiSuccess) {
           nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
           if (upiRes.data.short_url) {
             paymentLink = upiRes.data.short_url;
           }
         } else {
-          console.warn('[createPurchaseOrder] NSE UPI initiatePurchasePayment failed or unwhitelisted IP:', upiRes?.error || upiRes?.data);
+          upiErrorDetails = upiRes?.error?.message || upiRes?.data?.remark || upiRes?.error?.remark || upiRes?.message || 'NSE Exchange rejected the UPI request';
+          console.warn('[createPurchaseOrder] NSE UPI initiatePurchasePayment failed:', upiErrorDetails);
         }
       } catch (upiErr) {
+        upiErrorDetails = upiErr.message;
         console.warn(`[createPurchaseOrder] NSE UPI initiatePurchasePayment error:`, upiErr.message);
       }
     }
@@ -2481,6 +2547,7 @@ exports.createPurchaseOrder = async (req, res) => {
 
     // 4. Units & Allotment: Estimated units strictly for display, actual units remain 0 until authoritative allotment
     const estimatedUnits = scheme.nav && scheme.nav > 0 ? +(orderAmount / scheme.nav).toFixed(3) : null;
+    const hasUpiDispatched = Boolean(isUpi && nsePaymentRefNo);
 
     const order = await MfOrder.create({
       user: userId,
@@ -2508,15 +2575,19 @@ exports.createPurchaseOrder = async (req, res) => {
       nsePaymentRefNo,
       nseStatus: isSuccess ? 'ORDER PLACED' : 'PENDING_NSE',
       remarks: isUpi
-        ? `UPI order placed on NSE MFSS. Complete payment via UPI (Google Pay, PhonePe, Paytm) or NSE Clearing gateway.`
+        ? (hasUpiDispatched
+            ? `UPI Collect request dispatched to ${vpa.trim()} (Basket: ${nsePaymentRefNo}).`
+            : `Order placed on NSE. UPI Collect dispatch failed (${upiErrorDetails || 'exchange pending'}). Complete payment via NSE payment link.`)
         : 'Order placed on NSE MFSS. Awaiting investor payment through official NSE payment gateway.',
     });
 
     return res.json({
       success: true,
-      message: isUpi
-        ? 'Mutual fund order created. Please complete UPI payment (Google Pay / PhonePe / Paytm).'
-        : 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.',
+      message: hasUpiDispatched
+        ? `Mutual fund order created. UPI Collect request sent to ${vpa.trim()}. Please approve payment in Google Pay / PhonePe / Paytm.`
+        : (isUpi
+            ? `Mutual fund order placed on NSE. UPI Collect could not be sent (${upiErrorDetails || 'Awaiting gateway'}). Please complete payment through official NSE payment gateway.`
+            : 'Mutual fund order created successfully. Please complete payment through the official NSE payment link.'),
       data: {
         order,
         orderId: order.orderId,
@@ -2524,10 +2595,12 @@ exports.createPurchaseOrder = async (req, res) => {
         amount: Number(orderAmount),
         currency: 'INR',
         paymentMode: isUpi ? 'UPI' : 'NSE_PAYMENT_LINK',
-        requiresUpiApproval: isUpi,
+        requiresUpiApproval: hasUpiDispatched,
         vpa: isUpi && vpa ? vpa.trim() : null,
         nsePaymentRefNo: order.nsePaymentRefNo || nsePaymentRefNo,
         nseTrxnOrderId: order.nseTrxnOrderId || nseOrderId,
+        fallbackToWeb: isUpi && !hasUpiDispatched,
+        upiError: upiErrorDetails,
       },
     });
   } catch (error) {
@@ -2859,6 +2932,109 @@ exports.handleUpiPaymentCallback = async (req, res) => {
   } catch (error) {
     console.error('[handleUpiPaymentCallback Error]:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── 5c. POST /api/mutual-funds/orders/:orderId/retry-upi (Dispatch / Retry UPI Collect) ──
+exports.retryUpiPayment = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { orderId } = req.params;
+    const { vpa } = req.body;
+
+    const order = await MfOrder.findOne({
+      user: userId,
+      $or: [{ orderId }, { nseTrxnOrderId: orderId }],
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (!order.nseTrxnOrderId) {
+      return res.status(400).json({ success: false, message: 'Order does not have a valid NSE transaction order ID' });
+    }
+
+    const ucc = await MfClientUcc.findOne({ user: userId });
+    if (!ucc) {
+      return res.status(400).json({ success: false, message: 'User UCC not found' });
+    }
+
+    let bankAccNo = ucc.primaryBank?.accountNo || ucc.bankDetails?.accountNo || '';
+    let ifscCode = ucc.primaryBank?.ifsc || ucc.bankDetails?.ifsc || '';
+
+    if (!bankAccNo || !ifscCode) {
+      try {
+        const BankAccount = require('../models/BankAccount');
+        const primaryBank = (await BankAccount.findOne({ user: userId, isPrimary: true })) || (await BankAccount.findOne({ user: userId }));
+        if (primaryBank) {
+          bankAccNo = bankAccNo || primaryBank.accountNumber;
+          ifscCode = ifscCode || primaryBank.ifsc;
+        }
+      } catch (_) {}
+    }
+
+    const targetVpa = (vpa || order.vpa || '').trim();
+    if (!targetVpa || !targetVpa.includes('@')) {
+      return res.status(400).json({ success: false, message: 'A valid UPI ID (e.g. yourname@okhdfcbank) is required' });
+    }
+
+    const backendUrl = process.env.BASE_URL || process.env.BACKEND_URL || 'https://api.vikaone.com';
+    const upiPayload = {
+      payment_mode: 'UPI',
+      client_code: ucc.clientCode,
+      order_ids: String(order.nseTrxnOrderId),
+      bank_account_no: bankAccNo,
+      ifsc: ifscCode,
+      vpa: targetVpa,
+      callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
+    };
+
+    console.log('[retryUpiPayment] Dispatching UPI Collect to NSE:', upiPayload);
+    const upiRes = await nseClient.initiatePurchasePayment(upiPayload);
+    console.log('[retryUpiPayment] NSE response:', JSON.stringify(upiRes));
+
+    const isSuccess = upiRes?.success && (String(upiRes?.data?.status).toLowerCase() === 'success' || upiRes?.data?.status === '100');
+    if (isSuccess) {
+      order.nsePaymentRefNo = String(upiRes.data.basket_id || upiRes.data.nse_upi_ref_no || upiRes.data.payment_ref_no || '');
+      order.vpa = targetVpa;
+      order.paymentMode = 'UPI';
+      if (upiRes.data.short_url) {
+        order.paymentLink = upiRes.data.short_url;
+      }
+      order.remarks = `UPI Collect request dispatched to ${targetVpa} (Basket: ${order.nsePaymentRefNo})`;
+      await order.save();
+
+      return res.json({
+        success: true,
+        message: `UPI Collect request sent successfully to ${targetVpa}. Please approve payment in your UPI app.`,
+        data: {
+          order,
+          requiresUpiApproval: true,
+          nsePaymentRefNo: order.nsePaymentRefNo,
+          paymentLink: order.paymentLink,
+          rawNseResponse: upiRes.data,
+        },
+      });
+    } else {
+      const errMsg = upiRes?.error?.message || upiRes?.data?.remark || upiRes?.error?.remark || upiRes?.message || 'NSE rejected the UPI payment request';
+      order.remarks = `UPI Collect dispatch failed: ${errMsg}`;
+      await order.save();
+
+      return res.status(400).json({
+        success: false,
+        code: 'NSE_UPI_FAILED',
+        message: `NSE UPI Collect Failed: ${errMsg}`,
+        data: {
+          order,
+          rawNseResponse: upiRes?.data || upiRes?.error,
+          paymentLink: order.paymentLink,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('[retryUpiPayment Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 

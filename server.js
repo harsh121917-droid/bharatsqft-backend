@@ -108,7 +108,14 @@ app.use("/admin", express.static(path.join(__dirname, "admin")));
 
 /* ---------- Health Check ---------- */
 app.get("/api/health", (req, res) => {
-  res.json({ success: true, message: "Bharat SQFT API running", env: process.env.NODE_ENV });
+  res.json({
+    success: true,
+    message: "Bharat SQFT API running",
+    env: process.env.NODE_ENV,
+    version: "1.0.3",
+    deploy: "upi_collect_direct_v2",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 /* ---------- App Version Check ---------- */

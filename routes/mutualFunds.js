@@ -68,6 +68,7 @@ const {
   submitMfSupportRequest,
   initiateEkyc,
   checkEkycStatus,
+  retryUpiPayment,
 } = require('../controllers/mutualFundsController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -102,6 +103,7 @@ router.post('/ucc/register', registerUserUcc);
 router.post('/ucc/resend-act', resendUccActivation);
 router.post('/support', submitMfSupportRequest);
 router.post('/orders/purchase', createPurchaseOrder);
+router.post('/orders/:orderId/retry-upi', retryUpiPayment);
 router.post('/orders/sync-direct-nse', syncUserDirectTransactions);
 router.get('/orders/:orderId/status', syncOrderStatus);
 router.post('/orders/:orderId/sync-status', syncOrderStatus);

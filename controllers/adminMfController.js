@@ -1727,6 +1727,24 @@ exports.executeClientAction = async (req, res) => {
       }
     }
 
+    if (action === 'PURCHASE_PAYMENT') {
+      try {
+        const upiPayload = {
+          payment_mode: req.body.payment_mode || 'UPI',
+          client_code: clientCode || req.body.client_code,
+          order_ids: String(req.body.order_ids || ''),
+          bank_account_no: String(req.body.bank_account_no || ''),
+          ifsc: String(req.body.ifsc || '').toUpperCase(),
+          vpa: String(req.body.vpa || ''),
+          callback_url: req.body.callback_url || `${process.env.BASE_URL || 'https://api.vikaone.com'}/api/mutual-funds/orders/upi-callback`,
+        };
+        result.paymentPayload = upiPayload;
+        result.paymentResponse = await nseClient.initiatePurchasePayment(upiPayload);
+      } catch (pErr) {
+        result.paymentResponse = { error: pErr.message, stack: pErr.stack };
+      }
+    }
+
     return res.json({
       success: true,
       message: `Executed action ${action} for client ${clientCode}`,
