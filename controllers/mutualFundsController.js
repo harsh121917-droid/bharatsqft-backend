@@ -2429,8 +2429,8 @@ exports.createPurchaseOrder = async (req, res) => {
           payment_mode: 'UPI',
           client_code: ucc.clientCode,
           order_ids: String(nseOrderId),
-          bank_account_no: ucc.primaryBank?.accountNo || '',
-          ifsc: ucc.primaryBank?.ifsc || '',
+          bank_account_no: ucc.primaryBank?.accountNo || ucc.bankDetails?.accountNo || '',
+          ifsc: ucc.primaryBank?.ifsc || ucc.bankDetails?.ifsc || '',
           vpa: vpa.trim(),
           callback_url: `${backendUrl}/api/mutual-funds/orders/upi-callback`,
         };
@@ -2444,7 +2444,10 @@ exports.createPurchaseOrder = async (req, res) => {
       } catch (upiErr) {
         console.warn(`[createPurchaseOrder] NSE UPI initiatePurchasePayment error:`, upiErr.message);
       }
-    } else if (nseOrderId) {
+    }
+
+    // Always ensure paymentLink is populated via getShortLink('PUR', nseOrderId) as authoritative link or fallback
+    if (!paymentLink && nseOrderId) {
       try {
         const linkRes = await nseClient.getShortLink('PUR', nseOrderId);
         if (linkRes && linkRes.success && linkRes.data?.firstHolderLink) {
@@ -2693,12 +2696,33 @@ exports.syncOrderStatus = async (req, res) => {
         });
       }
 
-      // Handle Confirmed Payment / Accepted Transaction (including 'VALID' and 'PROVISIONAL ORDER')
-      if (['SUCCESS', 'APPROVED', 'VALIDATED', 'ACCEPTED', 'ORDER PLACED', 'VALID'].includes(nseOrderStatus) || /PROVISIONAL|ALLOTMENT|ACCEPTED|VALID/i.test(nseRemark)) {
+      // Check if payment is still pending on exchange (e.g. 2FA PENDING, PAYMENT PENDING, AWAITING PAYMENT)
+      const isPaymentExplicitlyPending = /2FA PENDING|PAYMENT PENDING|PAYMENT CONFIRMATION PENDING|AWAITING PAYMENT|PROVISIONAL ORDER/i.test(nseRemark);
+
+      if (isPaymentExplicitlyPending) {
+        order.paymentStatus = 'PENDING';
+        order.orderStatus = 'PAYMENT_PENDING';
+        order.remarks = nseRemark || 'Order placed on exchange. Awaiting investor 2FA / payment approval.';
+        await order.save();
+        return res.json({
+          success: true,
+          message: `Exchange Status: ${order.remarks}`,
+          data: { order, isAuthoritative: true },
+        });
+      }
+
+      // Handle Confirmed Payment / Accepted Transaction ONLY when explicitly confirmed by exchange
+      const isExchangePaymentConfirmed =
+        ['APPROVED', 'SETTLED'].includes(nsePaymentStatus) ||
+        allottedUnits > 0 ||
+        /ALLOTMENT DONE|PAYMENT RECEIVED|ALLOTTED/i.test(nseRemark) ||
+        (['SUCCESS', 'APPROVED'].includes(nseOrderStatus) && !/PENDING/i.test(nseRemark));
+
+      if (isExchangePaymentConfirmed) {
         if (order.paymentStatus !== 'SUCCESS') {
           order.paymentStatus = 'SUCCESS';
           order.orderStatus = 'PAYMENT_SUCCESS';
-          order.remarks = nseData.order_remark || 'Order placed and confirmed on NSE. Unit allotment pending with AMC.';
+          order.remarks = nseData.order_remark || 'Order payment confirmed on NSE. Unit allotment pending with AMC.';
           try {
             const eventNotificationService = require('../services/eventNotificationService');
             eventNotificationService.notifyFirstMfPurchase(order.user, order);
